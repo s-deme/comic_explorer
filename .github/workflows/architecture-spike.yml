@@ -1,0 +1,29 @@
+name: Architecture spike
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  foundation-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate deterministic fixture
+        run: >-
+          python3 benchmarks/architecture-spike/generate_dataset.py
+          --output "${{ runner.temp }}/comic-explorer-spike"
+      - name: Run foundation benchmark smoke
+        run: >-
+          python3 benchmarks/architecture-spike/run_foundation_benchmark.py
+          --dataset "${{ runner.temp }}/comic-explorer-spike"
+          --output "${{ runner.temp }}/foundation.json"
+          --runs 3
+      - name: Validate result schema
+        run: >-
+          python3 benchmarks/architecture-spike/validate_results.py
+          "${{ runner.temp }}/foundation.json"

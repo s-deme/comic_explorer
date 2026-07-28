@@ -1,0 +1,174 @@
+# CoDD プロジェクト設定
+version: "0.1.0"
+codd_required_version: null
+codd_required_version_strict: false
+
+project:
+  name: "comic_explorer"
+  language: "typescript"
+  frameworks: []
+
+ai_command: "codex exec --sandbox workspace-write --ask-for-approval never -"
+
+# codex_app_server:
+#   enabled: false
+#   transport: stdio
+#   thread_strategy: per_session
+#   effort: xhigh
+#   model: gpt-5.5
+#   timeout_seconds: 300
+#   fallback: subprocess
+coding_principles: null
+
+# operation_flow (optional - declare UI topology per operation):
+# operation_flow:
+#   operations:
+#     - id: "example_action"
+#       actor: "role_name"
+#       verb: "manage_collection"
+#       target: "child_entity"
+#       parent: "parent_entity"
+#       ui_pattern: "master_detail"
+#
+# ui_coherence:
+#   ignore_relations:
+#     - {parent: "foo", child: "bar"}  # intentional single-screen design
+#
+# runtime:
+#   global_action_targets:
+#     - name: "compact session action coverage"
+#       action:
+#         id: "session.sign_out"
+#         target: "session_action"
+#         outcomes: [breakpoint_available, session_absence_after_action]
+#       command: "npm run test:mobile-session-action"
+
+scan:
+  source_dirs:
+    - "src/"
+    - "benchmarks/architecture-spike/"
+  test_dirs:
+    - "tests/"
+  doc_dirs:
+    - "docs/"
+  config_files:
+    - ".github/workflows/architecture-spike.yml"
+  exclude:
+    - "**/node_modules/**"
+    - "**/__pycache__/**"
+    - "**/dist/**"
+
+graph:
+  store: "jsonl"
+  path: "codd/scan"
+
+bands:
+  green:
+    min_confidence: 0.90
+    min_evidence_count: 2
+  amber:
+    min_confidence: 0.50
+
+propagation:
+  max_depth: 10
+  stop_at_contract_boundary: true
+
+typecheck:
+  enabled: false
+  command: null
+  max_repair_attempts: 3
+
+verify:
+  # 製品のNode/TypeScript packageは技術決定後に作る。現段階は依存のない
+  # architecture spikeだけを検証し、存在しないpackageへのnpm installは行わない。
+  install_preflight: false
+  test_command: "python3 -B -m unittest discover -s tests -p 'test_*.py'"
+#   verification_timeout:
+#     per_node_seconds: 60    # optional: hard cap for each verification_test node
+#     total_seconds: 300      # optional: total budget for all verification_test nodes
+
+ci:
+  provider: github_actions   # github_actions | gitlab_ci | none
+  # GitHub Actions loads BOTH .yml and .yaml; the default spans both (comma-
+  # separated union). Narrow to a single pattern to scope to one extension.
+  workflow_glob: .github/workflows/*.yml,.github/workflows/*.yaml
+  required_triggers:
+    - push
+    - pull_request
+  runtime_check: false       # opt-in (v2.13.0)
+  staleness_days: 14
+  default_branch: main
+
+# runtime_smoke:
+#   enabled: false
+#   db_check:
+#     command: "nc -zv localhost 5432"
+#   dev_server:
+#     url: "http://localhost:3000"
+#     expected_status: 200
+#     timeout: 30
+#   smoke_connectivity:
+#     - url: "/api/health"
+#       expected_status: 200
+#   e2e:
+#     command: "npx playwright test tests/smoke/"
+
+# Optional: POST/PUT/PATCH/DELETE -> re-fetch -> visible reflection checks.
+# runtime:
+#   crud_flow_targets:
+#     - name: "create item appears in list"
+#       command: "npx playwright test tests/smoke/create-item.spec.ts"
+#     - name: "api create then list reflects"
+#       create:
+#         method: POST
+#         url: "/api/items"
+#         expected_status: 201
+#         json: {name: "codd-runtime-smoke"}
+#       reflect:
+#         url: "/items"
+#         expected_status: 200
+#         expect_text: "codd-runtime-smoke"
+#       max_wait_seconds: 10
+#       poll_interval: 0.5
+
+# Optional: action/command/control -> observable outcome checks.
+# Use this when operation_flow declares mutating commands such as update,
+# delete, complete, approve, publish, send, import, or a broad manage_collection action.
+# Terminal actions such as complete/delete/disable should also assert disabled_state,
+# control_absence, expected_absence, or terminal_state_guard.
+# runtime:
+#   action_outcome_targets:
+#     - name: "record update reflects after reload"
+#       actions:
+#         - id: "record.update"
+#           verb: "update"
+#           target: "record"
+#           trigger: "browser submit or API request"
+#           outcomes:
+#             - server_acceptance
+#             - persisted_change
+#             - visible_reflection
+#             - reload_persistence
+#       command: "npx playwright test tests/smoke/record-update.spec.ts"
+#     - name: "record publish emits event"
+#       action:
+#         id: "record.publish"
+#         verb: "publish"
+#         target: "record"
+#         outcomes:
+#           - server_acceptance
+#           - emitted_event
+#       invoke:
+#         method: POST
+#         url: "/api/records/publish"
+#         expected_status: 202
+#       observe:
+#         url: "/api/events"
+#         expected_status: 200
+#         expect_text: "record.publish"
+#       max_wait_seconds: 10
+
+# Project type (drives capability-aware generation: UI, network surface,
+# e2e modality). Profiles: codd/required_artifacts/defaults/*.yaml.
+required_artifacts:
+  project_type: "web"

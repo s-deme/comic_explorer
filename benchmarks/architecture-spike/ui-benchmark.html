@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comic Explorer UI spike</title>
+<style>
+  :root { font: 14px "Segoe UI", sans-serif; color-scheme: light dark; }
+  body { margin: 0; }
+  header { display: flex; gap: 8px; align-items: center; padding: 8px; }
+  #viewport { height: calc(100vh - 58px); overflow: auto; contain: strict; }
+  #canvas { position: relative; }
+  .row { position: absolute; left: 0; right: 0; display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; padding: 4px 8px; }
+  .item { height: 136px; border: 1px solid #888; border-radius: 4px;
+    display: grid; place-items: center; contain: content; }
+  output { margin-left: auto; }
+</style>
+<header>
+  <button id="run">10,000項目を測定</button>
+  <button id="save" disabled>JSONを保存</button>
+  <span>Edge/WebView相当の素のDOM仮想化。製品フレームワーク比較値ではありません。</span>
+  <output id="status">待機中</output>
+</header>
+<main id="viewport" tabindex="0"><div id="canvas"></div></main>
+<script>
+const viewport = document.querySelector("#viewport");
+const canvas = document.querySelector("#canvas");
+const status = document.querySelector("#status");
+const rowHeight = 146, columns = 8, itemCount = 10000;
+const rowCount = Math.ceil(itemCount / columns);
+let rafSamples = [], inputDelays = [], longTasks = [], result;
+canvas.style.height = `${rowCount * rowHeight}px`;
+
+function render() {
+  const first = Math.max(0, Math.floor(viewport.scrollTop / rowHeight) - 2);
+  const last = Math.min(rowCount, first + Math.ceil(viewport.clientHeight / rowHeight) + 5);
+  const fragment = document.createDocumentFragment();
+  for (let row = first; row < last; row++) {
+    const rowNode = document.createElement("div");
+    rowNode.className = "row";
+    rowNode.style.transform = `translateY(${row * rowHeight}px)`;
+    for (let column = 0; column < columns; column++) {
+      const index = row * columns + column;
+      if (index >= itemCount) break;
+      const item = document.createElement("div");
+      item.className = "item";
+      item.tabIndex = -1;
+      item.textContent = `作品 ${index.toString().padStart(5, "0")}`;
+      rowNode.append(item);
+    }
+    fragment.append(rowNode);
+  }
+  canvas.replaceChildren(fragment);
+}
+viewport.addEventListener("scroll", render, {passive:true});
+render();
+
+if ("PerformanceObserver" in window) {
+  try {
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) longTasks.push(entry.duration);
+    }).observe({type:"longtask", buffered:true});
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        if (entry.interactionId || entry.name === "keydown")
+          inputDelays.push(entry.processingStart - entry.startTime);
+      }
+    }).observe({type:"event", buffered:true, durationThreshold:0});
+  } catch {}
+}
+function p95(values) {
+  const sorted = [...values].sort((a,b)=>a-b);
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * .95) - 1)] || 0;
+}
+document.querySelector("#run").onclick = () => {
+  rafSamples = []; inputDelays = []; longTasks = [];
+  const started = performance.now(), duration = 5000;
+  let previous = started;
+  status.value = "測定中";
+  function frame(now) {
+    rafSamples.push(now - previous); previous = now;
+    const progress = Math.min(1, (now - started) / duration);
+    viewport.scrollTop = progress * (canvas.scrollHeight - viewport.clientHeight);
+    render();
+    if (progress < 1) return requestAnimationFrame(frame);
+    const elapsed = performance.now() - started;
+    result = {
+      schemaVersion: 1,
+      classification: "edge-dom-microbenchmark",
+      itemCount,
+      elapsedMs: elapsed,
+      frameIntervalMedianMs: [...rafSamples].sort((a,b)=>a-b)[Math.floor(rafSamples.length/2)],
+      frameIntervalP95Ms: p95(rafSamples),
+      estimatedFps: rafSamples.length / elapsed * 1000,
+      inputDelayP95Ms: p95(inputDelays),
+      longTaskCount: longTasks.length,
+      longTaskMaxMs: Math.max(0, ...longTasks),
+      userAgent: navigator.userAgent,
+      devicePixelRatio,
+      viewport: {width: innerWidth, height: innerHeight}
+    };
+    status.value = `FPS ${result.estimatedFps.toFixed(1)} / p95 ${result.frameIntervalP95Ms.toFixed(1)}ms`;
+    document.querySelector("#save").disabled = false;
+  }
+  requestAnimationFrame(frame);
+};
+document.querySelector("#save").onclick = () => {
+  const blob = new Blob([JSON.stringify(result, null, 2)], {type:"application/json"});
+  const link = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(blob), download: "ui-benchmark.json"
+  });
+  link.click(); URL.revokeObjectURL(link.href);
+};
+</script>
+</html>

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "classification": "measured-foundation-only",
+  "notMeasured": [
+    "Tauri/Electron/WinUI startup",
+    "time-to-interactive",
+    "JPEG/PNG platform decode",
+    "thumbnail generation",
+    "WebView2 rendering",
+    "scroll FPS",
+    "input latency",
+    "UI long tasks",
+    "GPU",
+    "installer size"
+  ],
+  "environment": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "processor": "x86_64",
+    "runs": 7,
+    "clock": "perf_counter_ns"
+  },
+  "results": {
+    "enumerateSort1000": {
+      "samplesMs": [
+        21.506,
+        31.578,
+        26.476,
+        21.651,
+        22.968,
+        21.257,
+        26.267
+      ],
+      "medianMs": 22.968,
+      "p95Ms": 31.578,
+      "peakPythonAllocationBytes": 129321
+    },
+    "enumerateSort10000": {
+      "samplesMs": [
+        238.402,
+        284.96,
+        253.15,
+        251.846,
+        241.4,
+        279.184,
+        269.527
+      ],
+      "medianMs": 253.15,
+      "p95Ms": 284.96,
+      "peakPythonAllocationBytes": 1733666
+    },
+    "zipDeflateRead30Random": {
+      "samplesMs": [
+        23.311,
+        26.526,
+        20.307,
+        21.593,
+        26.937,
+        33.769,
+        19.576
+      ],
+      "medianMs": 23.311,
+      "p95Ms": 33.769,
+      "peakPythonAllocationBytes": 249108
+    },
+    "zipStoredRead30Random": {
+      "samplesMs": [
+        21.443,
+        20.801,
+        21.151,
+        23.164,
+        20.267,
+        20.947,
+        29.965
+      ],
+      "medianMs": 21.151,
+      "p95Ms": 29.965,
+      "peakPythonAllocationBytes": 181366
+    },
+    "sqliteInsert10000AndRead100": {
+      "samplesMs": [
+        124.73,
+        119.332,
+        150.789,
+        117.494,
+        131.439,
+        131.786,
+        126.245
+      ],
+      "medianMs": 126.245,
+      "p95Ms": 150.789,
+      "peakPythonAllocationBytes": 13264
+    }
+  }
+}
