@@ -90,6 +90,24 @@ lockする。preview/betaは候補点へ含めない。
 installer toolのnotice/source-offer義務を法務確認する。ここでの記載は法的助言では
 ない。
 
+### 2.2 開発ツールチェーン確認
+
+2026-07-29にWindows側で次を実体確認した。Tauriの公式Windows前提である
+Microsoft C++ Build Tools、WebView2、Rust stable-msvc、Node.js LTSを満たす。
+
+| 項目 | 確認結果 |
+| --- | --- |
+| OS | Windows 11 Home x64、build 26200 |
+| Node.js / npm | Node.js 24.18.0 LTS、npm 11.16.0。ユーザーPATH登録済み |
+| Rust / Cargo | 1.97.1、`stable-x86_64-pc-windows-msvc`をdefaultに設定 |
+| MSVC | Visual Studio Build Tools 2022、MSVC 14.44 x64 `cl.exe`／`link.exe` |
+| Windows SDK | 10.0.26100.0、x64 library確認済み |
+| WebView2 | Evergreen Runtime 150.0.4078.99 |
+
+製品の`package.json`、`Cargo.toml`、lockfileは製造物なので、製造開始指示までは
+生成しない。開始時はこのtoolchain上でmanifestを作成し、直接・推移依存の正確な
+versionとlicenseをlockする。
+
 ## 3. アプリケーション基盤
 
 点数は 5=最良、1=不適。括弧内は証拠区分。
