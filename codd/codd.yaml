@@ -5,8 +5,40 @@ codd_required_version_strict: false
 
 project:
   name: "comic_explorer"
+  # CoDD has no desktop profile; generic is the correct mixed TypeScript/Rust
+  # profile for a Tauri application.
+  type: "generic"
   language: "typescript"
-  frameworks: []
+  frameworks:
+    - "tauri"
+    - "react"
+
+dag:
+  enabled_checks:
+    - "node_completeness"
+    - "edge_validity"
+    - "depends_on_consistency"
+    - "dependency_freshness"
+    - "task_completion"
+    - "transitive_closure"
+    - "source_completeness"
+    - "unresolved_import_residue"
+  implementation_suffixes_extend:
+    - ".css"
+  import_aliases:
+    architecture_spike_runner:
+      - "benchmarks/architecture-spike/run_foundation_benchmark.py"
+  impl_file_patterns:
+    - "vite.config.ts"
+    - "src-tauri/build.rs"
+  test_file_patterns:
+    - "src/**/*.test.ts"
+    - "src/**/*.test.tsx"
+
+common_node_patterns:
+  - "vite.config.ts"
+  - "src-tauri/build.rs"
+  - "tests/fixtures/**"
 
 ai_command: "codex exec --sandbox workspace-write --ask-for-approval never -"
 
@@ -46,13 +78,23 @@ coding_principles: null
 scan:
   source_dirs:
     - "src/"
+    - "src-tauri/src/"
     - "benchmarks/architecture-spike/"
+    - "tests/fixtures/"
   test_dirs:
     - "tests/"
   doc_dirs:
     - "docs/"
   config_files:
+    - "package.json"
+    - "package-lock.json"
+    - "tsconfig.json"
+    - "vite.config.ts"
+    - "src-tauri/Cargo.toml"
+    - "src-tauri/Cargo.lock"
+    - "src-tauri/tauri.conf.json"
     - ".github/workflows/architecture-spike.yml"
+    - ".github/workflows/product-quality.yml"
   exclude:
     - "**/node_modules/**"
     - "**/__pycache__/**"
@@ -74,15 +116,17 @@ propagation:
   stop_at_contract_boundary: true
 
 typecheck:
-  enabled: false
-  command: null
+  enabled: true
+  command: "scripts/run-typecheck.sh"
   max_repair_attempts: 3
 
 verify:
-  # 製品のNode/TypeScript packageは技術決定後に作る。現段階は依存のない
-  # architecture spikeだけを検証し、存在しないpackageへのnpm installは行わない。
+  # Frozen dependency installation is enforced by product-quality.yml.
+  # CoDD's built-in preflight hard-codes `npm ci`, while local WSL intentionally
+  # uses the Windows toolchain/project-local Node; verification still runs the
+  # lock-backed tests and the separately enabled typecheck gate below.
   install_preflight: false
-  test_command: "python3 -B -m unittest discover -s tests -p 'test_*.py'"
+  test_command: "scripts/run-tests.sh"
 #   verification_timeout:
 #     per_node_seconds: 60    # optional: hard cap for each verification_test node
 #     total_seconds: 300      # optional: total budget for all verification_test nodes
@@ -171,4 +215,6 @@ ci:
 # Project type (drives capability-aware generation: UI, network surface,
 # e2e modality). Profiles: codd/required_artifacts/defaults/*.yaml.
 required_artifacts:
-  project_type: "web"
+  # CoDD has no desktop profile. generic avoids web-server/API requirements
+  # while Tauri/React-specific artifacts are declared above.
+  project_type: "generic"

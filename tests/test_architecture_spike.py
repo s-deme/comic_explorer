@@ -7,6 +7,12 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # CoDD resolves this declared test target through codd.yaml. Runtime loading
+    # remains explicit because the architecture-spike directory contains a dash.
+    import architecture_spike_runner
 
 
 ROOT = Path(__file__).resolve().parents[1]

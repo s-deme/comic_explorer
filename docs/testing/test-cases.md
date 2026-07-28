@@ -89,10 +89,10 @@ codd:
 | TC-UI-004 | REQ-MVP-004 | UI | P1 | A→B→C済み | FIX-LIBRARY-001 | back/forward/up/外入力 | 正しい履歴、越境拒否 | root越境 | 標準 | Blocked |  |
 | TC-UI-005 | REQ-MVP-005 | UI | P1 | 一覧表示 | FIX-LIBRARY-001 | 長名選択、scroll | 種別/名/件数/完全名、全到達 | status不一致 | 標準 | Blocked |  |
 | TC-UI-006 | REQ-MVP-006 | UI | P1 | cache cold | FIX-LIBRARY-001 | 生成中に操作 | 操作可能、固定layout | 画面block | 標準 | Blocked |  |
-| TC-UI-007 | REQ-MVP-007,AC-006 | UI | P0 | mixed items | FIX-LIBRARY-001 | 4条件×昇降順 | 条件表示、欠損末尾、種類・tie-break規則、欠落重複0 | 次項目と別sort | 標準 | Blocked | UI待ち。sort oracle確定済み |
+| TC-UI-007 | REQ-MVP-007,AC-006 | UI | P0 | mixed items | FIX-LIBRARY-001 | 初回値確認、4条件×昇降順、再起動 | 初回は名前・昇順。条件表示、欠損末尾、種類・tie-break規則、欠落重複0。再起動後も選択値を復元 | 次項目と別sort、設定消失 | 標準 | Blocked | UI待ち。sort oracle確定済み |
 | TC-UI-008 | REQ-MVP-005,010 | UI | P0 | comic選択 | FIX-READING-001 | 漫画folderはCtrl+Enter、書庫はEnterで開きEsc | 未読先頭/既読page、一覧context復元。漫画folderのEnterは移動 | context喪失、漫画folderのEnterで暗黙閲覧 | 標準 | Blocked | UI待ち |
-| TC-UI-009 | REQ-MVP-011 | UI | P0 | viewer | FIX-IMAGE-001 | 単page前後/端 | 全体fit、比率維持、端stay | crop/変形 | 標準 | Blocked |  |
-| TC-UI-010 | REQ-MVP-011/012 | UI | P0 | 連続page | FIX-READING-001 | 1/2切替 | 最大2page、先頭ID維持 | page skip | 標準 | Blocked |  |
+| TC-UI-009 | REQ-MVP-011 | UI | P0 | viewer | FIX-IMAGE-001 | 大小画像で単page前後/端 | 全体fit、比率維持、100%上限、小画像は原寸中央、端stay | crop/変形/拡大 | 標準 | Blocked |  |
+| TC-UI-010 | REQ-MVP-011/012 | UI | P0 | 連続page | FIX-READING-001 | 初回表示、1/2切替、再起動 | 初回単ページ、最大2page、先頭ID維持、選択モード復元 | page skip、設定消失 | 標準 | Blocked |  |
 | TC-UI-011 | REQ-MVP-012 | UI | P0 | 横長/奇数末尾 | FIX-IMAGE-001 | 見開き移動 | 横長単独、末尾1枚、戻り整合 | 横長と次を併置 | 標準 | Blocked |  |
 | TC-UI-012 | REQ-MVP-013 | UI | P0 | viewer | FIX-READING-001 | R切替、再起動 | 配置/矢印/click反転、永続、初回右 | 一部だけ反転 | 標準 | Blocked |  |
 | TC-UI-013 | REQ-MVP-014 | UI | P0 | viewer | FIX-READING-001 | key/click/wheel | 同じpage、focus可視 | focus依存 | 標準 | Blocked |  |
@@ -105,7 +105,7 @@ codd:
 | TC-ERR-002 | REQ-MVP-003,019 | UI | P0 | 一部拒否 | FIX-LIBRARY-001 | node展開後別nodeへ | 局所error、他folder利用可 | tree全停止 | 標準 | Blocked |  |
 | TC-ERR-003 | REQ-MVP-008,019 | UI | P0 | viewer | FIX-IMAGE-ERROR-001 | corrupt pageから回復 | path/reason/actions、回復成功 | 自動skip/修復 | 標準 | Blocked |  |
 | TC-ERR-004 | REQ-MVP-009,019 | UI | P0 | viewer | FIX-ZIP-ERROR-001 | 異常書庫open | archive/reason/retry/list | viewer開始/展開 | 標準 | Blocked |  |
-| TC-ERR-005 | REQ-MVP-019 | UI | P0 | 読込中 | FIX-READING-001 | 試験側で対象消失 | error、確定page保持、一覧復帰 | crash/混線 | 標準 | Blocked | 複製のみ |
+| TC-ERR-005 | REQ-MVP-019 | UI | P0 | 読込中 | FIX-READING-001 | 7エラー分類を注入し、対象消失も発生 | 固定文言、対象、回復操作を表示。確定page保持、一覧復帰。スタックトレース非表示 | crash/混線/内部情報露出 | 標準 | Blocked | 複製のみ |
 
 ## 6. Non-functional／Distribution
 
@@ -117,9 +117,9 @@ codd:
 | TC-PERF-004 | NFR-MVP-002-AC1 | Performance | P1 | cold固定 | core | 起動7回 | 操作可能までmedian≤3sを判定 | 完了時刻だけ測定 | 標準 | Blocked | 製品待ち。PC確定済み |
 | TC-PERF-005 | NFR-MVP-002-AC2 | Performance | P1 | warm cache | 10k | 一覧5回 | 操作可能≤1s | cache作成混入 | 標準 | Blocked |  |
 | TC-PERF-006 | NFR-MVP-002-AC3 | Performance | P1 | prefetch済み | 300page | 切替100回 | 各値/p95、≤100ms判定 | 総処理だけ記録 | 標準 | Blocked |  |
-| TC-A11Y-001 | NFR-MVP-003,REQ-MVP-014 | UI/A11y | P1 | keyboardのみ | core | 登録からerror復帰 | mouseなし完走、focus可視 | trap | 標準 | Blocked |  |
+| TC-A11Y-001 | NFR-MVP-003,REQ-MVP-014 | UI/A11y | P1 | keyboardのみ | core | 登録からerror復帰、ヘルプを開閉 | mouseなし完走、focus可視。キー一覧はオフラインで開き、Esc/閉じるで呼出元へfocus復元 | trap、外部文書依存 | 標準 | Blocked |  |
 | TC-A11Y-002 | NFR-MVP-003 | UI/A11y | P1 | UIA inspector | core | Tab/F6/状態検査 | 順序、name/role/state完全 | 色のみ | 標準 | Blocked |  |
-| TC-A11Y-003 | NFR-MVP-003 | Manual/UI | P1 | high contrast/DPI | core | 100/150/200% | focus、完全名、操作可視 | clipping | 標準 | Blocked | 実機 |
+| TC-A11Y-003 | NFR-MVP-003 | Manual/UI | P1 | high contrast/DPI | core | 最小1024×720、tree初期240/最小180、item 176×248を100/150/200%で確認 | 論理寸法、focus、完全名、操作が可視 | clipping、最小寸法違反 | 標準 | Blocked | 実機 |
 | TC-DIST-001 | NFR-MVP-004 | License | P1 | lockfile/SBOM | 直接依存 | license照合 | 全件情報、禁止0 | unknown/有料 | report保持 | Blocked | 製造・lockfile待ち。技術決定済み |
 | TC-DIST-002 | NFR-MVP-005-AC1〜3 | Distribution | P0 | Win10/11 | installer | snapshot→install/start/uninstall | 両OS成功、library差分0 | 原本変更 | 方針どおり | Blocked | blocker |
 | TC-DIST-003 | NFR-MVP-005-AC5 | Distribution | P1 | 設定/cacheあり | installer | 既定と削除選択でuninstall | 既定は専用data保持、選択時だけ専用領域削除、原本不変 | 無断位置消失、原本変更 | 標準 | Blocked | 製品待ち。方針確定済み |

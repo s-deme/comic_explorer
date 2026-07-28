@@ -1,0 +1,107 @@
+{
+  "edges": {
+    "docs/decisions/adr-001-technology-stack.md -> docs/design/architecture.md": {
+      "acked_at": "2026-07-28T18:03:50.601849+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/decisions/adr-001-technology-stack.md -> docs/research/technology-evaluation.md": {
+      "acked_at": "2026-07-28T18:03:50.775510+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "3bfcc9b04d1a7ae8d40033413c1d3e117a036f83"
+    },
+    "docs/design/architecture.md -> docs/design/screen-flow.md": {
+      "acked_at": "2026-07-28T18:03:50.914861+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/design/architecture.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:51.067926+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/design/architecture.md -> docs/research/technology-evaluation.md": {
+      "acked_at": "2026-07-28T18:03:51.226735+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "3bfcc9b04d1a7ae8d40033413c1d3e117a036f83"
+    },
+    "docs/design/screen-flow.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:51.406356+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/requirements/mvp-requirements.md -> docs/requirements/product-questionnaire.md": {
+      "acked_at": "2026-07-28T18:03:51.602910+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "9476163a2747bf807504e48e5a238867491c05cb"
+    },
+    "docs/research/technology-evaluation.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:51.748257+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/performance-benchmark-plan.md -> docs/design/architecture.md": {
+      "acked_at": "2026-07-28T18:03:51.884411+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/performance-benchmark-plan.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:52.020317+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/performance-benchmark-results.md -> docs/research/technology-evaluation.md": {
+      "acked_at": "2026-07-28T18:03:52.190763+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "3bfcc9b04d1a7ae8d40033413c1d3e117a036f83"
+    },
+    "docs/testing/performance-benchmark-results.md -> docs/testing/performance-benchmark-plan.md": {
+      "acked_at": "2026-07-28T18:03:52.385284+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "9476163a2747bf807504e48e5a238867491c05cb"
+    },
+    "docs/testing/test-cases.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:52.530211+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/test-cases.md -> docs/testing/test-strategy.md": {
+      "acked_at": "2026-07-28T18:03:52.725880+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "9476163a2747bf807504e48e5a238867491c05cb"
+    },
+    "docs/testing/test-strategy.md -> docs/design/architecture.md": {
+      "acked_at": "2026-07-28T18:03:52.869739+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/test-strategy.md -> docs/design/screen-flow.md": {
+      "acked_at": "2026-07-28T18:03:53.010080+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    },
+    "docs/testing/test-strategy.md -> docs/requirements/mvp-requirements.md": {
+      "acked_at": "2026-07-28T18:03:53.155981+00:00",
+      "method": "baseline_ack",
+      "reason": "Approved implementation baseline committed on 2026-07-29.",
+      "upstream_commit": "bcad3a11a938071c1e06263fc227bdde3b41c85a"
+    }
+  },
+  "version": 1
+}

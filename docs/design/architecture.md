@@ -92,6 +92,10 @@ UIは表示、focus/selection、即時feedback、virtual range、最新generatio
 担当する。Rustはpath認可、列挙、自然順、ZIP、image metadata、cache、DB、queue、
 取消を担当する。UIへ任意path/SQL/ZIP entry accessを公開しない。
 
+製品のnative entry pointは`src-tauri/src/main.rs`、Tauri builderと公開commandの
+composition rootは`src-tauri/src/lib.rs`とする。UI entry pointは`src/main.tsx`、
+root componentは`src/App.tsx`とし、domain処理をこれらのentry fileへ置かない。
+
 ## 3. 起動とナビゲーション
 
 起動のcritical pathはwindow生成、最小設定読込、React shell表示までとする。DB
