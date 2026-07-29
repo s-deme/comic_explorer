@@ -29,9 +29,9 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、35 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、38 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 22 tests |
+| React unit/component | PASS | 23 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
