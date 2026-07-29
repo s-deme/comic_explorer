@@ -7,6 +7,7 @@ pub use scheduler::{BoundedPriorityQueue, Priority, QueueItem};
 
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ pub struct AppState {
     navigation: Mutex<NavigationCoordinator>,
     store: Mutex<Option<StateStore>>,
     pub(crate) media: Mutex<MediaTokenRegistry>,
+    shutting_down: AtomicBool,
 }
 
 impl Default for AppState {
@@ -43,7 +45,30 @@ impl Default for AppState {
             navigation: Mutex::new(NavigationCoordinator::default()),
             store: Mutex::new(store),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
+            shutting_down: AtomicBool::new(false),
         }
+    }
+}
+
+impl AppState {
+    pub fn shutdown(&self) {
+        if self.shutting_down.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        if let Ok(mut navigation) = self.navigation.lock() {
+            navigation.shutdown();
+        }
+        if let Ok(mut media) = self.media.lock() {
+            media.revoke_all();
+        }
+        // Dropping the connection closes SQLite and its WAL/SHM handles.
+        if let Ok(mut store) = self.store.lock() {
+            store.take();
+        }
+    }
+
+    fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Acquire)
     }
 }
 
@@ -82,7 +107,7 @@ pub fn get_library_root(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
 ) -> Result<Response<Option<LibraryRoot>>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let root = state
@@ -105,7 +130,7 @@ pub fn get_catalog_settings(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
 ) -> Result<Response<CatalogSettings>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let settings = state
@@ -134,7 +159,7 @@ pub fn set_catalog_sort(
     sort_field: String,
     sort_descending: bool,
 ) -> Result<Response<CatalogSettings>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     if !matches!(sort_field.as_str(), "name" | "modified" | "size" | "kind") {
@@ -167,7 +192,7 @@ pub async fn set_library_root(
     context: RequestContext,
     absolute_path: String,
 ) -> Result<Response<LibraryRoot>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let requested = PathBuf::from(absolute_path);
@@ -186,7 +211,7 @@ pub async fn pick_library_root(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
 ) -> Result<Response<Option<LibraryRoot>>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     #[cfg(target_os = "windows")]
@@ -273,7 +298,7 @@ pub async fn list_folder(
     context: RequestContext,
     relative_path: String,
 ) -> Result<Response<Vec<CatalogEntry>>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let relative_path = match RelativePath::parse(relative_path) {
@@ -355,7 +380,7 @@ pub async fn list_tree_children(
     context: RequestContext,
     relative_path: String,
 ) -> Result<Response<Vec<CatalogEntry>>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let relative_path = match RelativePath::parse(relative_path) {
@@ -430,7 +455,7 @@ pub async fn open_comic(
     context: RequestContext,
     item_relative_path: String,
 ) -> Result<Response<ViewerSession>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let item_relative = match RelativePath::parse(&item_relative_path) {
@@ -566,7 +591,7 @@ pub fn save_reading_position(
     page_key: String,
     natural_ordinal: usize,
 ) -> Result<Response<()>, String> {
-    if let Err(error) = context.validate() {
+    if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     let page_key = RelativePath::parse(page_key).map_err(str::to_string)?;
@@ -597,6 +622,14 @@ fn error_response<T>(context: &RequestContext, error: AppError) -> Response<T> {
     }
 }
 
+fn validate_request(state: &AppState, context: &RequestContext) -> Result<(), AppError> {
+    context.validate()?;
+    if state.is_shutting_down() {
+        return Err(AppError::cancelled());
+    }
+    Ok(())
+}
+
 fn request_error(code: ErrorCode, message: &str) -> AppError {
     AppError {
         code,
@@ -613,4 +646,46 @@ fn unix_millis() -> i64 {
         .as_millis()
         .try_into()
         .unwrap_or(i64::MAX)
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+
+    #[test]
+    fn shutdown_is_idempotent_cancels_work_revokes_media_and_closes_store() {
+        let state = AppState {
+            library_root: Mutex::new(None),
+            navigation: Mutex::new(NavigationCoordinator::default()),
+            store: Mutex::new(None),
+            media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
+            shutting_down: AtomicBool::new(false),
+        };
+        let cancellation = state.navigation.lock().unwrap().begin(Generation(7));
+        let token = state.media.lock().unwrap().issue(MediaGrant {
+            page_id: PageId::parse("shutdown-page").unwrap(),
+            mime_type: "image/png",
+            max_bytes: 10,
+            source: PageSource::File(PathBuf::from("page.png")),
+        });
+
+        state.shutdown();
+        state.shutdown();
+
+        assert!(cancellation.is_cancelled());
+        assert!(state.is_shutting_down());
+        assert!(state.media.lock().unwrap().resolve(&token).is_err());
+        assert!(state.store.lock().unwrap().is_none());
+        assert!(
+            validate_request(
+                &state,
+                &RequestContext {
+                    api_version: crate::api::API_VERSION,
+                    request_id: RequestId::parse("after-shutdown").unwrap(),
+                    generation: Generation(8),
+                }
+            )
+            .is_err()
+        );
+    }
 }

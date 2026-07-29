@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、33 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、34 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 20 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
@@ -117,3 +117,9 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   拒否する。Windows MSVC 33 tests、React 20 tests、typecheck、production build、
   fixture validatorで検証した。WebView2から届く実headerとの統合確認はBLOCKEDの
   実機試験として残す。
+- 2026-07-29: Tauriの`ExitRequested`/`Exit`をshutdown treeへ接続した。shutdown
+  flagを先に確定して全commandの新規受付を拒否し、進行中navigationをcancel、
+  media tokenを全失効、SQLite connectionをdropしてWAL/SHM handleを閉じる。
+  冪等なshutdown unit testを追加し、Windows MSVC 34 tests、React 20 tests、
+  typecheck、production build、fixture validatorで検証した。製品process終了時の
+  task/handle/最終読書位置をまとめて観測するE2Eは引き続き未完了である。

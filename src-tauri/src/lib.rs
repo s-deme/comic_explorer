@@ -9,7 +9,7 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .manage(application::AppState::default())
         .register_uri_scheme_protocol("comic", |context, request| {
             let state = context.app_handle().state::<application::AppState>();
@@ -39,6 +39,14 @@ pub fn run() {
             application::open_comic,
             application::save_reading_position
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Comic Explorer");
+        .build(tauri::generate_context!())
+        .expect("failed to build Comic Explorer");
+    app.run(|app_handle, event| {
+        if matches!(
+            event,
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+        ) {
+            app_handle.state::<application::AppState>().shutdown();
+        }
+    });
 }
