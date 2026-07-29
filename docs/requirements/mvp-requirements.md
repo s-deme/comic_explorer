@@ -370,6 +370,11 @@ codd:
 - REQ-MVP-017-AC2: 対象操作の前後で画像、ZIP／CBZ、漫画フォルダの更新日時が変更されない。
 - REQ-MVP-017-AC3: キャッシュ、設定、読書位置はライブラリルート外のアプリ専用領域へ保存する。
 - REQ-MVP-017-AC4: 書庫は読み取り専用で開き、書庫内へファイルを追加、更新、削除しない。
+- REQ-MVP-017-AC5: 漫画画像を返すcustom protocolは、固定scheme/authority、
+  queryとfragmentを持たない単一token path、許可済みOrigin/Referer、GET methodだけを
+  受け付ける。重複または不正byteのsecurity header、traversal、絶対/drive/UNC path、
+  任意の書庫entry名を拒否し、成功・失敗の全応答へ正確なContent-Type/Length、
+  `nosniff`、限定CORSを付け、原本pathや内部errorを応答へ含めない。
 
 ## REQ-MVP-018: ローカル完結と外部送信禁止
 

@@ -96,6 +96,12 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: custom protocol境界を固定scheme/authority、単一token pathへ狭め、
+  query、追加path segment、encoded traversal、absolute/drive/UNC path、任意archive
+  entry相当、重複Origin/Referer、不正UTF-8相当headerをtable-driven corpusで拒否した。
+  tokenのsource/page対応、別registry session、全失効も追加検証し、全error responseの
+  MIME/length、`nosniff`、cache制御、限定CORSと内部情報非開示をWindows MSVC 46 tests
+  で確認した。WebView2の実header統合は引き続き実機試験に残す。
 - 2026-07-29: JPEG/JPG/PNGをmemory入力からWICでdecodeし、EXIF orientation適用、
   拡大なし・長辺384pxの縦横比維持resize、JPEG quality 82 encodeを実装した。
   folderとZIP/CBZは同じ自然順先頭pageを使い、archive entryを展開しない。source

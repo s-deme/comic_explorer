@@ -146,7 +146,10 @@ pub fn handle_protocol_request(
         );
     }
     let uri = request.uri();
-    if uri.query().is_some() {
+    if uri.scheme_str() != Some("comic")
+        || uri.authority().map(|value| value.as_str()) != Some("localhost")
+        || uri.query().is_some()
+    {
         return safe_response(
             StatusCode::BAD_REQUEST,
             None,
@@ -155,7 +158,10 @@ pub fn handle_protocol_request(
         );
     }
     let token = uri.path().strip_prefix('/').unwrap_or_default();
-    if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if uri.path().matches('/').count() != 1
+        || token.len() != 32
+        || !token.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
         return safe_response(
             StatusCode::BAD_REQUEST,
             None,
@@ -178,17 +184,25 @@ pub fn handle_protocol_request(
 }
 
 fn validated_origin(request: &Request<Vec<u8>>) -> Result<Option<&str>, ()> {
-    let origin = request
-        .headers()
-        .get("Origin")
+    let origin_values = request.headers().get_all("Origin");
+    if origin_values.iter().count() > 1 {
+        return Err(());
+    }
+    let origin = origin_values
+        .iter()
+        .next()
         .map(|value| value.to_str().map_err(|_| ()))
         .transpose()?;
     if origin.is_some_and(|value| !ALLOWED_ORIGINS.contains(&value)) {
         return Err(());
     }
-    let referer = request
-        .headers()
-        .get("Referer")
+    let referer_values = request.headers().get_all("Referer");
+    if referer_values.iter().count() > 1 {
+        return Err(());
+    }
+    let referer = referer_values
+        .iter()
+        .next()
         .map(|value| value.to_str().map_err(|_| ()))
         .transpose()?;
     if referer.is_some_and(|value| {
@@ -257,6 +271,31 @@ fn media_error(error: impl std::fmt::Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tauri::http::HeaderValue;
+
+    fn assert_safe_error(request: Request<Vec<u8>>) {
+        let mut registry = MediaTokenRegistry::new(Duration::from_secs(60));
+        let response = handle_protocol_request(&mut registry, &request);
+        assert_ne!(response.status(), StatusCode::OK, "request: {request:?}");
+        assert_eq!(response.headers()["X-Content-Type-Options"], "nosniff");
+        assert_eq!(
+            response.headers()["Cache-Control"],
+            "private, max-age=0, no-store"
+        );
+        assert_eq!(response.headers()["Vary"], "Origin");
+        assert_eq!(
+            response.headers()["Content-Length"],
+            response.body().len().to_string()
+        );
+        assert_eq!(
+            response.headers()["Content-Type"],
+            "text/plain; charset=utf-8"
+        );
+        let body = String::from_utf8(response.body().clone()).unwrap();
+        assert!(!body.contains('\\'));
+        assert!(!body.contains("secret"));
+        assert!(!body.contains(".zip"));
+    }
 
     #[test]
     fn tokens_are_opaque_scoped_and_revocable() {
@@ -294,7 +333,6 @@ mod tests {
 
     #[test]
     fn protocol_rejects_methods_queries_tokens_and_untrusted_origins() {
-        let mut registry = MediaTokenRegistry::new(Duration::from_secs(60));
         for request in [
             Request::builder()
                 .method(Method::POST)
@@ -315,14 +353,91 @@ mod tests {
                 .body(Vec::new())
                 .unwrap(),
         ] {
-            let response = handle_protocol_request(&mut registry, &request);
-            assert_ne!(response.status(), StatusCode::OK);
-            assert_eq!(response.headers()["X-Content-Type-Options"], "nosniff");
-            assert_eq!(
-                response.headers()["Content-Length"],
-                response.body().len().to_string()
-            );
+            assert_safe_error(request);
         }
+    }
+
+    #[test]
+    fn protocol_rejects_ambiguous_headers_and_malformed_uri_corpus() {
+        let token = "0123456789abcdef0123456789abcdef";
+        let invalid_uris = [
+            format!("http://localhost/{token}"),
+            format!("comic://other/{token}"),
+            format!("comic://localhost/{token}/extra"),
+            "comic://localhost/..%2fsecret".into(),
+            "comic://localhost/%2e%2e%5csecret".into(),
+            "comic://localhost/C:%5csecret".into(),
+            "comic://localhost/%5c%5cserver%5cshare".into(),
+            "comic://localhost/archive.zip%23page.jpg".into(),
+            format!("comic://localhost/{token}?entry=page.jpg"),
+        ];
+        for uri in invalid_uris {
+            assert_safe_error(Request::builder().uri(uri).body(Vec::new()).unwrap());
+        }
+
+        let mut duplicate_origin = Request::builder()
+            .uri(format!("comic://localhost/{token}"))
+            .body(Vec::new())
+            .unwrap();
+        duplicate_origin
+            .headers_mut()
+            .append("Origin", HeaderValue::from_static(PRODUCTION_ORIGIN));
+        duplicate_origin
+            .headers_mut()
+            .append("Origin", HeaderValue::from_static("tauri://localhost"));
+        assert_safe_error(duplicate_origin);
+
+        let mut duplicate_referer = Request::builder()
+            .uri(format!("comic://localhost/{token}"))
+            .body(Vec::new())
+            .unwrap();
+        duplicate_referer
+            .headers_mut()
+            .append("Referer", HeaderValue::from_static(PRODUCTION_ORIGIN));
+        duplicate_referer
+            .headers_mut()
+            .append("Referer", HeaderValue::from_static("tauri://localhost"));
+        assert_safe_error(duplicate_referer);
+
+        let mut invalid_utf8 = Request::builder()
+            .uri(format!("comic://localhost/{token}"))
+            .body(Vec::new())
+            .unwrap();
+        invalid_utf8.headers_mut().insert(
+            "Origin",
+            HeaderValue::from_bytes(b"http://tauri.localhost\xff").unwrap(),
+        );
+        assert_safe_error(invalid_utf8);
+    }
+
+    #[test]
+    fn tokens_are_registry_and_source_scoped() {
+        let grant = |page: &str, source: &str| MediaGrant {
+            page_id: PageId::parse(page).unwrap(),
+            mime_type: "image/png",
+            max_bytes: 1024,
+            source: PageSource::File(PathBuf::from(source)),
+        };
+        let mut first = MediaTokenRegistry::new(Duration::from_secs(60));
+        let mut second = MediaTokenRegistry::new(Duration::from_secs(60));
+        let first_token = first.issue(grant("page-a", "source-a.png"));
+        let second_token = first.issue(grant("page-b", "source-b.png"));
+
+        assert_eq!(
+            first.resolve(&first_token).unwrap().page_id.as_str(),
+            "page-a"
+        );
+        assert_eq!(
+            first.resolve(&second_token).unwrap().page_id.as_str(),
+            "page-b"
+        );
+        assert_eq!(
+            second.resolve(&first_token).unwrap_err().code,
+            ErrorCode::AccessDenied
+        );
+        first.revoke_all();
+        assert!(first.resolve(&first_token).is_err());
+        assert!(first.resolve(&second_token).is_err());
     }
 
     #[test]
