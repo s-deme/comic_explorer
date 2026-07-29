@@ -77,3 +77,17 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 - installerのuser-data保持と明示削除動作
 
 これらは未実施をPASSとして扱わず、release判定前のblocked manual verificationとする。
+
+## 既知の未完了実装
+
+現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
+
+- WICによる長辺384px/JPEG quality 82のサムネイル生成と一覧への実画像表示
+- OS folder picker（現在はpath入力による登録）
+- 任意の未選択branchを展開できる完全な仮想folder tree
+- 更新日時・サイズ・種類sortのbackend metadataを含む完全実装
+- thumbnail priority worker、negative cache、実処理に接続した10GiB回収
+- custom protocolのorigin/refererを含むWindows WebView2実機security試験
+- shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
+
+これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
