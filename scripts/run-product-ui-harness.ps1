@@ -152,6 +152,7 @@ $before = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Ha
 
 $cold = $null
 $warm = $null
+$viewerRestart = $null
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
@@ -409,6 +410,25 @@ try {
     ) "viewer context restoration"
     Stop-Product $warm
     $warm = $null
+
+    $viewerRestart = Start-Product
+    Wait-Evaluate (
+        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+    ) "viewer-settings restart catalog"
+    Wait-Evaluate (
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 2 && " +
+        "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
+    ) "viewer-settings restart thumbnails"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('comic-folder ')); item.click(); " +
+        "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.page-spread')?.dataset.direction === 'leftToRight' && " +
+        "document.querySelectorAll('.page-spread img:not(.prefetch-page)').length === 1 && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
+    ) "viewer position, mode and direction restart restoration"
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
         throw "Product UI harness changed source archives."
@@ -431,11 +451,12 @@ try {
         spreadHistoryReversible = $true
         landscapeAndOddPagesAlone = $true
         viewerContextRestored = $true
-        viewerSettingsApplied = $true
+        viewerSettingsRestored = $true
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {
     if ($cold) { Stop-Product $cold }
     if ($warm) { Stop-Product $warm }
+    if ($viewerRestart) { Stop-Product $viewerRestart }
     Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

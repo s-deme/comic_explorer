@@ -98,9 +98,9 @@ codd:
 | TC-UI-007 | NOT RUN | release製品UIで4条件controlは連続操作済みだが、昇降順ごとの全順序と正常終了後の再起動復元を未観測 |
 | TC-UI-008 | NOT RUN | viewerを含む一覧context復帰試験を未実行 |
 | TC-UI-009 | NOT RUN | 実画像寸法を用いたfit/100%上限試験を未実行 |
-| TC-UI-010 | NOT RUN | model unitのみで製品UI再起動復元を未実行 |
+| TC-UI-010 | PASS | release WebView2で初回単page、見開き最大2page、切替時の先頭page維持を観測し、製品再起動後も見開きmodeと保存page 3/3を復元 |
 | TC-UI-011 | PASS | release WebView2で横長pageが単独、3page目の奇数末尾が単独となり、PageUpで直前の見開きへ可逆に戻ることを観測 |
-| TC-UI-012 | NOT RUN | 読み方向の製品UI再起動復元を未実行 |
+| TC-UI-012 | PASS | release WebView2で初回右読み、左読みに切替後のpage領域click/ArrowRight反転を観測し、製品再起動後も左読みを復元 |
 | TC-UI-013 | PASS | release WebView2でPageUp/Down、矢印、page領域click、wheelが同じpage列を移動し、Esc後に選択項目へfocusが復元することを観測 |
 | TC-UI-014 | NOT RUN | 次漫画遷移の製品UI試験を未実行 |
 | TC-E2E-001 | NOT RUN | install済み製品の登録→閲覧→再起動E2E harness未整備 |

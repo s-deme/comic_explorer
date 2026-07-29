@@ -93,6 +93,11 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: 製品UI harnessの3回目起動で、cache/negative thumbnail初期化完了後に
+  漫画folderを再度開き、保存page 3/3、見開きmode、左読み方向がSQLite reopenをまたいで
+  復元されることを実WebView2で観測した。中断された試験processがCDP portを保持した場合は
+  接続先を誤るため、試験processの厳密な終了を前提条件として確認した。
+  TC-UI-010/012をPASSへ変更し、集計はPASS 46 / BLOCKED 11 / NOT RUN 15。
 - 2026-07-30: release WebView2 CDP harnessを3枚の実PNG漫画folderへ拡張した。
   実画像decode、縦長画像の比率維持・100%拡大上限、key/click/wheelの同一page遷移、
   単page/見開き切替、横長page単独表示、奇数末尾単独表示、PageUpによる可逆履歴、
