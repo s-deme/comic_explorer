@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogEntry, RelativePath } from "../../types/domain";
-import { naturalCompare, sortCatalogEntries } from "./sort";
+import { naturalCompare, nextComicEntry, sortCatalogEntries } from "./sort";
 
 function entry(
   relativePath: string,
@@ -51,5 +51,17 @@ describe("catalog sorting", () => {
       .toEqual(["folder", "comic", "book.zip", "book.cbz"]);
     expect(sortCatalogEntries(values, "kind", "descending").map((item) => item.relativePath))
       .toEqual(["book.cbz", "book.zip", "comic", "folder"]);
+  });
+
+  it("selects only the next readable item in the established list order", () => {
+    const values = [
+      entry("current.cbz", { archiveKind: "cbz" }),
+      entry("plain-folder", { kind: "folder", archiveKind: undefined }),
+      entry("next-comic", { kind: "comicFolder", archiveKind: undefined }),
+      entry("later.zip"),
+    ];
+    expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("next-comic");
+    expect(nextComicEntry(values, "later.zip")).toBeUndefined();
+    expect(nextComicEntry(values, "missing.cbz")).toBeUndefined();
   });
 });

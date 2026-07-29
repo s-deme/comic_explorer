@@ -150,3 +150,7 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   から監査し、unknown/禁止license 0件を確認した。同一inventoryからCycloneDX 1.6
   SBOMと`THIRD-PARTY-NOTICES.md`を生成し同期checkを自動化したためTC-DIST-001を
   PASSへ変更した。portable benchmarkも7回再測定した。
+- 2026-07-29: 確定済み一覧順から次の読取可能漫画だけを選ぶpure functionを製品の
+  巻末遷移へ接続し、末尾とcurrent消失を含むunit testを追加した。item pathとpage
+  pathをscopeに含む決定的IDをfolder/ZIP/CBZ page生成へ接続し、形式間衝突を検証した。
+  Windows MSVC 36 tests、React対象4 testsでTC-UT-010/011をPASSへ変更した。

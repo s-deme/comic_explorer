@@ -45,8 +45,8 @@ codd:
 | TC-UT-007 | PASS | reading position 2 tests |
 | TC-UT-008 | PASS | `viewer page model > keeps the leading page when mode or direction changes` |
 | TC-UT-009 | PASS | `catalog sorting > keeps missing...`、`orders folder...` |
-| TC-UT-010 | NOT RUN | 次漫画選択を独立したunitとして未自動化 |
-| TC-UT-011 | NOT RUN | folder/ZIPを跨ぐitem/page identity衝突試験を未実行 |
+| TC-UT-010 | PASS | `catalog sorting > selects only the next readable item in the established list order` |
+| TC-UT-011 | PASS | `domain::id::tests::folder_and_archive_item_and_page_identities_do_not_collide`。製品page ID生成にもscoped identityを接続 |
 | TC-UT-012 | PASS | `folder::refuses_a_directory_outside_the_canonical_root`、path unit |
 | TC-UT-013 | PASS | `archive::rejects_unsafe_entry_names` |
 | TC-UT-014 | PASS | `fingerprint::size_mtime_and_archive_detail_participate_in_staleness` |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 26 |
+| PASS | 28 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 35 |
+| NOT RUN | 33 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

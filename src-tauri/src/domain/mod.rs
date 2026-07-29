@@ -8,7 +8,7 @@ mod path;
 
 pub use error::{AppError, ErrorCode};
 pub use file_kind::{FileKind, classify_file_name};
-pub use id::{ItemId, PageId, RequestId};
+pub use id::{ItemId, PageId, RequestId, item_id_for, page_id_for};
 pub use natural_sort::natural_cmp;
 pub use path::RelativePath;
 

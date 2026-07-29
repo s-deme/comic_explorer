@@ -16,6 +16,7 @@ import {
   type ViewerSession,
 } from "./features/library/client";
 import {
+  nextComicEntry,
   sortCatalogEntries,
   type SortField,
 } from "./features/catalog/sort";
@@ -236,15 +237,7 @@ export function App() {
         }}
         onClose={() => setViewerSession(null)}
         onNextItem={() => {
-          const current = sortedEntries.findIndex(
-            (entry) => entry.relativePath === viewerSession.itemKey,
-          );
-          const next = sortedEntries
-            .slice(current + 1)
-            .find(
-              (entry) =>
-                entry.kind === "comicFolder" || entry.kind === "archive",
-            );
+          const next = nextComicEntry(sortedEntries, viewerSession.itemKey);
           if (next) {
             generation.current += 1;
             void openComic(next.relativePath, generation.current).then(

@@ -102,3 +102,16 @@ export function sortCatalogEntries(
     compareCatalogEntries(left, right, field, direction),
   );
 }
+
+export function nextComicEntry(
+  entries: readonly CatalogEntry[],
+  currentRelativePath: string,
+): CatalogEntry | undefined {
+  const current = entries.findIndex(
+    (entry) => entry.relativePath === currentRelativePath,
+  );
+  if (current < 0) return undefined;
+  return entries
+    .slice(current + 1)
+    .find((entry) => entry.kind === "comicFolder" || entry.kind === "archive");
+}

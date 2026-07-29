@@ -17,7 +17,7 @@ use crate::catalog::{
     CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages,
 };
 use crate::domain::{
-    AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name,
+    AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
 use crate::state::{AppPaths, StateStore};
@@ -575,9 +575,8 @@ pub async fn open_comic(
     registry.revoke_all();
     let pages = page_paths
         .into_iter()
-        .enumerate()
-        .map(|(index, relative_path)| {
-            let id = PageId::parse(format!("page-{index}")).expect("generated page id");
+        .map(|relative_path| {
+            let id = page_id_for(item_relative.as_str(), relative_path.as_str());
             let mime_type = if relative_path
                 .as_str()
                 .to_ascii_lowercase()
