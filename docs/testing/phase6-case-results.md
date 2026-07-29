@@ -111,7 +111,7 @@ codd:
 | TC-ERR-002 | PASS | release WebView2実行中にfolder-a/acl-deniedへ現userのListDirectory/ReadData deny ACLを一時付与。対象path・理由・回復操作を表示し、親folderのchild/still-readableは継続利用、ACL解除後も正常閲覧、原本hash差分0を観測 |
 | TC-ERR-003 | PASS | release WebView2で漫画folderの破損2ページ目を開き、対象path・理由・再試行・前/次・一覧復帰を表示。前ページ、破損再訪、次の正常3ページ目への回復を観測 |
 | TC-ERR-004 | PASS | release WebView2で実corrupt ZIPをEnterし、対象名・理由・再試行・一覧復帰を表示、viewer非開始、一覧へ戻って125項目を継続利用 |
-| TC-ERR-005 | NOT RUN | 7分類を連続注入する製品UI試験を未実行 |
+| TC-ERR-005 | PASS | App UIへ6分類errorを連続注入し固定文言・対象・再試行/別folder・stack非表示を確認。release WebView2では実ACL/破損書庫と実破損SQLite隔離による第7分類「アプリデータを再初期化しました」を観測し、原本差分0 |
 
 ## Performance / Accessibility / Distribution
 
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 58 |
+| PASS | 59 |
 | FAIL | 0 |
 | BLOCKED | 12 |
-| NOT RUN | 2 |
+| NOT RUN | 1 |
 | **合計** | **72** |
 
 BLOCKED 12件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

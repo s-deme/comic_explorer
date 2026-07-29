@@ -14,6 +14,7 @@ import {
   restoreLibraryRoot,
   saveCatalogSort,
   saveViewerSettings,
+  takeRecoveryNotice,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -64,6 +65,7 @@ export function App() {
   const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState(false);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -75,6 +77,11 @@ export function App() {
           setViewMode(response.data.viewMode);
           setReadingDirection(response.data.readingDirection);
         }
+      })
+      .catch(() => undefined);
+    void takeRecoveryNotice(settingsGeneration.current)
+      .then((response) => {
+        if (response.status === "ok") setRecoveryNotice(response.data);
       })
       .catch(() => undefined);
     generation.current += 1;
@@ -247,6 +254,11 @@ export function App() {
       <main className="setup-screen">
         <div className="setup-card">
           <h1>Comic Explorer</h1>
+          {recoveryNotice && (
+            <p role="status">
+              アプリデータを再初期化しました。漫画ファイルは変更していません。
+            </p>
+          )}
           <p>漫画を保存しているローカルフォルダを登録してください。</p>
           {restoring && <p role="status">保存した設定を確認しています。</p>}
           <form onSubmit={chooseRoot}>
@@ -322,6 +334,11 @@ export function App() {
 
   return (
     <main className="app-shell">
+      {recoveryNotice && (
+        <p className="recovery-notice" role="status">
+          アプリデータを再初期化しました。漫画ファイルは変更していません。
+        </p>
+      )}
       <nav className="menu-bar" aria-label="メニューバー">
         <button onClick={() => setLibraryRoot(null)}>ファイル</button>
         <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>

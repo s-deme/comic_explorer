@@ -89,20 +89,27 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 - custom protocolのWindows WebView2実機security試験
 - offline E2E
-- 7分類errorの製品UI回復
 - keyboard-only全行程
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-30: App UIへアクセス拒否、消失、未対応、破損、暗号化、一時利用不能の
+  6分類を連続注入し、固定文言、対象、再試行/別folder、stack/内部path非表示を確認した。
+  StateStoreが破損SQLiteをrecoveryへ隔離した事実を一度だけ返すcommandを追加し、
+  第7分類`アプリデータを再初期化しました。漫画ファイルは変更していません。`をUIへ
+  接続した。release製品を実際の非SQLite DBで起動し、隔離file生成、固定通知、
+  SQLite/recovery/stack非表示、原本hash差分0を観測した。React対象15件、
+  Rust 54件+process 1件、release製品E2EがPASSし、TC-ERR-005をPASSへ変更した。
+  集計はPASS 59 / BLOCKED 12 / NOT RUN 1。
 - 2026-07-30: API error codeを利用者向け固定分類へ変換する単一presentation層を
   追加し、root登録、folder/list/tree、漫画open、想定外例外の全表示経路へ接続した。
   12 API codeすべてが固定分類へ収束し、OS error、例外名、stack、絶対内部pathを
   主メッセージへ出さないことをunit testで確認した。release WebView2でも実ACL拒否と
   破損書庫が固定日本語分類となり、`os error`/`Cannot read`/stack非表示を観測した。
-  アプリデータ再初期化通知を含む7分類すべてのUI注入は未完了のため、
-  TC-ERR-005はNOT RUNを維持する。
+  この段階ではアプリデータ再初期化通知を残件としていたが、上記の実装と実製品試験で
+  7分類を完了した。
 - 2026-07-30: TC-E2E-004は製品内計測だけでは外向き通信0件を独立証明できないため、
   NOT RUNからBLOCKEDへ変更した。clean隔離VM、offline installer/WebView2、
   VM外gatewayのDNS/TCP/UDP captureを使い、全MVP操作、7分類error、正常終了、

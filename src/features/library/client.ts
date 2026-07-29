@@ -73,6 +73,12 @@ export async function getCatalogSettings(
   return invoke("get_catalog_settings", { context: context(generation) });
 }
 
+export async function takeRecoveryNotice(
+  generation: number,
+): Promise<ApiResponse<boolean>> {
+  return invoke("take_recovery_notice", { context: context(generation) });
+}
+
 export async function saveCatalogSort(
   settings: Pick<CatalogSettings, "sortField" | "sortDescending">,
   generation: number,

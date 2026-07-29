@@ -34,22 +34,24 @@ pub struct AppState {
     thumbnail_workers: PriorityTaskPool,
     page_workers: PriorityTaskPool,
     pub(crate) media: Mutex<MediaTokenRegistry>,
+    recovery_notice: Mutex<bool>,
     shutting_down: AtomicBool,
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        let (store, library_root, thumbnails) = AppPaths::discover()
+        let (store, library_root, thumbnails, recovered) = AppPaths::discover()
             .and_then(|paths| {
-                StateStore::open(&paths).and_then(|(store, _)| {
-                    ThumbnailPipeline::new(&paths).map(|pipeline| (store, pipeline))
+                StateStore::open(&paths).and_then(|(store, notice)| {
+                    ThumbnailPipeline::new(&paths)
+                        .map(|pipeline| (store, pipeline, notice.is_some()))
                 })
             })
-            .and_then(|(store, pipeline)| {
+            .and_then(|(store, pipeline, recovered)| {
                 let library_root = store.load_settings()?.library_root;
-                Ok((Some(store), library_root, Some(pipeline)))
+                Ok((Some(store), library_root, Some(pipeline), recovered))
             })
-            .unwrap_or((None, None, None));
+            .unwrap_or((None, None, None, false));
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
@@ -59,6 +61,7 @@ impl Default for AppState {
             thumbnail_workers: PriorityTaskPool::new(2, 64),
             page_workers: PriorityTaskPool::new(2, 16),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
+            recovery_notice: Mutex::new(recovered),
             shutting_down: AtomicBool::new(false),
         }
     }
@@ -91,6 +94,15 @@ impl AppState {
 
     fn is_shutting_down(&self) -> bool {
         self.shutting_down.load(Ordering::Acquire)
+    }
+
+    fn take_recovery_notice(&self) -> Result<bool, String> {
+        Ok(std::mem::take(
+            &mut *self
+                .recovery_notice
+                .lock()
+                .map_err(|_| "recovery notice state poisoned")?,
+        ))
     }
 }
 
@@ -295,6 +307,22 @@ pub fn get_catalog_settings(
             view_mode: settings.view_mode,
             reading_direction: settings.reading_direction,
         },
+    })
+}
+
+#[tauri::command]
+pub fn take_recovery_notice(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let recovered = state.take_recovery_notice()?;
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: recovered,
     })
 }
 
@@ -1169,6 +1197,7 @@ mod shutdown_tests {
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
+            recovery_notice: Mutex::new(false),
             shutting_down: AtomicBool::new(false),
         };
         let cancellation = state.navigation.lock().unwrap().begin(Generation(7));
@@ -1197,6 +1226,26 @@ mod shutdown_tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn recovery_notice_is_consumed_once_without_exposing_internal_details() {
+        let state = AppState {
+            library_root: Mutex::new(None),
+            navigation: Mutex::new(NavigationCoordinator::default()),
+            viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
+            store: Arc::new(Mutex::new(None)),
+            thumbnails: Arc::new(Mutex::new(None)),
+            thumbnail_workers: PriorityTaskPool::new(1, 1),
+            page_workers: PriorityTaskPool::new(1, 1),
+            media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
+            recovery_notice: Mutex::new(true),
+            shutting_down: AtomicBool::new(false),
+        };
+
+        assert_eq!(state.take_recovery_notice().unwrap(), true);
+        assert_eq!(state.take_recovery_notice().unwrap(), false);
+        state.shutdown();
     }
 
     #[test]

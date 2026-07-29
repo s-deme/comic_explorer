@@ -6,6 +6,7 @@ $evidenceRoot = Join-Path $projectRoot "dist\product-ui-harness"
 $library = Join-Path $evidenceRoot "library"
 $missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
+$recoveryAppData = Join-Path $evidenceRoot "recovery-appdata"
 $port = 9224
 $script:sequence = 0
 $script:socket = $null
@@ -232,8 +233,8 @@ function Assert-CatalogSort([string]$Field, [string]$Direction) {
     }
 }
 
-function Start-Product {
-    $env:LOCALAPPDATA = $appData
+function Start-Product([string]$DataRoot = $appData) {
+    $env:LOCALAPPDATA = $DataRoot
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
     $process = Start-Process -FilePath $executable -PassThru
     try {
@@ -344,6 +345,7 @@ $cold = $null
 $warm = $null
 $viewerRestart = $null
 $rootRecovery = $null
+$appDataRecovery = $null
 $deniedPath = Join-Path $library "folder-a\acl-denied"
 $deniedRule = $null
 try {
@@ -862,6 +864,26 @@ try {
         "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
         "document.querySelector('#address').value.endsWith('\\library')"
     ) "stored root retry recovery"
+    Stop-Product $rootRecovery
+    $rootRecovery = $null
+    $recoveryStateRoot = Join-Path $recoveryAppData "ComicExplorer"
+    New-Item $recoveryStateRoot -ItemType Directory -Force | Out-Null
+    [IO.File]::WriteAllBytes(
+        (Join-Path $recoveryStateRoot "state.sqlite3"),
+        [Text.Encoding]::UTF8.GetBytes("not a sqlite database")
+    )
+    $appDataRecovery = Start-Product -DataRoot $recoveryAppData
+    Wait-Evaluate (
+        "document.querySelector('[role=status]')?.textContent.includes(" +
+        "'\u30a2\u30d7\u30ea\u30c7\u30fc\u30bf\u3092\u518d\u521d\u671f\u5316\u3057\u307e\u3057\u305f') && " +
+        "document.querySelector('[role=status]').textContent.includes(" +
+        "'\u6f2b\u753b\u30d5\u30a1\u30a4\u30eb\u306f\u5909\u66f4\u3057\u3066\u3044\u307e\u305b\u3093') && " +
+        "!/sqlite|recovery|stack/i.test(document.querySelector('[role=status]').textContent)"
+    ) "app-data recovery notice"
+    if (-not (Get-ChildItem (Join-Path $recoveryStateRoot "recovery") -File |
+        Where-Object { $_.Name -like "state-*.sqlite3" })) {
+        throw "Corrupt app database was not isolated in recovery."
+    }
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
         throw "Product UI harness changed source archives."
@@ -884,6 +906,7 @@ try {
         disappearedRootRecovered = $true
         localAclErrorRecovered = $true
         normalExitRestart = $true
+        appDataRecoveryNotice = $true
         navigationHistory = $true
         treeAddressListSynchronized = $true
         rootEscapeRejected = $true
@@ -908,6 +931,7 @@ try {
     if ($warm) { Stop-Product $warm -Force }
     if ($viewerRestart) { Stop-Product $viewerRestart -Force }
     if ($rootRecovery) { Stop-Product $rootRecovery -Force }
+    if ($appDataRecovery) { Stop-Product $appDataRecovery -Force }
     if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
         Move-Item $missingLibrary $library
     }

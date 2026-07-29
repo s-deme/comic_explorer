@@ -19,8 +19,9 @@ import {
   restoreLibraryRoot,
   saveCatalogSort,
   saveViewerSettings,
+  takeRecoveryNotice,
 } from "./features/library/client";
-import type { CatalogEntry } from "./types/domain";
+import type { CatalogEntry, ErrorCode } from "./types/domain";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock("./features/library/client", () => ({
   getThumbnail: vi.fn(),
   saveCatalogSort: vi.fn(),
   saveViewerSettings: vi.fn(),
+  takeRecoveryNotice: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
@@ -45,6 +47,7 @@ const settingsMock = vi.mocked(getCatalogSettings);
 const thumbnailMock = vi.mocked(getThumbnail);
 const saveSortMock = vi.mocked(saveCatalogSort);
 const saveViewerMock = vi.mocked(saveViewerSettings);
+const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 
 describe("application shell", () => {
   afterEach(cleanup);
@@ -60,6 +63,13 @@ describe("application shell", () => {
     thumbnailMock.mockReset();
     saveSortMock.mockReset();
     saveViewerMock.mockReset();
+    recoveryNoticeMock.mockReset();
+    recoveryNoticeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "recovery" as never,
+      generation: 1 as never,
+      data: false,
+    });
     settingsMock.mockResolvedValue({
       status: "ok",
       requestId: "settings" as never,
@@ -111,6 +121,23 @@ describe("application shell", () => {
       generation: 1 as never,
       data: [],
     });
+  });
+
+  it("announces app-data recovery without exposing the isolated database", async () => {
+    recoveryNoticeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "recovery" as never,
+      generation: 1 as never,
+      data: true,
+    });
+
+    render(<App />);
+
+    const notice = await screen.findByText(
+      "アプリデータを再初期化しました。漫画ファイルは変更していません。",
+    );
+    expect(notice).toHaveAttribute("role", "status");
+    expect(notice).not.toHaveTextContent("recovery");
   });
 
   it("starts with an accessible library-root registration form", () => {
@@ -210,6 +237,51 @@ describe("application shell", () => {
     expect(screen.getByTitle("戻る")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
   });
+
+  it.each([
+    ["ACCESS_DENIED", "アクセスできません"],
+    ["NOT_FOUND", "見つかりません"],
+    ["UNSUPPORTED_FORMAT", "対応していません"],
+    ["CORRUPT_ARCHIVE", "データが破損しています"],
+    ["ENCRYPTED_ARCHIVE", "暗号化されています"],
+    ["RESOURCE_LIMIT", "一時的に使用できません"],
+  ] satisfies [ErrorCode, string][])(
+    "renders %s as fixed copy with target and recovery actions",
+    async (code, expected) => {
+      registerMock.mockResolvedValue({
+        status: "ok",
+        requestId: "request-1" as never,
+        generation: 1 as never,
+        data: { absolutePath: "C:\\Comics" },
+      });
+      listMock.mockResolvedValue({
+        status: "error",
+        requestId: "request-2" as never,
+        generation: 2 as never,
+        error: {
+          code,
+          message: "secret stack at C:\\internal\\source.rs:42",
+          target: "problem" as never,
+          retryable: true,
+        },
+      });
+
+      render(<App />);
+      fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+        target: { value: "C:\\Comics" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(expected);
+      expect(alert).toHaveTextContent("対象: C:\\Comics");
+      expect(alert).not.toHaveTextContent("secret stack");
+      expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "別のフォルダを選択" }),
+      ).toBeInTheDocument();
+    },
+  );
 
   it("resizes the tree by keyboard and restores help focus", async () => {
     registerMock.mockResolvedValue({
