@@ -445,6 +445,11 @@ export function App() {
               <p>対象: {loadState.path}</p>
               <p>{loadState.message}</p>
               <button onClick={() => void load(navigation.current)}>再試行</button>
+              {entries.length > 0 && (
+                <button onClick={() => setLoadState({ status: "ready" })}>
+                  一覧へ戻る
+                </button>
+              )}
               {up !== null && <button onClick={() => navigate(up)}>親フォルダへ</button>}
               <button onClick={() => void chooseRootWithPicker()}>別のフォルダを選択</button>
             </div>

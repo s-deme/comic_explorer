@@ -88,11 +88,23 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
 - custom protocolのWindows WebView2実機security試験
+- sort 4条件×昇降順の全順序・選択維持・正常終了後復元
+- 巻末の次漫画遷移と次漫画の保存位置、後続なし末尾
+- install済み製品の正常終了を含む登録→閲覧→再起動とoffline E2E
+- root消失/ACL、破損画像、7分類errorの製品UI回復
+- keyboard-only全行程
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-30: clean app-dataからrootを登録し、tree/address/current一覧の同期と再起動復元を
+  製品WebView2で観測した。漫画folderのEnter/Ctrl+Enter分離、書庫Enter、保存page復元、
+  Esc後context/focus復元も同じ製品harnessへ接続した。実PNGのfit・比率・100%上限・
+  中央配置・page端stayを追加した。実corrupt ZIPでは対象付きerror、理由、再試行、
+  一覧復帰を表示し、一覧の継続利用を確認した。library全fileのrelative path/SHA-256
+  snapshotも閲覧前後差分0、隣接生成物0だった。TC-UI-001/008/009、TC-E2E-002、
+  TC-ERR-004をPASSへ変更した。集計はPASS 51 / BLOCKED 11 / NOT RUN 10。
 - 2026-07-30: 製品UI harnessの3回目起動で、cache/negative thumbnail初期化完了後に
   漫画folderを再度開き、保存page 3/3、見開きmode、左読み方向がSQLite reopenをまたいで
   復元されることを実WebView2で観測した。中断された試験processがCDP portを保持した場合は
