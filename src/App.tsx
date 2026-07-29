@@ -35,6 +35,7 @@ type LoadState =
 
 export function App() {
   const generation = useRef(0);
+  const viewerGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
@@ -285,7 +286,7 @@ export function App() {
     return (
       <Viewer
         session={viewerSession}
-        generation={generation.current}
+        generation={viewerGeneration.current}
         initialMode={viewMode}
         initialDirection={readingDirection}
         onSettingsChange={(mode, direction) => {
@@ -300,8 +301,8 @@ export function App() {
         onNextItem={() => {
           const next = nextComicEntry(sortedEntries, viewerSession.itemKey);
           if (next) {
-            generation.current += 1;
-            void openComic(next.relativePath, generation.current).then(
+            viewerGeneration.current += 1;
+            void openComic(next.relativePath, viewerGeneration.current).then(
               (response) =>
                 response.status === "ok" && setViewerSession(response.data),
             );
@@ -454,8 +455,8 @@ export function App() {
               onSelect={(entry) => setSelectedPath(entry.relativePath)}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={(entry) => {
-                generation.current += 1;
-                const requestGeneration = generation.current;
+                viewerGeneration.current += 1;
+                const requestGeneration = viewerGeneration.current;
                 setLoadState({ status: "loading", path: entry.relativePath });
                 void openComic(entry.relativePath, requestGeneration).then(
                   (response) => {

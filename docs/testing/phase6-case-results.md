@@ -20,7 +20,7 @@ codd:
 - 実行日時: 2026-07-29 22:06 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （48件PASS）
+  （49件PASS。接続済みpage workerの100 viewer generation試験を含む）
 - React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（25件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`

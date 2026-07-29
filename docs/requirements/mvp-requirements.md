@@ -320,6 +320,12 @@ codd:
 - REQ-MVP-014-AC3: マウスホイールで前ページと次ページへ移動できる。
 - REQ-MVP-014-AC4: 操作中のキーボードフォーカスを視覚的に識別できる。
 - REQ-MVP-014-AC5: MVPでは操作割り当てを固定し、具体的なキーとクリック領域は画面設計で定義する。
+- REQ-MVP-014-AC6: ページ読込みはviewer sessionごとのgenerationで管理し、一覧移動の
+  navigation generationとは分離する。新しいviewer sessionまたはアプリ終了は旧sessionの
+  未開始page requestを破棄し、完了済みの古い結果も画面へ反映しない。
+- REQ-MVP-014-AC7: 現在表示するpageと次の表示単位は容量制限付きpage workerで
+  読み込み、worker数、queue容量、展開後byte数を制限する。100世代を連続投入した場合も
+  最新viewer generationだけが利用可能なmedia grantを確定できる。
 
 ## REQ-MVP-015: 読書位置の保存と復元
 
@@ -340,6 +346,10 @@ codd:
 - REQ-MVP-015-AC6: 読書位置DBが破損または非対応スキーマで開けない場合は、
   アプリ専用領域の`recovery`配下へ元DBを隔離して空DBで継続し、読書位置を
   再初期化したことと隔離先を通知する。ライブラリ原本は変更しない。
+- REQ-MVP-015-AC7: viewer終了、次漫画遷移、アプリ終了では最新の確定済み読書位置を
+  flushした後にsessionを破棄する。アプリ終了は新規commandとqueue投入を先に拒否し、
+  navigation/viewer taskをcancelしてjoinし、archive/file、media token、
+  SQLite/WAL/SHMのhandleを閉じてからprocess終了を継続する。
 
 ## REQ-MVP-016: 巻末動作
 

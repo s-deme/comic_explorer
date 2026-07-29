@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import {
+  loadPage,
   saveReadingPosition,
   type ViewerSession,
 } from "../library/client";
@@ -37,10 +38,31 @@ export function Viewer({
   });
   const [landscape, setLandscape] = useState<Set<number>>(new Set());
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [mediaUris, setMediaUris] = useState<Record<number, string>>(() =>
+    Object.fromEntries(session.pages.flatMap((page, index) => page.mediaUri ? [[index, page.mediaUri]] : [])),
+  );
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
     [landscape, session.pages.length, state],
   );
+
+  useEffect(() => {
+    const wanted = [...visible];
+    const nextIndex = state.index + Math.max(1, visible.length);
+    if (nextIndex < session.pages.length) wanted.push(nextIndex);
+    wanted.forEach((index) => {
+      if (mediaUris[index] || imageErrors.has(index)) return;
+      void loadPage(session, index, generation, visible.includes(index) ? "visible" : "near")
+        .then((response) => {
+          if (response.status === "ok" && response.generation === generation) {
+            setMediaUris((current) => ({ ...current, [index]: response.data.mediaUri }));
+          } else if (response.status === "error") {
+            setImageErrors((current) => new Set(current).add(index));
+          }
+        })
+        .catch(() => setImageErrors((current) => new Set(current).add(index)));
+    });
+  }, [generation, imageErrors, mediaUris, session, state.index, visible]);
 
   function next() {
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
@@ -159,10 +181,10 @@ export function Viewer({
                 <button onClick={next}>次ページ</button>
                 <button onClick={close}>一覧へ戻る</button>
               </div>
-            ) : (
+            ) : mediaUris[index] ? (
               <img
                 key={session.pages[index].id}
-                src={session.pages[index].mediaUri}
+                src={mediaUris[index]}
                 alt={`${session.displayName} ${index + 1}ページ`}
                 onLoad={(event) => {
                   if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
@@ -171,7 +193,7 @@ export function Viewer({
                 }}
                 onError={() => setImageErrors((current) => new Set(current).add(index))}
               />
-            ),
+            ) : <p role="status" key={session.pages[index].id}>ページを読み込んでいます。</p>,
           )}
         </div>
         <button
@@ -185,10 +207,10 @@ export function Viewer({
               : next()
           }
         />
-        {session.pages[state.index + visible.length] && (
+        {mediaUris[state.index + visible.length] && (
           <img
             className="prefetch-page"
-            src={session.pages[state.index + visible.length].mediaUri}
+            src={mediaUris[state.index + visible.length]}
             alt=""
             aria-hidden="true"
           />

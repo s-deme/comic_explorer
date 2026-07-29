@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、44 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、49 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 24 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
@@ -95,6 +95,14 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: navigation generationとviewer session generationをfrontend/backendの
+  両方で分離し、page読込みをworker 2・queue容量16のpriority poolへ接続した。
+  folder/ZIP/CBZのpage byteをworker内で上限付きで読み、成功した最新sessionだけへ
+  memory-backed media tokenを発行する。取消済み未開始jobの破棄、100 viewer
+  generation中の旧99 commit 0、最新実PNG 1件、shutdown時のqueue受付拒否とjoinを
+  Windows MSVC 49 testsで確認した。Reactは表示pageをvisible、次の表示単位をnearで
+  要求し、旧generation responseを反映しない。製品WebViewを含むTC-CT-006/UIケースは
+  期待結果全体をまだ観測していないためNOT RUNを維持する。
 - 2026-07-29: `get_thumbnail`をworker 2・queue容量64の固定priority poolへ接続し、
   Reactからmounted visible、近傍、backgroundを優先度付きで投入するようにした。
   queue満杯時の低優先度evict、取消済み未開始jobの破棄、worker上限、shutdown後の

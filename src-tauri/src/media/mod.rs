@@ -20,6 +20,7 @@ const ALLOWED_ORIGINS: [&str; 3] = [
 pub enum PageSource {
     File(PathBuf),
     ArchiveEntry { archive: PathBuf, entry: String },
+    Memory(Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,41 +82,7 @@ impl MediaTokenRegistry {
 
     pub fn read(&mut self, token: &str) -> Result<(MediaGrant, Vec<u8>), AppError> {
         let grant = self.resolve(token)?;
-        let bytes = match &grant.source {
-            PageSource::File(path) => fs::read(path).map_err(media_io_error)?,
-            PageSource::ArchiveEntry { archive, entry } => {
-                let file = fs::File::open(archive).map_err(media_io_error)?;
-                let mut archive = zip::ZipArchive::new(file).map_err(media_error)?;
-                let entry = archive.by_name(entry).map_err(media_error)?;
-                if entry.encrypted() || entry.size() > grant.max_bytes {
-                    return Err(limit_error());
-                }
-                let mut bytes = Vec::with_capacity(
-                    usize::try_from(entry.size().min(grant.max_bytes)).unwrap_or_default(),
-                );
-                entry
-                    .take(grant.max_bytes.saturating_add(1))
-                    .read_to_end(&mut bytes)
-                    .map_err(media_io_error)?;
-                bytes
-            }
-        };
-        if bytes.len() as u64 > grant.max_bytes {
-            return Err(limit_error());
-        }
-        let signature_valid = match grant.mime_type {
-            "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
-            "image/jpeg" => bytes.starts_with(&[0xff, 0xd8]),
-            _ => false,
-        };
-        if !signature_valid {
-            return Err(AppError {
-                code: ErrorCode::CorruptImage,
-                message: "Image signature does not match its media type.".into(),
-                target: None,
-                retryable: false,
-            });
-        }
+        let bytes = read_grant_bytes(&grant)?;
         Ok((grant, bytes))
     }
 
@@ -127,6 +94,46 @@ impl MediaTokenRegistry {
         let now = Instant::now();
         self.grants.retain(|_, (expiry, _)| *expiry > now);
     }
+}
+
+pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
+    let bytes = match &grant.source {
+        PageSource::File(path) => fs::read(path).map_err(media_io_error)?,
+        PageSource::ArchiveEntry { archive, entry } => {
+            let file = fs::File::open(archive).map_err(media_io_error)?;
+            let mut archive = zip::ZipArchive::new(file).map_err(media_error)?;
+            let entry = archive.by_name(entry).map_err(media_error)?;
+            if entry.encrypted() || entry.size() > grant.max_bytes {
+                return Err(limit_error());
+            }
+            let mut bytes = Vec::with_capacity(
+                usize::try_from(entry.size().min(grant.max_bytes)).unwrap_or_default(),
+            );
+            entry
+                .take(grant.max_bytes.saturating_add(1))
+                .read_to_end(&mut bytes)
+                .map_err(media_io_error)?;
+            bytes
+        }
+        PageSource::Memory(bytes) => bytes.clone(),
+    };
+    if bytes.len() as u64 > grant.max_bytes {
+        return Err(limit_error());
+    }
+    let signature_valid = match grant.mime_type {
+        "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg" => bytes.starts_with(&[0xff, 0xd8]),
+        _ => false,
+    };
+    if !signature_valid {
+        return Err(AppError {
+            code: ErrorCode::CorruptImage,
+            message: "Image signature does not match its media type.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    Ok(bytes)
 }
 
 pub fn handle_protocol_request(

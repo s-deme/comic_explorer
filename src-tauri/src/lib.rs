@@ -39,6 +39,7 @@ pub fn run() {
             application::list_tree_children,
             application::cancel_navigation,
             application::open_comic,
+            application::load_page,
             application::save_reading_position
         ])
         .build(tauri::generate_context!())

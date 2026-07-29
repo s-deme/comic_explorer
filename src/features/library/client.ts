@@ -148,6 +148,20 @@ export async function openComic(
   });
 }
 
+export async function loadPage(
+  session: ViewerSession,
+  index: number,
+  generation: number,
+  priority: "visible" | "near" | "background" = "visible",
+): Promise<ApiResponse<{ pageId: PageId; mediaUri: string }>> {
+  return invoke("load_page", {
+    context: context(generation),
+    itemRelativePath: session.itemKey,
+    pageRelativePath: session.pages[index].relativePath,
+    priority,
+  });
+}
+
 export async function saveReadingPosition(
   session: ViewerSession,
   index: number,

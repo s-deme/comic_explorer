@@ -19,16 +19,18 @@ use crate::catalog::{
 use crate::domain::{
     AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name, page_id_for,
 };
-use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
+use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, read_grant_bytes};
 use crate::state::{AppPaths, StateStore, ThumbnailPipeline};
 use library_root::validate_library_root;
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
+    viewer: Arc<Mutex<NavigationCoordinator>>,
     store: Arc<Mutex<Option<StateStore>>>,
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
     thumbnail_workers: PriorityTaskPool,
+    page_workers: PriorityTaskPool,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     shutting_down: AtomicBool,
 }
@@ -49,9 +51,11 @@ impl Default for AppState {
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
+            viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(store)),
             thumbnails: Arc::new(Mutex::new(thumbnails)),
             thumbnail_workers: PriorityTaskPool::new(2, 64),
+            page_workers: PriorityTaskPool::new(2, 16),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             shutting_down: AtomicBool::new(false),
         }
@@ -66,10 +70,14 @@ impl AppState {
         if let Ok(mut navigation) = self.navigation.lock() {
             navigation.shutdown();
         }
+        if let Ok(mut viewer) = self.viewer.lock() {
+            viewer.shutdown();
+        }
         if let Ok(mut media) = self.media.lock() {
             media.revoke_all();
         }
         self.thumbnail_workers.shutdown();
+        self.page_workers.shutdown();
         if let Ok(mut thumbnails) = self.thumbnails.lock() {
             thumbnails.take();
         }
@@ -125,6 +133,13 @@ pub struct ThumbnailResponse {
     pub cache_hit: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageResponse {
+    pub page_id: PageId,
+    pub media_uri: String,
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ThumbnailPriority {
@@ -132,6 +147,8 @@ pub enum ThumbnailPriority {
     Near,
     Visible,
 }
+
+pub type PagePriority = ThumbnailPriority;
 
 impl From<ThumbnailPriority> for Priority {
     fn from(value: ThumbnailPriority) -> Self {
@@ -727,6 +744,11 @@ pub async fn open_comic(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
+    let viewer_cancellation = state
+        .viewer
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .begin(context.generation);
     let item_relative = match RelativePath::parse(&item_relative_path) {
         Ok(path) if !path.as_str().is_empty() => path,
         _ => {
@@ -755,6 +777,9 @@ pub async fn open_comic(
     let worker_item = item_path.clone();
     let is_archive = classify_file_name(item_relative.as_str()) == FileKind::Archive;
     let page_paths = tauri::async_runtime::spawn_blocking(move || {
+        if viewer_cancellation.is_cancelled() {
+            return Err(AppError::cancelled());
+        }
         if is_archive {
             enumerate_archive_pages(&worker_item)
         } else {
@@ -773,6 +798,17 @@ pub async fn open_comic(
         }
         Err(error) => return Ok(error_response(&context, error)),
     };
+    if !state
+        .viewer
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
 
     let mut registry = state.media.lock().map_err(|_| "state poisoned")?;
     registry.revoke_all();
@@ -780,33 +816,10 @@ pub async fn open_comic(
         .into_iter()
         .map(|relative_path| {
             let id = page_id_for(item_relative.as_str(), relative_path.as_str());
-            let mime_type = if relative_path
-                .as_str()
-                .to_ascii_lowercase()
-                .ends_with(".png")
-            {
-                "image/png"
-            } else {
-                "image/jpeg"
-            };
-            let source = if is_archive {
-                PageSource::ArchiveEntry {
-                    archive: item_path.clone(),
-                    entry: relative_path.as_str().into(),
-                }
-            } else {
-                PageSource::File(root.join(relative_path.as_str()))
-            };
-            let token = registry.issue(MediaGrant {
-                page_id: id.clone(),
-                mime_type,
-                max_bytes: MAX_IMAGE_BYTES,
-                source,
-            });
             ViewerPage {
                 id,
                 relative_path,
-                media_uri: format!("comic://localhost/{token}"),
+                media_uri: String::new(),
             }
         })
         .collect::<Vec<_>>();
@@ -847,6 +860,106 @@ pub async fn open_comic(
             display_name,
             pages,
             start_index,
+        },
+    })
+}
+
+#[tauri::command]
+pub async fn load_page(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_path: String,
+    page_relative_path: String,
+    priority: PagePriority,
+) -> Result<Response<PageResponse>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item = RelativePath::parse(item_relative_path).map_err(str::to_string)?;
+    let page = RelativePath::parse(page_relative_path).map_err(str::to_string)?;
+    let root = state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+        .ok_or_else(|| "library root is not configured".to_string())?;
+    let is_archive = classify_file_name(item.as_str()) == FileKind::Archive;
+    let source = if is_archive {
+        PageSource::ArchiveEntry {
+            archive: root.join(item.as_str()),
+            entry: page.as_str().into(),
+        }
+    } else {
+        PageSource::File(root.join(page.as_str()))
+    };
+    let page_id = page_id_for(item.as_str(), page.as_str());
+    let mime_type = if page.as_str().to_ascii_lowercase().ends_with(".png") {
+        "image/png"
+    } else {
+        "image/jpeg"
+    };
+    let cancellation = state
+        .viewer
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .cancellation_for(context.generation);
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let grant = MediaGrant {
+        page_id: page_id.clone(),
+        mime_type,
+        max_bytes: MAX_IMAGE_BYTES,
+        source,
+    };
+    if state
+        .page_workers
+        .submit(priority.into(), cancellation.clone(), move || {
+            let result = read_grant_bytes(&grant).map(|bytes| (grant, bytes));
+            if !cancellation.is_cancelled() {
+                let _ = sender.send(result);
+            }
+        })
+        .is_err()
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let Ok(result) = receiver.await else {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    };
+    if !state
+        .viewer
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let (grant, bytes) = match result {
+        Ok(value) => value,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let token = state
+        .media
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .issue(MediaGrant {
+            source: PageSource::Memory(bytes),
+            ..grant
+        });
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: PageResponse {
+            page_id,
+            media_uri: format!("comic://localhost/{token}"),
         },
     })
 }
@@ -926,9 +1039,11 @@ mod shutdown_tests {
         let state = AppState {
             library_root: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
+            viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
             thumbnail_workers: PriorityTaskPool::new(1, 1),
+            page_workers: PriorityTaskPool::new(1, 1),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             shutting_down: AtomicBool::new(false),
         };
@@ -958,6 +1073,65 @@ mod shutdown_tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn connected_page_workers_commit_only_latest_of_one_hundred_viewer_generations() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-IMAGE-001/portrait.png");
+        let pool = PriorityTaskPool::new(2, 128);
+        let blocker = Arc::new((Mutex::new(false), Condvar::new()));
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        for _ in 0..2 {
+            let blocker = blocker.clone();
+            let started_tx = started_tx.clone();
+            pool.submit(
+                Priority::Visible,
+                tokio_util::sync::CancellationToken::new(),
+                move || {
+                    started_tx.send(()).unwrap();
+                    let (lock, ready) = &*blocker;
+                    let mut released = lock.lock().unwrap();
+                    while !*released {
+                        released = ready.wait(released).unwrap();
+                    }
+                },
+            )
+            .unwrap();
+        }
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let coordinator = Arc::new(Mutex::new(NavigationCoordinator::default()));
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        for value in 1..=100 {
+            let generation = Generation(value);
+            let cancellation = coordinator.lock().unwrap().begin(generation);
+            let coordinator = coordinator.clone();
+            let result_tx = result_tx.clone();
+            let grant = MediaGrant {
+                page_id: PageId::parse(format!("page-{value}")).unwrap(),
+                mime_type: "image/png",
+                max_bytes: MAX_IMAGE_BYTES,
+                source: PageSource::File(fixture.clone()),
+            };
+            pool.submit(Priority::Visible, cancellation.clone(), move || {
+                let result = read_grant_bytes(&grant);
+                if !cancellation.is_cancelled()
+                    && coordinator.lock().unwrap().is_current(generation)
+                {
+                    result_tx.send((generation, result)).unwrap();
+                }
+            })
+            .unwrap();
+        }
+        let (lock, ready) = &*blocker;
+        *lock.lock().unwrap() = true;
+        ready.notify_all();
+        let (generation, bytes) = result_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(generation, Generation(100));
+        assert!(bytes.unwrap().starts_with(b"\x89PNG\r\n\x1a\n"));
+        assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
+        pool.shutdown();
     }
 
     #[cfg(target_os = "windows")]
