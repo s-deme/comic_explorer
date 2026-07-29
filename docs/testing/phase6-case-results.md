@@ -135,3 +135,6 @@ codd:
 | BLOCKED | 11 |
 | NOT RUN | 37 |
 | **合計** | **72** |
+
+BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は
+`docs/testing/phase6-manual-procedures.md`に記載した。

@@ -42,6 +42,8 @@ codd:
 
 72ケースの個別判定、対応test名、未実行理由は
 `docs/testing/phase6-case-results.md`に記録した。
+外部環境が必要なBLOCKEDケースの再現手順は
+`docs/testing/phase6-manual-procedures.md`に記録した。
 
 ## 基礎性能測定
 
