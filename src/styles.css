@@ -39,6 +39,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .setup-card label { display: block; margin-bottom: 6px; font-weight: 600; }
 .setup-row { display: flex; gap: 8px; }
 .setup-row input { flex: 1; min-height: 34px; padding: 4px 8px; }
+.picker-button { margin-top: 12px; }
 
 .app-shell {
   display: grid;

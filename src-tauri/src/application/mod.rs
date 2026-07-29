@@ -1,4 +1,5 @@
 mod coordinator;
+mod library_root;
 mod scheduler;
 
 pub use coordinator::NavigationCoordinator;
@@ -19,6 +20,7 @@ use crate::domain::{
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
 use crate::state::{AppPaths, StateStore};
+use library_root::validate_library_root;
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
@@ -170,25 +172,84 @@ pub async fn set_library_root(
     }
     let requested = PathBuf::from(absolute_path);
     let canonical =
-        match tauri::async_runtime::spawn_blocking(move || requested.canonicalize()).await {
-            Ok(Ok(path)) if path.is_dir() => path,
-            Ok(Ok(_)) => {
-                return Ok(error_response(
-                    &context,
-                    request_error(ErrorCode::InvalidPath, "Library root is not a directory."),
-                ));
-            }
-            Ok(Err(error)) => {
-                return Ok(error_response(
-                    &context,
-                    request_error(
-                        ErrorCode::InvalidPath,
-                        &format!("Cannot resolve library root: {error}"),
-                    ),
-                ));
-            }
+        match tauri::async_runtime::spawn_blocking(move || validate_library_root(&requested)).await
+        {
+            Ok(Ok(path)) => path,
+            Ok(Err(error)) => return Ok(error_response(&context, error)),
             Err(error) => return Err(format!("library root worker failed: {error}")),
         };
+    save_library_root(&state, &context, canonical)
+}
+
+#[tauri::command]
+pub async fn pick_library_root(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Option<LibraryRoot>>, String> {
+    if let Err(error) = context.validate() {
+        return Ok(error_response(&context, error));
+    }
+    #[cfg(target_os = "windows")]
+    let picked = tauri::async_runtime::spawn_blocking(library_root::pick_folder)
+        .await
+        .map_err(|error| format!("folder picker worker failed: {error}"))?;
+    #[cfg(not(target_os = "windows"))]
+    let picked: Result<Option<PathBuf>, AppError> = Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "フォルダ選択画面はWindows版で利用できます。",
+    ));
+
+    let picked = match picked {
+        Ok(Some(path)) => path,
+        Ok(None) => {
+            return Ok(Response::Ok {
+                request_id: context.request_id,
+                generation: context.generation,
+                data: None,
+            });
+        }
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let canonical =
+        match tauri::async_runtime::spawn_blocking(move || validate_library_root(&picked)).await {
+            Ok(Ok(path)) => path,
+            Ok(Err(error)) => return Ok(error_response(&context, error)),
+            Err(error) => return Err(format!("library root worker failed: {error}")),
+        };
+    save_library_root(&state, &context, canonical).map(|response| match response {
+        Response::Ok {
+            request_id,
+            generation,
+            data,
+        } => Response::Ok {
+            request_id,
+            generation,
+            data: Some(data),
+        },
+        Response::Error {
+            request_id,
+            generation,
+            error,
+        } => Response::Error {
+            request_id,
+            generation,
+            error,
+        },
+        Response::Cancelled {
+            request_id,
+            generation,
+        } => Response::Cancelled {
+            request_id,
+            generation,
+        },
+    })
+}
+
+fn save_library_root(
+    state: &tauri::State<'_, AppState>,
+    context: &RequestContext,
+    canonical: PathBuf,
+) -> Result<Response<LibraryRoot>, String> {
     *state.library_root.lock().map_err(|_| "state poisoned")? = Some(canonical.clone());
     if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
         let mut settings = store.load_settings().map_err(|error| error.message)?;
@@ -198,7 +259,7 @@ pub async fn set_library_root(
             .map_err(|error| error.message)?;
     }
     Ok(Response::Ok {
-        request_id: context.request_id,
+        request_id: context.request_id.clone(),
         generation: context.generation,
         data: LibraryRoot {
             absolute_path: canonical.to_string_lossy().into_owned(),

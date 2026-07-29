@@ -8,6 +8,7 @@ import {
   listFolder,
   getCatalogSettings,
   openComic,
+  pickLibraryRoot,
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
@@ -134,6 +135,23 @@ export function App() {
     }
   }
 
+  async function chooseRootWithPicker() {
+    generation.current += 1;
+    const response = await pickLibraryRoot(generation.current);
+    if (response.status === "ok" && response.data) {
+      setRootInput(response.data.absolutePath);
+      setLibraryRoot(response.data.absolutePath);
+      dispatch({ type: "reset", path: "" });
+      await load("");
+    } else if (response.status === "error") {
+      setLoadState({
+        status: "error",
+        path: rootInput,
+        message: response.error.message,
+      });
+    }
+  }
+
   function navigate(path: string, history: "push" | "back" | "forward" = "push") {
     if (history === "push") dispatch({ type: "navigate", path });
     else dispatch({ type: history });
@@ -160,6 +178,9 @@ export function App() {
               <button type="submit">登録</button>
             </div>
           </form>
+          <button className="picker-button" type="button" onClick={() => void chooseRootWithPicker()}>
+            フォルダを選択
+          </button>
           {loadState.status === "error" && (
             <p role="alert">{loadState.message}</p>
           )}
@@ -334,6 +355,7 @@ export function App() {
               <p>{loadState.message}</p>
               <button onClick={() => void load(navigation.current)}>再試行</button>
               {up !== null && <button onClick={() => navigate(up)}>親フォルダへ</button>}
+              <button onClick={() => void chooseRootWithPicker()}>別のフォルダを選択</button>
             </div>
           ) : (
             <CatalogGrid

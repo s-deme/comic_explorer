@@ -33,6 +33,14 @@ export async function registerLibraryRoot(
   });
 }
 
+export async function pickLibraryRoot(
+  generation: number,
+): Promise<ApiResponse<{ absolutePath: string } | null>> {
+  return invoke("pick_library_root", {
+    context: context(generation),
+  });
+}
+
 export async function restoreLibraryRoot(
   generation: number,
 ): Promise<ApiResponse<{ absolutePath: string } | null>> {

@@ -41,6 +41,7 @@ pub fn run() {
             application::get_library_root,
             application::get_catalog_settings,
             application::set_catalog_sort,
+            application::pick_library_root,
             application::set_library_root,
             application::list_folder,
             application::cancel_navigation,

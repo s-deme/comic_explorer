@@ -12,6 +12,7 @@ import {
   getCatalogSettings,
   listFolder,
   openComic,
+  pickLibraryRoot,
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
@@ -19,6 +20,7 @@ import {
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
+  pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
@@ -27,6 +29,7 @@ vi.mock("./features/library/client", () => ({
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
+const pickerMock = vi.mocked(pickLibraryRoot);
 const listMock = vi.mocked(listFolder);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
@@ -38,6 +41,7 @@ describe("application shell", () => {
 
   beforeEach(() => {
     registerMock.mockReset();
+    pickerMock.mockReset();
     listMock.mockReset();
     restoreMock.mockReset();
     openMock.mockReset();
@@ -58,6 +62,12 @@ describe("application shell", () => {
     restoreMock.mockResolvedValue({
       status: "ok",
       requestId: "restore" as never,
+      generation: 1 as never,
+      data: null,
+    });
+    pickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "picker" as never,
       generation: 1 as never,
       data: null,
     });
@@ -103,6 +113,31 @@ describe("application shell", () => {
     expect(
       screen.getByRole("grid", { name: "現在のフォルダの項目" }),
     ).toBeInTheDocument();
+  });
+
+  it("registers the folder returned by the Windows folder picker", async () => {
+    pickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "picker" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Selected Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "list" as never,
+      generation: 2 as never,
+      data: [],
+    });
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "フォルダを選択" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue(
+        "C:\\Selected Comics",
+      ),
+    );
+    expect(registerMock).not.toHaveBeenCalled();
   });
 
   it("shows a recoverable folder error without removing navigation", async () => {
