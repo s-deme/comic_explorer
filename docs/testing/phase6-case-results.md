@@ -20,7 +20,7 @@ codd:
 - 実行日時: 2026-07-29 22:06 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （49件PASS。接続済みpage workerの100 viewer generation試験を含む）
+  （50件PASS。接続済みpage workerの100 viewer generationと対象付き破損page回復試験を含む）
 - React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（25件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
@@ -58,7 +58,7 @@ codd:
 | ID | 結果 | 自動テスト／理由 |
 | --- | --- | --- |
 | TC-CT-001 | NOT RUN | 列挙portのsuccess/refusalは試験済みだが消失/cancel契約全体は未実行 |
-| TC-CT-002 | NOT RUN | WICの実JPEG/PNG decode、寸法、resize、破損時errorは試験済みだが、期待する対象付きerror contract全体は未観測 |
+| TC-CT-002 | PASS | WICの実JPEG/PNG decode、寸法、resizeに加え、製品`load_page`と同じpage adapterで破損PNGの`CORRUPT_IMAGE`、対象relative path、次の正常page成功を観測 |
 | TC-CT-003 | NOT RUN | archive list/openは試験済みだがcancel契約を未実行 |
 | TC-CT-004 | PASS | 実WIC/cache pipelineの生成画像・content/page identity・miss/hit・原本差分0に加え、接続済みpriority workerでcancel後の未開始job破棄と100世代中最新だけのcommitを実行 |
 | TC-CT-005 | PASS | `repository::settings_and_reading_position_survive_reopen` |
@@ -74,7 +74,7 @@ codd:
 | TC-INT-003 | PASS | 同一manifestをfolder/ZIP/CBZに適用するfixture test |
 | TC-INT-004 | PASS | cache atomic write後のlookup hitを実行 |
 | TC-INT-005 | PASS | `real_folder_cover_generates_then_hits_atomic_cache_and_negative_cache_expires`で実fileの表紙を差し替え、旧content hash/pathをhitせずWIC再生成したcacheを返すことを実行 |
-| TC-INT-006 | NOT RUN | 破損画像後のviewer前後移動integrationを未実行 |
+| TC-INT-006 | PASS | 試験専用漫画folderへ破損PNGと正常PNGを複製し、製品列挙順の先頭だけが対象付き局所error、次pageが正常byteを返すことを同一page adapterで実行 |
 | TC-INT-007 | PASS | corrupt/encrypted archive分類と他fixture継続をRust fixture testで実行 |
 | TC-INT-008 | PASS | SQLite保存・reopenと相対page維持を実行 |
 | TC-INT-009 | PASS | `mixed_library_fixture_classifies_every_entry_without_promoting_unsupported_files`とReact Enter/Ctrl+Enter分岐で混在root全分類・操作分離を実行 |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 32 |
+| PASS | 34 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 29 |
+| NOT RUN | 27 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

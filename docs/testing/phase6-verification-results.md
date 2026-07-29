@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、49 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、50 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 24 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
@@ -95,6 +95,11 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: 製品`load_page`の実file/archive byte読込み後にpage metadata decodeを
+  接続し、失敗errorへ漫画内relative page pathを必ず付与した。試験専用漫画folderへ
+  破損PNGと正常PNGを複製し、製品自然順列挙→先頭の`CORRUPT_IMAGE`と対象→次pageの
+  正常PNG byteを同じadapterで連続観測した。Windows MSVC 50 testsで
+  TC-CT-002/TC-INT-006をPASSへ変更し、PASS 34 / BLOCKED 11 / NOT RUN 27とした。
 - 2026-07-29: navigation generationとviewer session generationをfrontend/backendの
   両方で分離し、page読込みをworker 2・queue容量16のpriority poolへ接続した。
   folder/ZIP/CBZのpage byteをworker内で上限付きで読み、成功した最新sessionだけへ

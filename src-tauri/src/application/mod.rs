@@ -5,6 +5,7 @@ mod scheduler;
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -660,6 +661,17 @@ fn resolve_thumbnail(
     }
 }
 
+fn read_page_bytes(grant: &MediaGrant, target: &RelativePath) -> Result<Vec<u8>, AppError> {
+    let result = read_grant_bytes(grant).and_then(|bytes| {
+        crate::catalog::inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)?;
+        Ok(bytes)
+    });
+    result.map_err(|mut error| {
+        error.target = Some(target.clone());
+        error
+    })
+}
+
 #[tauri::command]
 pub async fn list_tree_children(
     state: tauri::State<'_, AppState>,
@@ -910,10 +922,11 @@ pub async fn load_page(
         max_bytes: MAX_IMAGE_BYTES,
         source,
     };
+    let worker_page = page.clone();
     if state
         .page_workers
         .submit(priority.into(), cancellation.clone(), move || {
-            let result = read_grant_bytes(&grant).map(|bytes| (grant, bytes));
+            let result = read_page_bytes(&grant, &worker_page).map(|bytes| (grant, bytes));
             if !cancellation.is_cancelled() {
                 let _ = sender.send(result);
             }
@@ -1132,6 +1145,55 @@ mod shutdown_tests {
         assert!(bytes.unwrap().starts_with(b"\x89PNG\r\n\x1a\n"));
         assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
         pool.shutdown();
+    }
+
+    #[test]
+    fn page_adapter_reports_the_target_and_recovers_on_the_next_real_page() {
+        let fixtures =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-page-recovery-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let comic = root.join("book");
+        std::fs::create_dir_all(&comic).unwrap();
+        std::fs::copy(
+            fixtures.join("FIX-IMAGE-ERROR-001/corrupt.png"),
+            comic.join("1-corrupt.png"),
+        )
+        .unwrap();
+        std::fs::copy(
+            fixtures.join("FIX-IMAGE-001/portrait.png"),
+            comic.join("2-normal.png"),
+        )
+        .unwrap();
+        let pages = enumerate_folder_pages(&root, &comic).unwrap();
+        assert_eq!(
+            pages.iter().map(RelativePath::as_str).collect::<Vec<_>>(),
+            ["book/1-corrupt.png", "book/2-normal.png"]
+        );
+        let corrupt_target = pages[0].clone();
+        let corrupt = MediaGrant {
+            page_id: PageId::parse("corrupt-page").unwrap(),
+            mime_type: "image/png",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::File(root.join(corrupt_target.as_str())),
+        };
+        let error = read_page_bytes(&corrupt, &corrupt_target).unwrap_err();
+        assert_eq!(error.code, ErrorCode::CorruptImage);
+        assert_eq!(error.target, Some(corrupt_target));
+
+        let next_target = pages[1].clone();
+        let next = MediaGrant {
+            page_id: PageId::parse("next-page").unwrap(),
+            mime_type: "image/png",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::File(root.join(next_target.as_str())),
+        };
+        let bytes = read_page_bytes(&next, &next_target).unwrap();
+        assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(target_os = "windows")]

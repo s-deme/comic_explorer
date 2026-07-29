@@ -224,6 +224,9 @@ codd:
 - REQ-MVP-008-AC5: Windows上のパス同一性はOSへ委ねる。表示順ではUnicode正規化を
   行わず、自然順で同値となる相対パスを正規化前のUTF-16コード単位の序数順で
   決着する。
+- REQ-MVP-008-AC6: page decodeまたはsignature検証に失敗した場合、error contractは
+  漫画項目内の対象relative page pathと`データが破損しています`分類を返す。失敗は
+  そのpageだけへ局所化し、同じviewer sessionの前後にある正常pageを引き続き読める。
 
 ## REQ-MVP-009: ZIP／CBZのページ読込み
 
