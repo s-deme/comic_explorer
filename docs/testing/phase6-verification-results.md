@@ -31,7 +31,7 @@ codd:
 | --- | --- | --- |
 | Rust fmt/check/test | PASS | Windows MSVC、34 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 21 tests |
+| React unit/component | PASS | 22 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
@@ -133,3 +133,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   操作時に先頭pageを維持したまま設定を即時保存するcomponent testを追加した。
   Windows MSVC 34 tests、React 21 tests、typecheck、production build、fixture
   validatorで検証した。製品再起動を含むUIケースは引き続きNOT RUNである。
+- 2026-07-29: Viewer終了と巻末から次漫画へ遷移する際、最新の確定済み先頭pageの
+  `save_reading_position`完了後に画面遷移するようflush順序を変更した。成功/失敗
+  どちらでもUIを停止させず、保存要求が遷移callbackより先になることをcomponent
+  testで検証した。Windows MSVC 34 tests、React 22 tests、typecheck、production
+  build、fixture validatorで検証した。

@@ -44,7 +44,9 @@ export function Viewer({
 
   function next() {
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
-      onNextItem?.();
+      void saveReadingPosition(session, state.index, generation).finally(() =>
+        onNextItem?.(),
+      );
       return;
     }
     dispatch({
@@ -55,8 +57,7 @@ export function Viewer({
   }
 
   function close() {
-    void saveReadingPosition(session, state.index, generation);
-    onClose();
+    void saveReadingPosition(session, state.index, generation).finally(onClose);
   }
 
   function changeMode(mode: ViewMode) {
