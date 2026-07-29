@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   getCatalogSettings,
+  listTreeChildren,
   listFolder,
   openComic,
   pickLibraryRoot,
@@ -22,6 +23,7 @@ vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
   pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
+  listTreeChildren: vi.fn(),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   getCatalogSettings: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("./features/library/client", () => ({
 const registerMock = vi.mocked(registerLibraryRoot);
 const pickerMock = vi.mocked(pickLibraryRoot);
 const listMock = vi.mocked(listFolder);
+const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
@@ -43,6 +46,7 @@ describe("application shell", () => {
     registerMock.mockReset();
     pickerMock.mockReset();
     listMock.mockReset();
+    treeMock.mockReset();
     restoreMock.mockReset();
     openMock.mockReset();
     settingsMock.mockReset();
@@ -70,6 +74,12 @@ describe("application shell", () => {
       requestId: "picker" as never,
       generation: 1 as never,
       data: null,
+    });
+    treeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "tree" as never,
+      generation: 1 as never,
+      data: [],
     });
   });
 

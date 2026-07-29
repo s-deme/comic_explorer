@@ -31,7 +31,7 @@ codd:
 | --- | --- | --- |
 | Rust fmt/check/test | PASS | Windows MSVC、31 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 15 tests |
+| React unit/component | PASS | 17 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
@@ -83,7 +83,6 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
 - WICによる長辺384px/JPEG quality 82のサムネイル生成と一覧への実画像表示
-- 任意の未選択branchを展開できる完全な仮想folder tree
 - thumbnail priority worker、negative cache、実処理に接続した10GiB回収
 - custom protocolのorigin/refererを含むWindows WebView2実機security試験
 - shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
@@ -101,3 +100,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   した。登録済みrootが消失・アクセス拒否になった場合もpathを維持して再試行・
   再選択できる。Windows MSVC 31 tests、React 15 tests、typecheck、production
   build、fixture validatorで検証した。picker自体のWindows UI操作は実機試験に残す。
+- 2026-07-29: 任意の未選択branchを遅延展開・折りたたみできる仮想folder treeを
+  実装した。tree専用backend列挙は通常フォルダと漫画フォルダだけを返し、一覧の
+  navigation cancellationとは分離した。branch単位のアクセスエラーを局所表示し、
+  他branchの操作を維持する。Windows MSVC 31 tests、React 17 tests、typecheck、
+  production build、fixture validatorで検証した。

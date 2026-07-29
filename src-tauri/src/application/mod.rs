@@ -350,6 +350,64 @@ pub async fn list_folder(
 }
 
 #[tauri::command]
+pub async fn list_tree_children(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    relative_path: String,
+) -> Result<Response<Vec<CatalogEntry>>, String> {
+    if let Err(error) = context.validate() {
+        return Ok(error_response(&context, error));
+    }
+    let relative_path = match RelativePath::parse(relative_path) {
+        Ok(path) => path,
+        Err(message) => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, message),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let requested_directory = root.join(relative_path.as_str());
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        enumerate_folder(&root, &requested_directory).map(|entries| {
+            entries
+                .into_iter()
+                .filter(|entry| {
+                    matches!(
+                        entry.kind,
+                        crate::domain::ItemKind::Folder | crate::domain::ItemKind::ComicFolder
+                    )
+                })
+                .collect()
+        })
+    })
+    .await
+    .map_err(|error| format!("tree worker failed: {error}"))?;
+    Ok(match result {
+        Ok(data) => Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        },
+        Err(error) => error_response(&context, error),
+    })
+}
+
+#[tauri::command]
 pub fn cancel_navigation(
     state: tauri::State<'_, AppState>,
     request_id: RequestId,

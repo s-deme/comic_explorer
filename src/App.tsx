@@ -19,6 +19,7 @@ import {
   type SortField,
 } from "./features/catalog/sort";
 import { Viewer } from "./features/viewer/Viewer";
+import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 
 type LoadState =
@@ -322,26 +323,11 @@ export function App() {
         <button type="submit">移動</button>
       </form>
       <div className="workspace">
-        <aside className="folder-tree" aria-label="フォルダツリー">
-          <button
-            className="tree-node"
-            aria-current={navigation.current === "" ? "page" : undefined}
-            onClick={() => navigate("")}
-          >
-            ▾ {libraryRoot.split(/[\\/]/).at(-1)}
-          </button>
-          {navigation.current.split("/").filter(Boolean).map((segment, index, all) => (
-            <button
-              className="tree-node"
-              style={{ paddingInlineStart: `${(index + 1) * 18 + 8}px` }}
-              key={all.slice(0, index + 1).join("/")}
-              aria-current={index === all.length - 1 ? "page" : undefined}
-              onClick={() => navigate(all.slice(0, index + 1).join("/"))}
-            >
-              ▸ {segment}
-            </button>
-          ))}
-        </aside>
+        <FolderTree
+          libraryRoot={libraryRoot}
+          currentPath={navigation.current}
+          onNavigate={(path) => navigate(path)}
+        />
         <section className="catalog-pane" aria-busy={loadState.status === "loading"}>
           {loadState.status === "loading" && (
             <p className="loading-state" role="status">

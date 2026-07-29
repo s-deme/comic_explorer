@@ -81,6 +81,16 @@ export async function listFolder(
   });
 }
 
+export async function listTreeChildren(
+  relativePath: string,
+  generation: number,
+): Promise<ApiResponse<CatalogEntry[]>> {
+  return invoke("list_tree_children", {
+    context: context(generation),
+    relativePath,
+  });
+}
+
 export interface ViewerPage {
   id: PageId;
   relativePath: RelativePath;

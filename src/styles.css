@@ -62,14 +62,32 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .workspace { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; }
 .folder-tree {
+  position: relative;
   overflow: auto;
   border-right: 1px solid #bfc5cc;
   background: #f7f8fa;
   resize: horizontal;
 }
+.tree-canvas { position: relative; min-width: 180px; }
+.tree-row {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  height: 32px;
+  align-items: center;
+}
+.tree-expander {
+  width: 26px;
+  min-height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.tree-expander:disabled { color: transparent; }
 .tree-node {
-  display: block;
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   padding: 5px 8px;
   overflow: hidden;
   border: 0;
@@ -78,7 +96,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tree-node[aria-current="page"] { background: #dbeafe; font-weight: 600; }
+.tree-node[aria-selected="true"] { background: #dbeafe; font-weight: 600; }
+.tree-error { padding: 0 6px; color: #a01717; font-weight: 700; }
 .catalog-pane { position: relative; min-width: 0; min-height: 0; }
 .catalog-scroll { height: 100%; overflow: auto; padding: 12px; }
 .virtual-canvas { position: relative; min-width: 900px; }
