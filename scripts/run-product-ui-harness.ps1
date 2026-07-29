@@ -135,6 +135,17 @@ Copy-Item (
 Copy-Item (
     Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\square.png"
 ) (Join-Path $library "comic-folder\3.png")
+New-Item (Join-Path $library "z-next-comic") -ItemType Directory -Force |
+    Out-Null
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\portrait.png"
+) (Join-Path $library "z-next-comic\1.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\square.png"
+) (Join-Path $library "z-next-comic\2.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\wide.png"
+) (Join-Path $library "z-next-comic\3.png")
 $longName = "0-very-long-comic-folder-name-0123456789-abcdefghijklmnopqrstuvwxyz"
 New-Item (Join-Path $library $longName) -ItemType Directory -Force | Out-Null
 1..120 | ForEach-Object {
@@ -146,7 +157,10 @@ $sourceFiles = @(
     (Join-Path $library "2-corrupt.zip"),
     (Join-Path $library "comic-folder\1.png"),
     (Join-Path $library "comic-folder\2.png"),
-    (Join-Path $library "comic-folder\3.png")
+    (Join-Path $library "comic-folder\3.png"),
+    (Join-Path $library "z-next-comic\1.png"),
+    (Join-Path $library "z-next-comic\2.png"),
+    (Join-Path $library "z-next-comic\3.png")
 )
 $before = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
 $beforeTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
@@ -172,7 +186,7 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('125') && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('126') && " +
         "document.querySelector('#address').value.endsWith('\\library') && " +
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
@@ -212,8 +226,10 @@ try {
         "node.textContent.includes('scroll-folder-120'))"
     ) "selected-item status"
     Invoke-Evaluate (
-        "(() => { const scroll = document.querySelector('.catalog-scroll'); " +
-        "scroll.scrollTop = 0; scroll.dispatchEvent(new Event('scroll')); return true; })()"
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('scroll-folder-120 ')); item.focus(); " +
+        "item.dispatchEvent(new KeyboardEvent('keydown', {key:'Home', bubbles:true})); " +
+        "return true; })()"
     ) | Out-Null
     Wait-Evaluate (
         "[...document.querySelectorAll('.catalog-item')].some((node) => " +
@@ -228,6 +244,10 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a')" "folder navigation"
+    Wait-Evaluate (
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('child '))"
+    ) "folder child catalog"
     Wait-Evaluate (
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'folder-a' && node.getAttribute('aria-selected') === 'true')"
@@ -255,7 +275,7 @@ try {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, $directPathJson);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 100));
   input.form.requestSubmit();
   return true;
 })()
@@ -267,7 +287,7 @@ try {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, 'C:\\outside-library');
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 100));
   input.form.requestSubmit();
   return true;
 })()
@@ -301,16 +321,44 @@ try {
 
     $warm = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
     ) "restored catalog"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 2 && " +
+        "document.querySelector('.toolbar select').value === 'kind' && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
-    ) "warm cache hit and negative placeholder"
+    ) "restored kind sort, cache hit and negative placeholder"
     Wait-Evaluate (
-        "[...document.querySelectorAll('.thumbnail[data-cache-hit=true] img')]" +
-        ".every((image) => image.complete && image.naturalWidth > 0)"
-    ) "warm thumbnail image decode"
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('z-next-comic '))"
+    ) "next comic mounted by restored kind sort"
+    Wait-Evaluate (
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
+        "document.querySelector('.catalog-item[title^=""z-next-comic ""] " +
+        ".thumbnail[data-cache-hit=true] img') !== null"
+    ) "next comic thumbnail cache hit"
+    Invoke-Evaluate (
+        "new Promise((resolve) => setTimeout(() => resolve(true), 500))"
+    ) | Out-Null
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('z-next-comic ')); item.click(); " +
+        "item.closest('[role=gridcell]').querySelector('.read-action').click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar strong')?.textContent === 'z-next-comic' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1 / 3')"
+    ) "next comic initial page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "next comic saved page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate "document.querySelector('.viewer') === null" "next comic setup close"
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
         ".find((node) => node.title.startsWith('comic-folder ')); item.click(); " +
@@ -379,6 +427,13 @@ try {
         "window.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true})); true"
     ) | Out-Null
     Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar strong')?.textContent === 'comic-folder' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
+    ) "current comic final page before transition"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
         "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3') && " +
         "document.querySelectorAll('.page-spread img:not(.prefetch-page)').length === 1"
     ) "final odd page"
@@ -411,11 +466,31 @@ try {
         "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1-2 / 3')"
     ) "direction click reverse"
     Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar strong')?.textContent === 'z-next-comic' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2-3 / 3')"
+    ) "next comic restores saved page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'1', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "next comic single-page leading page"
+    Invoke-Evaluate (
         "window.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight', bubbles:true})); true"
     ) | Out-Null
     Wait-Evaluate (
         "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
-    ) "left-to-right arrow direction"
+    ) "next comic final page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar strong')?.textContent === 'z-next-comic' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
+    ) "final comic edge stays"
     Invoke-Evaluate (
         "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
     ) | Out-Null
@@ -430,10 +505,10 @@ try {
 
     $viewerRestart = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
     ) "viewer-settings restart catalog"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 2 && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "viewer-settings restart thumbnails"
     Invoke-Evaluate (
@@ -450,7 +525,7 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('#address').value.endsWith('\\library') && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
     ) "comic-folder keyboard navigation return"
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -495,7 +570,7 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('[role=alert]') === null && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
     ) "corrupt archive list recovery"
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {

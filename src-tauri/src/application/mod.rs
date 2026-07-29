@@ -314,36 +314,31 @@ pub fn set_catalog_sort(
             request_error(ErrorCode::InvalidRequest, "Sort field is invalid."),
         ));
     }
-    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
-        let mut settings = store.load_settings().map_err(|error| error.message)?;
+    let settings = {
+        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
+        let mut settings = stores
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
         settings.sort_field.clone_from(&sort_field);
         settings.sort_descending = sort_descending;
-        store
-            .save_settings(&settings)
-            .map_err(|error| error.message)?;
-    }
+        if let Some(store) = stores.as_mut() {
+            store
+                .save_settings(&settings)
+                .map_err(|error| error.message)?;
+        }
+        settings
+    };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
         data: CatalogSettings {
             sort_field,
             sort_descending,
-            view_mode: state
-                .store
-                .lock()
-                .map_err(|_| "state poisoned")?
-                .as_ref()
-                .and_then(|store| store.load_settings().ok())
-                .unwrap_or_default()
-                .view_mode,
-            reading_direction: state
-                .store
-                .lock()
-                .map_err(|_| "state poisoned")?
-                .as_ref()
-                .and_then(|store| store.load_settings().ok())
-                .unwrap_or_default()
-                .reading_direction,
+            view_mode: settings.view_mode,
+            reading_direction: settings.reading_direction,
         },
     })
 }
@@ -366,22 +361,23 @@ pub fn set_viewer_settings(
             request_error(ErrorCode::InvalidRequest, "Viewer settings are invalid."),
         ));
     }
-    let mut settings = state
-        .store
-        .lock()
-        .map_err(|_| "state poisoned")?
-        .as_ref()
-        .map(|store| store.load_settings())
-        .transpose()
-        .map_err(|error| error.message)?
-        .unwrap_or_default();
-    settings.view_mode = view_mode;
-    settings.reading_direction = reading_direction;
-    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
-        store
-            .save_settings(&settings)
-            .map_err(|error| error.message)?;
-    }
+    let settings = {
+        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
+        let mut settings = stores
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
+        settings.view_mode = view_mode;
+        settings.reading_direction = reading_direction;
+        if let Some(store) = stores.as_mut() {
+            store
+                .save_settings(&settings)
+                .map_err(|error| error.message)?;
+        }
+        settings
+    };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,

@@ -36,6 +36,7 @@ type LoadState =
 export function App() {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
+  const settingsGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
@@ -61,8 +62,8 @@ export function App() {
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
 
   useEffect(() => {
-    const settingsGeneration = generation.current + 1;
-    void getCatalogSettings(settingsGeneration)
+    settingsGeneration.current += 1;
+    void getCatalogSettings(settingsGeneration.current)
       .then((response) => {
         if (response.status === "ok") {
           setSortField(response.data.sortField);
@@ -113,11 +114,12 @@ export function App() {
     const requestGeneration = generation.current;
     sortedEntries.forEach((entry, index) => {
       if (entry.kind !== "archive" && entry.kind !== "comicFolder") return;
+      if (thumbnails[entry.relativePath] !== undefined) return;
       const priority =
         index < 15 ? "visible" : index < 40 ? "near" : "background";
       queueThumbnail(entry, requestGeneration, priority);
     });
-  }, [sortedEntries]);
+  }, [sortedEntries, thumbnails]);
 
   async function load(relativePath: string) {
     generation.current += 1;
@@ -275,16 +277,17 @@ export function App() {
   function changeSort(nextField: SortField, nextDescending: boolean) {
     setSortField(nextField);
     setSortDescending(nextDescending);
-    generation.current += 1;
+    settingsGeneration.current += 1;
     void saveCatalogSort(
       { sortField: nextField, sortDescending: nextDescending },
-      generation.current,
+      settingsGeneration.current,
     ).catch(() => undefined);
   }
 
   if (viewerSession !== null) {
     return (
       <Viewer
+        key={viewerSession.itemKey}
         session={viewerSession}
         generation={viewerGeneration.current}
         initialMode={viewMode}
@@ -292,9 +295,10 @@ export function App() {
         onSettingsChange={(mode, direction) => {
           setViewMode(mode);
           setReadingDirection(direction);
+          settingsGeneration.current += 1;
           void saveViewerSettings(
             { viewMode: mode, readingDirection: direction },
-            generation.current,
+            settingsGeneration.current,
           );
         }}
         onClose={() => setViewerSession(null)}

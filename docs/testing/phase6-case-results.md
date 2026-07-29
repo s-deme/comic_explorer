@@ -102,10 +102,10 @@ codd:
 | TC-UI-011 | PASS | release WebView2で横長pageが単独、3page目の奇数末尾が単独となり、PageUpで直前の見開きへ可逆に戻ることを観測 |
 | TC-UI-012 | PASS | release WebView2で初回右読み、左読みに切替後のpage領域click/ArrowRight反転を観測し、製品再起動後も左読みを復元 |
 | TC-UI-013 | PASS | release WebView2でPageUp/Down、矢印、page領域click、wheelが同じpage列を移動し、Esc後に選択項目へfocusが復元することを観測 |
-| TC-UI-014 | NOT RUN | 次漫画遷移の製品UI試験を未実行 |
+| TC-UI-014 | PASS | release WebView2で前巻末からsort直後の次漫画へ自動遷移し、保存済み先頭page 2を見開き2-3として復元、最終漫画末尾はloopせずstay |
 | TC-E2E-001 | NOT RUN | install済み製品の登録→閲覧→再起動E2E harness未整備 |
 | TC-E2E-002 | PASS | clean app-dataのrelease製品でlibrary全fileのrelative path/SHA-256を閲覧前後比較し差分0、隣接展開物・管理file 0を観測 |
-| TC-E2E-003 | NOT RUN | 巻末次漫画E2E harness未整備 |
+| TC-E2E-003 | PASS | 種類降順の確定一覧でcomic-folder巻末→z-next-comicをdialogなしで開き、次漫画の保存page 2を復元、後続なし末尾stayを製品E2Eで観測 |
 | TC-E2E-004 | NOT RUN | offline E2E harness未整備。OS通信監視部分はTC-SEC-002でBLOCKED |
 | TC-ERR-001 | NOT RUN | root拒否/消失/retry/reselectの製品UI試験を未実行 |
 | TC-ERR-002 | NOT RUN | tree局所error componentはPASSだが製品ACL統合を未実行 |
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 51 |
+| PASS | 53 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 10 |
+| NOT RUN | 8 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

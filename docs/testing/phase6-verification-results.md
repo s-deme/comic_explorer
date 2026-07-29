@@ -98,6 +98,13 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: 設定保存専用generationをnavigationから分離し、sortで確定済みthumbnailを
+  再投入しないようにした。Rustのsort/viewer設定commandはstore mutexを単一の明示scopeで
+  読込・保存し、同command内再lockと後続読書位置保存の停止余地を除去した。次漫画では
+  `Viewer`をitem keyでremountし、前巻のreducer stateを持ち越さず保存pageから開始する。
+  release WebView2へ2冊目の実漫画folderを追加し、page 2保存、前巻末からの自動遷移、
+  見開き2-3での先頭page復元、最終漫画末尾stay、library全file hash差分0を観測した。
+  TC-UI-014/E2E-003をPASSへ変更し、集計はPASS 53 / BLOCKED 11 / NOT RUN 8。
 - 2026-07-30: clean app-dataからrootを登録し、tree/address/current一覧の同期と再起動復元を
   製品WebView2で観測した。漫画folderのEnter/Ctrl+Enter分離、書庫Enter、保存page復元、
   Esc後context/focus復元も同じ製品harnessへ接続した。実PNGのfit・比率・100%上限・
