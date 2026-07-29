@@ -157,3 +157,6 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 - 2026-07-29: 100 generationのnavigationを実Tokio taskとして同時再開し、各taskの
   cancel tokenとcommit時のgeneration gateを観測した。旧99 generationのcommit 0、
   最新generationだけ1件をWindows MSVC 37 testsで確認し、TC-INT-011をPASSへ変更した。
+- 2026-07-29: `FIX-LIBRARY-001`を実FS adapterで列挙し、通常folder、comic folder、
+  ZIP、CBZ、unsupportedが一意に分類され欠落・重複しないことをWindows MSVC
+  38 testsで確認した。既存React Enter/Ctrl+Enter分岐と合わせTC-INT-009をPASSにした。

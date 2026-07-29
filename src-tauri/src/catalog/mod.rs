@@ -89,6 +89,37 @@ mod fixture_tests {
     }
 
     #[test]
+    fn mixed_library_fixture_classifies_every_entry_without_promoting_unsupported_files() {
+        use crate::domain::ItemKind;
+
+        let root = fixtures();
+        let entries = enumerate_folder(&root, &root.join("FIX-LIBRARY-001")).unwrap();
+        let by_name = entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry
+                        .relative_path
+                        .as_str()
+                        .rsplit('/')
+                        .next()
+                        .unwrap()
+                        .to_owned(),
+                    entry.kind,
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>();
+
+        assert_eq!(by_name["normal-folder"], ItemKind::Folder);
+        assert_eq!(by_name["empty-folder"], ItemKind::Folder);
+        assert_eq!(by_name["comic-folder"], ItemKind::ComicFolder);
+        assert_eq!(by_name["volume.zip"], ItemKind::Archive);
+        assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
+        assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
+        assert_eq!(entries.len(), by_name.len());
+    }
+
+    #[test]
     fn corrupt_and_encrypted_archives_are_classified_without_writes() {
         let root = fixtures();
         let archive_root = root.join("FIX-ZIP-ERROR-001");

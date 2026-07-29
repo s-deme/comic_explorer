@@ -77,7 +77,7 @@ codd:
 | TC-INT-006 | NOT RUN | 破損画像後のviewer前後移動integrationを未実行 |
 | TC-INT-007 | PASS | corrupt/encrypted archive分類と他fixture継続をRust fixture testで実行 |
 | TC-INT-008 | PASS | SQLite保存・reopenと相対page維持を実行 |
-| TC-INT-009 | NOT RUN | 混在root全分類と操作分離のintegrationを未実行 |
+| TC-INT-009 | PASS | `mixed_library_fixture_classifies_every_entry_without_promoting_unsupported_files`とReact Enter/Ctrl+Enter分岐で混在root全分類・操作分離を実行 |
 | TC-INT-010 | PASS | 実装済み全read経路を同一fixture treeのbefore/after snapshotで囲み、path/種別/size/mtime/content/ZIP entry一覧の差分0、library配下のDB/cache/temp/log 0件を実測 |
 | TC-INT-011 | PASS | `one_hundred_navigation_tasks_commit_only_the_latest_generation`。実Tokio task/cancel token/commit gateで旧99 generationのcommit 0を観測 |
 | TC-INT-012 | PASS | `repository::corrupt_database_is_isolated_in_recovery` |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 29 |
+| PASS | 30 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 32 |
+| NOT RUN | 31 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は
