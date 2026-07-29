@@ -9,10 +9,12 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
+  getCatalogSettings,
   listFolder,
   openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
+  saveCatalogSort,
 } from "./features/library/client";
 
 vi.mock("./features/library/client", () => ({
@@ -20,12 +22,16 @@ vi.mock("./features/library/client", () => ({
   listFolder: vi.fn(),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
+  getCatalogSettings: vi.fn(),
+  saveCatalogSort: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
 const listMock = vi.mocked(listFolder);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
+const settingsMock = vi.mocked(getCatalogSettings);
+const saveSortMock = vi.mocked(saveCatalogSort);
 
 describe("application shell", () => {
   afterEach(cleanup);
@@ -35,6 +41,20 @@ describe("application shell", () => {
     listMock.mockReset();
     restoreMock.mockReset();
     openMock.mockReset();
+    settingsMock.mockReset();
+    saveSortMock.mockReset();
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings" as never,
+      generation: 1 as never,
+      data: { sortField: "name", sortDescending: false },
+    });
+    saveSortMock.mockResolvedValue({
+      status: "ok",
+      requestId: "save-sort" as never,
+      generation: 1 as never,
+      data: { sortField: "name", sortDescending: false },
+    });
     restoreMock.mockResolvedValue({
       status: "ok",
       requestId: "restore" as never,

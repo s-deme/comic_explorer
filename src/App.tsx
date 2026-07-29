@@ -6,11 +6,17 @@ import {
 } from "./features/navigation/navigation";
 import {
   listFolder,
+  getCatalogSettings,
   openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
+  saveCatalogSort,
   type ViewerSession,
 } from "./features/library/client";
+import {
+  sortCatalogEntries,
+  type SortField,
+} from "./features/catalog/sort";
 import { Viewer } from "./features/viewer/Viewer";
 import type { CatalogEntry } from "./types/domain";
 
@@ -33,12 +39,22 @@ export function App() {
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
+  const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
 
   useEffect(() => {
+    const settingsGeneration = generation.current + 1;
+    void getCatalogSettings(settingsGeneration)
+      .then((response) => {
+        if (response.status === "ok") {
+          setSortField(response.data.sortField);
+          setSortDescending(response.data.sortDescending);
+        }
+      })
+      .catch(() => undefined);
     generation.current += 1;
     const requestGeneration = generation.current;
     void restoreLibraryRoot(requestGeneration)
@@ -66,6 +82,16 @@ export function App() {
 
   useEffect(() => setAddressInput(absoluteAddress), [absoluteAddress]);
 
+  const sortedEntries = useMemo(
+    () =>
+      sortCatalogEntries(
+        entries,
+        sortField,
+        sortDescending ? "descending" : "ascending",
+      ),
+    [entries, sortDescending, sortField],
+  );
+
   async function load(relativePath: string) {
     generation.current += 1;
     const requestGeneration = generation.current;
@@ -75,9 +101,7 @@ export function App() {
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
-        setEntries(
-          sortDescending ? [...response.data].reverse() : response.data,
-        );
+        setEntries(response.data);
         setLoadState({ status: "ready" });
       } else if (response.status === "error") {
         setLoadState({
@@ -149,6 +173,16 @@ export function App() {
   );
   const up = parentPath(navigation.current);
 
+  function changeSort(nextField: SortField, nextDescending: boolean) {
+    setSortField(nextField);
+    setSortDescending(nextDescending);
+    generation.current += 1;
+    void saveCatalogSort(
+      { sortField: nextField, sortDescending: nextDescending },
+      generation.current,
+    ).catch(() => undefined);
+  }
+
   if (viewerSession !== null) {
     return (
       <Viewer
@@ -156,10 +190,10 @@ export function App() {
         generation={generation.current}
         onClose={() => setViewerSession(null)}
         onNextItem={() => {
-          const current = entries.findIndex(
+          const current = sortedEntries.findIndex(
             (entry) => entry.relativePath === viewerSession.itemKey,
           );
-          const next = entries
+          const next = sortedEntries
             .slice(current + 1)
             .find(
               (entry) =>
@@ -181,7 +215,7 @@ export function App() {
     <main className="app-shell">
       <nav className="menu-bar" aria-label="メニューバー">
         <button onClick={() => setLibraryRoot(null)}>ファイル</button>
-        <button onClick={() => setSortDescending((value) => !value)}>表示</button>
+        <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>
         <button onClick={() => setHelpOpen(true)}>ヘルプ</button>
       </nav>
       <div className="toolbar" aria-label="ナビゲーション">
@@ -214,7 +248,13 @@ export function App() {
         </button>
         <label>
           並べ替え
-          <select aria-label="並べ替え条件" defaultValue="name">
+          <select
+            aria-label="並べ替え条件"
+            value={sortField}
+            onChange={(event) =>
+              changeSort(event.target.value as SortField, sortDescending)
+            }
+          >
             <option value="name">名前</option>
             <option value="modified">更新日時</option>
             <option value="size">サイズ</option>
@@ -223,8 +263,7 @@ export function App() {
         </label>
         <button
           onClick={() => {
-            setSortDescending((value) => !value);
-            setEntries((current) => [...current].reverse());
+            changeSort(sortField, !sortDescending);
           }}
         >
           {sortDescending ? "降順 ▼" : "昇順 ▲"}
@@ -298,7 +337,7 @@ export function App() {
             </div>
           ) : (
             <CatalogGrid
-              entries={entries}
+              entries={sortedEntries}
               selectedPath={selectedPath}
               onSelect={(entry) => setSelectedPath(entry.relativePath)}
               onNavigate={(entry) => navigate(entry.relativePath)}

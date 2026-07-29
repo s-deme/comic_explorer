@@ -39,6 +39,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             application::get_library_root,
+            application::get_catalog_settings,
+            application::set_catalog_sort,
             application::set_library_root,
             application::list_folder,
             application::cancel_navigation,

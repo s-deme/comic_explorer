@@ -53,6 +53,13 @@ pub struct LibraryRoot {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CatalogSettings {
+    pub sort_field: String,
+    pub sort_descending: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ViewerPage {
     pub id: PageId,
     pub relative_path: RelativePath,
@@ -88,6 +95,67 @@ pub fn get_library_root(
         request_id: context.request_id,
         generation: context.generation,
         data: root,
+    })
+}
+
+#[tauri::command]
+pub fn get_catalog_settings(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = context.validate() {
+        return Ok(error_response(&context, error));
+    }
+    let settings = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .map(|store| store.load_settings())
+        .transpose()
+        .map_err(|error| error.message)?
+        .unwrap_or_default();
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: CatalogSettings {
+            sort_field: settings.sort_field,
+            sort_descending: settings.sort_descending,
+        },
+    })
+}
+
+#[tauri::command]
+pub fn set_catalog_sort(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    sort_field: String,
+    sort_descending: bool,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = context.validate() {
+        return Ok(error_response(&context, error));
+    }
+    if !matches!(sort_field.as_str(), "name" | "modified" | "size" | "kind") {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Sort field is invalid."),
+        ));
+    }
+    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
+        let mut settings = store.load_settings().map_err(|error| error.message)?;
+        settings.sort_field.clone_from(&sort_field);
+        settings.sort_descending = sort_descending;
+        store
+            .save_settings(&settings)
+            .map_err(|error| error.message)?;
+    }
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: CatalogSettings {
+            sort_field,
+            sort_descending,
+        },
     })
 }
 

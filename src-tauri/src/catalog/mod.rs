@@ -3,7 +3,7 @@ mod folder;
 mod image_metadata;
 
 pub use archive::enumerate_archive_pages;
-pub use folder::{CatalogEntry, enumerate_folder, enumerate_folder_pages};
+pub use folder::{ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages};
 pub use image_metadata::{ImageMetadata, inspect_image};
 
 #[cfg(test)]

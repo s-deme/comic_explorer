@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +14,15 @@ pub struct CatalogEntry {
     pub relative_path: RelativePath,
     pub kind: ItemKind,
     pub byte_size: Option<u64>,
+    pub modified_ms: Option<u64>,
+    pub archive_kind: Option<ArchiveKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ArchiveKind {
+    Zip,
+    Cbz,
 }
 
 pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntry>, AppError> {
@@ -68,6 +78,18 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
             relative_path,
             kind,
             byte_size: metadata.is_file().then_some(metadata.len()),
+            modified_ms: metadata
+                .modified()
+                .ok()
+                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                .and_then(|value| u64::try_from(value.as_millis()).ok()),
+            archive_kind: (kind == ItemKind::Archive).then(|| {
+                if name.to_ascii_lowercase().ends_with(".cbz") {
+                    ArchiveKind::Cbz
+                } else {
+                    ArchiveKind::Zip
+                }
+            }),
         });
     }
     entries.sort_by(|left, right| {
@@ -231,5 +253,33 @@ mod tests {
         );
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[test]
+    fn catalog_metadata_distinguishes_zip_and_cbz_and_omits_folder_size() {
+        let root = temporary_root("catalog-metadata");
+        fs::create_dir_all(root.join("folder")).unwrap();
+        fs::write(root.join("book.zip"), b"zip").unwrap();
+        fs::write(root.join("book.cbz"), b"cbz").unwrap();
+
+        let entries = enumerate_folder(&root, &root).unwrap();
+        let folder = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "folder")
+            .unwrap();
+        let zip = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.zip")
+            .unwrap();
+        let cbz = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.cbz")
+            .unwrap();
+
+        assert_eq!(folder.byte_size, None);
+        assert!(folder.modified_ms.is_some());
+        assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
+        assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
+        fs::remove_dir_all(root).unwrap();
     }
 }

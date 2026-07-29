@@ -24,6 +24,8 @@ export interface CatalogEntry {
   relativePath: RelativePath;
   kind: ItemKind;
   byteSize?: number;
+  modifiedMs?: number;
+  archiveKind?: "zip" | "cbz";
 }
 
 export interface Page {

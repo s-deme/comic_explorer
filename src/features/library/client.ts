@@ -41,6 +41,28 @@ export async function restoreLibraryRoot(
   });
 }
 
+export interface CatalogSettings {
+  sortField: "name" | "modified" | "size" | "kind";
+  sortDescending: boolean;
+}
+
+export async function getCatalogSettings(
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("get_catalog_settings", { context: context(generation) });
+}
+
+export async function saveCatalogSort(
+  settings: CatalogSettings,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("set_catalog_sort", {
+    context: context(generation),
+    sortField: settings.sortField,
+    sortDescending: settings.sortDescending,
+  });
+}
+
 export async function listFolder(
   relativePath: string,
   generation: number,

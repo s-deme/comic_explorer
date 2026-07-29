@@ -29,9 +29,9 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、28 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、29 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 11 tests |
+| React unit/component | PASS | 14 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
@@ -85,9 +85,15 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 - WICによる長辺384px/JPEG quality 82のサムネイル生成と一覧への実画像表示
 - OS folder picker（現在はpath入力による登録）
 - 任意の未選択branchを展開できる完全な仮想folder tree
-- 更新日時・サイズ・種類sortのbackend metadataを含む完全実装
 - thumbnail priority worker、negative cache、実処理に接続した10GiB回収
 - custom protocolのorigin/refererを含むWindows WebView2実機security試験
 - shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
+
+## 今回完了した実装
+
+- 2026-07-29: 一覧項目へ更新日時、ファイルサイズ、ZIP/CBZ種別metadataを追加し、
+  名前・更新日時・サイズ・種類の昇順／降順、欠損値末尾、自然順と決定的tie-break、
+  選択中sortのSQLite保存・再起動復元を実装した。Windows MSVC 29 tests、
+  React 14 tests、typecheck、production buildで検証した。
