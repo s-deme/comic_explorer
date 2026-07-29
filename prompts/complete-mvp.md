@@ -2,7 +2,7 @@
 
 `/mnt/e/script/comic_explorer` のComic Explorer MVPを完成させてください。
 
-現在の基準コミットは`1ae3e88`です。最初に`git status`、直近コミット、
+現在の基準コミットは`72a5671`です。最初に`git status`、直近コミット、
 `AGENTS.md`を確認し、既存のユーザー変更を上書きしないでください。
 
 ## 最初に読む資料
@@ -20,10 +20,14 @@
 - `docs/testing/phase6-manual-procedures.md`
 - `docs/testing/performance-benchmark-plan.md`
 
-`phase6-case-results.md`のNOT RUN 31件とBLOCKED 11件、および
+`phase6-case-results.md`のNOT RUN 29件とBLOCKED 11件、および
 `phase6-verification-results.md`の「既知の未完了実装」を残作業の正としてください。
-すでにPASSの30ケースを再実装しないでください。ただし後続変更によるregressionは
+すでにPASSの32ケースを再実装しないでください。ただし後続変更によるregressionは
 毎回確認してください。
+
+`TC-CT-004`は実pipelineと接続済みworkerの期待結果全体を観測してPASS化済みです。
+`TC-CT-002`はWIC decode自体ではなく「対象付きerror contract」が未観測なので、
+対象情報を含むdecoder error contractを実装・試験できた場合だけPASSへ変更してください。
 
 ## 引継ぎ済み成果
 
@@ -38,8 +42,28 @@
 - 次漫画選択とfolder/archive scoped item/page identity（`9e42547`）
 - 実Tokio task 100世代のcancel/stale commit拒否（`d6af196`）
 - mixed library分類integration（`c429bca`）
-- 最終実測baseline: Rust 38、React 23、Python 7、fixture validator PASS
-- 72ケースbaseline: PASS 30 / FAIL 0 / BLOCKED 11 / NOT RUN 31
+- WIC thumbnail pipelineとcache/UI接続（`be0f5ee`）
+  - JPEG/JPG/PNGのmemory入力WIC decode
+  - EXIF orientation、拡大なし・長辺384px、JPEG quality 82
+  - folder/ZIP/CBZの自然順先頭page、archive非展開
+  - source fingerprint由来content key、hit/stale、atomic write
+  - 理由と期限を持つnegative cache、10GiB LRU、pin
+  - `get_thumbnail` commandとReactの固定thumbnail slot
+  - 実file差替え後のstale再生成を実測しTC-INT-005をPASS化
+- custom protocol security corpus（`c0954bd`）
+  - 固定scheme/authority、単一token path、method/query/path segment検証
+  - encoded traversal、absolute/drive/UNC、任意archive entry相当を拒否
+  - 重複/不正Origin・Referer、別session、期限、全失効を検証
+  - 全成功/error responseのMIME、length、CORS、`nosniff`、非開示を検証
+- bounded thumbnail workerと実pipeline接続（`72a5671`）
+  - worker 2、queue容量64、visible/near/background priority
+  - queue満杯時の低優先度evict、cancel済み未開始job破棄
+  - shutdown受付拒否、worker cancel/join
+  - 実WIC/cache pipelineへ100世代を投入し旧99 commit 0、最新実JPEG 1件
+  - TC-CT-004をPASS化
+- 最終実測baseline: Rust 48、React 25、Python 7、fixture validator PASS
+- CoDD baseline: relevant red gate 0、advisory 4
+- 72ケースbaseline: PASS 32 / FAIL 0 / BLOCKED 11 / NOT RUN 29
 
 ## 目的
 
@@ -48,37 +72,15 @@
 BLOCKEDとして残してください。1項目で止まらず、安全に実装できる次項目へ継続して
 ください。
 
-## 優先順位1: WICサムネイルpipeline
+## 優先順位1: page prefetch、generation分離、shutdown完成
 
-最優先で以下を完成させてください。
+thumbnail workerは完了済みです。再実装せず、同じ実task水準でpage/viewer/shutdownを
+完成させてください。
 
-- Windows Imaging ComponentでJPEG/JPG/PNGをdecodeする
-- EXIF orientationを適用する
-- アスペクト比を維持して長辺384pxへ縮小する。小さい画像を不要に拡大しない
-- JPEG quality 82でencodeする
-- folderとZIP/CBZの自然順先頭pageを表紙にする
-- archive entryを原本の隣へ展開せず、memoryまたはapp-local tempだけで処理する
-- source fingerprintとcache indexを接続し、hit/staleを判定する
-- atomic cache書込みを実処理へ接続する
-- 失敗理由と期限を持つnegative cacheを実装する
-- app-local cache/temp以外へ一切書き込まない
-- visible / near / background priorityをbounded queueへ投入する
-- worker数、queue容量、decode byte/pixel上限を固定し、cancel可能にする
-- 10GiB hard capのLRU回収を実処理へ接続し、表示中entryをpinする
-- Explorer一覧へ実thumbnailを表示する
-- cold生成中、cache hit、失敗placeholderをレイアウト変更なしで表示する
-- navigation generationが古いthumbnail commitを拒否する
-
-最低限、WIC decode、orientation、resize、quality、folder/ZIP表紙一致、cache hit、
-stale、negative cache、atomic write、LRU、pin、priority、cancel、原本非破壊の
-unit/contract/integration/component testsを追加してください。
-
-## 優先順位2: 非同期処理とshutdown完成
-
-- thumbnail/page prefetchへ実workerを接続する
+- page prefetchへ容量制限付き実workerを接続する
 - navigation generationとviewer session generationを分離する
-- 完了済みの100世代cancel/stale commit試験を実thumbnail/page workerでも維持する
-- cancel後の未開始queue itemを破棄する
+- page workerでも100世代のcancel/stale commit拒否を維持する
+- cancel後の未開始queue itemを実際に破棄する
 - shutdown開始後は全command/queueが新規受付を拒否する
 - 起動したtaskを追跡し、cancel後にjoinする
 - archive/file/DB/WAL/SHM handleを閉じる
@@ -89,10 +91,24 @@ unit/contract/integration/component testsを追加してください。
 単なるflagのunit testだけで完了扱いにせず、実task・queue・handleを使って観測して
 ください。
 
+## 優先順位2: 接続済みUI/application harness
+
+製品WebViewを自動運転できる場合はそれを使い、困難な場合はRust
+command/application adapterとReactを接続するtest harnessを追加してください。
+
+- thumbnail cold生成中、cache hit、negative/error placeholderを同じslotで連続観測
+- folder/ZIP/CBZの実media URIをReact viewerへ渡し、成功/error/cancelを観測
+- viewer終了、次漫画、app終了時の読書位置flush順序を実storeで観測
+- root登録、保存、adapter再生成後の復元、root消失、retry/reselect
+- 原本snapshot差分0とlibrary配下の管理file 0件をharness全体の前後で維持
+
+mockだけの無条件成功やpure componentの言い換えでUI/E2EケースをPASSにしないで
+ください。
+
 ## 優先順位3: ViewerとExplorerの未実行ケース
 
-`TC-UI-001`〜`014`、`TC-ERR-001`〜`005`をcomponent/integration testで可能な限り
-自動化してください。
+`TC-UI-001`〜`014`、`TC-ERR-001`〜`005`、`TC-CT-001`〜`006`のNOT RUNを
+component/contract/integration testで可能な限り自動化してください。
 
 - picker登録、保存、再起動復元、root消失、アクセス拒否、retry/reselect
 - tree/address/list/current folderの同期
@@ -114,21 +130,12 @@ WebdriverIO Tauriを導入できる場合は製品E2Eへ進めてください。
 mockだけの無条件成功ではなくRust command/application adapterとReactを接続した
 integration harnessを優先してください。
 
-## 優先順位4: custom protocol security corpus
+## 優先順位4: custom protocol実機統合
 
-既存のpure handler testsを拡張してください。
-
-- malformed header、複数Origin、invalid UTF-8相当、missing/invalid Referer
-- traversal、encoded traversal、absolute path、UNC、drive path
-- 任意ZIP entry名、危険archive entry
-- tokenのpage/source scope、期限、全失効、別session token
-- exact MIME、byte上限、Content-Length、CORS、`nosniff`
-- 成功・全error responseの安全header
-- method、authority、path segment、query、fragment相当の拒否
-- fuzz/propertyまたはtable-driven security corpus
-
-WebView2が実際に送るOrigin/Refererとの統合だけは実機手順に従い、未実施ならPASSに
-しないでください。
+pure handlerのtable-driven security corpusは完了済みです。再実装せず、WebView2が
+実際に送るOrigin/Refererとの統合だけを
+`docs/testing/phase6-manual-procedures.md`の手順で実施してください。必要な実機traceが
+取れなければBLOCKEDのままとし、推測でallowlistを変更したりPASSにしないでください。
 
 ## 優先順位5: release証跡の回帰維持
 
