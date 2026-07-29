@@ -1,0 +1,79 @@
+---
+codd:
+  node_id: "test:phase6-verification-results"
+  type: test
+  status: active
+  confidence: 0.9
+  depends_on:
+    - id: "design:implementation-plan"
+      relation: "verifies"
+      semantic: "behavioral"
+    - id: "design:test-strategy"
+      relation: "executes"
+      semantic: "behavioral"
+    - id: "test:test-cases"
+      relation: "executes"
+      semantic: "behavioral"
+---
+
+# Phase 6 検証結果
+
+## 実行情報
+
+- 実行日: 2026-07-29
+- 実行環境: Windows 11 host + WSL2
+- 対象version: 0.1.0
+- fixture: 固定seed 20260728、通常64ファイル/11 fixture、性能版11,365ファイル/12 fixture
+
+## 自動検証結果
+
+| 検証 | 結果 | 証跡 |
+| --- | --- | --- |
+| Rust fmt/check/test | PASS | Windows MSVC、28 tests |
+| TypeScript typecheck | PASS | `tsc --noEmit` |
+| React unit/component | PASS | 11 tests |
+| Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
+| Production frontend build | PASS | Vite production build |
+| CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
+| Windows release executable | PASS | `comic-explorer.exe`生成 |
+| Windows process smoke launch | PASS | 5秒間起動継続後、試験processを終了 |
+| NSIS x64 installer | PASS | offline WebView2 modeで生成 |
+| SBOM | PASS | lock-backed CycloneDX 1.6 inventory |
+
+## 基礎性能測定
+
+この値はWSL2上のportable foundation harnessであり、Windows製品UIの合否値ではない。
+7回測定のp95は次のとおり。
+
+| 操作 | p95 |
+| --- | ---: |
+| 1,000項目列挙・metadata sort | 22.293 ms |
+| 10,000項目列挙・metadata sort | 247.454 ms |
+| Deflate ZIPから30ページrandom read | 24.792 ms |
+| Stored ZIPから30ページrandom read | 22.751 ms |
+| SQLite 10,000件insert + 100件read | 126.903 ms |
+
+## 配布物
+
+release executableおよびNSIS installerをWindows MSVCで生成した。installerは
+WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を構成上要求する。
+署名証明書は設定されていないため、現成果物は未署名である。
+
+| 成果物 | bytes | SHA-256 |
+| --- | ---: | --- |
+| `comic-explorer.exe` | 10,814,976 | `5afc419eb9328d058e57c774377323e65a3552a6c3a181ed68d1257905fc30d5` |
+| `Comic Explorer_0.1.0_x64-setup.exe` | 209,274,596 | `c9a1756765f0d5bca968eca35cdc28816be65204850328baeb0fab427e3e5ef5` |
+
+## 実機・隔離環境待ち
+
+次の項目は現在の単一開発ホストでは合否を確定しない。
+
+- Windows 10 22H2 clean VMでのinstall/start/read/uninstall
+- 別のWindows 11 clean VMでのinstall/start/read/uninstall
+- OSレベルDNS/TCP/UDP監視による外向き通信0件
+- WebView2未導入VMでのoffline runtime導入
+- 製品UIのcold TTI、page switch、scroll FPS、input delay、working set
+- screen readerを含むWindows実機アクセシビリティ
+- installerのuser-data保持と明示削除動作
+
+これらは未実施をPASSとして扱わず、release判定前のblocked manual verificationとする。

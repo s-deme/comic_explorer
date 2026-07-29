@@ -80,6 +80,7 @@ scan:
     - "src/"
     - "src-tauri/src/"
     - "benchmarks/architecture-spike/"
+    - "scripts/"
     - "tests/fixtures/"
   test_dirs:
     - "tests/"

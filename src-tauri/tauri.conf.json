@@ -27,6 +27,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"]
+    "targets": ["nsis"],
+    "resources": [
+      "../THIRD-PARTY-NOTICES.md",
+      "../dist/SBOM.json"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      }
+    }
   }
 }
