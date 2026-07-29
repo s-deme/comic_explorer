@@ -6,9 +6,12 @@ import {
 } from "./features/navigation/navigation";
 import {
   listFolder,
+  openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
+  type ViewerSession,
 } from "./features/library/client";
+import { Viewer } from "./features/viewer/Viewer";
 import type { CatalogEntry } from "./types/domain";
 
 type LoadState =
@@ -33,6 +36,7 @@ export function App() {
   const [sortDescending, setSortDescending] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
+  const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
 
   useEffect(() => {
     generation.current += 1;
@@ -144,6 +148,34 @@ export function App() {
     (entry) => entry.relativePath === selectedPath,
   );
   const up = parentPath(navigation.current);
+
+  if (viewerSession !== null) {
+    return (
+      <Viewer
+        session={viewerSession}
+        generation={generation.current}
+        onClose={() => setViewerSession(null)}
+        onNextItem={() => {
+          const current = entries.findIndex(
+            (entry) => entry.relativePath === viewerSession.itemKey,
+          );
+          const next = entries
+            .slice(current + 1)
+            .find(
+              (entry) =>
+                entry.kind === "comicFolder" || entry.kind === "archive",
+            );
+          if (next) {
+            generation.current += 1;
+            void openComic(next.relativePath, generation.current).then(
+              (response) =>
+                response.status === "ok" && setViewerSession(response.data),
+            );
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -270,12 +302,24 @@ export function App() {
               selectedPath={selectedPath}
               onSelect={(entry) => setSelectedPath(entry.relativePath)}
               onNavigate={(entry) => navigate(entry.relativePath)}
-              onRead={() => {
-                setLoadState({
-                  status: "error",
-                  path: selectedPath ?? "",
-                  message: "ビューワを準備しています。",
-                });
+              onRead={(entry) => {
+                generation.current += 1;
+                const requestGeneration = generation.current;
+                setLoadState({ status: "loading", path: entry.relativePath });
+                void openComic(entry.relativePath, requestGeneration).then(
+                  (response) => {
+                    if (response.status === "ok") {
+                      setViewerSession(response.data);
+                      setLoadState({ status: "ready" });
+                    } else if (response.status === "error") {
+                      setLoadState({
+                        status: "error",
+                        path: entry.relativePath,
+                        message: response.error.message,
+                      });
+                    }
+                  },
+                );
               }}
             />
           )}

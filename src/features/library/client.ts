@@ -7,6 +7,8 @@ import {
 import type {
   CatalogEntry,
   Generation,
+  PageId,
+  RelativePath,
   RequestId,
 } from "../../types/domain";
 
@@ -46,5 +48,41 @@ export async function listFolder(
   return invoke("list_folder", {
     context: context(generation),
     relativePath,
+  });
+}
+
+export interface ViewerPage {
+  id: PageId;
+  relativePath: RelativePath;
+  mediaUri: string;
+}
+
+export interface ViewerSession {
+  itemKey: string;
+  displayName: string;
+  pages: ViewerPage[];
+  startIndex: number;
+}
+
+export async function openComic(
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<ViewerSession>> {
+  return invoke("open_comic", {
+    context: context(generation),
+    itemRelativePath,
+  });
+}
+
+export async function saveReadingPosition(
+  session: ViewerSession,
+  index: number,
+  generation: number,
+): Promise<ApiResponse<void>> {
+  return invoke("save_reading_position", {
+    context: context(generation),
+    itemKey: session.itemKey,
+    pageKey: session.pages[index].relativePath,
+    naturalOrdinal: index,
   });
 }

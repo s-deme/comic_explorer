@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   listFolder,
+  openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
 } from "./features/library/client";
@@ -18,11 +19,13 @@ vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
   restoreLibraryRoot: vi.fn(),
+  openComic: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
 const listMock = vi.mocked(listFolder);
 const restoreMock = vi.mocked(restoreLibraryRoot);
+const openMock = vi.mocked(openComic);
 
 describe("application shell", () => {
   afterEach(cleanup);
@@ -31,6 +34,7 @@ describe("application shell", () => {
     registerMock.mockReset();
     listMock.mockReset();
     restoreMock.mockReset();
+    openMock.mockReset();
     restoreMock.mockResolvedValue({
       status: "ok",
       requestId: "restore" as never,
