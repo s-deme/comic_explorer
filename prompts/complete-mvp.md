@@ -2,7 +2,7 @@
 
 `/mnt/e/script/comic_explorer` のComic Explorer MVPを完成させてください。
 
-現在の基準コミットは`9b7123f`です。最初に`git status`、直近コミット、
+現在の基準コミットは`1ae3e88`です。最初に`git status`、直近コミット、
 `AGENTS.md`を確認し、既存のユーザー変更を上書きしないでください。
 
 ## 最初に読む資料
@@ -20,10 +20,26 @@
 - `docs/testing/phase6-manual-procedures.md`
 - `docs/testing/performance-benchmark-plan.md`
 
-`phase6-case-results.md`のNOT RUN 37件とBLOCKED 11件、および
+`phase6-case-results.md`のNOT RUN 31件とBLOCKED 11件、および
 `phase6-verification-results.md`の「既知の未完了実装」を残作業の正としてください。
-すでにPASSの24ケースを再実装しないでください。ただし後続変更によるregressionは
+すでにPASSの30ケースを再実装しないでください。ただし後続変更によるregressionは
 毎回確認してください。
+
+## 引継ぎ済み成果
+
+次は基準コミットまでに完了済みであり、regression修正が必要な場合を除いて
+再実装しないでください。
+
+- Phase 6 fixture/release証跡自動化（`c0030de`）
+- malformed image/ZIP corpus 68 files / 11 fixturesと無断上書き拒否
+- 実装済み全read経路の原本snapshot差分0、library配下の管理file 0件
+- npm/Cargo 665 componentのlicense監査、unknown/禁止0件、SBOM/notice同期
+- portable benchmark再測定と10,000項目mounted DOM上限
+- 次漫画選択とfolder/archive scoped item/page identity（`9e42547`）
+- 実Tokio task 100世代のcancel/stale commit拒否（`d6af196`）
+- mixed library分類integration（`c429bca`）
+- 最終実測baseline: Rust 38、React 23、Python 7、fixture validator PASS
+- 72ケースbaseline: PASS 30 / FAIL 0 / BLOCKED 11 / NOT RUN 31
 
 ## 目的
 
@@ -61,7 +77,7 @@ unit/contract/integration/component testsを追加してください。
 
 - thumbnail/page prefetchへ実workerを接続する
 - navigation generationとviewer session generationを分離する
-- A読込中にBへ100回移動し、Aの結果が一度もcommitされない試験を追加する
+- 完了済みの100世代cancel/stale commit試験を実thumbnail/page workerでも維持する
 - cancel後の未開始queue itemを破棄する
 - shutdown開始後は全command/queueが新規受付を拒否する
 - 起動したtaskを追跡し、cancel後にjoinする
@@ -114,20 +130,31 @@ integration harnessを優先してください。
 WebView2が実際に送るOrigin/Refererとの統合だけは実機手順に従い、未実施ならPASSに
 しないでください。
 
-## 優先順位5: Phase 6自動化とrelease証跡
+## 優先順位5: release証跡の回帰維持
 
-- malformed ZIP/image/security corpusをfixture generatorへ追加する
-- generatorは既存出力を無断上書きしない
-- 実装済み全read経路をbefore/after snapshotで囲む
-- path、種別、size、mtime、内容hash、ZIP entry一覧の差分0を要求する
-- DB/cache/temp/logがlibrary配下に0件であることを検証する
-- TC-INT-010を期待結果全体が観測できた場合だけPASSへ変更する
-- direct/transitive dependency licenseを監査する
-- `THIRD-PARTY-NOTICES.md`とSBOMをlockfileに同期する
-- unknown/禁止license 0件を自動検証する
-- portable performance measurementを再実行する
-- 10,000項目のmounted DOM上限を維持する
-- 72ケースすべてのstatus、command、環境、日時、test名、証跡を更新する
+Phase 6自動化は完了済みです。後続実装で次を壊さず、最終release候補に対して再実行
+してください。
+
+- fixture generatorの無断上書き拒否とmalformed corpus validator
+- 全read経路のbefore/after snapshotとlibrary配下の管理file 0件
+- TC-INT-010の原本差分0
+- direct/transitive dependency license、SBOM、noticeの同期
+- unknown/禁止license 0件
+- portable performance measurementと10,000項目mounted DOM上限
+- 72ケースすべてのstatus、command、環境、日時、test名、証跡
+
+## 未実装再走査ループ
+
+各実装単位の完了後に`phase6-case-results.md`のNOT RUNと
+`phase6-verification-results.md`の既知未完了を再走査してください。外部環境不要で
+安全に閉じられる次項目を選び、要件確認からcommitまでを繰り返してください。
+
+- 最大10ループ。1ループで複数ケースを同じ実装境界として閉じてもよい
+- PASSへ変更するのは期待結果全体を実task、実adapter、実file/handleまたは接続済み
+  componentで観測できた場合だけ
+- 単なるmock、flag、既存pure unitの言い換えでintegration/UIケースをPASSにしない
+- 各ループ後にPASS/FAIL/BLOCKED/NOT RUN集計と実測test件数を同期する
+- 大きな機能が未完了でも、独立して完了できる次項目へ継続する
 
 ## 外部環境として残してよい項目
 
@@ -172,6 +199,7 @@ amberは内容を確認し、解消可能なら解消してください。skip�
 - `TMPDIR=/tmp TEMP=/tmp TMP=/tmp PATH="$PWD/.tools/node/bin:$PATH" npm test`
 - `TMPDIR=/tmp TEMP=/tmp TMP=/tmp PATH="$PWD/.tools/node/bin:$PATH" npm run build`
 - 必要なら`.venv/bin/python scripts/generate-sbom.py`
+- `.venv/bin/python scripts/generate-sbom.py --check`
 - `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
 - `.venv/bin/python tests/fixtures/validate_fixtures.py tests/fixtures/generated`
 - `git diff --check`
