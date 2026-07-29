@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、31 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、33 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 20 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
@@ -84,7 +84,7 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 - WICによる長辺384px/JPEG quality 82のサムネイル生成と一覧への実画像表示
 - thumbnail priority worker、negative cache、実処理に接続した10GiB回収
-- custom protocolのorigin/refererを含むWindows WebView2実機security試験
+- custom protocolのWindows WebView2実機security試験
 - shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
@@ -110,3 +110,10 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   復元を実装した。10,000項目を入力したcomponent testで、mounted gridcellが100件
   以下に保たれることも自動検証した。Windows MSVC 31 tests、React 20 tests、
   typecheck、production build、fixture validatorで検証した。
+- 2026-07-29: custom protocolのGET method、queryなしURI、32桁hex token、
+  Origin/Referer allowlistを検証し、成功・エラーとも正確なContent-Type、
+  Content-Length、`nosniff`、CORS、cache制御headerを付けるhandlerへ分離した。
+  任意origin、traversal相当URI、query、method、期限切れ・失効token、byte上限を
+  拒否する。Windows MSVC 33 tests、React 20 tests、typecheck、production build、
+  fixture validatorで検証した。WebView2から届く実headerとの統合確認はBLOCKEDの
+  実機試験として残す。

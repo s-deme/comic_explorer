@@ -12,30 +12,20 @@ pub fn run() {
     tauri::Builder::default()
         .manage(application::AppState::default())
         .register_uri_scheme_protocol("comic", |context, request| {
-            let token = request.uri().path().trim_start_matches('/');
             let state = context.app_handle().state::<application::AppState>();
-            let result = state
+            state
                 .media
                 .lock()
-                .map_err(|_| "media state poisoned".to_string())
-                .and_then(|mut registry| registry.read(token).map_err(|error| error.message));
-            match result {
-                Ok((grant, bytes)) => tauri::http::Response::builder()
-                    .status(200)
-                    .header("Content-Type", grant.mime_type)
-                    .header("Content-Length", bytes.len().to_string())
-                    .header("X-Content-Type-Options", "nosniff")
-                    .header("Access-Control-Allow-Origin", "http://tauri.localhost")
-                    .header("Cache-Control", "private, max-age=300")
-                    .body(bytes)
-                    .expect("valid media response"),
-                Err(message) => tauri::http::Response::builder()
-                    .status(404)
-                    .header("Content-Type", "text/plain; charset=utf-8")
-                    .header("X-Content-Type-Options", "nosniff")
-                    .body(message.into_bytes())
-                    .expect("valid media error response"),
-            }
+                .map(|mut registry| media::handle_protocol_request(&mut registry, &request))
+                .unwrap_or_else(|_| {
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .header("Content-Type", "text/plain; charset=utf-8")
+                        .header("Content-Length", "17")
+                        .header("X-Content-Type-Options", "nosniff")
+                        .body(b"Media unavailable".to_vec())
+                        .expect("static media error response")
+                })
         })
         .invoke_handler(tauri::generate_handler![
             application::get_library_root,

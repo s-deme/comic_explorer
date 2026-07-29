@@ -5,7 +5,16 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use tauri::http::{Method, Request, Response, StatusCode};
+
 use crate::domain::{AppError, ErrorCode, PageId};
+
+const PRODUCTION_ORIGIN: &str = "http://tauri.localhost";
+const ALLOWED_ORIGINS: [&str; 3] = [
+    PRODUCTION_ORIGIN,
+    "tauri://localhost",
+    "http://127.0.0.1:1420",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PageSource {
@@ -120,6 +129,104 @@ impl MediaTokenRegistry {
     }
 }
 
+pub fn handle_protocol_request(
+    registry: &mut MediaTokenRegistry,
+    request: &Request<Vec<u8>>,
+) -> Response<Vec<u8>> {
+    let origin = match validated_origin(request) {
+        Ok(origin) => origin,
+        Err(()) => return safe_response(StatusCode::FORBIDDEN, None, b"Forbidden".to_vec(), None),
+    };
+    if request.method() != Method::GET {
+        return safe_response(
+            StatusCode::METHOD_NOT_ALLOWED,
+            None,
+            b"Method not allowed".to_vec(),
+            origin,
+        );
+    }
+    let uri = request.uri();
+    if uri.query().is_some() {
+        return safe_response(
+            StatusCode::BAD_REQUEST,
+            None,
+            b"Invalid media URI".to_vec(),
+            origin,
+        );
+    }
+    let token = uri.path().strip_prefix('/').unwrap_or_default();
+    if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return safe_response(
+            StatusCode::BAD_REQUEST,
+            None,
+            b"Invalid media token".to_vec(),
+            origin,
+        );
+    }
+    match registry.read(token) {
+        Ok((grant, bytes)) => safe_response(StatusCode::OK, Some(grant.mime_type), bytes, origin),
+        Err(error) => {
+            let status = match error.code {
+                ErrorCode::ResourceLimit => StatusCode::PAYLOAD_TOO_LARGE,
+                ErrorCode::AccessDenied => StatusCode::FORBIDDEN,
+                ErrorCode::NotFound => StatusCode::NOT_FOUND,
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            safe_response(status, None, b"Media unavailable".to_vec(), origin)
+        }
+    }
+}
+
+fn validated_origin(request: &Request<Vec<u8>>) -> Result<Option<&str>, ()> {
+    let origin = request
+        .headers()
+        .get("Origin")
+        .map(|value| value.to_str().map_err(|_| ()))
+        .transpose()?;
+    if origin.is_some_and(|value| !ALLOWED_ORIGINS.contains(&value)) {
+        return Err(());
+    }
+    let referer = request
+        .headers()
+        .get("Referer")
+        .map(|value| value.to_str().map_err(|_| ()))
+        .transpose()?;
+    if referer.is_some_and(|value| {
+        !ALLOWED_ORIGINS
+            .iter()
+            .any(|allowed| value == *allowed || value.starts_with(&format!("{allowed}/")))
+    }) {
+        return Err(());
+    }
+    Ok(origin)
+}
+
+fn safe_response(
+    status: StatusCode,
+    media_type: Option<&str>,
+    body: Vec<u8>,
+    origin: Option<&str>,
+) -> Response<Vec<u8>> {
+    let mut builder = Response::builder()
+        .status(status)
+        .header(
+            "Content-Type",
+            media_type.unwrap_or("text/plain; charset=utf-8"),
+        )
+        .header("Content-Length", body.len().to_string())
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Cache-Control", "private, max-age=0, no-store")
+        .header("Vary", "Origin");
+    if let Some(origin) = origin {
+        builder = builder.header("Access-Control-Allow-Origin", origin);
+    } else {
+        builder = builder.header("Access-Control-Allow-Origin", PRODUCTION_ORIGIN);
+    }
+    builder
+        .body(body)
+        .expect("static protocol response headers")
+}
+
 fn limit_error() -> AppError {
     AppError {
         code: ErrorCode::ResourceLimit,
@@ -183,5 +290,75 @@ mod tests {
             registry.resolve(&token).unwrap_err().code,
             ErrorCode::AccessDenied
         );
+    }
+
+    #[test]
+    fn protocol_rejects_methods_queries_tokens_and_untrusted_origins() {
+        let mut registry = MediaTokenRegistry::new(Duration::from_secs(60));
+        for request in [
+            Request::builder()
+                .method(Method::POST)
+                .uri("comic://localhost/0123456789abcdef0123456789abcdef")
+                .body(Vec::new())
+                .unwrap(),
+            Request::builder()
+                .uri("comic://localhost/0123456789abcdef0123456789abcdef?path=secret")
+                .body(Vec::new())
+                .unwrap(),
+            Request::builder()
+                .uri("comic://localhost/../secret")
+                .body(Vec::new())
+                .unwrap(),
+            Request::builder()
+                .uri("comic://localhost/0123456789abcdef0123456789abcdef")
+                .header("Origin", "https://attacker.invalid")
+                .body(Vec::new())
+                .unwrap(),
+        ] {
+            let response = handle_protocol_request(&mut registry, &request);
+            assert_ne!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()["X-Content-Type-Options"], "nosniff");
+            assert_eq!(
+                response.headers()["Content-Length"],
+                response.body().len().to_string()
+            );
+        }
+    }
+
+    #[test]
+    fn protocol_returns_exact_mime_cors_and_length_for_a_scoped_token() {
+        let path = std::env::temp_dir().join(format!(
+            "comic-explorer-media-{}-{}.png",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let bytes = b"\x89PNG\r\n\x1a\npayload";
+        fs::write(&path, bytes).unwrap();
+        let mut registry = MediaTokenRegistry::new(Duration::from_secs(60));
+        let token = registry.issue(MediaGrant {
+            page_id: PageId::parse("page-protocol").unwrap(),
+            mime_type: "image/png",
+            max_bytes: 1024,
+            source: PageSource::File(path.clone()),
+        });
+        let request = Request::builder()
+            .uri(format!("comic://localhost/{token}"))
+            .header("Origin", PRODUCTION_ORIGIN)
+            .header("Referer", format!("{PRODUCTION_ORIGIN}/"))
+            .body(Vec::new())
+            .unwrap();
+
+        let response = handle_protocol_request(&mut registry, &request);
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["Content-Type"], "image/png");
+        assert_eq!(
+            response.headers()["Access-Control-Allow-Origin"],
+            PRODUCTION_ORIGIN
+        );
+        assert_eq!(response.body(), bytes);
+        fs::remove_file(path).unwrap();
     }
 }
