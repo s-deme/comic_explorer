@@ -38,6 +38,13 @@ describe("catalog sorting", () => {
       .toEqual(["large.zip", "small.zip", "missing.cbz"]);
     expect(sortCatalogEntries(values, "modified", "descending").map((item) => item.relativePath))
       .toEqual(["large.zip", "small.zip", "missing.cbz"]);
+    const runtimeNull = {
+      ...entry("runtime-null-folder", { kind: "folder", archiveKind: undefined }),
+      byteSize: null,
+    } as unknown as CatalogEntry;
+    expect(sortCatalogEntries([runtimeNull, values[1]], "size", "ascending")
+      .map((item) => item.relativePath))
+      .toEqual(["small.zip", "runtime-null-folder"]);
   });
 
   it("orders folder, comic folder, ZIP and CBZ and reverses the kind order", () => {

@@ -88,16 +88,26 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
 - custom protocolのWindows WebView2実機security試験
-- sort 4条件×昇降順の全順序・選択維持・正常終了後復元
-- 巻末の次漫画遷移と次漫画の保存位置、後続なし末尾
 - install済み製品の正常終了を含む登録→閲覧→再起動とoffline E2E
-- root消失/ACL、破損画像、7分類errorの製品UI回復
+- root消失/ACL、7分類errorの製品UI回復
 - keyboard-only全行程
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-30: release WebView2で漫画folderの破損2ページ目を開き、対象path・理由と
+  再試行/前/次/一覧復帰の3回復操作を表示した。前ページへの復帰、破損pageの再訪、
+  次の正常3ページ目への回復を実file adapterで観測し、TC-ERR-003をPASSへ変更した。
+  library全fileのrelative path/SHA-256差分は0、集計はPASS 55 / BLOCKED 11 /
+  NOT RUN 6。
+- 2026-07-30: CatalogGridへstate由来のsort field/directionとentry metadataを
+  locale非依存data属性として公開し、release WebView2の仮想一覧127項目を全scroll収集する
+  独立sort oracleを追加した。名前・更新日時・size・種類の昇降順8通りすべてで全順序一致、
+  count/unique 127、null欠損末尾、選択/focus維持を観測し、再起動後の種類降順復元も確認した。
+  実データのsize欠損がJSON `null`であるのにcomparatorが`undefined`だけを扱い欠損先頭に
+  していた不具合を修正した。TC-UI-007をPASSへ変更し、集計は
+  PASS 54 / BLOCKED 11 / NOT RUN 7。
 - 2026-07-30: 設定保存専用generationをnavigationから分離し、sortで確定済みthumbnailを
   再投入しないようにした。Rustのsort/viewer設定commandはstore mutexを単一の明示scopeで
   読込・保存し、同command内再lockと後続読書位置保存の停止余地を除去した。次漫画では

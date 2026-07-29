@@ -145,6 +145,11 @@ export function CatalogGrid({
                       }}
                       className="catalog-item"
                       data-selected={selectedPath === entry.relativePath}
+                      data-relative-path={entry.relativePath}
+                      data-kind={entry.kind}
+                      data-archive-kind={entry.archiveKind}
+                      data-modified-ms={entry.modifiedMs}
+                      data-byte-size={entry.byteSize}
                       title={`${name} — ${kindLabel(entry)}`}
                       tabIndex={
                         selectedPath === entry.relativePath ||

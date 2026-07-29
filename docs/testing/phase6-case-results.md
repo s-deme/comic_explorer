@@ -95,7 +95,7 @@ codd:
 | TC-UI-004 | PASS | 製品UIでback/forward/up/直接絶対pathを順に実行し、root外`C:\outside-library`をerror panelで拒否、rootを越えないことを観測 |
 | TC-UI-005 | PASS | 125実項目で長名title、総件数・選択名status、末尾scroll到達、先頭復帰、mounted gridcell 100以下、選択状態をrelease WebView2で観測 |
 | TC-UI-006 | PASS | `run-product-ui-harness.ps1`がrelease製品WebView2をCDP自動運転し、同じ2 slotでcold生成画像の実decode、再起動後cache hit、破損ZIPのnegative/error placeholder、操作継続、原本hash差分0を観測 |
-| TC-UI-007 | NOT RUN | release製品UIで4条件controlは連続操作済みだが、昇降順ごとの全順序と正常終了後の再起動復元を未観測 |
+| TC-UI-007 | PASS | release WebView2で127項目を4条件×昇降順すべて全scroll収集し独立oracleと一致、欠落重複0、null欠損末尾、選択/focus維持、種類降順の再起動復元を観測 |
 | TC-UI-008 | PASS | release WebView2で漫画folderのEnterは移動、Ctrl+Enterは保存pageから閲覧、書庫Enterは閲覧となり、Esc後にfolder・選択・focusを復元 |
 | TC-UI-009 | PASS | 実PNGで全体fit、比率維持、100%拡大上限、中央配置、先頭PageUpと後続なし末尾の端stayをrelease WebView2で観測 |
 | TC-UI-010 | PASS | release WebView2で初回単page、見開き最大2page、切替時の先頭page維持を観測し、製品再起動後も見開きmodeと保存page 3/3を復元 |
@@ -109,7 +109,7 @@ codd:
 | TC-E2E-004 | NOT RUN | offline E2E harness未整備。OS通信監視部分はTC-SEC-002でBLOCKED |
 | TC-ERR-001 | NOT RUN | root拒否/消失/retry/reselectの製品UI試験を未実行 |
 | TC-ERR-002 | NOT RUN | tree局所error componentはPASSだが製品ACL統合を未実行 |
-| TC-ERR-003 | NOT RUN | 破損画像viewer回復を未実行 |
+| TC-ERR-003 | PASS | release WebView2で漫画folderの破損2ページ目を開き、対象path・理由・再試行・前/次・一覧復帰を表示。前ページ、破損再訪、次の正常3ページ目への回復を観測 |
 | TC-ERR-004 | PASS | release WebView2で実corrupt ZIPをEnterし、対象名・理由・再試行・一覧復帰を表示、viewer非開始、一覧へ戻って125項目を継続利用 |
 | TC-ERR-005 | NOT RUN | 7分類を連続注入する製品UI試験を未実行 |
 
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 53 |
+| PASS | 55 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 8 |
+| NOT RUN | 6 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

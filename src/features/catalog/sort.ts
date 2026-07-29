@@ -59,12 +59,12 @@ function kindRank(entry: CatalogEntry): number {
 }
 
 function optionalNumberCompare(
-  left: number | undefined,
-  right: number | undefined,
+  left: number | null | undefined,
+  right: number | null | undefined,
   direction: SortDirection,
 ): number {
-  if (left === undefined) return right === undefined ? 0 : 1;
-  if (right === undefined) return -1;
+  if (left == null) return right == null ? 0 : 1;
+  if (right == null) return -1;
   const difference = left - right;
   return direction === "ascending" ? difference : -difference;
 }

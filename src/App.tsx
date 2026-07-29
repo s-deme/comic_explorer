@@ -355,6 +355,7 @@ export function App() {
           並べ替え
           <select
             aria-label="並べ替え条件"
+            data-sort-field={sortField}
             value={sortField}
             onChange={(event) =>
               changeSort(event.target.value as SortField, sortDescending)
@@ -367,6 +368,7 @@ export function App() {
           </select>
         </label>
         <button
+          data-sort-descending={sortDescending}
           onClick={() => {
             changeSort(sortField, !sortDescending);
           }}

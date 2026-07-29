@@ -92,6 +92,145 @@ function Wait-Evaluate([string]$Expression, [string]$Description) {
     throw "Timed out waiting for $Description. thumbnails=$($diagnostic | ConvertTo-Json -Compress)"
 }
 
+function Assert-CatalogSort([string]$Field, [string]$Direction) {
+    $fieldJson = $Field | ConvertTo-Json -Compress
+    $descendingJson = if ($Direction -eq "descending") { "true" } else { "false" }
+    $result = Invoke-Evaluate @"
+(async () => {
+  const select = document.querySelector('.toolbar select');
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+  setter.call(select, $fieldJson);
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (document.querySelector('.toolbar select').dataset.sortField === $fieldJson) break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  const direction = document.querySelector('.toolbar > button:last-of-type');
+  const currentlyDescending = direction.dataset.sortDescending === 'true';
+  if (currentlyDescending !== $descendingJson) direction.click();
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const current = document.querySelector('.toolbar > button:last-of-type');
+    if ((current.dataset.sortDescending === 'true') === $descendingJson) break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const finalDirection = document.querySelector('.toolbar > button:last-of-type');
+
+  const selected = document.querySelector('.catalog-item[data-selected=true]');
+  const selectionFocused = selected?.dataset.relativePath === 'comic-folder' &&
+    document.activeElement?.dataset.relativePath === 'comic-folder';
+  const scroll = document.querySelector('.catalog-scroll');
+  const items = new Map();
+  const capture = () => {
+    for (const row of document.querySelectorAll('.catalog-row')) {
+      const rowIndex = Number(row.getAttribute('aria-rowindex')) - 1;
+      [...row.querySelectorAll('.catalog-item')].forEach((item, column) => {
+        items.set(rowIndex * 5 + column, {
+          path: item.dataset.relativePath,
+          name: item.dataset.relativePath.split('/').at(-1),
+          kind: item.dataset.kind,
+          archiveKind: item.dataset.archiveKind || null,
+          modifiedMs: item.dataset.modifiedMs === undefined ? null : Number(item.dataset.modifiedMs),
+          byteSize: item.dataset.byteSize === undefined ? null : Number(item.dataset.byteSize),
+        });
+      });
+    }
+  };
+  for (let top = 0; top <= scroll.scrollHeight; top += Math.max(100, scroll.clientHeight / 2)) {
+    scroll.scrollTop = top;
+    scroll.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 10)));
+    capture();
+  }
+  scroll.scrollTop = scroll.scrollHeight;
+  scroll.dispatchEvent(new Event('scroll'));
+  await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 10)));
+  capture();
+  const actual = [...items.entries()].sort((left, right) => left[0] - right[0]).map((entry) => entry[1]);
+
+  const ordinal = (left, right) => {
+    const length = Math.min(left.length, right.length);
+    for (let index = 0; index < length; index += 1) {
+      const difference = left.charCodeAt(index) - right.charCodeAt(index);
+      if (difference !== 0) return difference;
+    }
+    return left.length - right.length;
+  };
+  const natural = (left, right) => {
+    let leftIndex = 0;
+    let rightIndex = 0;
+    while (leftIndex < left.length && rightIndex < right.length) {
+      const leftDigit = left.charCodeAt(leftIndex) >= 48 && left.charCodeAt(leftIndex) <= 57;
+      const rightDigit = right.charCodeAt(rightIndex) >= 48 && right.charCodeAt(rightIndex) <= 57;
+      if (leftDigit && rightDigit) {
+        let leftEnd = leftIndex;
+        let rightEnd = rightIndex;
+        while (leftEnd < left.length && /\d/.test(left[leftEnd])) leftEnd += 1;
+        while (rightEnd < right.length && /\d/.test(right[rightEnd])) rightEnd += 1;
+        const leftRun = left.slice(leftIndex, leftEnd);
+        const rightRun = right.slice(rightIndex, rightEnd);
+        const leftSignificant = leftRun.replace(/^0+/, '') || '0';
+        const rightSignificant = rightRun.replace(/^0+/, '') || '0';
+        const difference = leftSignificant.length - rightSignificant.length ||
+          ordinal(leftSignificant, rightSignificant) || ordinal(leftRun, rightRun);
+        if (difference !== 0) return difference;
+        leftIndex = leftEnd;
+        rightIndex = rightEnd;
+        continue;
+      }
+      const difference = left.charCodeAt(leftIndex) - right.charCodeAt(rightIndex);
+      if (difference !== 0) return difference;
+      leftIndex += 1;
+      rightIndex += 1;
+    }
+    return left.length - right.length;
+  };
+  const kindRank = (item) => item.kind === 'folder' ? 0 :
+    item.kind === 'comicFolder' ? 1 :
+    item.archiveKind === 'zip' ? 2 : item.archiveKind === 'cbz' ? 3 : 4;
+  const compareOptional = (left, right) => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return $descendingJson ? right - left : left - right;
+  };
+  const expected = [...actual].sort((left, right) => {
+    let primary = 0;
+    if ($fieldJson === 'name') primary = natural(left.name, right.name);
+    else if ($fieldJson === 'modified') primary = compareOptional(left.modifiedMs, right.modifiedMs);
+    else if ($fieldJson === 'size') primary = compareOptional(left.byteSize, right.byteSize);
+    else primary = kindRank(left) - kindRank(right);
+    if ($fieldJson !== 'modified' && $fieldJson !== 'size' && $descendingJson) primary = -primary;
+    return primary || natural(left.name, right.name) || ordinal(left.path, right.path);
+  });
+  const actualPaths = actual.map((item) => item.path);
+  const expectedPaths = expected.map((item) => item.path);
+  const matches = JSON.stringify(actualPaths) === JSON.stringify(expectedPaths);
+  const descending = finalDirection.dataset.sortDescending === 'true';
+  return {
+    ok: actual.length === 127 && new Set(actualPaths).size === 127 &&
+      selectionFocused && matches && select.value === $fieldJson &&
+      descending === $descendingJson,
+    count: actual.length,
+    unique: new Set(actualPaths).size,
+    selectionFocused,
+    matches,
+    firstMismatch: actualPaths.findIndex((path, index) => path !== expectedPaths[index]),
+    field: select.value,
+    descending,
+    expectedField: $fieldJson,
+    expectedDescending: $descendingJson,
+    fieldMatches: select.value === $fieldJson,
+    directionMatches: descending === $descendingJson,
+    actualHead: actual.slice(0, 5),
+    expectedHead: expected.slice(0, 5),
+  };
+})()
+"@
+    if (-not $result.ok) {
+        throw "Catalog sort oracle failed: $($result | ConvertTo-Json -Compress)"
+    }
+}
+
 function Start-Product {
     $env:LOCALAPPDATA = $appData
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
@@ -135,6 +274,17 @@ Copy-Item (
 Copy-Item (
     Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\square.png"
 ) (Join-Path $library "comic-folder\3.png")
+New-Item (Join-Path $library "a-error-comic") -ItemType Directory -Force |
+    Out-Null
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\portrait.png"
+) (Join-Path $library "a-error-comic\1.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-ERROR-001\corrupt.png"
+) (Join-Path $library "a-error-comic\2-corrupt.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\square.png"
+) (Join-Path $library "a-error-comic\3.png")
 New-Item (Join-Path $library "z-next-comic") -ItemType Directory -Force |
     Out-Null
 Copy-Item (
@@ -158,6 +308,9 @@ $sourceFiles = @(
     (Join-Path $library "comic-folder\1.png"),
     (Join-Path $library "comic-folder\2.png"),
     (Join-Path $library "comic-folder\3.png"),
+    (Join-Path $library "a-error-comic\1.png"),
+    (Join-Path $library "a-error-comic\2-corrupt.png"),
+    (Join-Path $library "a-error-comic\3.png"),
     (Join-Path $library "z-next-comic\1.png"),
     (Join-Path $library "z-next-comic\2.png"),
     (Join-Path $library "z-next-comic\3.png")
@@ -186,19 +339,42 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('126') && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
         "document.querySelector('#address').value.endsWith('\\library') && " +
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 2 && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "cold thumbnail success and error"
     Wait-Evaluate (
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('comic-folder ')); item.click(); item.focus(); " +
+        "return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.catalog-item[data-selected=true]')?.dataset.relativePath === " +
+        "'comic-folder' && document.activeElement?.dataset.relativePath === 'comic-folder'"
+    ) "sort selection baseline"
+    foreach ($field in @("name", "modified", "size", "kind")) {
+        Assert-CatalogSort -Field $field -Direction "ascending"
+        Assert-CatalogSort -Field $field -Direction "descending"
+    }
+    Invoke-Evaluate (
+        "(async () => { const scroll = document.querySelector('.catalog-scroll'); " +
+        "scroll.scrollTop = 0; scroll.dispatchEvent(new Event('scroll')); " +
+        "await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 20))); " +
+        "return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('0-very-long-comic-folder-name-'))"
+    ) "catalog return after sort oracle"
     $longNameJson = $longName | ConvertTo-Json -Compress
     if (-not (Invoke-Evaluate (
         "[...document.querySelectorAll('.catalog-item')].some((node) => " +
@@ -293,39 +469,16 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate "document.querySelector('[role=alert]') !== null" "root escape rejection"
-    $coldSortState = Invoke-Evaluate @"
-(async () => {
-  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
-  for (const field of ['name', 'modified', 'size', 'kind']) {
-    const select = document.querySelector('.toolbar select');
-    setter.call(select, field);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  const select = document.querySelector('.toolbar select');
-  setter.call(select, 'kind');
-  select.dispatchEvent(new Event('change', { bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const direction = document.querySelector('.toolbar > button:last-of-type');
-  direction.click();
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {field: document.querySelector('.toolbar select').value,
-    text: document.querySelector('.toolbar > button:last-of-type').textContent};
-})()
-"@
-    if ($coldSortState.field -ne "kind") {
-        throw "Sort control did not change in product UI: $($coldSortState | ConvertTo-Json -Compress)"
-    }
     Stop-Product $cold
     $cold = $null
 
     $warm = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
     ) "restored catalog"
     Wait-Evaluate (
         "document.querySelector('.toolbar select').value === 'kind' && " +
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 4 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "restored kind sort, cache hit and negative placeholder"
     Wait-Evaluate (
@@ -333,7 +486,7 @@ try {
         "node.title.startsWith('z-next-comic '))"
     ) "next comic mounted by restored kind sort"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 4 && " +
         "document.querySelector('.catalog-item[title^=""z-next-comic ""] " +
         ".thumbnail[data-cache-hit=true] img') !== null"
     ) "next comic thumbnail cache hit"
@@ -505,10 +658,10 @@ try {
 
     $viewerRestart = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
     ) "viewer-settings restart catalog"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 3 && " +
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 4 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "viewer-settings restart thumbnails"
     Invoke-Evaluate (
@@ -525,7 +678,7 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('#address').value.endsWith('\\library') && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
     ) "comic-folder keyboard navigation return"
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -542,6 +695,44 @@ try {
         "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
     ) | Out-Null
     Wait-Evaluate "document.querySelector('.viewer') === null" "restored viewer close"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('a-error-comic ')); item.click(); " +
+        "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar strong')?.textContent === 'a-error-comic' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1 / 3') && " +
+        "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0"
+    ) "corrupt-page comic first page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.page-error[role=alert]')?.textContent.includes('2-corrupt.png') && " +
+        "document.querySelectorAll('.page-error button').length === 3"
+    ) "targeted corrupt page error"
+    Invoke-Evaluate "document.querySelector('.page-error button:nth-of-type(1)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.page-error') === null && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1 / 3')"
+    ) "corrupt page previous recovery"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate "document.querySelector('.page-error') !== null" "corrupt page revisit"
+    Invoke-Evaluate "document.querySelector('.page-error button:nth-of-type(2)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.page-error') === null && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3') && " +
+        "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0"
+    ) "corrupt page next recovery"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate "document.querySelector('.viewer') === null" "corrupt-page viewer close"
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
         ".find((node) => node.title.startsWith('1-valid.cbz ')); item.focus(); " +
@@ -570,7 +761,7 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('[role=alert]') === null && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('126')"
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
     ) "corrupt archive list recovery"
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
