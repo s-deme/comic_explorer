@@ -88,7 +88,7 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
 - custom protocolのWindows WebView2実機security試験
-- install済み製品の正常終了を含む登録→閲覧→再起動とoffline E2E
+- offline E2E
 - 7分類errorの製品UI回復
 - keyboard-only全行程
 
@@ -96,6 +96,12 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: 製品E2Eの再起動境界をprocess強制停止からmain windowの正常closeへ
+  変更し、10秒以内の終了とexit code 0を必須化した。clean app-dataでroot登録、
+  folder/ZIP/CBZ閲覧、読書位置page 3/3、見開き、左読みを保存し、正常終了後の
+  release製品再起動でrootと全状態を復元した。失敗時の証跡清掃だけは強制停止を残す。
+  library全file hash差分0を確認し、TC-E2E-001をPASSへ変更した。集計は
+  PASS 58 / BLOCKED 11 / NOT RUN 3。
 - 2026-07-30: synthetic library内の1サブfolderへ現Windows userの
   `ListDirectory/ReadData` deny ACLを一時付与し、release WebView2で対象path、
   OS理由、再試行/一覧/親/別folderの回復操作を表示した。漫画folder判定中の子階層

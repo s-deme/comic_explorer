@@ -245,13 +245,27 @@ function Start-Product {
     }
 }
 
-function Stop-Product($Process) {
+function Stop-Product($Process, [switch]$Force) {
     if ($script:socket) {
         $script:socket.Dispose()
         $script:socket = $null
     }
-    Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
-    $Process.WaitForExit()
+    if ($Process.HasExited) { return }
+    if ($Force) {
+        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        $Process.WaitForExit()
+        return
+    }
+    if (-not $Process.CloseMainWindow()) {
+        throw "Product main window could not be closed normally."
+    }
+    if (-not $Process.WaitForExit(10000)) {
+        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        throw "Product did not exit within 10 seconds after a normal window close."
+    }
+    if ($Process.ExitCode -ne 0) {
+        throw "Product normal exit returned code $($Process.ExitCode)."
+    }
 }
 
 Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -863,6 +877,7 @@ try {
         invalidRootRejected = $true
         disappearedRootRecovered = $true
         localAclErrorRecovered = $true
+        normalExitRestart = $true
         navigationHistory = $true
         treeAddressListSynchronized = $true
         rootEscapeRejected = $true
@@ -883,10 +898,10 @@ try {
         $deniedAcl.RemoveAccessRuleSpecific($deniedRule)
         Set-Acl $deniedPath $deniedAcl
     }
-    if ($cold) { Stop-Product $cold }
-    if ($warm) { Stop-Product $warm }
-    if ($viewerRestart) { Stop-Product $viewerRestart }
-    if ($rootRecovery) { Stop-Product $rootRecovery }
+    if ($cold) { Stop-Product $cold -Force }
+    if ($warm) { Stop-Product $warm -Force }
+    if ($viewerRestart) { Stop-Product $viewerRestart -Force }
+    if ($rootRecovery) { Stop-Product $rootRecovery -Force }
     if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
         Move-Item $missingLibrary $library
     }
