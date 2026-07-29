@@ -27,6 +27,8 @@ jobs:
         working-directory: src-tauri
     steps:
       - uses: actions/checkout@v4
+      - run: python ../tests/fixtures/generate_fixtures.py --force
+      - run: python ../tests/fixtures/validate_fixtures.py ../tests/fixtures/generated
       - run: rustup toolchain install stable --profile minimal
       - run: rustup default stable
       - run: rustup component add rustfmt

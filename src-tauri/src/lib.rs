@@ -1,4 +1,5 @@
 pub mod api;
+pub mod catalog;
 pub mod domain;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
