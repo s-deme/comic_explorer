@@ -26,6 +26,10 @@ import type { ReadingDirection, ViewMode } from "./features/viewer/model";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
+import {
+  presentError,
+  presentUnexpectedError,
+} from "./features/errors/presentation";
 
 type LoadState =
   | { status: "idle" }
@@ -138,15 +142,15 @@ export function App() {
         setLoadState({
           status: "error",
           path: relativePath,
-          message: response.error.message,
+          message: presentError(response.error),
         });
       }
-    } catch (error) {
+    } catch {
       if (requestGeneration === generation.current) {
         setLoadState({
           status: "error",
           path: relativePath,
-          message: error instanceof Error ? error.message : String(error),
+          message: presentUnexpectedError(),
         });
       }
     }
@@ -161,7 +165,7 @@ export function App() {
       dispatch({ type: "reset", path: "" });
       await load("");
     } else if (response.status === "error") {
-      setLoadState({ status: "error", path: rootInput, message: response.error.message });
+      setLoadState({ status: "error", path: rootInput, message: presentError(response.error) });
     }
   }
 
@@ -177,7 +181,7 @@ export function App() {
       setLoadState({
         status: "error",
         path: rootInput,
-        message: response.error.message,
+        message: presentError(response.error),
       });
     }
   }
@@ -478,7 +482,7 @@ export function App() {
                       setLoadState({
                         status: "error",
                         path: entry.relativePath,
-                        message: response.error.message,
+                        message: presentError(response.error),
                       });
                     }
                   },

@@ -96,6 +96,13 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: API error codeを利用者向け固定分類へ変換する単一presentation層を
+  追加し、root登録、folder/list/tree、漫画open、想定外例外の全表示経路へ接続した。
+  12 API codeすべてが固定分類へ収束し、OS error、例外名、stack、絶対内部pathを
+  主メッセージへ出さないことをunit testで確認した。release WebView2でも実ACL拒否と
+  破損書庫が固定日本語分類となり、`os error`/`Cannot read`/stack非表示を観測した。
+  アプリデータ再初期化通知を含む7分類すべてのUI注入は未完了のため、
+  TC-ERR-005はNOT RUNを維持する。
 - 2026-07-30: TC-E2E-004は製品内計測だけでは外向き通信0件を独立証明できないため、
   NOT RUNからBLOCKEDへ変更した。clean隔離VM、offline installer/WebView2、
   VM外gatewayのDNS/TCP/UDP captureを使い、全MVP操作、7分類error、正常終了、

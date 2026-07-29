@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listTreeChildren } from "../library/client";
+import { presentError } from "../errors/presentation";
 
 interface TreeNode {
   path: string;
@@ -58,7 +59,7 @@ export function FolderTree({
       });
     } else if (response.status === "error") {
       setErrors((previous) =>
-        new Map(previous).set(path, response.error.message),
+        new Map(previous).set(path, presentError(response.error)),
       );
     }
   }

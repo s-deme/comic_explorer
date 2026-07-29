@@ -94,7 +94,11 @@ describe("FolderTree", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByTitle("アクセスできません。")).toBeInTheDocument(),
+      expect(
+        screen.getByTitle(
+          "アクセスできません。権限または他のアプリによる使用状況を確認してください。",
+        ),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByRole("treeitem", { name: "Available" })).toBeInTheDocument();
   });

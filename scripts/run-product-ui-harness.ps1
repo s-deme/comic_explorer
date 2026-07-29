@@ -488,6 +488,9 @@ try {
 "@ | Out-Null
     Wait-Evaluate (
         "document.querySelector('.error-panel[role=alert]')?.textContent.includes('acl-denied') && " +
+        "document.querySelector('.error-panel').textContent.includes(" +
+        "'\u30a2\u30af\u30bb\u30b9\u3067\u304d\u307e\u305b\u3093') && " +
+        "!/os error|Cannot read|stack/i.test(document.querySelector('.error-panel').textContent) && " +
         "document.querySelector('.error-panel button:nth-of-type(1)') !== null && " +
         "document.querySelector('.error-panel button:nth-of-type(2)') !== null"
     ) "local ACL error"
@@ -831,6 +834,9 @@ try {
     ) | Out-Null
     Wait-Evaluate (
         "document.querySelector('[role=alert]')?.textContent.includes('2-corrupt.zip') && " +
+        "document.querySelector('[role=alert]').textContent.includes(" +
+        "'\u30c7\u30fc\u30bf\u304c\u7834\u640d\u3057\u3066\u3044\u307e\u3059') && " +
+        "!/stack|os error/i.test(document.querySelector('[role=alert]').textContent) && " +
         "document.querySelector('[role=alert] button:nth-of-type(2)') !== null"
     ) "corrupt archive error and recovery actions"
     Invoke-Evaluate "document.querySelector('[role=alert] button:nth-of-type(2)').click(); true" |
