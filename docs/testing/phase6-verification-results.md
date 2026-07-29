@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、52 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、52 unit tests + 1 product-process integration |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 24 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
@@ -89,12 +89,19 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 - 製品WebViewでcold生成、cache hit、失敗placeholderを連続観測する統合試験
 - custom protocolのWindows WebView2実機security試験
-- shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-29: Cargoが生成した実`comic-explorer.exe`を別processで起動する
+  `shutdown_process` integrationを追加した。隔離`LOCALAPPDATA`の実SQLiteへ最新位置を
+  保存し、active navigation/viewer generationとmedia tokenを作成してから製品の
+  shutdown treeを実行する。両generation cancel、media全失効、shutdown後queue拒否、
+  SQLite reopenでpage 7復元、app-data directoryのrename成功によるDB/WAL/SHM/cache
+  handle close、exit code 0を親processから観測した。Windows MSVC 52 unit tests +
+  1 product-process integrationで「shutdown時の全task停止、全handle close、最終位置
+  flushを対象とするE2E」を既知未完了から除外した。
 - 2026-07-29: `list_folder`の実fixture port結果とcommand response組立てを共通境界へ
   接続した。混在fixture successではarchive分類data、missingでは`NOT_FOUND`、
   完了済みでも旧generationならdataを捨てた`cancelled`を返し、3経路すべてで要求時の

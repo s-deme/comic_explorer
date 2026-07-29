@@ -94,6 +94,90 @@ impl AppState {
     }
 }
 
+pub fn run_shutdown_process_harness() -> Result<serde_json::Value, String> {
+    let paths = AppPaths::discover().map_err(|error| error.message)?;
+    let state = AppState::default();
+    let navigation = state
+        .navigation
+        .lock()
+        .map_err(|_| "navigation state poisoned")?
+        .begin(Generation(91));
+    let viewer = state
+        .viewer
+        .lock()
+        .map_err(|_| "viewer state poisoned")?
+        .begin(Generation(92));
+    let media_token = state
+        .media
+        .lock()
+        .map_err(|_| "media state poisoned")?
+        .issue(MediaGrant {
+            page_id: PageId::parse("shutdown-harness-page").map_err(str::to_string)?,
+            mime_type: "image/png",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::Memory(b"\x89PNG\r\n\x1a\n".to_vec()),
+        });
+    state
+        .store
+        .lock()
+        .map_err(|_| "store state poisoned")?
+        .as_ref()
+        .ok_or_else(|| "shutdown harness store is unavailable".to_string())?
+        .save_reading_position(
+            "shutdown-book",
+            &crate::state::ReadingPosition {
+                page_key: RelativePath::parse("page-7.png").map_err(str::to_string)?,
+                natural_ordinal: 6,
+            },
+            unix_millis(),
+        )
+        .map_err(|error| error.message)?;
+    state.shutdown();
+    if !navigation.is_cancelled() || !viewer.is_cancelled() {
+        return Err("shutdown did not cancel active generations".into());
+    }
+    if state
+        .media
+        .lock()
+        .map_err(|_| "media state poisoned")?
+        .resolve(&media_token)
+        .is_ok()
+    {
+        return Err("shutdown did not revoke media tokens".into());
+    }
+    if state
+        .page_workers
+        .submit(Priority::Visible, CancellationToken::new(), || {})
+        .is_ok()
+    {
+        return Err("shutdown page queue accepted new work".into());
+    }
+    let (reopened, _) = StateStore::open(&paths).map_err(|error| error.message)?;
+    let saved = reopened
+        .reading_position("shutdown-book")
+        .map_err(|error| error.message)?
+        .ok_or_else(|| "shutdown position was not flushed".to_string())?;
+    drop(reopened);
+    let moved = paths.root.with_extension("closed");
+    std::fs::rename(&paths.root, &moved).map_err(|error| {
+        format!(
+            "app-data handles remained open ({} -> {}): {error}",
+            paths.root.display(),
+            moved.display()
+        )
+    })?;
+    std::fs::rename(&moved, &paths.root).map_err(|error| error.to_string())?;
+    Ok(serde_json::json!({
+        "status": "ok",
+        "position": saved.page_key.as_str(),
+        "navigationCancelled": true,
+        "viewerCancelled": true,
+        "mediaRevoked": true,
+        "queueRejected": true,
+        "handlesClosed": true
+    }))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRoot {

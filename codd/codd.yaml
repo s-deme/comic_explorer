@@ -34,6 +34,7 @@ dag:
   test_file_patterns:
     - "src/**/*.test.ts"
     - "src/**/*.test.tsx"
+    - "src-tauri/tests/**/*.rs"
 
 common_node_patterns:
   - "vite.config.ts"
@@ -79,6 +80,7 @@ scan:
   source_dirs:
     - "src/"
     - "src-tauri/src/"
+    - "src-tauri/tests/"
     - "benchmarks/architecture-spike/"
     - "scripts/"
     - "tests/fixtures/"
