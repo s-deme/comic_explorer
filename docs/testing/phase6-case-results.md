@@ -106,7 +106,7 @@ codd:
 | TC-E2E-001 | PASS | clean app-dataのrelease製品でroot登録→folder/ZIP/CBZ閲覧→読書位置/表示設定保存→main window正常close、10秒以内exit code 0→再起動しroot、保存page 3/3、見開き、左読みを復元 |
 | TC-E2E-002 | PASS | clean app-dataのrelease製品でlibrary全fileのrelative path/SHA-256を閲覧前後比較し差分0、隣接展開物・管理file 0を観測 |
 | TC-E2E-003 | PASS | 種類降順の確定一覧でcomic-folder巻末→z-next-comicをdialogなしで開き、次漫画の保存page 2を復元、後続なし末尾stayを製品E2Eで観測 |
-| TC-E2E-004 | NOT RUN | offline E2E harness未整備。OS通信監視部分はTC-SEC-002でBLOCKED |
+| TC-E2E-004 | BLOCKED | clean隔離VM、offline installer/WebView2、VM外DNS/TCP/UDP監視が必要。全MVP完走・通信0・原本差分0の手順と証跡条件をmanual procedureへ固定 |
 | TC-ERR-001 | PASS | release WebView2で存在しないrootを拒否し、同画面の登録/選択導線から有効rootを再登録。保存済みrootを実renameして再起動し、対象絶対path・理由・再試行・別folder選択を表示後、同path復旧と再試行で127項目へ復帰 |
 | TC-ERR-002 | PASS | release WebView2実行中にfolder-a/acl-deniedへ現userのListDirectory/ReadData deny ACLを一時付与。対象path・理由・回復操作を表示し、親folderのchild/still-readableは継続利用、ACL解除後も正常閲覧、原本hash差分0を観測 |
 | TC-ERR-003 | PASS | release WebView2で漫画folderの破損2ページ目を開き、対象path・理由・再試行・前/次・一覧復帰を表示。前ページ、破損再訪、次の正常3ページ目への回復を観測 |
@@ -136,9 +136,9 @@ codd:
 | --- | ---: |
 | PASS | 58 |
 | FAIL | 0 |
-| BLOCKED | 11 |
-| NOT RUN | 3 |
+| BLOCKED | 12 |
+| NOT RUN | 2 |
 | **合計** | **72** |
 
-BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は
+BLOCKED 12件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は
 `docs/testing/phase6-manual-procedures.md`に記載した。

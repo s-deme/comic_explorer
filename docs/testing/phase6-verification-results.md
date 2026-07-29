@@ -96,6 +96,12 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: TC-E2E-004は製品内計測だけでは外向き通信0件を独立証明できないため、
+  NOT RUNからBLOCKEDへ変更した。clean隔離VM、offline installer/WebView2、
+  VM外gatewayのDNS/TCP/UDP captureを使い、全MVP操作、7分類error、正常終了、
+  再起動、uninstallまでを通信0・library差分0で判定する完全な手順、証跡、後処理を
+  manual procedureへ追加した。PASSへの読み替えは行わず、集計は
+  PASS 58 / BLOCKED 12 / NOT RUN 2。
 - 2026-07-30: 製品E2Eの再起動境界をprocess強制停止からmain windowの正常closeへ
   変更し、10秒以内の終了とexit code 0を必須化した。clean app-dataでroot登録、
   folder/ZIP/CBZ閲覧、読書位置page 3/3、見開き、左読みを保存し、正常終了後の

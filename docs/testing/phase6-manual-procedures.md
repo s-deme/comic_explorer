@@ -50,6 +50,23 @@ Firewall logging、pktmon/Wireshark、DNS server query logを開始する。
 期待結果はComic Explorer由来の外向きDNS/TCP/UDP 0件で、1件でも宛先・payloadに
 かかわらずFAIL。pcapng、pktmon ETL、firewall/DNS log、操作時刻表を保存する。
 
+## TC-E2E-004: offline全MVP完走と通信0件
+
+TC-SEC-002と同じclean Windows 11 VM、隔離gateway、外部packet監視を使い、NICを
+隔離networkへ限定する。試験前にinstaller、WebView2 offline runtime、全fixtureを
+VMへ搬入し、hashを記録する。
+
+1. gateway側のDNS/TCP/UDP captureとVM側firewall/pktmon logを開始する。
+2. offline installer、初回root登録、tree/list/navigation/sort、folder/ZIP/CBZ閲覧、
+   読書位置/設定保存、next comic、7分類error回復、正常終了、再起動復元を完走する。
+3. library全fileのrelative path/SHA-256、原本隣接物、app process/子process、
+   操作時刻を前後比較する。
+4. uninstall後まで監視し、PID、VM IP、時刻帯をpcapng、DNS、firewall logと照合する。
+
+全MVP操作成功、network要求UIなし、Comic Explorer由来DNS/TCP/UDP 0件、library差分0、
+隣接生成物0でPASSとする。通信のprocess帰属が曖昧な場合はPASSにせず再試験し、
+VM snapshotを戻す。
+
 ## WebView2 custom protocol統合security
 
 必要環境はWindows 10 22H2とWindows 11の各WebView2実機、DevTools Protocol trace、
