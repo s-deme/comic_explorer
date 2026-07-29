@@ -20,7 +20,7 @@ codd:
 - 実行日時: 2026-07-29 22:06 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （50件PASS。接続済みpage workerの100 viewer generationと対象付き破損page回復試験を含む）
+  （51件PASS。接続済みfolder/archive portのsuccess・missing・cancel契約を含む）
 - React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（25件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
@@ -57,9 +57,9 @@ codd:
 
 | ID | 結果 | 自動テスト／理由 |
 | --- | --- | --- |
-| TC-CT-001 | NOT RUN | 列挙portのsuccess/refusalは試験済みだが消失/cancel契約全体は未実行 |
+| TC-CT-001 | PASS | 製品`list_folder`と同じcancellable portで実folder success、missing分類、root越境拒否、事前cancelの`CANCELLED`を実行 |
 | TC-CT-002 | PASS | WICの実JPEG/PNG decode、寸法、resizeに加え、製品`load_page`と同じpage adapterで破損PNGの`CORRUPT_IMAGE`、対象relative path、次の正常page成功を観測 |
-| TC-CT-003 | NOT RUN | archive list/openは試験済みだがcancel契約を未実行 |
+| TC-CT-003 | PASS | 製品`open_comic`と同じcancellable portで実CBZ entry、corrupt/encrypted/unsupported/unsafe分類、事前cancelの`CANCELLED`、非展開を実行 |
 | TC-CT-004 | PASS | 実WIC/cache pipelineの生成画像・content/page identity・miss/hit・原本差分0に加え、接続済みpriority workerでcancel後の未開始job破棄と100世代中最新だけのcommitを実行 |
 | TC-CT-005 | PASS | `repository::settings_and_reading_position_survive_reopen` |
 | TC-CT-006 | NOT RUN | API構造とgenerationはunit済みだがUI-backend success/error/cancel一式を未実行 |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 34 |
+| PASS | 36 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 27 |
+| NOT RUN | 25 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

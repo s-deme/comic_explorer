@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 
 use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::catalog::{
@@ -463,15 +464,7 @@ pub async fn list_folder(
     let requested_directory = root.join(relative_path.as_str());
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        if cancellation.is_cancelled() {
-            return Err(AppError::cancelled());
-        }
-        let result = enumerate_folder(&worker_root, &requested_directory);
-        if cancellation.is_cancelled() {
-            Err(AppError::cancelled())
-        } else {
-            result
-        }
+        enumerate_folder_port(&worker_root, &requested_directory, &cancellation)
     })
     .await
     .map_err(|error| format!("catalog worker failed: {error}"))?;
@@ -672,6 +665,43 @@ fn read_page_bytes(grant: &MediaGrant, target: &RelativePath) -> Result<Vec<u8>,
     })
 }
 
+fn enumerate_folder_port(
+    root: &std::path::Path,
+    directory: &std::path::Path,
+    cancellation: &CancellationToken,
+) -> Result<Vec<CatalogEntry>, AppError> {
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let result = enumerate_folder(root, directory);
+    if cancellation.is_cancelled() {
+        Err(AppError::cancelled())
+    } else {
+        result
+    }
+}
+
+fn enumerate_pages_port(
+    root: &std::path::Path,
+    item: &std::path::Path,
+    is_archive: bool,
+    cancellation: &CancellationToken,
+) -> Result<Vec<RelativePath>, AppError> {
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let result = if is_archive {
+        enumerate_archive_pages(item)
+    } else {
+        enumerate_folder_pages(root, item)
+    };
+    if cancellation.is_cancelled() {
+        Err(AppError::cancelled())
+    } else {
+        result
+    }
+}
+
 #[tauri::command]
 pub async fn list_tree_children(
     state: tauri::State<'_, AppState>,
@@ -789,14 +819,7 @@ pub async fn open_comic(
     let worker_item = item_path.clone();
     let is_archive = classify_file_name(item_relative.as_str()) == FileKind::Archive;
     let page_paths = tauri::async_runtime::spawn_blocking(move || {
-        if viewer_cancellation.is_cancelled() {
-            return Err(AppError::cancelled());
-        }
-        if is_archive {
-            enumerate_archive_pages(&worker_item)
-        } else {
-            enumerate_folder_pages(&worker_root, &worker_item)
-        }
+        enumerate_pages_port(&worker_root, &worker_item, is_archive, &viewer_cancellation)
     })
     .await
     .map_err(|error| format!("page enumeration worker failed: {error}"))?;
@@ -1194,6 +1217,47 @@ mod shutdown_tests {
         let bytes = read_page_bytes(&next, &next_target).unwrap();
         assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn folder_and_archive_ports_distinguish_success_missing_and_cancel() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated")
+            .canonicalize()
+            .unwrap();
+        let active = CancellationToken::new();
+        let entries = enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), &active).unwrap();
+        assert!(!entries.is_empty());
+        assert_eq!(
+            enumerate_folder_port(&root, &root.join("missing"), &active)
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+        let pages =
+            enumerate_pages_port(&root, &root.join("FIX-ZIP-001/standard.cbz"), true, &active)
+                .unwrap();
+        assert!(!pages.is_empty());
+
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        assert_eq!(
+            enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), &cancelled)
+                .unwrap_err()
+                .code,
+            ErrorCode::Cancelled
+        );
+        assert_eq!(
+            enumerate_pages_port(
+                &root,
+                &root.join("FIX-ZIP-001/standard.cbz"),
+                true,
+                &cancelled,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::Cancelled
+        );
     }
 
     #[cfg(target_os = "windows")]
