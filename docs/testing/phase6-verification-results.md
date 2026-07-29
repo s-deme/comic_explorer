@@ -40,6 +40,9 @@ codd:
 | NSIS x64 installer | PASS | offline WebView2 modeで生成 |
 | SBOM | PASS | lock-backed CycloneDX 1.6 inventory |
 
+72ケースの個別判定、対応test名、未実行理由は
+`docs/testing/phase6-case-results.md`に記録した。
+
 ## 基礎性能測定
 
 この値はWSL2上のportable foundation harnessであり、Windows製品UIの合否値ではない。
