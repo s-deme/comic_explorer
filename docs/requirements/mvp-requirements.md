@@ -425,6 +425,9 @@ codd:
   `暗号化されています`、`一時的に使用できません`、`アプリデータを再初期化しました`
   とする。内部例外やstack traceを主メッセージへ表示せず、対象、簡潔な理由、
   安全な回復操作を示す。
+- REQ-MVP-019-AC5: UI-backend境界の全responseは要求時のrequest IDとgenerationを
+  保持し、success、分類付きerror、cancelを構造的に区別する。取消済みまたは古い
+  generationの実port結果はsuccessとしてUIへ返さない。
 
 ## 6. 非機能要件
 

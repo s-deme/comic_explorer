@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、51 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、52 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 24 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
@@ -95,6 +95,12 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: `list_folder`の実fixture port結果とcommand response組立てを共通境界へ
+  接続した。混在fixture successではarchive分類data、missingでは`NOT_FOUND`、
+  完了済みでも旧generationならdataを捨てた`cancelled`を返し、3経路すべてで要求時の
+  request ID/generationを保持することをWindows MSVC 52 testsで観測した。React側の
+  stale response拒否contractと合わせTC-CT-006をPASSへ変更し、集計は
+  PASS 37 / BLOCKED 11 / NOT RUN 24。
 - 2026-07-29: `list_folder`と`open_comic`が使うfolder/archive列挙を共通の
   cancellable portへ集約し、処理前後のcancelを部分成功より優先する契約にした。
   実folder/CBZのsuccess、missing、root越境拒否、corrupt/encrypted/unsupported/

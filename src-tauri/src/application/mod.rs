@@ -474,28 +474,7 @@ pub async fn list_folder(
         .lock()
         .map_err(|_| "state poisoned")?
         .is_current(context.generation);
-    if !is_current {
-        return Ok(Response::Cancelled {
-            request_id: context.request_id,
-            generation: context.generation,
-        });
-    }
-    Ok(match result {
-        Ok(data) => Response::Ok {
-            request_id: context.request_id,
-            generation: context.generation,
-            data,
-        },
-        Err(error) if error.code == ErrorCode::Cancelled => Response::Cancelled {
-            request_id: context.request_id,
-            generation: context.generation,
-        },
-        Err(error) => Response::Error {
-            request_id: context.request_id,
-            generation: context.generation,
-            error,
-        },
-    })
+    Ok(port_response(context, result, is_current))
 }
 
 #[tauri::command]
@@ -699,6 +678,35 @@ fn enumerate_pages_port(
         Err(AppError::cancelled())
     } else {
         result
+    }
+}
+
+fn port_response<T>(
+    context: RequestContext,
+    result: Result<T, AppError>,
+    is_current: bool,
+) -> Response<T> {
+    if !is_current
+        || result
+            .as_ref()
+            .is_err_and(|error| error.code == ErrorCode::Cancelled)
+    {
+        return Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        };
+    }
+    match result {
+        Ok(data) => Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        },
+        Err(error) => Response::Error {
+            request_id: context.request_id,
+            generation: context.generation,
+            error,
+        },
     }
 }
 
@@ -1258,6 +1266,69 @@ mod shutdown_tests {
             .code,
             ErrorCode::Cancelled
         );
+    }
+
+    #[test]
+    fn application_boundary_preserves_context_and_rejects_stale_real_results() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated")
+            .canonicalize()
+            .unwrap();
+        let cancellation = CancellationToken::new();
+        let success = enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), &cancellation);
+        let context = RequestContext {
+            api_version: crate::api::API_VERSION,
+            request_id: RequestId::parse("fixture-success").unwrap(),
+            generation: Generation(41),
+        };
+        match port_response(context, success, true) {
+            Response::Ok {
+                request_id,
+                generation,
+                data,
+            } => {
+                assert_eq!(request_id.as_str(), "fixture-success");
+                assert_eq!(generation, Generation(41));
+                assert!(data.iter().any(|entry| {
+                    entry.relative_path.as_str().ends_with("volume.cbz")
+                        && entry.kind == crate::domain::ItemKind::Archive
+                }));
+            }
+            response => panic!("unexpected success response: {response:?}"),
+        }
+
+        let missing = enumerate_folder_port(&root, &root.join("missing"), &cancellation);
+        let context = RequestContext {
+            api_version: crate::api::API_VERSION,
+            request_id: RequestId::parse("fixture-error").unwrap(),
+            generation: Generation(42),
+        };
+        match port_response(context, missing, true) {
+            Response::Error {
+                request_id,
+                generation,
+                error,
+            } => {
+                assert_eq!(request_id.as_str(), "fixture-error");
+                assert_eq!(generation, Generation(42));
+                assert_eq!(error.code, ErrorCode::NotFound);
+            }
+            response => panic!("unexpected error response: {response:?}"),
+        }
+
+        let stale = enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), &cancellation);
+        let context = RequestContext {
+            api_version: crate::api::API_VERSION,
+            request_id: RequestId::parse("fixture-stale").unwrap(),
+            generation: Generation(40),
+        };
+        assert!(matches!(
+            port_response(context, stale, false),
+            Response::Cancelled {
+                request_id,
+                generation: Generation(40)
+            } if request_id.as_str() == "fixture-stale"
+        ));
     }
 
     #[cfg(target_os = "windows")]
