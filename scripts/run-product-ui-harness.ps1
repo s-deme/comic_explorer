@@ -129,6 +129,12 @@ New-Item (Join-Path $library "comic-folder") -ItemType Directory -Force |
 Copy-Item (
     Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\portrait.png"
 ) (Join-Path $library "comic-folder\1.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\wide.png"
+) (Join-Path $library "comic-folder\2.png")
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\square.png"
+) (Join-Path $library "comic-folder\3.png")
 $longName = "0-very-long-comic-folder-name-0123456789-abcdefghijklmnopqrstuvwxyz"
 New-Item (Join-Path $library $longName) -ItemType Directory -Force | Out-Null
 1..120 | ForEach-Object {
@@ -137,7 +143,10 @@ New-Item (Join-Path $library $longName) -ItemType Directory -Force | Out-Null
 }
 $sourceFiles = @(
     (Join-Path $library "1-valid.cbz"),
-    (Join-Path $library "2-corrupt.zip")
+    (Join-Path $library "2-corrupt.zip"),
+    (Join-Path $library "comic-folder\1.png"),
+    (Join-Path $library "comic-folder\2.png"),
+    (Join-Path $library "comic-folder\3.png")
 )
 $before = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
 
@@ -233,22 +242,24 @@ try {
     $directPathJson = (Join-Path $library "folder-a\child") |
         ConvertTo-Json -Compress
     Invoke-Evaluate @"
-(() => {
+(async () => {
   const input = document.querySelector('#address');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, $directPathJson);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
   input.form.requestSubmit();
   return true;
 })()
 "@ | Out-Null
     Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a\\child')" "direct-path navigation"
     Invoke-Evaluate @"
-(() => {
+(async () => {
   const input = document.querySelector('#address');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, 'C:\\outside-library');
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
   input.form.requestSubmit();
   return true;
 })()
@@ -292,6 +303,112 @@ try {
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=true] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "warm thumbnail image decode"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('comic-folder ')); item.click(); " +
+        "item.closest('[role=gridcell]').querySelector('.read-action').click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer') !== null && " +
+        "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0"
+    ) "viewer first page"
+    if (-not (Invoke-Evaluate (
+        "(() => { const image = document.querySelector('.page-spread img'); " +
+        "const box = image.getBoundingClientRect(); return box.width <= image.naturalWidth && " +
+        "box.height <= image.naturalHeight && Math.abs(box.width / box.height - " +
+        "image.naturalWidth / image.naturalHeight) < 0.02; })()"
+    ))) { throw "Single-page fit distorted or upscaled the real image." }
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "PageDown navigation"
+    Wait-Evaluate (
+        "document.querySelector('.page-spread img')?.naturalWidth > " +
+        "document.querySelector('.page-spread img')?.naturalHeight"
+    ) "landscape page decode"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageUp', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1 / 3')"
+    ) "PageUp navigation"
+    Invoke-Evaluate (
+        "document.querySelector('.viewer-stage').dispatchEvent(" +
+        "new WheelEvent('wheel', {deltaY:1, bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "wheel next navigation"
+    Invoke-Evaluate (
+        "document.querySelector('.viewer-stage').dispatchEvent(" +
+        "new WheelEvent('wheel', {deltaY:-1, bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1 / 3')"
+    ) "wheel previous navigation"
+    Invoke-Evaluate "document.querySelector('.page-zone-left').click(); true" | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "click next navigation"
+    Invoke-Evaluate "document.querySelector('.viewer-toolbar button:nth-of-type(1)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelectorAll('.page-spread img:not(.prefetch-page)').length === 1"
+    ) "landscape page alone in spread mode"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:' ', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3') && " +
+        "document.querySelectorAll('.page-spread img:not(.prefetch-page)').length === 1"
+    ) "final odd page"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageUp', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
+    ) "spread history first reverse"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageUp', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1-2 / 3')"
+    ) "spread history returns leading page"
+    Invoke-Evaluate "document.querySelector('.viewer-toolbar button:nth-of-type(2)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.page-spread').dataset.direction === 'leftToRight' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1-2 / 3')"
+    ) "direction switch keeps leading page"
+    Invoke-Evaluate "document.querySelector('.page-zone-right').click(); true" | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
+    ) "left-to-right click direction"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageUp', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1-2 / 3')"
+    ) "direction click reverse"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('3 / 3')"
+    ) "left-to-right arrow direction"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer') === null && " +
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.includes('comic-folder')) && " +
+        "document.activeElement?.title?.startsWith('comic-folder ')"
+    ) "viewer context restoration"
+    Stop-Product $warm
+    $warm = $null
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
         throw "Product UI harness changed source archives."
@@ -309,6 +426,12 @@ try {
         sortControlsExercised = $true
         longNameTooltip = $true
         mountedGridCellsAtMost100 = $true
+        viewerFitNoUpscale = $true
+        viewerInputParity = $true
+        spreadHistoryReversible = $true
+        landscapeAndOddPagesAlone = $true
+        viewerContextRestored = $true
+        viewerSettingsApplied = $true
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {

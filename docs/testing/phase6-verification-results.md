@@ -31,7 +31,7 @@ codd:
 | --- | --- | --- |
 | Rust fmt/check/test | PASS | Windows MSVC、52 unit tests + 1 product-process integration |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 24 tests |
+| React unit/component | PASS | 26 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、advisory 4 |
@@ -93,6 +93,14 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-30: release WebView2 CDP harnessを3枚の実PNG漫画folderへ拡張した。
+  実画像decode、縦長画像の比率維持・100%拡大上限、key/click/wheelの同一page遷移、
+  単page/見開き切替、横長page単独表示、奇数末尾単独表示、PageUpによる可逆履歴、
+  読み方向変更時のclick/矢印反転を製品WebViewで観測した。Esc後は一覧の選択、
+  status、keyboard focusまで同じ漫画へ復元し、原本hash差分0を維持した。
+  TC-UI-011/013をPASSへ変更した。再起動後のviewer openは読み込み状態から完了せず、
+  永続復元を含むTC-UI-008/010/012はNOT RUNを維持する。
+  集計はPASS 44 / BLOCKED 11 / NOT RUN 17。
 - 2026-07-29: release WebView2 CDP harnessを125項目と3階層の実libraryへ拡張した。
   root→folder→child、tree/address/list current同期、back/forward/up/直接絶対path、
   root外拒否、長名tooltip、総件数/選択status、仮想gridの末尾到達・先頭復帰・mounted

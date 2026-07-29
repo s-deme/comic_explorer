@@ -17,18 +17,18 @@ codd:
 
 ## 実行条件
 
-- 実行日時: 2026-07-29 22:06 JST
+- 実行日時: 2026-07-30 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
   （52 unit + 1 product-process integration PASS。実binary shutdown、位置復元、
   cancel/token失効/queue拒否、app-data renameによるhandle closeを含む）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（25件PASS。
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（26件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
   （7件PASS）
 - build: `npm run build`（PASS）
 - fixture: `.venv/bin/python tests/fixtures/validate_fixtures.py
-  tests/fixtures/generated`（64 files / 11 fixtures、PASS）
+  tests/fixtures/generated`（68 files / 11 fixtures、PASS）
 - 判定規則: ケースの期待結果全体を直接観測した場合だけPASSとする。部分的なunit
   testしかないケースはNOT RUN、指定された外部Windows/隔離環境がないケースは
   BLOCKEDとする。自動test suiteがPASSでも対応ケースを推測でPASSへ繰り上げない。
@@ -99,9 +99,9 @@ codd:
 | TC-UI-008 | NOT RUN | viewerを含む一覧context復帰試験を未実行 |
 | TC-UI-009 | NOT RUN | 実画像寸法を用いたfit/100%上限試験を未実行 |
 | TC-UI-010 | NOT RUN | model unitのみで製品UI再起動復元を未実行 |
-| TC-UI-011 | NOT RUN | model unitのみで製品UI画像表示を未実行 |
+| TC-UI-011 | PASS | release WebView2で横長pageが単独、3page目の奇数末尾が単独となり、PageUpで直前の見開きへ可逆に戻ることを観測 |
 | TC-UI-012 | NOT RUN | 読み方向の製品UI再起動復元を未実行 |
-| TC-UI-013 | NOT RUN | key/click/wheelの同一page統合試験を未実行 |
+| TC-UI-013 | PASS | release WebView2でPageUp/Down、矢印、page領域click、wheelが同じpage列を移動し、Esc後に選択項目へfocusが復元することを観測 |
 | TC-UI-014 | NOT RUN | 次漫画遷移の製品UI試験を未実行 |
 | TC-E2E-001 | NOT RUN | install済み製品の登録→閲覧→再起動E2E harness未整備 |
 | TC-E2E-002 | NOT RUN | 製品閲覧を囲む原本snapshot E2E harness未整備 |

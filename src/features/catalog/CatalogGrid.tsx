@@ -95,7 +95,10 @@ export function CatalogGrid({
     const index = entries.findIndex(
       (entry) => entry.relativePath === selectedPath,
     );
-    if (index >= 0) virtualizer.scrollToIndex(Math.floor(index / COLUMN_COUNT));
+    if (index >= 0) {
+      virtualizer.scrollToIndex(Math.floor(index / COLUMN_COUNT));
+      requestAnimationFrame(() => itemRefs.current.get(selectedPath)?.focus());
+    }
   }, [entries, selectedPath, virtualizer]);
 
   return (

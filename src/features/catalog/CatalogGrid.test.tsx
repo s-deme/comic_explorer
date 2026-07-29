@@ -48,6 +48,21 @@ describe("CatalogGrid", () => {
     expect(mounted).toBeLessThanOrEqual(100);
   });
 
+  it("restores focus to the selected item when the grid remounts", async () => {
+    render(
+      <CatalogGrid
+        entries={entries(20)}
+        selectedPath={"book-3" as never}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /book-3/ })).toHaveFocus(),
+    );
+  });
+
   it("keeps the thumbnail slot stable while loading and displays the generated image", async () => {
     const onNeeded = vi.fn();
     const { rerender } = render(
