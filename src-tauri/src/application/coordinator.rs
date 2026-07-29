@@ -48,6 +48,8 @@ impl NavigationCoordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
+    use tokio::sync::Barrier;
 
     #[test]
     fn new_generation_cancels_old_work_and_gates_late_results() {
@@ -66,5 +68,36 @@ mod tests {
         coordinator.shutdown();
         assert!(coordinator.begin(Generation(1)).is_cancelled());
         assert!(!coordinator.is_current(Generation(1)));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn one_hundred_navigation_tasks_commit_only_the_latest_generation() {
+        let coordinator = Arc::new(Mutex::new(NavigationCoordinator::default()));
+        let barrier = Arc::new(Barrier::new(101));
+        let commits = Arc::new(Mutex::new(Vec::new()));
+        let mut tasks = Vec::new();
+
+        for value in 1..=100 {
+            let generation = Generation(value);
+            let cancellation = coordinator.lock().unwrap().begin(generation);
+            let coordinator = coordinator.clone();
+            let barrier = barrier.clone();
+            let commits = commits.clone();
+            tasks.push(tokio::spawn(async move {
+                barrier.wait().await;
+                tokio::task::yield_now().await;
+                if !cancellation.is_cancelled()
+                    && coordinator.lock().unwrap().is_current(generation)
+                {
+                    commits.lock().unwrap().push(generation);
+                }
+            }));
+        }
+
+        barrier.wait().await;
+        for task in tasks {
+            task.await.unwrap();
+        }
+        assert_eq!(*commits.lock().unwrap(), [Generation(100)]);
     }
 }

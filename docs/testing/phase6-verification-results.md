@@ -154,3 +154,6 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   巻末遷移へ接続し、末尾とcurrent消失を含むunit testを追加した。item pathとpage
   pathをscopeに含む決定的IDをfolder/ZIP/CBZ page生成へ接続し、形式間衝突を検証した。
   Windows MSVC 36 tests、React対象4 testsでTC-UT-010/011をPASSへ変更した。
+- 2026-07-29: 100 generationのnavigationを実Tokio taskとして同時再開し、各taskの
+  cancel tokenとcommit時のgeneration gateを観測した。旧99 generationのcommit 0、
+  最新generationだけ1件をWindows MSVC 37 testsで確認し、TC-INT-011をPASSへ変更した。
