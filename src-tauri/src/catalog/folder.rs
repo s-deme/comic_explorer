@@ -1,11 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
 use crate::domain::{
     AppError, ErrorCode, FileKind, ItemKind, RelativePath, classify_file_name, natural_cmp,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CatalogEntry {
     pub relative_path: RelativePath,
     pub kind: ItemKind,
