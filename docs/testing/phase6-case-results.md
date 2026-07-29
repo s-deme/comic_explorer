@@ -17,11 +17,14 @@ codd:
 
 ## 実行条件
 
-- 実行日時: 2026-07-29 11:07 JST
+- 実行日時: 2026-07-29 20:05 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
   （35件PASS）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（22件PASS）
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（22件PASS。
+  10,000項目でmounted gridcell 100以下を含む）
+- Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
+  （7件PASS）
 - build: `npm run build`（PASS）
 - fixture: `.venv/bin/python tests/fixtures/validate_fixtures.py
   tests/fixtures/generated`（64 files / 11 fixtures、PASS）
@@ -75,7 +78,7 @@ codd:
 | TC-INT-007 | PASS | corrupt/encrypted archive分類と他fixture継続をRust fixture testで実行 |
 | TC-INT-008 | PASS | SQLite保存・reopenと相対page維持を実行 |
 | TC-INT-009 | NOT RUN | 混在root全分類と操作分離のintegrationを未実行 |
-| TC-INT-010 | NOT RUN | 実装済みread経路のpath/種別/size/mtime/content差分0は実測。未実装thumbnailを含む全read service判定は未実行 |
+| TC-INT-010 | PASS | 実装済み全read経路を同一fixture treeのbefore/after snapshotで囲み、path/種別/size/mtime/content/ZIP entry一覧の差分0、library配下のDB/cache/temp/log 0件を実測 |
 | TC-INT-011 | NOT RUN | generation unitはPASSだがA→B競合100回を未実行 |
 | TC-INT-012 | PASS | `repository::corrupt_database_is_isolated_in_recovery` |
 | TC-SEC-001 | PASS | unsafe entry拒否、非展開archive API、fixture差分なしをRust testsで実行 |
@@ -122,7 +125,7 @@ codd:
 | TC-A11Y-001 | NOT RUN | help focus componentはPASSだがkeyboard-only全行程を未実行 |
 | TC-A11Y-002 | BLOCKED | Windows UIA inspector/screen reader環境が必要 |
 | TC-A11Y-003 | BLOCKED | Windows high contrastと100/150/200% DPI環境が必要 |
-| TC-DIST-001 | NOT RUN | SBOM生成はPASSだがdirect/transitive license照合を未完了 |
+| TC-DIST-001 | PASS | npm/Cargoのdirect/transitive 665 componentをlockfile/Cargo metadataから監査し、unknown/禁止license 0件。SBOM/notice同期check PASS |
 | TC-DIST-002 | BLOCKED | Windows 10 22H2と別Windows 11 clean VMが必要 |
 | TC-DIST-003 | BLOCKED | clean VMでuninstall時のuser-data保持/明示削除確認が必要 |
 
@@ -130,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 24 |
+| PASS | 26 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 37 |
+| NOT RUN | 35 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

@@ -77,6 +77,14 @@ def main() -> None:
         pass
     else:
         raise AssertionError("corrupt.zip unexpectedly parsed")
+    with ZipFile(zip_root / "unsupported-compression.zip") as archive:
+        assert archive.infolist()[0].compress_type == 99
+    assert (zip_root / "malformed-local-header.zip").read_bytes().startswith(b"BAD!")
+
+    image_root = root / "FIX-IMAGE-ERROR-001"
+    assert {"invalid-crc.png", "dimension-bomb.png"} <= {
+        path.name for path in image_root.iterdir()
+    }
 
     for forbidden in ("escape.png", "absolute.png"):
         assert not (root / forbidden).exists()

@@ -13,7 +13,11 @@ if errorlevel 1 exit /b %errorlevel%
 where cargo >nul 2>nul
 if errorlevel 1 set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 
+if not exist "%~dp0..\dist" mkdir "%~dp0..\dist"
 pushd "%~dp0..\src-tauri"
+cargo metadata --locked --format-version 1 > "%~dp0..\dist\cargo-metadata.json"
+if errorlevel 1 exit /b %errorlevel%
+
 cargo fmt --check
 if errorlevel 1 exit /b %errorlevel%
 

@@ -111,14 +111,18 @@ mod fixture_tests {
 
     #[test]
     fn all_read_paths_leave_the_source_tree_byte_for_byte_unchanged() {
-        fn complete_snapshot(
-            root: &Path,
-        ) -> Vec<(PathBuf, bool, u64, std::time::SystemTime, Option<Vec<u8>>)> {
-            fn visit(
-                root: &Path,
-                path: &Path,
-                output: &mut Vec<(PathBuf, bool, u64, std::time::SystemTime, Option<Vec<u8>>)>,
-            ) {
+        type ArchiveEntries = Vec<(String, u64, u32, String, bool)>;
+        type SnapshotEntry = (
+            PathBuf,
+            bool,
+            u64,
+            std::time::SystemTime,
+            Option<Vec<u8>>,
+            Option<ArchiveEntries>,
+        );
+
+        fn complete_snapshot(root: &Path) -> Vec<SnapshotEntry> {
+            fn visit(root: &Path, path: &Path, output: &mut Vec<SnapshotEntry>) {
                 let mut entries = fs::read_dir(path)
                     .unwrap()
                     .map(Result::unwrap)
@@ -127,12 +131,41 @@ mod fixture_tests {
                 for entry in entries {
                     let metadata = entry.metadata().unwrap();
                     let entry_path = entry.path();
+                    let extension = entry_path
+                        .extension()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or_default();
+                    let archive_entries = if metadata.is_file()
+                        && matches!(extension.to_ascii_lowercase().as_str(), "zip" | "cbz")
+                    {
+                        fs::File::open(&entry_path)
+                            .ok()
+                            .and_then(|file| zip::ZipArchive::new(file).ok())
+                            .map(|mut archive| {
+                                (0..archive.len())
+                                    .filter_map(|index| {
+                                        archive.by_index(index).ok().map(|item| {
+                                            (
+                                                item.name().to_owned(),
+                                                item.size(),
+                                                item.crc32(),
+                                                format!("{:?}", item.compression()),
+                                                item.encrypted(),
+                                            )
+                                        })
+                                    })
+                                    .collect::<ArchiveEntries>()
+                            })
+                    } else {
+                        None
+                    };
                     output.push((
                         entry_path.strip_prefix(root).unwrap().to_path_buf(),
                         metadata.is_dir(),
                         metadata.len(),
                         metadata.modified().unwrap(),
                         metadata.is_file().then(|| fs::read(&entry_path).unwrap()),
+                        archive_entries,
                     ));
                     if metadata.is_dir() {
                         visit(root, &entry_path, output);
@@ -170,6 +203,16 @@ mod fixture_tests {
         });
         media.read(&archive_token).unwrap();
 
-        assert_eq!(complete_snapshot(&root), before);
+        let after = complete_snapshot(&root);
+        assert_eq!(after, before);
+        assert!(!after.iter().any(|entry| {
+            let name = entry.0.to_string_lossy().to_ascii_lowercase();
+            name.ends_with(".sqlite")
+                || name.ends_with(".sqlite-wal")
+                || name.ends_with(".sqlite-shm")
+                || name.ends_with(".tmp")
+                || name.ends_with(".log")
+                || name.contains("/cache/")
+        }));
     }
 }

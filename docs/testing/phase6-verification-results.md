@@ -32,13 +32,13 @@ codd:
 | Rust fmt/check/test | PASS | Windows MSVC、35 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 22 tests |
-| Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
+| Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
 | Windows release executable | PASS | `comic-explorer.exe`生成 |
 | Windows process smoke launch | PASS | 5秒間起動継続後、試験processを終了 |
 | NSIS x64 installer | PASS | offline WebView2 modeで生成 |
-| SBOM | PASS | lock-backed CycloneDX 1.6 inventory |
+| License/SBOM/notices | PASS | npm/Cargo direct/transitive 665 components、unknown/禁止0、CycloneDX 1.6とnotice同期 |
 
 72ケースの個別判定、対応test名、未実行理由は
 `docs/testing/phase6-case-results.md`に記録した。
@@ -52,11 +52,11 @@ codd:
 
 | 操作 | p95 |
 | --- | ---: |
-| 1,000項目列挙・metadata sort | 22.293 ms |
-| 10,000項目列挙・metadata sort | 247.454 ms |
-| Deflate ZIPから30ページrandom read | 24.792 ms |
-| Stored ZIPから30ページrandom read | 22.751 ms |
-| SQLite 10,000件insert + 100件read | 126.903 ms |
+| 1,000項目列挙・metadata sort | 21.588 ms |
+| 10,000項目列挙・metadata sort | 238.665 ms |
+| Deflate ZIPから30ページrandom read | 21.153 ms |
+| Stored ZIPから30ページrandom read | 20.798 ms |
+| SQLite 10,000件insert + 100件read | 116.516 ms |
 
 ## 配布物
 
@@ -141,5 +141,12 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 - 2026-07-29: 実装済みのroot/folder/page列挙、ZIP/CBZ列挙、folder page media読込、
   archive entry media読込を同一fixture treeへ実行し、前後の全relative path、種別、
   size、mtime、file content byteが完全一致するintegration testを追加した。
-  Windows MSVC 35 testsで差分0を実測した。未実装thumbnailを含むTC-INT-010全体は
-  推測でPASSにせずNOT RUNを維持する。
+  Windows MSVC 35 testsで差分0を実測した。
+- 2026-07-29: snapshotへZIP entry名、size、CRC、圧縮方式、暗号化flagを加え、
+  library配下のDB/WAL/SHM/cache/temp/log 0件を明示検証した。malformed image/ZIP
+  corpusを68 filesへ拡張し、generatorの既存出力拒否も実測した。実装済み全read経路
+  の期待結果を観測できたためTC-INT-010をPASSへ変更した。
+- 2026-07-29: npm/Cargoの直接・推移依存665 componentをlockfileとCargo metadata
+  から監査し、unknown/禁止license 0件を確認した。同一inventoryからCycloneDX 1.6
+  SBOMと`THIRD-PARTY-NOTICES.md`を生成し同期checkを自動化したためTC-DIST-001を
+  PASSへ変更した。portable benchmarkも7回再測定した。

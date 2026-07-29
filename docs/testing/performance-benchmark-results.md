@@ -22,7 +22,7 @@ codd:
 
 **Windows製品性能は未測定。確定済みADR-001の品質gate判定はまだできない。**
 
-2026-07-28時点で、生成fixtureとportable foundation harnessを作成し、WSL2で
+2026-07-29に生成fixtureとportable foundation harnessを再実行し、WSL2で
 filesystem、ZIP、SQLiteの基礎処理を7回測定した。Tauri、Electron、WinUI、
 WebView2、WICを含むWindows desktop値ではない。
 
@@ -46,18 +46,18 @@ PCのWindows側CPU、storage型番、GPU、電源modeはsandboxから信頼で�
 
 | 操作 | samples ms | median ms | p95 ms | peak Python allocation |
 | --- | --- | ---: | ---: | ---: |
-| 1,000 item enumerate/stat/sort | 21.506, 31.578, 26.476, 21.651, 22.968, 21.257, 26.267 | 22.968 | 31.578 | 129,321 B |
-| 10,000 item enumerate/stat/sort | 238.402, 284.960, 253.150, 251.846, 241.400, 279.184, 269.527 | 253.150 | 284.960 | 1,733,666 B |
-| Deflate CBZ random 30 entries | 23.311, 26.526, 20.307, 21.593, 26.937, 33.769, 19.576 | 23.311 | 33.769 | 249,108 B |
-| Stored ZIP random 30 entries | 21.443, 20.801, 21.151, 23.164, 20.267, 20.947, 29.965 | 21.151 | 29.965 | 181,366 B |
-| SQLite WAL 10k insert + 100 read | 124.730, 119.332, 150.789, 117.494, 131.439, 131.786, 126.245 | 126.245 | 150.789 | 13,264 B |
+| 1,000 item enumerate/stat/sort | 21.297, 21.163, 21.370, 21.588, 21.006, 21.092, 21.296 | 21.296 | 21.588 | 129,320 B |
+| 10,000 item enumerate/stat/sort | 237.181, 231.559, 238.665, 217.249, 227.414, 215.591, 219.121 | 227.414 | 238.665 | 1,733,665 B |
+| Deflate CBZ random 30 entries | 20.386, 20.138, 20.259, 20.089, 20.463, 21.153, 19.846 | 20.259 | 21.153 | 249,107 B |
+| Stored ZIP random 30 entries | 20.172, 20.275, 20.042, 20.144, 20.798, 20.361, 19.734 | 20.172 | 20.798 | 181,365 B |
+| SQLite WAL 10k insert + 100 read | 112.288, 108.788, 111.719, 110.738, 116.516, 110.922, 111.721 | 111.719 | 116.516 | 13,263 B |
 
 Python allocationはnative SQLite/zlibおよびOS cacheを完全には含まない。process
 memoryではない。
 
 ## 4. 解釈
 
-- 10,000件の基礎列挙/metadata sortはこのfixture/環境でp95 285msだった。最初の
+- 10,000件の基礎列挙/metadata sortはこのfixture/環境でp95 238.665msだった。最初の
   操作可能表示を全件処理に依存させる理由はなく、chunkとbackground sortを維持する。
 - synthetic PNGは非常に圧縮しやすい。DeflateとStoredの差は実漫画へ一般化しない。
 - SQLite 10,000 row transactionは起動critical pathへ置くべきでないが、WALを使う

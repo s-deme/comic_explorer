@@ -452,6 +452,9 @@ codd:
 - NFR-MVP-004-AC1: 使用する直接依存関係の名称、バージョン、ライセンス、配布条件を一覧化する。
 - NFR-MVP-004-AC2: ライセンス表示またはソース提供義務がある場合、配布物に必要な文書を含める。
 - NFR-MVP-004-AC3: 有料ライセンス、用途制限、一般配布を禁止するライセンスを含まない。
+- NFR-MVP-004-AC4: npmおよびCargoのlockfileに含まれる直接・推移依存を
+  機械的に監査し、SPDXで判定できないlicenseまたは禁止licenseを0件とする。
+  SBOMと`THIRD-PARTY-NOTICES.md`は同じlockfile inventoryから生成・検証する。
 
 ## NFR-MVP-005: Windows配布
 
@@ -485,6 +488,11 @@ codd:
 - NFR-MVP-006-AC3: 1,000／10,000項目、300ページ、ZIP／CBZ、破損データ、未生成／生成済みキャッシュを含む著作権上問題のない生成データと測定手順を用意する。
 - NFR-MVP-006-AC4: 最初に操作可能になるまでの時間、入力遅延、p95、UIスレッドの長時間停止を総処理時間と分けて評価する。
 - NFR-MVP-006-AC5: 採用構成ごとに理由、UX・性能上の利点、欠点、ライセンス、却下候補および再評価条件を記録する。
+- NFR-MVP-006-AC6: malformed ZIP/image/security corpusは固定seedのfixture
+  generatorから再現でき、既存出力は明示的な置換指定なしに上書きしない。
+- NFR-MVP-006-AC7: release前に実装済みの全library read経路をbefore/after
+  snapshotで囲み、相対path、種別、size、mtime、内容hash、ZIP entry一覧が一致し、
+  library配下にDB、cache、temp、logまたはsidecarが新規作成されないことを自動検証する。
 
 ## 7. UIの外観に関する制約
 

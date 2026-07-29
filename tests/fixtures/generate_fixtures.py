@@ -23,7 +23,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 SEED = 20260728
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 FIXED_EPOCH = 1_700_000_000
 ZIP_TIME = (2023, 11, 14, 22, 13, 20)
 SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png"}
@@ -213,6 +213,20 @@ def mark_encrypted(path: Path) -> None:
     path.write_bytes(data)
 
 
+def patch_zip_compression(path: Path, method: int) -> None:
+    """Patch local and central headers to an unsupported compression method."""
+    data = bytearray(path.read_bytes())
+    for signature, offset in ((b"PK\x03\x04", 8), (b"PK\x01\x02", 10)):
+        position = 0
+        while True:
+            position = data.find(signature, position)
+            if position < 0:
+                break
+            struct.pack_into("<H", data, position + offset, method)
+            position += 4
+    path.write_bytes(data)
+
+
 def build_core(builder: Builder) -> None:
     p = builder.fixture("FIX-ORDER-001", "basic natural order", ["1.jpg", "2.jpg", "10.jpg"], "1.jpg", "success")
     for page in (1, 2, 10):
@@ -270,6 +284,12 @@ def build_core(builder: Builder) -> None:
     (p / "corrupt.png").write_bytes(b"\x89PNG\r\n\x1a\ntruncated")
     (p / "zero.png").write_bytes(b"")
     (p / "mismatch.jpg").write_bytes(png_bytes(32, 48, "MISMATCH", SEED))
+    invalid_crc = bytearray(png_bytes(32, 48, "CRC", SEED + 2))
+    invalid_crc[-8] ^= 0xFF
+    (p / "invalid-crc.png").write_bytes(invalid_crc)
+    dimension_bomb = bytearray(png_bytes(1, 1, "BOMB", SEED + 3))
+    struct.pack_into(">II", dimension_bomb, 16, 0x7FFF_FFFF, 0x7FFF_FFFF)
+    (p / "dimension-bomb.png").write_bytes(dimension_bomb)
     (p / "unreadable.png").write_bytes(png_bytes(32, 48, "UNREADABLE", SEED + 1))
     (p / "WINDOWS-ACL-README.txt").write_text(
         "On Windows deny Read to unreadable.png for the test identity; restore ACL during cleanup.\n",
@@ -306,6 +326,11 @@ def build_core(builder: Builder) -> None:
     )
     valid = (p / "no-images.cbz").read_bytes()
     (p / "corrupt.zip").write_bytes(valid[: max(20, len(valid) // 2)])
+    builder.archive(p / "unsupported-compression.zip", [("1.png", png_bytes(8, 8, "X", SEED), ZIP_STORED)])
+    patch_zip_compression(p / "unsupported-compression.zip", 99)
+    malformed = bytearray((p / "no-images.cbz").read_bytes())
+    malformed[0:4] = b"BAD!"
+    (p / "malformed-local-header.zip").write_bytes(malformed)
 
     p = builder.fixture("FIX-READING-001", "reading position for folder/ZIP/CBZ", [f"page{i}.png" for i in range(1, 13)], "page1.png", "success")
     folder = p / "folder"
