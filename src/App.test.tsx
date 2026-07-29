@@ -1,14 +1,113 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import {
+  listFolder,
+  registerLibraryRoot,
+  restoreLibraryRoot,
+} from "./features/library/client";
+
+vi.mock("./features/library/client", () => ({
+  registerLibraryRoot: vi.fn(),
+  listFolder: vi.fn(),
+  restoreLibraryRoot: vi.fn(),
+}));
+
+const registerMock = vi.mocked(registerLibraryRoot);
+const listMock = vi.mocked(listFolder);
+const restoreMock = vi.mocked(restoreLibraryRoot);
 
 describe("application shell", () => {
-  it("exposes the product name as its main heading", () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    registerMock.mockReset();
+    listMock.mockReset();
+    restoreMock.mockReset();
+    restoreMock.mockResolvedValue({
+      status: "ok",
+      requestId: "restore" as never,
+      generation: 1 as never,
+      data: null,
+    });
+  });
+
+  it("starts with an accessible library-root registration form", () => {
     render(<App />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Comic Explorer" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("ライブラリルート")).toHaveAttribute(
+      "required",
+    );
+  });
+
+  it("keeps tree, address and catalog synchronized after registration", async () => {
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      data: [],
+    });
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"),
+    );
+    expect(
+      screen.getByRole("complementary", { name: "フォルダツリー" }),
+    ).toHaveTextContent("Comics");
+    expect(
+      screen.getByRole("grid", { name: "現在のフォルダの項目" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a recoverable folder error without removing navigation", async () => {
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "error",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      error: {
+        code: "ACCESS_DENIED",
+        message: "アクセスできません。",
+        retryable: true,
+      },
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "アクセスできません。",
+    );
+    expect(screen.getByTitle("戻る")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
   });
 });

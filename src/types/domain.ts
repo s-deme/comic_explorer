@@ -20,6 +20,12 @@ export interface LibraryItem {
   kind: ItemKind;
 }
 
+export interface CatalogEntry {
+  relativePath: RelativePath;
+  kind: ItemKind;
+  byteSize?: number;
+}
+
 export interface Page {
   id: PageId;
   itemId: ItemId;

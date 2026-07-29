@@ -12,17 +12,58 @@ use serde::{Deserialize, Serialize};
 use crate::api::{Generation, RequestContext, Response};
 use crate::catalog::{CatalogEntry, enumerate_folder};
 use crate::domain::{AppError, ErrorCode, RelativePath, RequestId};
+use crate::state::{AppPaths, StateStore};
 
-#[derive(Default)]
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
+    store: Mutex<Option<StateStore>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        let (store, library_root) = AppPaths::discover()
+            .and_then(|paths| StateStore::open(&paths).map(|(store, _)| store))
+            .and_then(|store| {
+                let library_root = store.load_settings()?.library_root;
+                Ok((Some(store), library_root))
+            })
+            .unwrap_or((None, None));
+        Self {
+            library_root: Mutex::new(library_root),
+            navigation: Mutex::new(NavigationCoordinator::default()),
+            store: Mutex::new(store),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryRoot {
     pub absolute_path: String,
+}
+
+#[tauri::command]
+pub fn get_library_root(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Option<LibraryRoot>>, String> {
+    if let Err(error) = context.validate() {
+        return Ok(error_response(&context, error));
+    }
+    let root = state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .map(|path| LibraryRoot {
+            absolute_path: path.to_string_lossy().into_owned(),
+        });
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: root,
+    })
 }
 
 #[tauri::command]
@@ -56,6 +97,13 @@ pub async fn set_library_root(
             Err(error) => return Err(format!("library root worker failed: {error}")),
         };
     *state.library_root.lock().map_err(|_| "state poisoned")? = Some(canonical.clone());
+    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
+        let mut settings = store.load_settings().map_err(|error| error.message)?;
+        settings.library_root = Some(canonical.clone());
+        store
+            .save_settings(&settings)
+            .map_err(|error| error.message)?;
+    }
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,

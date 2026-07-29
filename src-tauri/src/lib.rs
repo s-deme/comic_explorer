@@ -10,6 +10,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(application::AppState::default())
         .invoke_handler(tauri::generate_handler![
+            application::get_library_root,
             application::set_library_root,
             application::list_folder,
             application::cancel_navigation
