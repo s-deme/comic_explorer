@@ -89,13 +89,19 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 - custom protocolのWindows WebView2実機security試験
 - install済み製品の正常終了を含む登録→閲覧→再起動とoffline E2E
-- root消失/ACL、7分類errorの製品UI回復
+- ACL、7分類errorの製品UI回復
 - keyboard-only全行程
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-30: release WebView2の初回登録で存在しないrootを実際に拒否し、対象入力、
+  登録、folder選択の再選択導線を保持したまま有効rootへ復帰した。保存済みlibraryを
+  process停止中に一時renameして製品を再起動し、対象絶対path、理由、再試行、
+  別folder選択を表示した後、同pathを戻して再試行し127項目へ復帰した。root直下の
+  列挙errorで対象表示が空になる不具合も修正し、library全file hash差分0を確認した。
+  TC-ERR-001をPASSへ変更し、集計はPASS 56 / BLOCKED 11 / NOT RUN 5。
 - 2026-07-30: release WebView2で漫画folderの破損2ページ目を開き、対象path・理由と
   再試行/前/次/一覧復帰の3回復操作を表示した。前ページへの復帰、破損pageの再訪、
   次の正常3ページ目への回復を実file adapterで観測し、TC-ERR-003をPASSへ変更した。

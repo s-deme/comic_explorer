@@ -4,6 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $executable = Join-Path $projectRoot "src-tauri\target\release\comic-explorer.exe"
 $evidenceRoot = Join-Path $projectRoot "dist\product-ui-harness"
 $library = Join-Path $evidenceRoot "library"
+$missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
 $port = 9224
 $script:sequence = 0
@@ -324,10 +325,28 @@ $beforeTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
 $cold = $null
 $warm = $null
 $viewerRestart = $null
+$rootRecovery = $null
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
     $libraryJson = $library | ConvertTo-Json -Compress
+    $missingLibraryJson = $missingLibrary | ConvertTo-Json -Compress
+    Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#library-root');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, $missingLibraryJson);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('[role=alert]') !== null && " +
+        "document.querySelector('#library-root').value.endsWith('\\library-missing') && " +
+        "document.querySelector('button[type=submit]') !== null && " +
+        "document.querySelector('.picker-button') !== null"
+    ) "invalid root rejection and reselection actions"
     Invoke-Evaluate @"
 (() => {
   const input = document.querySelector('#library-root');
@@ -763,6 +782,23 @@ try {
         "document.querySelector('[role=alert]') === null && " +
         "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
     ) "corrupt archive list recovery"
+    Stop-Product $viewerRestart
+    $viewerRestart = $null
+    Move-Item $library $missingLibrary
+    $rootRecovery = Start-Product
+    Wait-Evaluate (
+        "document.querySelector('.error-panel[role=alert]')?.textContent.includes(" +
+        "'library') && document.querySelector('.error-panel button:nth-of-type(1)') !== null && " +
+        "document.querySelector('.error-panel button:nth-of-type(2)') !== null"
+    ) "stored root disappearance and recovery actions"
+    Move-Item $missingLibrary $library
+    Invoke-Evaluate "document.querySelector('.error-panel button:nth-of-type(1)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.error-panel') === null && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+        "document.querySelector('#address').value.endsWith('\\library')"
+    ) "stored root retry recovery"
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
         throw "Product UI harness changed source archives."
@@ -781,6 +817,8 @@ try {
         negativePlaceholder = $true
         imageDecoded = $true
         rootRestored = $true
+        invalidRootRejected = $true
+        disappearedRootRecovered = $true
         navigationHistory = $true
         treeAddressListSynchronized = $true
         rootEscapeRejected = $true
@@ -799,5 +837,9 @@ try {
     if ($cold) { Stop-Product $cold }
     if ($warm) { Stop-Product $warm }
     if ($viewerRestart) { Stop-Product $viewerRestart }
+    if ($rootRecovery) { Stop-Product $rootRecovery }
+    if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
+        Move-Item $missingLibrary $library
+    }
     Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

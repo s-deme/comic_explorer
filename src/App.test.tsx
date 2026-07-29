@@ -206,6 +206,7 @@ describe("application shell", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "アクセスできません。",
     );
+    expect(screen.getByRole("alert")).toHaveTextContent("対象: C:\\Comics");
     expect(screen.getByTitle("戻る")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
   });

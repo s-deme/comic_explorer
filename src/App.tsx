@@ -448,7 +448,7 @@ export function App() {
           {loadState.status === "error" ? (
             <div className="error-panel" role="alert">
               <h2>読み込みに失敗しました</h2>
-              <p>対象: {loadState.path}</p>
+              <p>対象: {loadState.path || libraryRoot}</p>
               <p>{loadState.message}</p>
               <button onClick={() => void load(navigation.current)}>再試行</button>
               {entries.length > 0 && (
