@@ -94,7 +94,7 @@ codd:
 | TC-UI-003 | NOT RUN | tree/address/list同期の製品UI試験を未実行 |
 | TC-UI-004 | NOT RUN | 履歴・直接入力・越境拒否の製品UI試験を未実行 |
 | TC-UI-005 | NOT RUN | grid unitはPASSだが長名/status/全到達の製品UI試験を未実行 |
-| TC-UI-006 | NOT RUN | WIC生成、cache、`get_thumbnail` command、React実画像slotは接続済み。製品WebViewでcold/hit/errorを連続観測する統合試験は未実行 |
+| TC-UI-006 | PASS | `run-product-ui-harness.ps1`がrelease製品WebView2をCDP自動運転し、同じ2 slotでcold生成画像の実decode、再起動後cache hit、破損ZIPのnegative/error placeholder、操作継続、原本hash差分0を観測 |
 | TC-UI-007 | NOT RUN | sort unitはPASSだが製品UI再起動復元を未実行 |
 | TC-UI-008 | NOT RUN | viewerを含む一覧context復帰試験を未実行 |
 | TC-UI-009 | NOT RUN | 実画像寸法を用いたfit/100%上限試験を未実行 |
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 37 |
+| PASS | 38 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 24 |
+| NOT RUN | 23 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

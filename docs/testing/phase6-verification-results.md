@@ -87,13 +87,20 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
-- 製品WebViewでcold生成、cache hit、失敗placeholderを連続観測する統合試験
 - custom protocolのWindows WebView2実機security試験
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-29: Windows/Tauriのcustom protocol mappingが
+  `http://<scheme>.localhost`であることを公式API contractと実WebView2で確認し、
+  製品が発行するmedia URIを`http://comic.localhost/<token>`へ修正した。固定host、
+  単一token path、既存Origin/Referer制限は維持した。release executableを
+  `tauri/custom-protocol`付きで再buildし、PowerShell ClientWebSocketからCDPで製品
+  WebView2を自動運転した。実CBZのcold WIC生成画像decode、同じapp-dataで再起動後の
+  cache hit、破損ZIPのnegative/error placeholder、2原本のSHA-256差分0を連続観測し、
+  TC-UI-006をPASSへ変更した。集計はPASS 38 / BLOCKED 11 / NOT RUN 23。
 - 2026-07-29: Cargoが生成した実`comic-explorer.exe`を別processで起動する
   `shutdown_process` integrationを追加した。隔離`LOCALAPPDATA`の実SQLiteへ最新位置を
   保存し、active navigation/viewer generationとmedia tokenを作成してから製品の

@@ -96,6 +96,14 @@ impl MediaTokenRegistry {
     }
 }
 
+pub fn media_uri(token: &str) -> String {
+    if cfg!(target_os = "windows") {
+        format!("http://comic.localhost/{token}")
+    } else {
+        format!("comic://localhost/{token}")
+    }
+}
+
 pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
     let bytes = match &grant.source {
         PageSource::File(path) => fs::read(path).map_err(media_io_error)?,
@@ -153,10 +161,14 @@ pub fn handle_protocol_request(
         );
     }
     let uri = request.uri();
-    if uri.scheme_str() != Some("comic")
-        || uri.authority().map(|value| value.as_str()) != Some("localhost")
-        || uri.query().is_some()
-    {
+    let registered_authority = matches!(
+        (
+            uri.scheme_str(),
+            uri.authority().map(|value| value.as_str())
+        ),
+        (Some("comic"), Some("localhost")) | (Some("http"), Some("comic.localhost"))
+    );
+    if !registered_authority || uri.query().is_some() {
         return safe_response(
             StatusCode::BAD_REQUEST,
             None,
@@ -467,7 +479,7 @@ mod tests {
             source: PageSource::File(path.clone()),
         });
         let request = Request::builder()
-            .uri(format!("comic://localhost/{token}"))
+            .uri(media_uri(&token))
             .header("Origin", PRODUCTION_ORIGIN)
             .header("Referer", format!("{PRODUCTION_ORIGIN}/"))
             .body(Vec::new())

@@ -21,7 +21,7 @@ use crate::catalog::{
 use crate::domain::{
     AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name, page_id_for,
 };
-use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, read_grant_bytes};
+use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
 use crate::state::{AppPaths, StateStore, ThumbnailPipeline};
 use library_root::validate_library_root;
 
@@ -668,7 +668,7 @@ pub async fn get_thumbnail(
         data: ThumbnailResponse {
             item_relative_path: item,
             content_hash: thumbnail.content_hash,
-            media_uri: format!("comic://localhost/{token}"),
+            media_uri: media_uri(&token),
             cache_hit: thumbnail.cache_hit,
         },
     })
@@ -1087,7 +1087,7 @@ pub async fn load_page(
         generation: context.generation,
         data: PageResponse {
             page_id,
-            media_uri: format!("comic://localhost/{token}"),
+            media_uri: media_uri(&token),
         },
     })
 }

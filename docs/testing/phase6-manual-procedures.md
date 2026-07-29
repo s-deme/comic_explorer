@@ -58,7 +58,10 @@ requestへ実際に付けるmethod、Origin、Refererをtraceへ保存する。�
 consoleまたは専用security harnessからPOST、query付きURI、短い/非hex/期限切れtoken、
 別origin、traversal、絶対path、drive path、任意archive entry名を要求する。
 
-正常pageだけ200と正確なMIME/lengthを返し、それ以外は画像byte、絶対path、entry名、
+製品WebView2で正常なthumbnailの実decodeとWindows側
+`http://comic.localhost/<token>` mappingは自動harnessで観測済みである。ここでは
+DevToolsからの攻撃requestと実header traceを追加確認する。正常pageだけ200と正確な
+MIME/lengthを返し、それ以外は画像byte、絶対path、entry名、
 内部errorを返さず、全応答に`nosniff`、安全なContent-Type/Length/CORSが付けばPASS。
 WebView2の実headerがallowlistと一致しない場合は製品画像が表示不能となるためFAILで、
 推測によるallowlist拡張は行わない。HAR/DevTools trace、response headers/body hash、

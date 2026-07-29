@@ -121,7 +121,7 @@ flowchart TD
   Validate --> Sort
   Sort --> Resume[DBのrelative page keyを照合]
   Resume --> Token[opaque session/page tokenを発行]
-  Token --> Request["img src=media://token"]
+  Token --> Request["img src=platform-mapped comic URI"]
   Request --> Source{source}
   Source -- folder --> Read[read-only file stream]
   Source -- ZIP --> Entry[必要entryだけinflate]
@@ -133,7 +133,9 @@ flowchart TD
 ```
 
 page tokenはsession ID、page ID、expiryをserver-side mapへ関連付け、URLに絶対pathを
-含めない。custom protocolはCSPで許可したoriginだけへ返し、CORS、Content-Type、
+含めない。Tauriのcustom protocol mappingに合わせ、Windows WebView2へは
+`http://comic.localhost/<token>`、その他の対応platformへは
+`comic://localhost/<token>`を発行する。custom protocolはCSPで許可したoriginだけへ返し、CORS、Content-Type、
 `nosniff`、最大byte数を設定する。HTTP Rangeは計測して有効性がある場合のみ実装する。
 
 ZIPは抽出APIを使わずentry streamを読む。暗号化/未対応compressionはビューワ開始前
