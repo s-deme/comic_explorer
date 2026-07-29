@@ -9,9 +9,11 @@ pub use image_metadata::{ImageMetadata, inspect_image};
 #[cfg(test)]
 mod fixture_tests {
     use super::*;
-    use crate::domain::ErrorCode;
+    use crate::domain::{ErrorCode, PageId};
+    use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::time::Duration;
 
     fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -105,5 +107,69 @@ mod fixture_tests {
             ErrorCode::EncryptedArchive
         );
         assert_eq!(snapshot(&root), before);
+    }
+
+    #[test]
+    fn all_read_paths_leave_the_source_tree_byte_for_byte_unchanged() {
+        fn complete_snapshot(
+            root: &Path,
+        ) -> Vec<(PathBuf, bool, u64, std::time::SystemTime, Option<Vec<u8>>)> {
+            fn visit(
+                root: &Path,
+                path: &Path,
+                output: &mut Vec<(PathBuf, bool, u64, std::time::SystemTime, Option<Vec<u8>>)>,
+            ) {
+                let mut entries = fs::read_dir(path)
+                    .unwrap()
+                    .map(Result::unwrap)
+                    .collect::<Vec<_>>();
+                entries.sort_by_key(|entry| entry.file_name());
+                for entry in entries {
+                    let metadata = entry.metadata().unwrap();
+                    let entry_path = entry.path();
+                    output.push((
+                        entry_path.strip_prefix(root).unwrap().to_path_buf(),
+                        metadata.is_dir(),
+                        metadata.len(),
+                        metadata.modified().unwrap(),
+                        metadata.is_file().then(|| fs::read(&entry_path).unwrap()),
+                    ));
+                    if metadata.is_dir() {
+                        visit(root, &entry_path, output);
+                    }
+                }
+            }
+            let mut output = Vec::new();
+            visit(root, root, &mut output);
+            output
+        }
+
+        let root = fixtures();
+        let before = complete_snapshot(&root);
+        enumerate_folder(&root, &root).unwrap();
+        enumerate_folder_pages(&root, &root.join("FIX-NESTED-001")).unwrap();
+        enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.zip")).unwrap();
+        enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.cbz")).unwrap();
+
+        let mut media = MediaTokenRegistry::new(Duration::from_secs(60));
+        let file_token = media.issue(MediaGrant {
+            page_id: PageId::parse("source-file").unwrap(),
+            mime_type: "image/png",
+            max_bytes: crate::api::MAX_IMAGE_BYTES,
+            source: PageSource::File(root.join("FIX-NESTED-001/1.png")),
+        });
+        media.read(&file_token).unwrap();
+        let archive_token = media.issue(MediaGrant {
+            page_id: PageId::parse("source-archive").unwrap(),
+            mime_type: "image/jpeg",
+            max_bytes: crate::api::MAX_IMAGE_BYTES,
+            source: PageSource::ArchiveEntry {
+                archive: root.join("FIX-ZIP-001/standard.cbz"),
+                entry: "1.JPG".into(),
+            },
+        });
+        media.read(&archive_token).unwrap();
+
+        assert_eq!(complete_snapshot(&root), before);
     }
 }

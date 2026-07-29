@@ -20,7 +20,7 @@ codd:
 - 実行日時: 2026-07-29 11:07 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （34件PASS）
+  （35件PASS）
 - React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（22件PASS）
 - build: `npm run build`（PASS）
 - fixture: `.venv/bin/python tests/fixtures/validate_fixtures.py
@@ -75,7 +75,7 @@ codd:
 | TC-INT-007 | PASS | corrupt/encrypted archive分類と他fixture継続をRust fixture testで実行 |
 | TC-INT-008 | PASS | SQLite保存・reopenと相対page維持を実行 |
 | TC-INT-009 | NOT RUN | 混在root全分類と操作分離のintegrationを未実行 |
-| TC-INT-010 | NOT RUN | 全read serviceを囲むbefore/after snapshotは未実行 |
+| TC-INT-010 | NOT RUN | 実装済みread経路のpath/種別/size/mtime/content差分0は実測。未実装thumbnailを含む全read service判定は未実行 |
 | TC-INT-011 | NOT RUN | generation unitはPASSだがA→B競合100回を未実行 |
 | TC-INT-012 | PASS | `repository::corrupt_database_is_isolated_in_recovery` |
 | TC-SEC-001 | PASS | unsafe entry拒否、非展開archive API、fixture差分なしをRust testsで実行 |

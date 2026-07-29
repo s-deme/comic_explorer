@@ -29,7 +29,7 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、34 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、35 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
 | React unit/component | PASS | 22 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
@@ -138,3 +138,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   どちらでもUIを停止させず、保存要求が遷移callbackより先になることをcomponent
   testで検証した。Windows MSVC 34 tests、React 22 tests、typecheck、production
   build、fixture validatorで検証した。
+- 2026-07-29: 実装済みのroot/folder/page列挙、ZIP/CBZ列挙、folder page media読込、
+  archive entry media読込を同一fixture treeへ実行し、前後の全relative path、種別、
+  size、mtime、file content byteが完全一致するintegration testを追加した。
+  Windows MSVC 35 testsで差分0を実測した。未実装thumbnailを含むTC-INT-010全体は
+  推測でPASSにせずNOT RUNを維持する。
