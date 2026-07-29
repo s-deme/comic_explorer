@@ -30,6 +30,7 @@ type LoadState =
 
 export function App() {
   const generation = useRef(0);
+  const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
   const [libraryRoot, setLibraryRoot] = useState<string | null>(null);
   const [navigation, dispatch] = useReducer(navigationReducer, {
@@ -44,6 +45,7 @@ export function App() {
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
 
@@ -159,6 +161,11 @@ export function App() {
     void load(path);
   }
 
+  function closeHelp() {
+    setHelpOpen(false);
+    requestAnimationFrame(() => helpTriggerRef.current?.focus());
+  }
+
   if (libraryRoot === null) {
     return (
       <main className="setup-screen">
@@ -238,7 +245,7 @@ export function App() {
       <nav className="menu-bar" aria-label="メニューバー">
         <button onClick={() => setLibraryRoot(null)}>ファイル</button>
         <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>
-        <button onClick={() => setHelpOpen(true)}>ヘルプ</button>
+        <button ref={helpTriggerRef} onClick={() => setHelpOpen(true)}>ヘルプ</button>
       </nav>
       <div className="toolbar" aria-label="ナビゲーション">
         <button
@@ -322,11 +329,37 @@ export function App() {
         />
         <button type="submit">移動</button>
       </form>
-      <div className="workspace">
+      <div
+        className="workspace"
+        style={{ gridTemplateColumns: `${treeWidth}px 6px minmax(0, 1fr)` }}
+      >
         <FolderTree
           libraryRoot={libraryRoot}
           currentPath={navigation.current}
           onNavigate={(path) => navigate(path)}
+        />
+        <div
+          className="tree-splitter"
+          role="separator"
+          aria-label="フォルダツリーの幅"
+          aria-orientation="vertical"
+          aria-valuemin={180}
+          aria-valuenow={treeWidth}
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              setTreeWidth((width) =>
+                Math.max(180, width + (event.key === "ArrowLeft" ? -10 : 10)),
+              );
+            }
+          }}
+          onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
+          onPointerMove={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              setTreeWidth(Math.max(180, event.clientX));
+            }
+          }}
         />
         <section className="catalog-pane" aria-busy={loadState.status === "loading"}>
           {loadState.status === "loading" && (
@@ -379,11 +412,19 @@ export function App() {
       </footer>
       {helpOpen && (
         <div className="dialog-backdrop">
-          <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="help-dialog">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-title"
+            className="help-dialog"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeHelp();
+            }}
+          >
             <h2 id="help-title">キー操作</h2>
             <p>Enter: フォルダを開く / Ctrl+Enter: 漫画として読む</p>
             <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
-            <button autoFocus onClick={() => setHelpOpen(false)}>閉じる</button>
+            <button autoFocus onClick={closeHelp}>閉じる</button>
           </div>
         </div>
       )}

@@ -179,4 +179,36 @@ describe("application shell", () => {
     expect(screen.getByTitle("戻る")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
   });
+
+  it("resizes the tree by keyboard and restores help focus", async () => {
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      data: [],
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+    const splitter = await screen.findByRole("separator", {
+      name: "フォルダツリーの幅",
+    });
+    expect(splitter).toHaveAttribute("aria-valuenow", "240");
+    fireEvent.keyDown(splitter, { key: "ArrowLeft" });
+    expect(splitter).toHaveAttribute("aria-valuenow", "230");
+
+    const trigger = screen.getByRole("button", { name: "ヘルプ" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
 });

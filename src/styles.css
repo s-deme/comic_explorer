@@ -60,14 +60,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .address-bar label { font-size: .82rem; }
 .address-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
 
-.workspace { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; }
+.workspace { display: grid; min-height: 0; }
 .folder-tree {
   position: relative;
   overflow: auto;
-  border-right: 1px solid #bfc5cc;
   background: #f7f8fa;
-  resize: horizontal;
 }
+.tree-splitter {
+  width: 6px;
+  cursor: col-resize;
+  background: #d9dde2;
+}
+.tree-splitter:hover, .tree-splitter:focus-visible { background: #7aa7d9; }
 .tree-canvas { position: relative; min-width: 180px; }
 .tree-row {
   position: absolute;

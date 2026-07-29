@@ -39,6 +39,7 @@ export function CatalogGrid({
   onRead,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef(new Map<string, HTMLButtonElement>());
   const rows = useMemo(() => {
     const output: CatalogEntry[][] = [];
     for (let index = 0; index < entries.length; index += COLUMN_COUNT) {
@@ -51,7 +52,34 @@ export function CatalogGrid({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 268,
     overscan: 2,
+    initialRect: { width: 900, height: 720 },
+    observeElementRect: (instance, callback) => {
+      const element = instance.scrollElement;
+      if (!element) return undefined;
+      const report = () =>
+        callback({
+          width: element.clientWidth || 900,
+          height: element.clientHeight || 720,
+        });
+      report();
+      if (typeof ResizeObserver === "undefined") return undefined;
+      const observer = new ResizeObserver(report);
+      observer.observe(element);
+      return () => observer.disconnect();
+    },
   });
+
+  function moveFocus(currentIndex: number, offset: number) {
+    const nextIndex = Math.max(
+      0,
+      Math.min(entries.length - 1, currentIndex + offset),
+    );
+    const next = entries[nextIndex];
+    if (!next) return;
+    onSelect(next);
+    virtualizer.scrollToIndex(Math.floor(nextIndex / COLUMN_COUNT));
+    requestAnimationFrame(() => itemRefs.current.get(next.relativePath)?.focus());
+  }
 
   useEffect(() => {
     if (selectedPath === null) return;
@@ -84,7 +112,8 @@ export function CatalogGrid({
               key={virtualRow.key}
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
-              {rows[virtualRow.index].map((entry) => {
+              {rows[virtualRow.index].map((entry, columnIndex) => {
+                const itemIndex = virtualRow.index * COLUMN_COUNT + columnIndex;
                 const name = displayName(entry);
                 const canNavigate =
                   entry.kind === "folder" || entry.kind === "comicFolder";
@@ -98,14 +127,38 @@ export function CatalogGrid({
                     key={entry.relativePath}
                   >
                     <button
+                      ref={(element) => {
+                        if (element) itemRefs.current.set(entry.relativePath, element);
+                        else itemRefs.current.delete(entry.relativePath);
+                      }}
                       className="catalog-item"
                       data-selected={selectedPath === entry.relativePath}
                       title={`${name} — ${kindLabel(entry)}`}
+                      tabIndex={
+                        selectedPath === entry.relativePath ||
+                        (selectedPath === null && itemIndex === 0)
+                          ? 0
+                          : -1
+                      }
                       onClick={() => onSelect(entry)}
                       onDoubleClick={() =>
                         canNavigate ? onNavigate(entry) : canRead && onRead(entry)
                       }
                       onKeyDown={(event) => {
+                        const offsets: Partial<Record<string, number>> = {
+                          ArrowLeft: -1,
+                          ArrowRight: 1,
+                          ArrowUp: -COLUMN_COUNT,
+                          ArrowDown: COLUMN_COUNT,
+                          Home: -itemIndex,
+                          End: entries.length - 1 - itemIndex,
+                        };
+                        const offset = offsets[event.key];
+                        if (offset !== undefined) {
+                          event.preventDefault();
+                          moveFocus(itemIndex, offset);
+                          return;
+                        }
                         if (event.key === "Enter") {
                           event.preventDefault();
                           if (event.ctrlKey && canRead) onRead(entry);

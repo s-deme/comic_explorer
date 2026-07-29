@@ -31,7 +31,7 @@ codd:
 | --- | --- | --- |
 | Rust fmt/check/test | PASS | Windows MSVC、31 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 17 tests |
+| React unit/component | PASS | 20 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
@@ -105,3 +105,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   navigation cancellationとは分離した。branch単位のアクセスエラーを局所表示し、
   他branchの操作を維持する。Windows MSVC 31 tests、React 17 tests、typecheck、
   production build、fixture validatorで検証した。
+- 2026-07-29: folder tree splitterを初期240px・最小180pxでpointer/keyboard操作
+  可能にし、catalog gridの上下左右/Home/End移動、ヘルプを閉じた際の呼出元focus
+  復元を実装した。10,000項目を入力したcomponent testで、mounted gridcellが100件
+  以下に保たれることも自動検証した。Windows MSVC 31 tests、React 20 tests、
+  typecheck、production build、fixture validatorで検証した。
