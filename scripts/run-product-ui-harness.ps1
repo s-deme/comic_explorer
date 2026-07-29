@@ -65,7 +65,12 @@ function Invoke-Evaluate([string]$Expression) {
         awaitPromise = $true
         returnByValue = $true
     }
-    if ($result.exceptionDetails) { throw $result.exceptionDetails.text }
+    if ($result.exceptionDetails) {
+        throw (
+            "$($result.exceptionDetails.text): " +
+            "$($result.exceptionDetails.exception.description) in $Expression"
+        )
+    }
     return $result.result.value
 }
 
@@ -117,6 +122,19 @@ Copy-Item (
 Copy-Item (
     Join-Path $projectRoot "tests\fixtures\generated\FIX-ZIP-ERROR-001\corrupt.zip"
 ) (Join-Path $library "2-corrupt.zip")
+New-Item (Join-Path $library "folder-a\child\deep") -ItemType Directory -Force |
+    Out-Null
+New-Item (Join-Path $library "comic-folder") -ItemType Directory -Force |
+    Out-Null
+Copy-Item (
+    Join-Path $projectRoot "tests\fixtures\generated\FIX-IMAGE-001\portrait.png"
+) (Join-Path $library "comic-folder\1.png")
+$longName = "0-very-long-comic-folder-name-0123456789-abcdefghijklmnopqrstuvwxyz"
+New-Item (Join-Path $library $longName) -ItemType Directory -Force | Out-Null
+1..120 | ForEach-Object {
+    New-Item (Join-Path $library ("scroll-folder-{0:D3}" -f $_)) `
+        -ItemType Directory -Force | Out-Null
+}
 $sourceFiles = @(
     (Join-Path $library "1-valid.cbz"),
     (Join-Path $library "2-corrupt.zip")
@@ -139,22 +157,135 @@ try {
   return true;
 })()
 "@ | Out-Null
-    Wait-Evaluate "document.querySelectorAll('[role=gridcell]').length === 2" "catalog entries"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 1 && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+    ) "all catalog entries"
+    Wait-Evaluate (
+        "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 2 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "cold thumbnail success and error"
     Wait-Evaluate (
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    $longNameJson = $longName | ConvertTo-Json -Compress
+    if (-not (Invoke-Evaluate (
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith($longNameJson + ' '))"
+    ))) { throw "Long-name tooltip was not exposed." }
+    if ((Invoke-Evaluate "document.querySelectorAll('[role=gridcell]').length") -gt 100) {
+        throw "Virtual grid mounted more than 100 cells."
+    }
+    Invoke-Evaluate (
+        "(() => { const scroll = document.querySelector('.catalog-scroll'); " +
+        "scroll.scrollTop = scroll.scrollHeight; scroll.dispatchEvent(new Event('scroll')); " +
+        "return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('scroll-folder-120 '))"
+    ) "last virtualized catalog item"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('scroll-folder-120 ')); " +
+        "item.click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.includes('scroll-folder-120'))"
+    ) "selected-item status"
+    Invoke-Evaluate (
+        "(() => { const scroll = document.querySelector('.catalog-scroll'); " +
+        "scroll.scrollTop = 0; scroll.dispatchEvent(new Event('scroll')); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate (
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('folder-a '))"
+    ) "first virtualized catalog items"
+    Invoke-Evaluate @"
+(() => {
+  const item = [...document.querySelectorAll('.catalog-item')]
+    .find((node) => node.title.startsWith('folder-a '));
+  item.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a')" "folder navigation"
+    Wait-Evaluate (
+        "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
+        "node.textContent === 'folder-a' && node.getAttribute('aria-selected') === 'true')"
+    ) "tree/address/list synchronization"
+    Invoke-Evaluate @"
+(() => {
+  const item = [...document.querySelectorAll('.catalog-item')]
+    .find((node) => node.title.startsWith('child '));
+  item.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a\\child')" "deep navigation"
+    Invoke-Evaluate "document.querySelector('.toolbar > button:nth-of-type(1)').click(); true" | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a')" "back navigation"
+    Invoke-Evaluate "document.querySelector('.toolbar > button:nth-of-type(2)').click(); true" | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a\\child')" "forward navigation"
+    Invoke-Evaluate "document.querySelector('.toolbar > button:nth-of-type(3)').click(); true" | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a')" "up navigation"
+    $directPathJson = (Join-Path $library "folder-a\child") |
+        ConvertTo-Json -Compress
+    Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#address');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, $directPathJson);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.form.requestSubmit();
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate "document.querySelector('#address').value.endsWith('\\folder-a\\child')" "direct-path navigation"
+    Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#address');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'C:\\outside-library');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.form.requestSubmit();
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate "document.querySelector('[role=alert]') !== null" "root escape rejection"
+    $coldSortState = Invoke-Evaluate @"
+(async () => {
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+  for (const field of ['name', 'modified', 'size', 'kind']) {
+    const select = document.querySelector('.toolbar select');
+    setter.call(select, field);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  const select = document.querySelector('.toolbar select');
+  setter.call(select, 'kind');
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const direction = document.querySelector('.toolbar > button:last-of-type');
+  direction.click();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return {field: document.querySelector('.toolbar select').value,
+    text: document.querySelector('.toolbar > button:last-of-type').textContent};
+})()
+"@
+    if ($coldSortState.field -ne "kind") {
+        throw "Sort control did not change in product UI: $($coldSortState | ConvertTo-Json -Compress)"
+    }
     Stop-Product $cold
     $cold = $null
 
     $warm = Start-Product
-    Wait-Evaluate "document.querySelectorAll('[role=gridcell]').length === 2" "restored catalog"
     Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 1 && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('125')"
+    ) "restored catalog"
+    Wait-Evaluate (
+        "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 2 && " +
         "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
     ) "warm cache hit and negative placeholder"
     Wait-Evaluate (
@@ -171,6 +302,13 @@ try {
         warmCacheHit = $true
         negativePlaceholder = $true
         imageDecoded = $true
+        rootRestored = $true
+        navigationHistory = $true
+        treeAddressListSynchronized = $true
+        rootEscapeRejected = $true
+        sortControlsExercised = $true
+        longNameTooltip = $true
+        mountedGridCellsAtMost100 = $true
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {

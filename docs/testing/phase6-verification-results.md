@@ -93,6 +93,13 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: release WebView2 CDP harnessを125項目と3階層の実libraryへ拡張した。
+  root→folder→child、tree/address/list current同期、back/forward/up/直接絶対path、
+  root外拒否、長名tooltip、総件数/選択status、仮想gridの末尾到達・先頭復帰・mounted
+  100以下、root再起動復元を製品UIと実Rust adapterで観測した。全read前後の原本hash
+  差分0も維持し、TC-UI-002/003/004/005をPASSへ変更した。sort 4条件controlも製品UIで
+  操作したが、全順序と正常終了後の復元は未観測なのでTC-UI-007はNOT RUNを維持する。
+  集計はPASS 42 / BLOCKED 11 / NOT RUN 19。
 - 2026-07-29: Windows/Tauriのcustom protocol mappingが
   `http://<scheme>.localhost`であることを公式API contractと実WebView2で確認し、
   製品が発行するmedia URIを`http://comic.localhost/<token>`へ修正した。固定host、

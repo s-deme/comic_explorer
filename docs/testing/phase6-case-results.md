@@ -90,12 +90,12 @@ codd:
 | ID | 結果 | 未実行・阻害理由 |
 | --- | --- | --- |
 | TC-UI-001 | NOT RUN | picker/backend/componentは個別PASSだがWindows UIで登録→再起動を未実行 |
-| TC-UI-002 | NOT RUN | 仮想tree componentはPASSだが深さ違いを含む製品UI一式を未実行 |
-| TC-UI-003 | NOT RUN | tree/address/list同期の製品UI試験を未実行 |
-| TC-UI-004 | NOT RUN | 履歴・直接入力・越境拒否の製品UI試験を未実行 |
-| TC-UI-005 | NOT RUN | grid unitはPASSだが長名/status/全到達の製品UI試験を未実行 |
+| TC-UI-002 | PASS | release WebView2 CDP harnessでroot→folder-a→childの深さ違いを実file adapter経由で移動し、treeの遅延展開と一覧を観測 |
+| TC-UI-003 | PASS | 製品UIでfolder-a選択後、treeitem `aria-selected`、address絶対path、child一覧が同じcurrent folderへ同期 |
+| TC-UI-004 | PASS | 製品UIでback/forward/up/直接絶対pathを順に実行し、root外`C:\outside-library`をerror panelで拒否、rootを越えないことを観測 |
+| TC-UI-005 | PASS | 125実項目で長名title、総件数・選択名status、末尾scroll到達、先頭復帰、mounted gridcell 100以下、選択状態をrelease WebView2で観測 |
 | TC-UI-006 | PASS | `run-product-ui-harness.ps1`がrelease製品WebView2をCDP自動運転し、同じ2 slotでcold生成画像の実decode、再起動後cache hit、破損ZIPのnegative/error placeholder、操作継続、原本hash差分0を観測 |
-| TC-UI-007 | NOT RUN | sort unitはPASSだが製品UI再起動復元を未実行 |
+| TC-UI-007 | NOT RUN | release製品UIで4条件controlは連続操作済みだが、昇降順ごとの全順序と正常終了後の再起動復元を未観測 |
 | TC-UI-008 | NOT RUN | viewerを含む一覧context復帰試験を未実行 |
 | TC-UI-009 | NOT RUN | 実画像寸法を用いたfit/100%上限試験を未実行 |
 | TC-UI-010 | NOT RUN | model unitのみで製品UI再起動復元を未実行 |
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 38 |
+| PASS | 42 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 23 |
+| NOT RUN | 19 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は
