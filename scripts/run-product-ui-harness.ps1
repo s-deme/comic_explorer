@@ -264,6 +264,10 @@ Copy-Item (
 ) (Join-Path $library "2-corrupt.zip")
 New-Item (Join-Path $library "folder-a\child\deep") -ItemType Directory -Force |
     Out-Null
+New-Item (Join-Path $library "folder-a\acl-denied") -ItemType Directory -Force |
+    Out-Null
+New-Item (Join-Path $library "folder-a\still-readable") -ItemType Directory -Force |
+    Out-Null
 New-Item (Join-Path $library "comic-folder") -ItemType Directory -Force |
     Out-Null
 Copy-Item (
@@ -326,6 +330,8 @@ $cold = $null
 $warm = $null
 $viewerRestart = $null
 $rootRecovery = $null
+$deniedPath = Join-Path $library "folder-a\acl-denied"
+$deniedRule = $null
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
@@ -447,10 +453,47 @@ try {
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'folder-a' && node.getAttribute('aria-selected') === 'true')"
     ) "tree/address/list synchronization"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $deniedRule = [Security.AccessControl.FileSystemAccessRule]::new(
+        $identity.User,
+        [Security.AccessControl.FileSystemRights]"ListDirectory,ReadData",
+        [Security.AccessControl.InheritanceFlags]::None,
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Deny
+    )
+    $deniedAcl = Get-Acl $deniedPath
+    $deniedAcl.AddAccessRule($deniedRule) | Out-Null
+    Set-Acl $deniedPath $deniedAcl
     Invoke-Evaluate @"
 (() => {
   const item = [...document.querySelectorAll('.catalog-item')]
-    .find((node) => node.title.startsWith('child '));
+    .find((node) => node.title.startsWith('acl-denied '));
+  item.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.error-panel[role=alert]')?.textContent.includes('acl-denied') && " +
+        "document.querySelector('.error-panel button:nth-of-type(1)') !== null && " +
+        "document.querySelector('.error-panel button:nth-of-type(2)') !== null"
+    ) "local ACL error"
+    Invoke-Evaluate "document.querySelector('.error-panel button:nth-of-type(3)').click(); true" |
+        Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.error-panel') === null && " +
+        "document.querySelector('#address').value.endsWith('\\folder-a') && " +
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.title.startsWith('still-readable ')) && " +
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.dataset.relativePath === 'folder-a/child')"
+    ) "other folders remain usable after local ACL error"
+    $deniedAcl = Get-Acl $deniedPath
+    $deniedAcl.RemoveAccessRuleSpecific($deniedRule)
+    Set-Acl $deniedPath $deniedAcl
+    $deniedRule = $null
+    Invoke-Evaluate @"
+(() => {
+  const item = document.querySelector('.catalog-item[data-relative-path="folder-a/child"]');
   item.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
   return true;
 })()
@@ -819,6 +862,7 @@ try {
         rootRestored = $true
         invalidRootRejected = $true
         disappearedRootRecovered = $true
+        localAclErrorRecovered = $true
         navigationHistory = $true
         treeAddressListSynchronized = $true
         rootEscapeRejected = $true
@@ -834,6 +878,11 @@ try {
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {
+    if ($deniedRule -and (Test-Path $deniedPath)) {
+        $deniedAcl = Get-Acl $deniedPath
+        $deniedAcl.RemoveAccessRuleSpecific($deniedRule)
+        Set-Acl $deniedPath $deniedAcl
+    }
     if ($cold) { Stop-Product $cold }
     if ($warm) { Stop-Product $warm }
     if ($viewerRestart) { Stop-Product $viewerRestart }

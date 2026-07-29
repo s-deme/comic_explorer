@@ -62,11 +62,7 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
         let name = entry.file_name();
         let name = name.to_string_lossy();
         let kind = if metadata.is_dir() {
-            if contains_supported_image(&root, &path)? {
-                ItemKind::ComicFolder
-            } else {
-                ItemKind::Folder
-            }
+            directory_kind(contains_supported_image(&root, &path))
         } else {
             match classify_file_name(&name) {
                 FileKind::Archive => ItemKind::Archive,
@@ -96,6 +92,14 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
         natural_cmp(left.relative_path.as_str(), right.relative_path.as_str())
     });
     Ok(entries)
+}
+
+fn directory_kind(scan: Result<bool, AppError>) -> ItemKind {
+    if matches!(scan, Ok(true)) {
+        ItemKind::ComicFolder
+    } else {
+        ItemKind::Folder
+    }
 }
 
 pub fn enumerate_folder_pages(root: &Path, comic: &Path) -> Result<Vec<RelativePath>, AppError> {
@@ -217,6 +221,18 @@ mod tests {
             "comic-explorer-{test_name}-{}-{nonce}",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn unreadable_child_is_kept_as_a_folder_without_poisoning_its_parent() {
+        let error = io_error(
+            Path::new("denied"),
+            std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+        );
+
+        assert_eq!(directory_kind(Err(error)), ItemKind::Folder);
+        assert_eq!(directory_kind(Ok(false)), ItemKind::Folder);
+        assert_eq!(directory_kind(Ok(true)), ItemKind::ComicFolder);
     }
 
     #[test]

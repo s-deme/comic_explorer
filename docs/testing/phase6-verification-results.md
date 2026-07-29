@@ -89,13 +89,21 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 - custom protocolのWindows WebView2実機security試験
 - install済み製品の正常終了を含む登録→閲覧→再起動とoffline E2E
-- ACL、7分類errorの製品UI回復
+- 7分類errorの製品UI回復
 - keyboard-only全行程
 
 これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
 
 ## 今回完了した実装
 
+- 2026-07-30: synthetic library内の1サブfolderへ現Windows userの
+  `ListDirectory/ReadData` deny ACLを一時付与し、release WebView2で対象path、
+  OS理由、再試行/一覧/親/別folderの回復操作を表示した。漫画folder判定中の子階層
+  AccessDeniedを親一覧全体へ伝播していたため、読取不能な子は通常folderとして局所化し、
+  本人を開いた時だけerrorにするよう修正した。親のchild/still-readableは継続利用でき、
+  ACL解除と全試験後のlibrary hash差分0も確認した。Rust 53件とprocess test 1件、
+  release製品E2EがPASSし、TC-ERR-002をPASSへ変更した。集計はPASS 57 /
+  BLOCKED 11 / NOT RUN 4。
 - 2026-07-30: release WebView2の初回登録で存在しないrootを実際に拒否し、対象入力、
   登録、folder選択の再選択導線を保持したまま有効rootへ復帰した。保存済みlibraryを
   process停止中に一時renameして製品を再起動し、対象絶対path、理由、再試行、
