@@ -20,30 +20,36 @@ use crate::domain::{
     AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
-use crate::state::{AppPaths, StateStore};
+use crate::state::{AppPaths, StateStore, ThumbnailPipeline};
 use library_root::validate_library_root;
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
     store: Mutex<Option<StateStore>>,
+    thumbnails: Mutex<Option<ThumbnailPipeline>>,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     shutting_down: AtomicBool,
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        let (store, library_root) = AppPaths::discover()
-            .and_then(|paths| StateStore::open(&paths).map(|(store, _)| store))
-            .and_then(|store| {
-                let library_root = store.load_settings()?.library_root;
-                Ok((Some(store), library_root))
+        let (store, library_root, thumbnails) = AppPaths::discover()
+            .and_then(|paths| {
+                StateStore::open(&paths).and_then(|(store, _)| {
+                    ThumbnailPipeline::new(&paths).map(|pipeline| (store, pipeline))
+                })
             })
-            .unwrap_or((None, None));
+            .and_then(|(store, pipeline)| {
+                let library_root = store.load_settings()?.library_root;
+                Ok((Some(store), library_root, Some(pipeline)))
+            })
+            .unwrap_or((None, None, None));
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
             store: Mutex::new(store),
+            thumbnails: Mutex::new(thumbnails),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             shutting_down: AtomicBool::new(false),
         }
@@ -60,6 +66,9 @@ impl AppState {
         }
         if let Ok(mut media) = self.media.lock() {
             media.revoke_all();
+        }
+        if let Ok(mut thumbnails) = self.thumbnails.lock() {
+            thumbnails.take();
         }
         // Dropping the connection closes SQLite and its WAL/SHM handles.
         if let Ok(mut store) = self.store.lock() {
@@ -102,6 +111,15 @@ pub struct ViewerSession {
     pub display_name: String,
     pub pages: Vec<ViewerPage>,
     pub start_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailResponse {
+    pub item_relative_path: RelativePath,
+    pub content_hash: String,
+    pub media_uri: String,
+    pub cache_hit: bool,
 }
 
 #[tauri::command]
@@ -395,6 +413,14 @@ pub async fn list_folder(
         .lock()
         .map_err(|_| "state poisoned")?
         .begin(context.generation);
+    if let Some(pipeline) = state
+        .thumbnails
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_mut()
+    {
+        pipeline.replace_pins(&[]).map_err(|error| error.message)?;
+    }
     let requested_directory = root.join(relative_path.as_str());
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -436,6 +462,94 @@ pub async fn list_folder(
             request_id: context.request_id,
             generation: context.generation,
             error,
+        },
+    })
+}
+
+#[tauri::command]
+pub fn get_thumbnail(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_path: String,
+    retry: bool,
+) -> Result<Response<ThumbnailResponse>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item = match RelativePath::parse(item_relative_path) {
+        Ok(item) if !item.as_str().is_empty() => item,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Thumbnail item path is invalid."),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let mut pipelines = state.thumbnails.lock().map_err(|_| "state poisoned")?;
+    let Some(pipeline) = pipelines.as_mut() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::UnsupportedFormat,
+                "Thumbnail generation is unavailable on this platform.",
+            ),
+        ));
+    };
+    if retry {
+        pipeline.retry(&item);
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Thumbnail cache is unavailable."),
+        ));
+    };
+    #[cfg(target_os = "windows")]
+    let result = pipeline.resolve(store, &root, &item, unix_millis());
+    #[cfg(not(target_os = "windows"))]
+    let result: Result<crate::state::ThumbnailResult, AppError> = Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "WIC thumbnail generation requires Windows.",
+    ));
+    let thumbnail = match result {
+        Ok(thumbnail) => thumbnail,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let page_id =
+        PageId::parse(format!("thumbnail-{}", thumbnail.content_hash)).map_err(str::to_string)?;
+    let token = state
+        .media
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .issue(MediaGrant {
+            page_id,
+            mime_type: "image/jpeg",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::File(thumbnail.path),
+        });
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: ThumbnailResponse {
+            item_relative_path: item,
+            content_hash: thumbnail.content_hash,
+            media_uri: format!("comic://localhost/{token}"),
+            cache_hit: thumbnail.cache_hit,
         },
     })
 }
@@ -723,6 +837,7 @@ mod shutdown_tests {
             library_root: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             store: Mutex::new(None),
+            thumbnails: Mutex::new(None),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             shutting_down: AtomicBool::new(false),
         };

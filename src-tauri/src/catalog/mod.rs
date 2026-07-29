@@ -1,10 +1,17 @@
 mod archive;
 mod folder;
 mod image_metadata;
+mod thumbnail;
 
 pub use archive::enumerate_archive_pages;
 pub use folder::{ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages};
 pub use image_metadata::{ImageMetadata, inspect_image};
+#[cfg(target_os = "windows")]
+pub use thumbnail::encode_wic_jpeg;
+pub use thumbnail::{
+    CoverBytes, THUMBNAIL_JPEG_QUALITY, THUMBNAIL_LONG_EDGE, exif_orientation, output_dimensions,
+    read_cover,
+};
 
 #[cfg(test)]
 mod fixture_tests {

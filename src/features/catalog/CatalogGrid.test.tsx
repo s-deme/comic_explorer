@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
 import { CatalogGrid } from "./CatalogGrid";
@@ -46,5 +46,43 @@ describe("CatalogGrid", () => {
     const mounted = screen.getAllByRole("gridcell").length;
     expect(mounted).toBeGreaterThan(0);
     expect(mounted).toBeLessThanOrEqual(100);
+  });
+
+  it("keeps the thumbnail slot stable while loading and displays the generated image", async () => {
+    const onNeeded = vi.fn();
+    const { rerender } = render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onThumbnailNeeded={onNeeded}
+      />,
+    );
+    const slot = document.querySelector(".thumbnail");
+    expect(slot).toHaveAttribute("data-thumbnail-state", "loading");
+    await waitFor(() => expect(onNeeded).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        thumbnailFor={() => ({
+          status: "ready",
+          mediaUri: "comic://localhost/token",
+          cacheHit: true,
+        })}
+      />,
+    );
+    expect(document.querySelector(".thumbnail")).toBe(slot);
+    expect(document.querySelector(".thumbnail img")).toHaveAttribute(
+      "src",
+      "comic://localhost/token",
+    );
+    expect(slot).toHaveAttribute("data-cache-hit", "true");
   });
 });

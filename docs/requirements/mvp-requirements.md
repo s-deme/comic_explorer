@@ -170,6 +170,18 @@ codd:
 - REQ-MVP-006-AC3: サムネイル生成中も一覧の移動と選択を妨げない。
 - REQ-MVP-006-AC4: キャッシュ済みで原本が変更されていない場合、サムネイルを再生成せずキャッシュを使用する。
 - REQ-MVP-006-AC5: 原本が変更または削除された場合、古いキャッシュを原本として扱わない。
+- REQ-MVP-006-AC6: Windows Imaging ComponentでJPEG／JPG／PNGをdecodeし、EXIF
+  orientationを適用した後、アスペクト比を維持して長辺384px以下へ縮小する。長辺が
+  384px以下の画像は拡大せず、JPEG quality 82でencodeする。
+- REQ-MVP-006-AC7: フォルダとZIP／CBZの表紙生成は同じ自然順先頭ページを使用し、
+  書庫entryを原本の隣へ展開しない。
+- REQ-MVP-006-AC8: source fingerprintとcache indexでhitとstaleを判定し、cacheは
+  app-local領域へatomicに書き込む。失敗は理由と期限を持つnegative cacheへ記録する。
+- REQ-MVP-006-AC9: visible、near、backgroundの順で容量制限付きqueueへ投入し、
+  worker数、圧縮byte数、decode pixel数を制限する。取消済みまたは古いnavigation
+  generationの結果は一覧へ反映しない。
+- REQ-MVP-006-AC10: thumbnail cacheは10GiBをhard capとするLRU回収を行い、表示中、
+  先読み中、生成中のentryをpinして回収対象から除外する。
 
 ## REQ-MVP-007: 一覧の並べ替え
 

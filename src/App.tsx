@@ -7,6 +7,7 @@ import {
 import {
   listFolder,
   getCatalogSettings,
+  getThumbnail,
   openComic,
   pickLibraryRoot,
   registerLibraryRoot,
@@ -24,6 +25,7 @@ import { Viewer } from "./features/viewer/Viewer";
 import type { ReadingDirection, ViewMode } from "./features/viewer/model";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
+import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
 
 type LoadState =
   | { status: "idle" }
@@ -43,6 +45,7 @@ export function App() {
   });
   const [addressInput, setAddressInput] = useState("");
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
+  const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
@@ -109,6 +112,7 @@ export function App() {
     const requestGeneration = generation.current;
     setLoadState({ status: "loading", path: relativePath });
     setSelectedPath(null);
+    setThumbnails({});
     try {
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
@@ -410,6 +414,38 @@ export function App() {
                     }
                   },
                 );
+              }}
+              thumbnailFor={(entry) =>
+                thumbnails[entry.relativePath] ?? { status: "loading" }
+              }
+              onThumbnailNeeded={(entry) => {
+                if (thumbnails[entry.relativePath] !== undefined) return;
+                const requestGeneration = generation.current;
+                setThumbnails((current) => ({
+                  ...current,
+                  [entry.relativePath]: { status: "loading" },
+                }));
+                void getThumbnail(entry.relativePath, requestGeneration)
+                  .then((response) => {
+                    if (requestGeneration !== generation.current) return;
+                    setThumbnails((current) => ({
+                      ...current,
+                      [entry.relativePath]:
+                        response.status === "ok"
+                          ? {
+                              status: "ready",
+                              mediaUri: response.data.mediaUri,
+                              cacheHit: response.data.cacheHit,
+                            }
+                          : { status: "error" },
+                    }));
+                  })
+                  .catch(() =>
+                    setThumbnails((current) => ({
+                      ...current,
+                      [entry.relativePath]: { status: "error" },
+                    })),
+                  );
               }}
             />
           )}

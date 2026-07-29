@@ -35,6 +35,7 @@ pub fn run() {
             application::pick_library_root,
             application::set_library_root,
             application::list_folder,
+            application::get_thumbnail,
             application::list_tree_children,
             application::cancel_navigation,
             application::open_comic,

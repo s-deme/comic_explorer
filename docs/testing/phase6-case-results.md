@@ -17,11 +17,11 @@ codd:
 
 ## 実行条件
 
-- 実行日時: 2026-07-29 20:05 JST
+- 実行日時: 2026-07-29 21:25 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （38件PASS）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（23件PASS。
+  （44件PASS）
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（24件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
   （7件PASS）
@@ -73,7 +73,7 @@ codd:
 | TC-INT-002 | PASS | Stored/Deflate ZIP/CBZをRust archive/fixture testsで実行 |
 | TC-INT-003 | PASS | 同一manifestをfolder/ZIP/CBZに適用するfixture test |
 | TC-INT-004 | PASS | cache atomic write後のlookup hitを実行 |
-| TC-INT-005 | NOT RUN | stale検出unitのみで再生成cacheとの統合は未実行 |
+| TC-INT-005 | PASS | `real_folder_cover_generates_then_hits_atomic_cache_and_negative_cache_expires`で実fileの表紙を差し替え、旧content hash/pathをhitせずWIC再生成したcacheを返すことを実行 |
 | TC-INT-006 | NOT RUN | 破損画像後のviewer前後移動integrationを未実行 |
 | TC-INT-007 | PASS | corrupt/encrypted archive分類と他fixture継続をRust fixture testで実行 |
 | TC-INT-008 | PASS | SQLite保存・reopenと相対page維持を実行 |
@@ -93,7 +93,7 @@ codd:
 | TC-UI-003 | NOT RUN | tree/address/list同期の製品UI試験を未実行 |
 | TC-UI-004 | NOT RUN | 履歴・直接入力・越境拒否の製品UI試験を未実行 |
 | TC-UI-005 | NOT RUN | grid unitはPASSだが長名/status/全到達の製品UI試験を未実行 |
-| TC-UI-006 | NOT RUN | thumbnail生成未実装 |
+| TC-UI-006 | NOT RUN | WIC生成、cache、`get_thumbnail` command、React実画像slotは接続済み。製品WebViewでcold/hit/errorを連続観測する統合試験は未実行 |
 | TC-UI-007 | NOT RUN | sort unitはPASSだが製品UI再起動復元を未実行 |
 | TC-UI-008 | NOT RUN | viewerを含む一覧context復帰試験を未実行 |
 | TC-UI-009 | NOT RUN | 実画像寸法を用いたfit/100%上限試験を未実行 |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 30 |
+| PASS | 31 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 31 |
+| NOT RUN | 30 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

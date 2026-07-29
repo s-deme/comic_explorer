@@ -94,6 +94,25 @@ export async function listFolder(
   });
 }
 
+export interface ThumbnailData {
+  itemRelativePath: RelativePath;
+  contentHash: string;
+  mediaUri: string;
+  cacheHit: boolean;
+}
+
+export async function getThumbnail(
+  itemRelativePath: string,
+  generation: number,
+  retry = false,
+): Promise<ApiResponse<ThumbnailData>> {
+  return invoke("get_thumbnail", {
+    context: context(generation),
+    itemRelativePath,
+    retry,
+  });
+}
+
 export async function listTreeChildren(
   relativePath: string,
   generation: number,

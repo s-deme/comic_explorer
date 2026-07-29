@@ -29,12 +29,12 @@ codd:
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、38 tests |
+| Rust fmt/check/test | PASS | Windows MSVC、44 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 23 tests |
+| React unit/component | PASS | 24 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
 | Production frontend build | PASS | Vite production build |
-| CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
+| CoDD scan/check/verify | PASS | red gate 0、advisory 4 |
 | Windows release executable | PASS | `comic-explorer.exe`生成 |
 | Windows process smoke launch | PASS | 5秒間起動継続後、試験processを終了 |
 | NSIS x64 installer | PASS | offline WebView2 modeで生成 |
@@ -87,8 +87,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
-- WICによる長辺384px/JPEG quality 82のサムネイル生成と一覧への実画像表示
-- thumbnail priority worker、negative cache、実処理に接続した10GiB回収
+- thumbnail priority workerとcancel後の未開始job破棄
+- 製品WebViewでcold生成、cache hit、失敗placeholderを連続観測する統合試験
 - custom protocolのWindows WebView2実機security試験
 - shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
 
@@ -96,6 +96,15 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: JPEG/JPG/PNGをmemory入力からWICでdecodeし、EXIF orientation適用、
+  拡大なし・長辺384pxの縦横比維持resize、JPEG quality 82 encodeを実装した。
+  folderとZIP/CBZは同じ自然順先頭pageを使い、archive entryを展開しない。source
+  fingerprint由来content key、cache index hit/stale、app-local temp、atomic write、
+  理由/期限付きnegative cache、10GiB LRU、pinを実処理へ接続し、`get_thumbnail`
+  commandとReactの固定thumbnail slotへ実画像URIを接続した。実fixtureのWIC出力、
+  folder/archiveの自然順先頭page一致、cache hit、実file差替え後のstale再生成、negative
+  cache、原本隣接展開0をWindows MSVC 44 tests、表示slotをReact 24 testsで検証し、
+  TC-INT-005をPASSへ変更した。priority workerと製品WebView統合は未完了として残す。
 - 2026-07-29: 一覧項目へ更新日時、ファイルサイズ、ZIP/CBZ種別metadataを追加し、
   名前・更新日時・サイズ・種類の昇順／降順、欠損値末尾、自然順と決定的tie-break、
   選択中sortのSQLite保存・再起動復元を実装した。Windows MSVC 29 tests、

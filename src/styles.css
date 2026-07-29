@@ -138,6 +138,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: #627083;
   font-size: 3rem;
 }
+
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
 .item-name {
   display: -webkit-box;
   overflow: hidden;

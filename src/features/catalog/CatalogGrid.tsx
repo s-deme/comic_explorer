@@ -8,7 +8,14 @@ interface CatalogGridProps {
   onSelect: (entry: CatalogEntry) => void;
   onNavigate: (entry: CatalogEntry) => void;
   onRead: (entry: CatalogEntry) => void;
+  thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
+  onThumbnailNeeded?: (entry: CatalogEntry) => void;
 }
+
+export type ThumbnailViewState =
+  | { status: "loading" }
+  | { status: "ready"; mediaUri: string; cacheHit: boolean }
+  | { status: "error" };
 
 const COLUMN_COUNT = 5;
 
@@ -37,6 +44,8 @@ export function CatalogGrid({
   onSelect,
   onNavigate,
   onRead,
+  thumbnailFor = () => ({ status: "loading" }),
+  onThumbnailNeeded = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -167,9 +176,11 @@ export function CatalogGrid({
                         }
                       }}
                     >
-                      <span className="thumbnail" aria-hidden="true">
-                        {entry.kind === "archive" ? "▣" : "▤"}
-                      </span>
+                      <Thumbnail
+                        entry={entry}
+                        state={thumbnailFor(entry)}
+                        onNeeded={onThumbnailNeeded}
+                      />
                       <span className="item-name">{name}</span>
                       <span className="item-kind">{kindLabel(entry)}</span>
                     </button>
@@ -190,5 +201,37 @@ export function CatalogGrid({
         </div>
       )}
     </div>
+  );
+}
+
+function Thumbnail({
+  entry,
+  state,
+  onNeeded,
+}: {
+  entry: CatalogEntry;
+  state: ThumbnailViewState;
+  onNeeded: (entry: CatalogEntry) => void;
+}) {
+  const eligible = entry.kind === "archive" || entry.kind === "comicFolder";
+  useEffect(() => {
+    if (eligible && state.status === "loading") onNeeded(entry);
+  }, [eligible, entry, onNeeded, state.status]);
+
+  if (state.status === "ready") {
+    return (
+      <span className="thumbnail" aria-hidden="true" data-cache-hit={state.cacheHit}>
+        <img src={state.mediaUri} alt="" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="thumbnail"
+      aria-hidden="true"
+      data-thumbnail-state={eligible ? state.status : "placeholder"}
+    >
+      {entry.kind === "archive" ? "▣" : "▤"}
+    </span>
   );
 }

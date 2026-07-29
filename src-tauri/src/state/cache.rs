@@ -126,6 +126,10 @@ impl ThumbnailCache {
         self.pinned.remove(content_hash);
     }
 
+    pub fn clear_pins(&mut self) {
+        self.pinned.clear();
+    }
+
     pub fn evict_to_limit(&self, store: &StateStore, limit_bytes: u64) -> Result<u64, AppError> {
         let mut statement = store
             .connection()
