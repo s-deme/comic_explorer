@@ -3,11 +3,11 @@ mod library_root;
 mod scheduler;
 
 pub use coordinator::NavigationCoordinator;
-pub use scheduler::{BoundedPriorityQueue, Priority, QueueItem};
+pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -26,8 +26,9 @@ use library_root::validate_library_root;
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
-    store: Mutex<Option<StateStore>>,
-    thumbnails: Mutex<Option<ThumbnailPipeline>>,
+    store: Arc<Mutex<Option<StateStore>>>,
+    thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
+    thumbnail_workers: PriorityTaskPool,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     shutting_down: AtomicBool,
 }
@@ -48,8 +49,9 @@ impl Default for AppState {
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
-            store: Mutex::new(store),
-            thumbnails: Mutex::new(thumbnails),
+            store: Arc::new(Mutex::new(store)),
+            thumbnails: Arc::new(Mutex::new(thumbnails)),
+            thumbnail_workers: PriorityTaskPool::new(2, 64),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             shutting_down: AtomicBool::new(false),
         }
@@ -67,6 +69,7 @@ impl AppState {
         if let Ok(mut media) = self.media.lock() {
             media.revoke_all();
         }
+        self.thumbnail_workers.shutdown();
         if let Ok(mut thumbnails) = self.thumbnails.lock() {
             thumbnails.take();
         }
@@ -120,6 +123,24 @@ pub struct ThumbnailResponse {
     pub content_hash: String,
     pub media_uri: String,
     pub cache_hit: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ThumbnailPriority {
+    Background,
+    Near,
+    Visible,
+}
+
+impl From<ThumbnailPriority> for Priority {
+    fn from(value: ThumbnailPriority) -> Self {
+        match value {
+            ThumbnailPriority::Background => Priority::Background,
+            ThumbnailPriority::Near => Priority::Near,
+            ThumbnailPriority::Visible => Priority::Visible,
+        }
+    }
 }
 
 #[tauri::command]
@@ -467,11 +488,12 @@ pub async fn list_folder(
 }
 
 #[tauri::command]
-pub fn get_thumbnail(
+pub async fn get_thumbnail(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
     item_relative_path: String,
     retry: bool,
+    priority: ThumbnailPriority,
 ) -> Result<Response<ThumbnailResponse>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
@@ -499,33 +521,57 @@ pub fn get_thumbnail(
             ));
         }
     };
-    let mut pipelines = state.thumbnails.lock().map_err(|_| "state poisoned")?;
-    let Some(pipeline) = pipelines.as_mut() else {
-        return Ok(error_response(
-            &context,
-            request_error(
-                ErrorCode::UnsupportedFormat,
-                "Thumbnail generation is unavailable on this platform.",
-            ),
-        ));
-    };
-    if retry {
-        pipeline.retry(&item);
+    let cancellation = state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .cancellation_for(context.generation);
+    let pipelines = state.thumbnails.clone();
+    let stores = state.store.clone();
+    let worker_item = item.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    if state
+        .thumbnail_workers
+        .submit(priority.into(), cancellation.clone(), move || {
+            let result = resolve_thumbnail(
+                &pipelines,
+                &stores,
+                &root,
+                &worker_item,
+                retry,
+                unix_millis(),
+            );
+            if !cancellation.is_cancelled() {
+                let _ = sender.send(result);
+            }
+        })
+        .is_err()
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
     }
-    let stores = state.store.lock().map_err(|_| "state poisoned")?;
-    let Some(store) = stores.as_ref() else {
-        return Ok(error_response(
-            &context,
-            request_error(ErrorCode::Internal, "Thumbnail cache is unavailable."),
-        ));
+    let result = match receiver.await {
+        Ok(result) => result,
+        Err(_) => {
+            return Ok(Response::Cancelled {
+                request_id: context.request_id,
+                generation: context.generation,
+            });
+        }
     };
-    #[cfg(target_os = "windows")]
-    let result = pipeline.resolve(store, &root, &item, unix_millis());
-    #[cfg(not(target_os = "windows"))]
-    let result: Result<crate::state::ThumbnailResult, AppError> = Err(request_error(
-        ErrorCode::UnsupportedFormat,
-        "WIC thumbnail generation requires Windows.",
-    ));
+    if !state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
     let thumbnail = match result {
         Ok(thumbnail) => thumbnail,
         Err(error) => return Ok(error_response(&context, error)),
@@ -552,6 +598,49 @@ pub fn get_thumbnail(
             cache_hit: thumbnail.cache_hit,
         },
     })
+}
+
+fn resolve_thumbnail(
+    pipelines: &Mutex<Option<ThumbnailPipeline>>,
+    stores: &Mutex<Option<StateStore>>,
+    root: &std::path::Path,
+    item: &RelativePath,
+    retry: bool,
+    now_ms: i64,
+) -> Result<crate::state::ThumbnailResult, AppError> {
+    let mut pipelines = pipelines
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail pipeline state is poisoned."))?;
+    let Some(pipeline) = pipelines.as_mut() else {
+        return Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "Thumbnail generation is unavailable on this platform.",
+        ));
+    };
+    if retry {
+        pipeline.retry(item);
+    }
+    let stores = stores
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail cache state is poisoned."))?;
+    let Some(store) = stores.as_ref() else {
+        return Err(request_error(
+            ErrorCode::Internal,
+            "Thumbnail cache is unavailable.",
+        ));
+    };
+    #[cfg(target_os = "windows")]
+    {
+        pipeline.resolve(store, root, item, now_ms)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (store, root, now_ms);
+        Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "WIC thumbnail generation requires Windows.",
+        ))
+    }
 }
 
 #[tauri::command]
@@ -830,14 +919,16 @@ fn unix_millis() -> i64 {
 #[cfg(test)]
 mod shutdown_tests {
     use super::*;
+    use std::sync::Condvar;
 
     #[test]
     fn shutdown_is_idempotent_cancels_work_revokes_media_and_closes_store() {
         let state = AppState {
             library_root: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
-            store: Mutex::new(None),
-            thumbnails: Mutex::new(None),
+            store: Arc::new(Mutex::new(None)),
+            thumbnails: Arc::new(Mutex::new(None)),
+            thumbnail_workers: PriorityTaskPool::new(1, 1),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             shutting_down: AtomicBool::new(false),
         };
@@ -867,5 +958,89 @@ mod shutdown_tests {
             )
             .is_err()
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn real_thumbnail_pipeline_commits_only_latest_of_one_hundred_queued_generations() {
+        let test_root = std::env::temp_dir().join(format!(
+            "comic-explorer-connected-worker-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let paths = AppPaths::under(test_root.clone());
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let pipeline = ThumbnailPipeline::new(&paths).unwrap();
+        let stores = Arc::new(Mutex::new(Some(store)));
+        let pipelines = Arc::new(Mutex::new(Some(pipeline)));
+        let fixture_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");
+        let item = RelativePath::parse("FIX-IMAGE-001").unwrap();
+        let pool = PriorityTaskPool::new(2, 128);
+        let blocker = Arc::new((Mutex::new(false), Condvar::new()));
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        for _ in 0..2 {
+            let blocker = blocker.clone();
+            let started_tx = started_tx.clone();
+            pool.submit(
+                Priority::Visible,
+                tokio_util::sync::CancellationToken::new(),
+                move || {
+                    started_tx.send(()).unwrap();
+                    let (lock, ready) = &*blocker;
+                    let mut released = lock.lock().unwrap();
+                    while !*released {
+                        released = ready.wait(released).unwrap();
+                    }
+                },
+            )
+            .unwrap();
+        }
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+
+        let coordinator = Arc::new(Mutex::new(NavigationCoordinator::default()));
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        for value in 1..=100 {
+            let generation = Generation(value);
+            let cancellation = coordinator.lock().unwrap().begin(generation);
+            let coordinator = coordinator.clone();
+            let result_tx = result_tx.clone();
+            let stores = stores.clone();
+            let pipelines = pipelines.clone();
+            let root = fixture_root.clone();
+            let item = item.clone();
+            pool.submit(Priority::Visible, cancellation.clone(), move || {
+                let result =
+                    resolve_thumbnail(&pipelines, &stores, &root, &item, false, unix_millis());
+                if !cancellation.is_cancelled()
+                    && coordinator.lock().unwrap().is_current(generation)
+                {
+                    result_tx.send((generation, result)).unwrap();
+                }
+            })
+            .unwrap();
+        }
+
+        let (lock, ready) = &*blocker;
+        *lock.lock().unwrap() = true;
+        ready.notify_all();
+        let (generation, result) = result_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_eq!(generation, Generation(100));
+        assert!(result.unwrap().path.is_file());
+        assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
+
+        pool.shutdown();
+        assert!(
+            pool.submit(
+                Priority::Visible,
+                tokio_util::sync::CancellationToken::new(),
+                || {}
+            )
+            .is_err()
+        );
+        drop(pipelines);
+        drop(stores);
+        std::fs::remove_dir_all(test_root).unwrap();
     }
 }

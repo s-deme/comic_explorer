@@ -33,6 +33,16 @@ impl NavigationCoordinator {
         !self.shutting_down && self.current == generation
     }
 
+    pub fn cancellation_for(&self, generation: Generation) -> CancellationToken {
+        if self.is_current(generation) {
+            self.cancellation.clone()
+        } else {
+            let cancelled = CancellationToken::new();
+            cancelled.cancel();
+            cancelled
+        }
+    }
+
     pub fn cancel(&mut self, generation: Generation) {
         if self.current == generation {
             self.cancellation.cancel();

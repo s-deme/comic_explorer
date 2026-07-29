@@ -87,7 +87,6 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
 
-- thumbnail priority workerとcancel後の未開始job破棄
 - 製品WebViewでcold生成、cache hit、失敗placeholderを連続観測する統合試験
 - custom protocolのWindows WebView2実機security試験
 - shutdown時の全task停止、全handle close、最終位置flushを対象とするE2E
@@ -96,6 +95,13 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 今回完了した実装
 
+- 2026-07-29: `get_thumbnail`をworker 2・queue容量64の固定priority poolへ接続し、
+  Reactからmounted visible、近傍、backgroundを優先度付きで投入するようにした。
+  queue満杯時の低優先度evict、取消済み未開始jobの破棄、worker上限、shutdown後の
+  受付拒否とthread joinを接続済みtaskで検証した。さらに実WIC/cache pipelineを
+  塞いだworkerへ100 navigation generationを投入し、旧99件のcommit 0、最新1件だけの
+  実JPEG生成を確認した。Windows MSVC 48 tests、React 25 testsでTC-CT-004をPASSへ
+  変更した。
 - 2026-07-29: custom protocol境界を固定scheme/authority、単一token pathへ狭め、
   query、追加path segment、encoded traversal、absolute/drive/UNC path、任意archive
   entry相当、重複Origin/Referer、不正UTF-8相当headerをtable-driven corpusで拒否した。

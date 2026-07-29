@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   getCatalogSettings,
+  getThumbnail,
   listTreeChildren,
   listFolder,
   openComic,
@@ -19,6 +20,7 @@ import {
   saveCatalogSort,
   saveViewerSettings,
 } from "./features/library/client";
+import type { CatalogEntry } from "./types/domain";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("./features/library/client", () => ({
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   getCatalogSettings: vi.fn(),
+  getThumbnail: vi.fn(),
   saveCatalogSort: vi.fn(),
   saveViewerSettings: vi.fn(),
 }));
@@ -39,6 +42,7 @@ const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
+const thumbnailMock = vi.mocked(getThumbnail);
 const saveSortMock = vi.mocked(saveCatalogSort);
 const saveViewerMock = vi.mocked(saveViewerSettings);
 
@@ -53,6 +57,7 @@ describe("application shell", () => {
     restoreMock.mockReset();
     openMock.mockReset();
     settingsMock.mockReset();
+    thumbnailMock.mockReset();
     saveSortMock.mockReset();
     saveViewerMock.mockReset();
     settingsMock.mockResolvedValue({
@@ -235,5 +240,37 @@ describe("application shell", () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("submits visible, near and background thumbnails with bounded-worker priorities", async () => {
+    const entries: CatalogEntry[] = Array.from({ length: 45 }, (_, index) => ({
+      relativePath: `book-${index.toString().padStart(2, "0")}.cbz` as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    }));
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      data: entries,
+    });
+    thumbnailMock.mockImplementation(() => new Promise(() => undefined));
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+    await waitFor(() => expect(thumbnailMock).toHaveBeenCalledTimes(45));
+    const priorities = thumbnailMock.mock.calls.map((call) => call[3]);
+    expect(priorities.filter((value) => value === "visible")).toHaveLength(25);
+    expect(priorities.filter((value) => value === "near")).toHaveLength(15);
+    expect(priorities.filter((value) => value === "background")).toHaveLength(5);
   });
 });

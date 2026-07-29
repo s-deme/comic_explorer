@@ -17,11 +17,11 @@ codd:
 
 ## 実行条件
 
-- 実行日時: 2026-07-29 21:47 JST
+- 実行日時: 2026-07-29 22:06 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （46件PASS）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（24件PASS。
+  （48件PASS）
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（25件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
   （7件PASS）
@@ -58,9 +58,9 @@ codd:
 | ID | 結果 | 自動テスト／理由 |
 | --- | --- | --- |
 | TC-CT-001 | NOT RUN | 列挙portのsuccess/refusalは試験済みだが消失/cancel契約全体は未実行 |
-| TC-CT-002 | NOT RUN | WIC decoder port未実装 |
+| TC-CT-002 | NOT RUN | WICの実JPEG/PNG decode、寸法、resize、破損時errorは試験済みだが、期待する対象付きerror contract全体は未観測 |
 | TC-CT-003 | NOT RUN | archive list/openは試験済みだがcancel契約を未実行 |
-| TC-CT-004 | NOT RUN | thumbnail生成port未実装 |
+| TC-CT-004 | PASS | 実WIC/cache pipelineの生成画像・content/page identity・miss/hit・原本差分0に加え、接続済みpriority workerでcancel後の未開始job破棄と100世代中最新だけのcommitを実行 |
 | TC-CT-005 | PASS | `repository::settings_and_reading_position_survive_reopen` |
 | TC-CT-006 | NOT RUN | API構造とgenerationはunit済みだがUI-backend success/error/cancel一式を未実行 |
 | TC-CT-007 | PASS | `cache::atomic_cache_write_lookup_and_lru_respect_pins` |
@@ -133,10 +133,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 31 |
+| PASS | 32 |
 | FAIL | 0 |
 | BLOCKED | 11 |
-| NOT RUN | 30 |
+| NOT RUN | 29 |
 | **合計** | **72** |
 
 BLOCKED 11件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

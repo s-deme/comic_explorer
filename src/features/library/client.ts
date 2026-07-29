@@ -105,11 +105,13 @@ export async function getThumbnail(
   itemRelativePath: string,
   generation: number,
   retry = false,
+  priority: "visible" | "near" | "background" = "visible",
 ): Promise<ApiResponse<ThumbnailData>> {
   return invoke("get_thumbnail", {
     context: context(generation),
     itemRelativePath,
     retry,
+    priority,
   });
 }
 

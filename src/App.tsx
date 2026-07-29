@@ -35,6 +35,7 @@ type LoadState =
 
 export function App() {
   const generation = useRef(0);
+  const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
   const [libraryRoot, setLibraryRoot] = useState<string | null>(null);
@@ -107,12 +108,23 @@ export function App() {
     [entries, sortDescending, sortField],
   );
 
+  useEffect(() => {
+    const requestGeneration = generation.current;
+    sortedEntries.forEach((entry, index) => {
+      if (entry.kind !== "archive" && entry.kind !== "comicFolder") return;
+      const priority =
+        index < 15 ? "visible" : index < 40 ? "near" : "background";
+      queueThumbnail(entry, requestGeneration, priority);
+    });
+  }, [sortedEntries]);
+
   async function load(relativePath: string) {
     generation.current += 1;
     const requestGeneration = generation.current;
     setLoadState({ status: "loading", path: relativePath });
     setSelectedPath(null);
     setThumbnails({});
+    thumbnailRequests.current.clear();
     try {
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
@@ -176,6 +188,51 @@ export function App() {
   function closeHelp() {
     setHelpOpen(false);
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
+  }
+
+  function queueThumbnail(
+    entry: CatalogEntry,
+    requestGeneration: number,
+    priority: "visible" | "near" | "background",
+  ) {
+    if (thumbnailRequests.current.has(entry.relativePath)) return;
+    thumbnailRequests.current.add(entry.relativePath);
+    setThumbnails((current) => ({
+      ...current,
+      [entry.relativePath]: { status: "loading" },
+    }));
+    void getThumbnail(entry.relativePath, requestGeneration, false, priority)
+      .then((response) => {
+        if (requestGeneration !== generation.current) return;
+        if (response.status === "cancelled") {
+          setThumbnails((current) => {
+            const next = { ...current };
+            delete next[entry.relativePath];
+            return next;
+          });
+          return;
+        }
+        setThumbnails((current) => ({
+          ...current,
+          [entry.relativePath]:
+            response.status === "ok"
+              ? {
+                  status: "ready",
+                  mediaUri: response.data.mediaUri,
+                  cacheHit: response.data.cacheHit,
+                }
+              : { status: "error" },
+        }));
+      })
+      .catch(() => {
+        if (requestGeneration === generation.current) {
+          setThumbnails((current) => ({
+            ...current,
+            [entry.relativePath]: { status: "error" },
+          }));
+        }
+      })
+      .finally(() => thumbnailRequests.current.delete(entry.relativePath));
   }
 
   if (libraryRoot === null) {
@@ -419,33 +476,8 @@ export function App() {
                 thumbnails[entry.relativePath] ?? { status: "loading" }
               }
               onThumbnailNeeded={(entry) => {
-                if (thumbnails[entry.relativePath] !== undefined) return;
-                const requestGeneration = generation.current;
-                setThumbnails((current) => ({
-                  ...current,
-                  [entry.relativePath]: { status: "loading" },
-                }));
-                void getThumbnail(entry.relativePath, requestGeneration)
-                  .then((response) => {
-                    if (requestGeneration !== generation.current) return;
-                    setThumbnails((current) => ({
-                      ...current,
-                      [entry.relativePath]:
-                        response.status === "ok"
-                          ? {
-                              status: "ready",
-                              mediaUri: response.data.mediaUri,
-                              cacheHit: response.data.cacheHit,
-                            }
-                          : { status: "error" },
-                    }));
-                  })
-                  .catch(() =>
-                    setThumbnails((current) => ({
-                      ...current,
-                      [entry.relativePath]: { status: "error" },
-                    })),
-                  );
+                if (thumbnails[entry.relativePath]?.status === "ready") return;
+                queueThumbnail(entry, generation.current, "visible");
               }}
             />
           )}
