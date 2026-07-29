@@ -83,6 +83,8 @@ pub struct LibraryRoot {
 pub struct CatalogSettings {
     pub sort_field: String,
     pub sort_descending: bool,
+    pub view_mode: String,
+    pub reading_direction: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,6 +150,8 @@ pub fn get_catalog_settings(
         data: CatalogSettings {
             sort_field: settings.sort_field,
             sort_descending: settings.sort_descending,
+            view_mode: settings.view_mode,
+            reading_direction: settings.reading_direction,
         },
     })
 }
@@ -182,6 +186,68 @@ pub fn set_catalog_sort(
         data: CatalogSettings {
             sort_field,
             sort_descending,
+            view_mode: state
+                .store
+                .lock()
+                .map_err(|_| "state poisoned")?
+                .as_ref()
+                .and_then(|store| store.load_settings().ok())
+                .unwrap_or_default()
+                .view_mode,
+            reading_direction: state
+                .store
+                .lock()
+                .map_err(|_| "state poisoned")?
+                .as_ref()
+                .and_then(|store| store.load_settings().ok())
+                .unwrap_or_default()
+                .reading_direction,
+        },
+    })
+}
+
+#[tauri::command]
+pub fn set_viewer_settings(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    view_mode: String,
+    reading_direction: String,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !matches!(view_mode.as_str(), "single" | "spread")
+        || !matches!(reading_direction.as_str(), "rightToLeft" | "leftToRight")
+    {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Viewer settings are invalid."),
+        ));
+    }
+    let mut settings = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .map(|store| store.load_settings())
+        .transpose()
+        .map_err(|error| error.message)?
+        .unwrap_or_default();
+    settings.view_mode = view_mode;
+    settings.reading_direction = reading_direction;
+    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
+        store
+            .save_settings(&settings)
+            .map_err(|error| error.message)?;
+    }
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: CatalogSettings {
+            sort_field: settings.sort_field,
+            sort_descending: settings.sort_descending,
+            view_mode: settings.view_mode,
+            reading_direction: settings.reading_direction,
         },
     })
 }

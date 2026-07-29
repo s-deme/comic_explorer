@@ -21,7 +21,7 @@ codd:
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
   （34件PASS）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（20件PASS）
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（21件PASS）
 - build: `npm run build`（PASS）
 - fixture: `.venv/bin/python tests/fixtures/validate_fixtures.py
   tests/fixtures/generated`（64 files / 11 fixtures、PASS）

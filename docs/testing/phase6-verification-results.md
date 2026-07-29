@@ -31,7 +31,7 @@ codd:
 | --- | --- | --- |
 | Rust fmt/check/test | PASS | Windows MSVC、34 tests |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 20 tests |
+| React unit/component | PASS | 21 tests |
 | Python fixture/benchmark tests | PASS | 4 tests、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、amber advisory 1 |
@@ -128,3 +128,8 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   冪等なshutdown unit testを追加し、Windows MSVC 34 tests、React 20 tests、
   typecheck、production build、fixture validatorで検証した。製品process終了時の
   task/handle/最終読書位置をまとめて観測するE2Eは引き続き未完了である。
+- 2026-07-29: 単ページ/見開きmodeと右開き/左開きを既存SQLite settingsへ保存し、
+  起動時にfrontendへ復元してViewer初期stateへ渡すようにした。Viewerのbutton/key
+  操作時に先頭pageを維持したまま設定を即時保存するcomponent testを追加した。
+  Windows MSVC 34 tests、React 21 tests、typecheck、production build、fixture
+  validatorで検証した。製品再起動を含むUIケースは引き続きNOT RUNである。

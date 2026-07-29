@@ -52,6 +52,19 @@ export async function restoreLibraryRoot(
 export interface CatalogSettings {
   sortField: "name" | "modified" | "size" | "kind";
   sortDescending: boolean;
+  viewMode: "single" | "spread";
+  readingDirection: "rightToLeft" | "leftToRight";
+}
+
+export async function saveViewerSettings(
+  settings: Pick<CatalogSettings, "viewMode" | "readingDirection">,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("set_viewer_settings", {
+    context: context(generation),
+    viewMode: settings.viewMode,
+    readingDirection: settings.readingDirection,
+  });
 }
 
 export async function getCatalogSettings(
@@ -61,7 +74,7 @@ export async function getCatalogSettings(
 }
 
 export async function saveCatalogSort(
-  settings: CatalogSettings,
+  settings: Pick<CatalogSettings, "sortField" | "sortDescending">,
   generation: number,
 ): Promise<ApiResponse<CatalogSettings>> {
   return invoke("set_catalog_sort", {

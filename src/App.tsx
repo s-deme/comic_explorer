@@ -12,6 +12,7 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveViewerSettings,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -19,6 +20,7 @@ import {
   type SortField,
 } from "./features/catalog/sort";
 import { Viewer } from "./features/viewer/Viewer";
+import type { ReadingDirection, ViewMode } from "./features/viewer/model";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 
@@ -44,6 +46,9 @@ export function App() {
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("single");
+  const [readingDirection, setReadingDirection] =
+    useState<ReadingDirection>("rightToLeft");
   const [helpOpen, setHelpOpen] = useState(false);
   const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
@@ -56,6 +61,8 @@ export function App() {
         if (response.status === "ok") {
           setSortField(response.data.sortField);
           setSortDescending(response.data.sortDescending);
+          setViewMode(response.data.viewMode);
+          setReadingDirection(response.data.readingDirection);
         }
       })
       .catch(() => undefined);
@@ -217,6 +224,16 @@ export function App() {
       <Viewer
         session={viewerSession}
         generation={generation.current}
+        initialMode={viewMode}
+        initialDirection={readingDirection}
+        onSettingsChange={(mode, direction) => {
+          setViewMode(mode);
+          setReadingDirection(direction);
+          void saveViewerSettings(
+            { viewMode: mode, readingDirection: direction },
+            generation.current,
+          );
+        }}
         onClose={() => setViewerSession(null)}
         onNextItem={() => {
           const current = sortedEntries.findIndex(

@@ -15,6 +15,9 @@ interface ViewerProps {
   generation: number;
   onClose: () => void;
   onNextItem?: () => void;
+  initialMode: ViewMode;
+  initialDirection: ReadingDirection;
+  onSettingsChange: (mode: ViewMode, direction: ReadingDirection) => void;
 }
 
 export function Viewer({
@@ -22,11 +25,14 @@ export function Viewer({
   generation,
   onClose,
   onNextItem,
+  initialMode,
+  initialDirection,
+  onSettingsChange,
 }: ViewerProps) {
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
-    mode: "single" as ViewMode,
-    direction: "rightToLeft" as ReadingDirection,
+    mode: initialMode,
+    direction: initialDirection,
     history: [],
   });
   const [landscape, setLandscape] = useState<Set<number>>(new Set());
@@ -51,6 +57,18 @@ export function Viewer({
   function close() {
     void saveReadingPosition(session, state.index, generation);
     onClose();
+  }
+
+  function changeMode(mode: ViewMode) {
+    dispatch({ type: "mode", mode });
+    onSettingsChange(mode, state.direction);
+  }
+
+  function toggleDirection() {
+    const direction =
+      state.direction === "rightToLeft" ? "leftToRight" : "rightToLeft";
+    dispatch({ type: "toggleDirection" });
+    onSettingsChange(state.mode, direction);
   }
 
   useEffect(() => {
@@ -78,9 +96,9 @@ export function Viewer({
       ) {
         event.preventDefault();
         dispatch({ type: "previous" });
-      } else if (event.key === "1") dispatch({ type: "mode", mode: "single" });
-      else if (event.key === "2") dispatch({ type: "mode", mode: "spread" });
-      else if (event.key.toLowerCase() === "r") dispatch({ type: "toggleDirection" });
+      } else if (event.key === "1") changeMode("single");
+      else if (event.key === "2") changeMode("spread");
+      else if (event.key.toLowerCase() === "r") toggleDirection();
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -103,16 +121,11 @@ export function Viewer({
         <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>
         <span>{progress}</span>
         <button
-          onClick={() =>
-            dispatch({
-              type: "mode",
-              mode: state.mode === "single" ? "spread" : "single",
-            })
-          }
+          onClick={() => changeMode(state.mode === "single" ? "spread" : "single")}
         >
           {state.mode === "single" ? "見開きへ" : "単ページへ"}
         </button>
-        <button onClick={() => dispatch({ type: "toggleDirection" })}>
+        <button onClick={toggleDirection}>
           読み方向
         </button>
         <button onClick={close}>一覧へ戻る</button>

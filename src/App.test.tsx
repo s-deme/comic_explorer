@@ -17,6 +17,7 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveViewerSettings,
 } from "./features/library/client";
 
 vi.mock("./features/library/client", () => ({
@@ -28,6 +29,7 @@ vi.mock("./features/library/client", () => ({
   openComic: vi.fn(),
   getCatalogSettings: vi.fn(),
   saveCatalogSort: vi.fn(),
+  saveViewerSettings: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
@@ -38,6 +40,7 @@ const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
 const saveSortMock = vi.mocked(saveCatalogSort);
+const saveViewerMock = vi.mocked(saveViewerSettings);
 
 describe("application shell", () => {
   afterEach(cleanup);
@@ -51,17 +54,39 @@ describe("application shell", () => {
     openMock.mockReset();
     settingsMock.mockReset();
     saveSortMock.mockReset();
+    saveViewerMock.mockReset();
     settingsMock.mockResolvedValue({
       status: "ok",
       requestId: "settings" as never,
       generation: 1 as never,
-      data: { sortField: "name", sortDescending: false },
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+      },
     });
     saveSortMock.mockResolvedValue({
       status: "ok",
       requestId: "save-sort" as never,
       generation: 1 as never,
-      data: { sortField: "name", sortDescending: false },
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+      },
+    });
+    saveViewerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "save-viewer" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+      },
     });
     restoreMock.mockResolvedValue({
       status: "ok",
