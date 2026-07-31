@@ -161,8 +161,8 @@ def main() -> None:
             raise SystemExit(f"{args.notices} is not synchronized with lockfiles")
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(sbom_text, encoding="utf-8")
-        args.notices.write_text(notice_text, encoding="utf-8")
+        args.output.write_text(sbom_text, encoding="utf-8", newline="\n")
+        args.notices.write_text(notice_text, encoding="utf-8", newline="\n")
     print(f"{len(components)} components; unknown/prohibited licenses: 0")
 
 

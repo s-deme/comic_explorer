@@ -18,6 +18,13 @@ pushd "%~dp0..\src-tauri"
 cargo metadata --locked --format-version 1 > "%~dp0..\dist\cargo-metadata.json"
 if errorlevel 1 exit /b %errorlevel%
 
+popd
+pushd "%~dp0.."
+python scripts\generate-sbom.py
+if errorlevel 1 exit /b %errorlevel%
+popd
+pushd "%~dp0..\src-tauri"
+
 cargo fmt --check
 if errorlevel 1 exit /b %errorlevel%
 

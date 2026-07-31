@@ -15,6 +15,17 @@ SPEC.loader.exec_module(generate_sbom)
 
 
 class ReleaseEvidenceTests(unittest.TestCase):
+    def test_product_quality_generates_sbom_before_cargo_check(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "product-quality.yml").read_text(
+            encoding="utf-8"
+        )
+        metadata = workflow.index("cargo metadata --manifest-path")
+        sbom = workflow.index("python scripts/generate-sbom.py")
+        cargo_check = workflow.index("cargo check --locked")
+
+        self.assertLess(metadata, sbom)
+        self.assertLess(sbom, cargo_check)
+
     def test_license_audit_accepts_allowlisted_spdx_expressions(self) -> None:
         self.assertEqual(
             generate_sbom.validate_license(
