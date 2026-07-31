@@ -108,8 +108,15 @@ def png_bytes(width: int, height: int, label: str, seed: int) -> bytes:
     )
 
 
+def is_wsl() -> bool:
+    proc_version = Path("/proc/version")
+    return proc_version.is_file() and "microsoft" in proc_version.read_text(
+        errors="ignore"
+    ).lower()
+
+
 def windows_path(path: Path) -> str:
-    if "microsoft" in Path("/proc/version").read_text(errors="ignore").lower():
+    if is_wsl():
         return subprocess.check_output(["wslpath", "-w", str(path.resolve())], text=True).strip()
     return str(path.resolve())
 
