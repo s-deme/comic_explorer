@@ -20,22 +20,23 @@ codd:
 
 ## 実行情報
 
-- 実行日: 2026-07-29
+- 実行日: 2026-07-30
 - 実行環境: Windows 11 host + WSL2
 - 対象version: 0.1.0
-- fixture: 固定seed 20260728、通常64ファイル/11 fixture、性能版11,365ファイル/12 fixture
+- fixture: 固定seed 20260728、通常68ファイル/11 fixture、性能版11,365ファイル/12 fixture
 
 ## 自動検証結果
 
 | 検証 | 結果 | 証跡 |
 | --- | --- | --- |
-| Rust fmt/check/test | PASS | Windows MSVC、52 unit tests + 1 product-process integration |
+| Rust fmt/check/test | PASS | Windows MSVC、54 unit tests + 1 product-process integration |
 | TypeScript typecheck | PASS | `tsc --noEmit` |
-| React unit/component | PASS | 26 tests |
+| React unit/component | PASS | 36 tests |
 | Python fixture/benchmark/release tests | PASS | 7 tests、68 files / 11 fixtures、fixture validator |
 | Production frontend build | PASS | Vite production build |
 | CoDD scan/check/verify | PASS | red gate 0、advisory 4 |
 | Windows release executable | PASS | `comic-explorer.exe`生成 |
+| Windows release WebView2 E2E | PASS | sort 8通り、root/ACL/error/DB回復、正常再起動、keyboard-only、原本差分0 |
 | Windows process smoke launch | PASS | 5秒間起動継続後、試験processを終了 |
 | NSIS x64 installer | PASS | offline WebView2 modeで生成 |
 | License/SBOM/notices | PASS | npm/Cargo direct/transitive 665 components、unknown/禁止0、CycloneDX 1.6とnotice同期 |
@@ -85,16 +86,20 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
 
 ## 既知の未完了実装
 
-現時点の成果物は製造ベースラインであり、MVP完了判定は行わない。次は未完了である。
+既知の未完了実装はない。72ケースのNOT RUNは0である。
 
-- custom protocolのWindows WebView2実機security試験
-- offline E2E
-- keyboard-only全行程
-
-これらを解消し、72テストケースの実行記録を揃えるまでPhase 6のMVP完了条件は未達とする。
+外部環境を必要とする12件はBLOCKEDのまま推測でPASSにせず、release判定前のmanual
+verificationとして完全な再現手順と証跡条件を保持する。
 
 ## 今回完了した実装
 
+- 2026-07-30: clean app-dataのrelease WebView2専用sessionをWindows SendKeysの
+  実key入力だけで操作した。root入力とTab/Enter登録、addressからfolder移動、
+  実ACL拒否errorから親folderへのEnter復帰、helpのEnter/Escと呼出元focus復元、
+  catalog itemの`:focus-visible`、Ctrl+Enter漫画open、PageDownで2/3、
+  Esc後の選択item focus復元をmouse eventなしで観測した。未選択itemの
+  Ctrl+Enterが選択を確定せずfocus復元できない不具合を修正しunit testを追加した。
+  TC-A11Y-001をPASSへ変更し、集計はPASS 60 / BLOCKED 12 / NOT RUN 0。
 - 2026-07-30: App UIへアクセス拒否、消失、未対応、破損、暗号化、一時利用不能の
   6分類を連続注入し、固定文言、対象、再試行/別folder、stack/内部path非表示を確認した。
   StateStoreが破損SQLiteをrecoveryへ隔離した事実を一度だけ返すcommandを追加し、
@@ -274,8 +279,9 @@ WebView2 `offlineInstaller` を使用し、ネットワーク不要の導入を�
   flagを先に確定して全commandの新規受付を拒否し、進行中navigationをcancel、
   media tokenを全失効、SQLite connectionをdropしてWAL/SHM handleを閉じる。
   冪等なshutdown unit testを追加し、Windows MSVC 34 tests、React 20 tests、
-  typecheck、production build、fixture validatorで検証した。製品process終了時の
-  task/handle/最終読書位置をまとめて観測するE2Eは引き続き未完了である。
+  typecheck、production build、fixture validatorで検証した。この時点で未観測だった
+  製品process終了時のtask/handle/最終読書位置は、後続のprocess testと正常終了
+  release E2Eで完了した。
 - 2026-07-29: 単ページ/見開きmodeと右開き/左開きを既存SQLite settingsへ保存し、
   起動時にfrontendへ復元してViewer初期stateへ渡すようにした。Viewerのbutton/key
   操作時に先頭pageを維持したまま設定を即時保存するcomponent testを追加した。

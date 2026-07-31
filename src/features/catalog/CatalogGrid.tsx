@@ -178,6 +178,7 @@ export function CatalogGrid({
                         }
                         if (event.key === "Enter") {
                           event.preventDefault();
+                          onSelect(entry);
                           if (event.ctrlKey && canRead) onRead(entry);
                           else if (canNavigate) onNavigate(entry);
                           else if (canRead) onRead(entry);

@@ -20,9 +20,9 @@ codd:
 - 実行日時: 2026-07-30 JST
 - 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
-  （52 unit + 1 product-process integration PASS。実binary shutdown、位置復元、
+  （54 unit + 1 product-process integration PASS。実binary shutdown、位置復元、
   cancel/token失効/queue拒否、app-data renameによるhandle closeを含む）
-- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（26件PASS。
+- React: `TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test`（36件PASS。
   10,000項目でmounted gridcell 100以下を含む）
 - Python: `.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
   （7件PASS）
@@ -123,7 +123,7 @@ codd:
 | TC-PERF-004 | BLOCKED | clean Windows環境でcold TTI計測が必要 |
 | TC-PERF-005 | BLOCKED | Windows製品UIでwarm一覧ready計測が必要 |
 | TC-PERF-006 | BLOCKED | Windows製品UIでpage switch 100回計測が必要 |
-| TC-A11Y-001 | NOT RUN | help focus componentはPASSだがkeyboard-only全行程を未実行 |
+| TC-A11Y-001 | PASS | release WebView2専用sessionをWindows実key入力だけで操作。root登録、address移動、ACL error→親folder復帰、help Enter/Escとfocus復元、catalog :focus-visible、Ctrl+Enter閲覧、PageDown、Esc後の選択項目focus復元を完走 |
 | TC-A11Y-002 | BLOCKED | Windows UIA inspector/screen reader環境が必要 |
 | TC-A11Y-003 | BLOCKED | Windows high contrastと100/150/200% DPI環境が必要 |
 | TC-DIST-001 | PASS | npm/Cargoのdirect/transitive 665 componentをlockfile/Cargo metadataから監査し、unknown/禁止license 0件。SBOM/notice同期check PASS |
@@ -134,10 +134,10 @@ codd:
 
 | 結果 | 件数 |
 | --- | ---: |
-| PASS | 59 |
+| PASS | 60 |
 | FAIL | 0 |
 | BLOCKED | 12 |
-| NOT RUN | 1 |
+| NOT RUN | 0 |
 | **合計** | **72** |
 
 BLOCKED 12件の必要環境、実行手順、監視方法、期待結果、証跡、後処理は

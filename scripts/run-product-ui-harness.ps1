@@ -7,6 +7,7 @@ $library = Join-Path $evidenceRoot "library"
 $missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
 $recoveryAppData = Join-Path $evidenceRoot "recovery-appdata"
+$keyboardAppData = Join-Path $evidenceRoot "keyboard-appdata"
 $port = 9224
 $script:sequence = 0
 $script:socket = $null
@@ -38,12 +39,24 @@ function Invoke-Cdp([string]$Method, [hashtable]$Params) {
         ConvertTo-Json -Compress -Depth 10
     $bytes = [Text.Encoding]::UTF8.GetBytes($payload)
     $segment = [ArraySegment[byte]]::new($bytes)
-    $script:socket.SendAsync(
-        $segment,
-        [Net.WebSockets.WebSocketMessageType]::Text,
-        $true,
-        [Threading.CancellationToken]::None
-    ).GetAwaiter().GetResult() | Out-Null
+    try {
+        $script:socket.SendAsync(
+            $segment,
+            [Net.WebSockets.WebSocketMessageType]::Text,
+            $true,
+            [Threading.CancellationToken]::None
+        ).GetAwaiter().GetResult() | Out-Null
+    } catch {
+        if ($script:socket) { $script:socket.Dispose() }
+        $script:socket = $null
+        Connect-Cdp
+        $script:socket.SendAsync(
+            $segment,
+            [Net.WebSockets.WebSocketMessageType]::Text,
+            $true,
+            [Threading.CancellationToken]::None
+        ).GetAwaiter().GetResult() | Out-Null
+    }
     do {
         $stream = [IO.MemoryStream]::new()
         do {
@@ -92,6 +105,57 @@ function Wait-Evaluate([string]$Expression, [string]$Description) {
         "[...document.querySelectorAll('.thumbnail')].map((node) => node.outerHTML)}; })()"
     )
     throw "Timed out waiting for $Description. thumbnails=$($diagnostic | ConvertTo-Json -Compress)"
+}
+
+function Invoke-Key(
+    [string]$Key,
+    [string]$Code,
+    [int]$VirtualKeyCode,
+    [int]$Modifiers = 0
+) {
+    $down = @{
+        type = "keyDown"
+        key = $Key
+        code = $Code
+        windowsVirtualKeyCode = $VirtualKeyCode
+        nativeVirtualKeyCode = $VirtualKeyCode
+        modifiers = $Modifiers
+    }
+    if ($Key -eq "Enter") {
+        $down.text = "`r"
+        $down.unmodifiedText = "`r"
+    }
+    Invoke-Cdp "Input.dispatchKeyEvent" $down | Out-Null
+    if ($Key -eq "Enter") {
+        Invoke-Cdp "Input.dispatchKeyEvent" @{
+            type = "char"
+            key = $Key
+            code = $Code
+            text = "`r"
+            unmodifiedText = "`r"
+            windowsVirtualKeyCode = $VirtualKeyCode
+            nativeVirtualKeyCode = $VirtualKeyCode
+            modifiers = $Modifiers
+        } | Out-Null
+    }
+    Invoke-Cdp "Input.dispatchKeyEvent" @{
+        type = "keyUp"
+        key = $Key
+        code = $Code
+        windowsVirtualKeyCode = $VirtualKeyCode
+        nativeVirtualKeyCode = $VirtualKeyCode
+        modifiers = $Modifiers
+    } | Out-Null
+}
+
+function Invoke-OsKeys($Process, [string]$Keys) {
+    $shell = New-Object -ComObject WScript.Shell
+    if (-not $shell.AppActivate($Process.Id)) {
+        throw "Could not activate product window for keyboard input."
+    }
+    Start-Sleep -Milliseconds 50
+    $shell.SendKeys($Keys)
+    Start-Sleep -Milliseconds 50
 }
 
 function Assert-CatalogSort([string]$Field, [string]$Direction) {
@@ -346,6 +410,7 @@ $warm = $null
 $viewerRestart = $null
 $rootRecovery = $null
 $appDataRecovery = $null
+$keyboardProduct = $null
 $deniedPath = Join-Path $library "folder-a\acl-denied"
 $deniedRule = $null
 try {
@@ -884,6 +949,106 @@ try {
         Where-Object { $_.Name -like "state-*.sqlite3" })) {
         throw "Corrupt app database was not isolated in recovery."
     }
+    Stop-Product $appDataRecovery
+    $appDataRecovery = $null
+    $keyboardProduct = Start-Product -DataRoot $keyboardAppData
+    Wait-Evaluate "document.querySelector('#library-root') !== null" "keyboard setup UI"
+    Invoke-Evaluate "document.querySelector('#library-root').focus(); true" | Out-Null
+    Invoke-Cdp "Input.insertText" @{ text = $library } | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('#library-root').value.endsWith('\\library')"
+    ) "keyboard root text input"
+    Invoke-OsKeys $keyboardProduct "{TAB}"
+    Wait-Evaluate (
+        "document.activeElement === document.querySelector('button[type=submit]')"
+    ) "keyboard submit focus"
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate (
+        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+        "document.querySelector('#address').value.endsWith('\\library')"
+    ) "keyboard root registration"
+    $keyboardLibraryRoot = Invoke-Evaluate "document.querySelector('#address').value"
+    Invoke-Evaluate "document.querySelector('#address').focus(); true" | Out-Null
+    Invoke-OsKeys $keyboardProduct "^a"
+    Invoke-Cdp "Input.insertText" @{
+        text = "$keyboardLibraryRoot\folder-a"
+    } | Out-Null
+    Invoke-OsKeys $keyboardProduct "{TAB}"
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate (
+        "document.querySelector('#address').value.endsWith('\\folder-a') && " +
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.dataset.relativePath === 'folder-a/child')"
+    ) "keyboard address navigation"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $deniedRule = [Security.AccessControl.FileSystemAccessRule]::new(
+        $identity.User,
+        [Security.AccessControl.FileSystemRights]"ListDirectory,ReadData",
+        [Security.AccessControl.InheritanceFlags]::None,
+        [Security.AccessControl.PropagationFlags]::None,
+        [Security.AccessControl.AccessControlType]::Deny
+    )
+    $deniedAcl = Get-Acl $deniedPath
+    $deniedAcl.AddAccessRule($deniedRule) | Out-Null
+    Set-Acl $deniedPath $deniedAcl
+    Invoke-Evaluate "document.querySelector('#address').focus(); true" | Out-Null
+    Invoke-OsKeys $keyboardProduct "^a"
+    Invoke-Cdp "Input.insertText" @{
+        text = "$keyboardLibraryRoot\folder-a\acl-denied"
+    } | Out-Null
+    Invoke-OsKeys $keyboardProduct "{TAB}"
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate (
+        "document.querySelector('.error-panel[role=alert]') !== null && " +
+        "document.querySelector('.error-panel button:nth-of-type(3)') !== null"
+    ) "keyboard error route"
+    Invoke-Evaluate (
+        "document.querySelector('.error-panel button:nth-of-type(3)').focus(); true"
+    ) | Out-Null
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate (
+        "document.querySelector('.error-panel') === null && " +
+        "document.querySelector('#address').value.endsWith('\\folder-a')"
+    ) "keyboard error recovery"
+    $deniedAcl = Get-Acl $deniedPath
+    $deniedAcl.RemoveAccessRuleSpecific($deniedRule)
+    Set-Acl $deniedPath $deniedAcl
+    $deniedRule = $null
+    Invoke-Evaluate "document.querySelector('.menu-bar button:nth-of-type(3)').focus(); true" |
+        Out-Null
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate "document.querySelector('[role=dialog]') !== null" "keyboard help open"
+    Invoke-OsKeys $keyboardProduct "{ESC}"
+    Wait-Evaluate (
+        "document.querySelector('[role=dialog]') === null && " +
+        "document.activeElement === document.querySelector('.menu-bar button:nth-of-type(3)')"
+    ) "keyboard help focus restore"
+    Invoke-Evaluate "document.querySelector('#address').focus(); true" | Out-Null
+    Invoke-OsKeys $keyboardProduct "^a"
+    Invoke-Cdp "Input.insertText" @{ text = $keyboardLibraryRoot } | Out-Null
+    Invoke-OsKeys $keyboardProduct "{TAB}"
+    Invoke-OsKeys $keyboardProduct "{ENTER}"
+    Wait-Evaluate (
+        "document.querySelector('#address').value.endsWith('\\library') && " +
+        "[...document.querySelectorAll('.catalog-item')].some((node) => " +
+        "node.dataset.relativePath === 'comic-folder')"
+    ) "keyboard return to catalog"
+    if (-not (Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.dataset.relativePath === 'comic-folder'); item.focus(); " +
+        "return item.matches(':focus-visible'); })()"
+    ))) { throw "Keyboard-focused catalog item did not expose :focus-visible." }
+    Invoke-OsKeys $keyboardProduct "^~"
+    Wait-Evaluate "document.querySelector('.viewer') !== null" "keyboard viewer open"
+    Invoke-OsKeys $keyboardProduct "{PGDN}"
+    Wait-Evaluate (
+        "document.querySelector('.viewer-toolbar')?.textContent.includes('2 / 3')"
+    ) "keyboard viewer page movement"
+    Invoke-OsKeys $keyboardProduct "{ESC}"
+    Wait-Evaluate (
+        "document.querySelector('.viewer') === null && " +
+        "document.activeElement?.dataset.relativePath === 'comic-folder'"
+    ) "keyboard viewer close focus restore"
     $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
     if (Compare-Object $before $after) {
         throw "Product UI harness changed source archives."
@@ -907,6 +1072,7 @@ try {
         localAclErrorRecovered = $true
         normalExitRestart = $true
         appDataRecoveryNotice = $true
+        keyboardOnlyRoute = $true
         navigationHistory = $true
         treeAddressListSynchronized = $true
         rootEscapeRejected = $true
@@ -932,6 +1098,7 @@ try {
     if ($viewerRestart) { Stop-Product $viewerRestart -Force }
     if ($rootRecovery) { Stop-Product $rootRecovery -Force }
     if ($appDataRecovery) { Stop-Product $appDataRecovery -Force }
+    if ($keyboardProduct) { Stop-Product $keyboardProduct -Force }
     if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
         Move-Item $missingLibrary $library
     }

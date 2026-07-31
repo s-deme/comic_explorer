@@ -63,6 +63,30 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("selects a keyboard-focused item before Ctrl+Enter opens it", () => {
+    const onSelect = vi.fn();
+    const onRead = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={onRead}
+      />,
+    );
+    const item = screen.getByRole("button", { name: /book-0/ });
+
+    fireEvent.keyDown(item, { key: "Enter", ctrlKey: true });
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "book-0" }),
+    );
+    expect(onRead).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "book-0" }),
+    );
+  });
+
   it("keeps the thumbnail slot stable while loading and displays the generated image", async () => {
     const onNeeded = vi.fn();
     const { rerender } = render(
