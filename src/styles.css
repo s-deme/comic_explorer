@@ -196,6 +196,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: #0006;
 }
 .help-dialog { width: 440px; padding: 24px; border-radius: 6px; background: white; box-shadow: 0 12px 40px #0005; }
+.end-of-volume-dialog { width: min(440px, calc(100vw - 48px)); padding: 24px; border-radius: 6px; color: #1f2328; background: white; box-shadow: 0 12px 40px #0005; }
+.end-of-volume-dialog button + button { margin-left: 8px; }
 
 @media (prefers-contrast: more) {
   .catalog-item[data-selected="true"] { border-width: 3px; }
@@ -209,6 +211,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow: hidden;
   color: #f5f7fa;
   background: #14171b;
+}
+.end-of-volume-notice {
+  position: fixed;
+  z-index: 4;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #d8b45a;
+  border-radius: 4px;
+  color: #2b220d;
+  background: #fff3c4;
 }
 .viewer-toolbar {
   z-index: 3;

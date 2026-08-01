@@ -201,6 +201,7 @@ pub struct LibraryRoot {
 pub struct CatalogSettings {
     pub sort_field: String,
     pub sort_descending: bool,
+    pub end_of_volume_policy: String,
     pub view_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -232,12 +233,25 @@ fn viewer_scale_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn end_of_volume_policy(settings: &crate::state::Settings) -> String {
+    if matches!(
+        settings.end_of_volume_policy.as_str(),
+        "auto_next" | "confirm_next" | "return_library" | "stop" | "loop"
+    ) {
+        settings.end_of_volume_policy.clone()
+    } else {
+        "auto_next".into()
+    }
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
+    let end_of_volume_policy = end_of_volume_policy(&settings);
     CatalogSettings {
         sort_field: settings.sort_field,
         sort_descending: settings.sort_descending,
+        end_of_volume_policy,
         view_mode: settings.view_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
@@ -388,6 +402,50 @@ pub fn set_catalog_sort(
             .unwrap_or_default();
         settings.sort_field.clone_from(&sort_field);
         settings.sort_descending = sort_descending;
+        if let Some(store) = stores.as_mut() {
+            store
+                .save_settings(&settings)
+                .map_err(|error| error.message)?;
+        }
+        settings
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: catalog_settings(settings),
+    })
+}
+
+#[tauri::command]
+pub fn set_end_of_volume_policy(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    policy: String,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !matches!(
+        policy.as_str(),
+        "auto_next" | "confirm_next" | "return_library" | "stop" | "loop"
+    ) {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "End-of-volume policy is invalid.",
+            ),
+        ));
+    }
+    let settings = {
+        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
+        let mut settings = stores
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
+        settings.end_of_volume_policy = policy;
         if let Some(store) = stores.as_mut() {
             store
                 .save_settings(&settings)

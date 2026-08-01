@@ -15,6 +15,7 @@ pub struct Settings {
     pub library_root: Option<PathBuf>,
     pub sort_field: String,
     pub sort_descending: bool,
+    pub end_of_volume_policy: String,
     pub view_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -28,6 +29,7 @@ impl Default for Settings {
             library_root: None,
             sort_field: "name".into(),
             sort_descending: false,
+            end_of_volume_policy: "auto_next".into(),
             view_mode: "single".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
@@ -96,6 +98,7 @@ impl StateStore {
                 "libraryRoot" => settings.library_root = Some(PathBuf::from(value)),
                 "sortField" => settings.sort_field = value,
                 "sortDescending" => settings.sort_descending = value == "true",
+                "endOfVolumePolicy" => settings.end_of_volume_policy = value,
                 "viewMode" => settings.view_mode = value,
                 "readingDirection" => settings.reading_direction = value,
                 "scaleMode" => settings.scale_mode = value,
@@ -112,6 +115,7 @@ impl StateStore {
         let mut values = vec![
             ("sortField", settings.sort_field.clone()),
             ("sortDescending", settings.sort_descending.to_string()),
+            ("endOfVolumePolicy", settings.end_of_volume_policy.clone()),
             ("viewMode", settings.view_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
             ("scaleMode", settings.scale_mode.clone()),
@@ -364,6 +368,7 @@ mod tests {
                 library_root: Some(PathBuf::from(r"C:\Comics")),
                 sort_field: "modified".into(),
                 sort_descending: true,
+                end_of_volume_policy: "loop".into(),
                 view_mode: "spread".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
@@ -390,6 +395,7 @@ mod tests {
         let restored = store.load_settings().unwrap();
         assert_eq!(restored.scale_mode, "custom");
         assert_eq!(restored.scale, "1.7");
+        assert_eq!(restored.end_of_volume_policy, "loop");
         assert!(restored.loupe_enabled);
         assert_eq!(
             store.reading_position("item-1").unwrap().unwrap().page_key,

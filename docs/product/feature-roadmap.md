@@ -39,8 +39,8 @@ codd:
 | `Blocked` | 明示された依存、環境、ライセンス、安全設計、または採否判断が未解決。未着手の候補を先行割当しない。 |
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
-現在の12バッチはすべて `Planned` である。対象の `FUT-*` 行は台帳上すべて
-`Candidate / NOT TESTED` であり、実装決定や完了を意味しない。
+FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新した。FR-B03〜FR-B12は
+引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
 
 ## 推奨実装順
 
@@ -53,7 +53,7 @@ codd:
 | 固定ID | Batch | 領域 | 対象 feature ID（台帳の原子ID） | 現在の運用状態 |
 |---|---:|---|---|---|
 | `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done`（重点QC完了） |
-| `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Planned` |
+| `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done`（pilot実装・重点QC完了） |
 | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Planned` |
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Planned` |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
@@ -101,9 +101,9 @@ codd:
 - **未実行環境:** Windows WebView2製品harnessはLinux環境のため未実行。これはcomponent
   focused test、Rust check/test、CoDD verifyのPASSとは別の製品実機gateとして保持する。
 
-### FR-B02 — 巻末動作（Batch 2）
+### FR-B02 — 巻末動作（Batch 2、pilot完了）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。
+- **状態:** `Done`。対象5行はC0で採用要件化され、`Implemented / PASS`へ更新済み。
 - **対象 feature ID:** `FUT-C-020`, `FUT-C-038`, `FUT-C-039`, `FUT-C-040`, `FUT-C-041`。
 - **user outcome:** 巻末で、次の巻を開く、確認してから開く、library へ戻る、停止する、
   または先頭へ loop する動作を読者が選べる。
@@ -118,6 +118,21 @@ codd:
   `FT-B02-006` sort 順と再起動復元。
 - **batch末尾 gate:** 全6本の focused test を SKIP 0 で実測し、既存 `TC-UI-014`/
   `TC-E2E-003` 相当の既定動作を退行させないことを確認した後、`BATCH-END-GATE`。
+
+#### FR-B02 実装・直接観測証跡
+
+- **採用要件:** [FR-B02 巻末動作要件](../requirements/end-of-volume-requirements.md)。
+- **実装根拠:** `src/features/catalog/end-of-volume.ts`、`src/App.tsx`、
+  `src/features/library/client.ts`、`src-tauri/src/application/mod.rs`、
+  `src-tauri/src/state/repository.rs`、`src-tauri/src/lib.rs`。
+- **直接観測:** [FR-B02 focused test結果](../testing/fr-b02-results.md)。FT-B02-001〜006は
+  policy resolver、確認UI、一覧復帰、停止、loop/no-next、sort順と再起動復元を対象に
+  SKIP 0で実測する。
+- **C0/C1境界:** `auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を固定し、
+  未知値と旧設定の既定値は`auto_next`。次項目なしはloopだけsort済み先頭へ戻り、他は
+  現在巻末に留まる。B03〜B12はpilot評価完了まで開始しない。
+- **非破壊境界:** policyはlibrary root外のapp-local SQLite settingsへ保存し、原本・書庫・
+  library管理fileの新規作成0、外部通信0を維持する。
 
 ### FR-B03 — 一覧表示形式（Batch 3）
 

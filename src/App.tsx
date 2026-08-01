@@ -13,16 +13,23 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveEndOfVolumePolicy,
   saveViewerSettings,
   takeRecoveryNotice,
   type CatalogSettings,
   type ViewerSession,
 } from "./features/library/client";
 import {
-  nextComicEntry,
   sortCatalogEntries,
   type SortField,
 } from "./features/catalog/sort";
+import {
+  END_OF_VOLUME_POLICY_LABELS,
+  normalizeEndOfVolumePolicy,
+  resolveEndOfVolume,
+  type EndOfVolumeDecision,
+  type EndOfVolumePolicy,
+} from "./features/catalog/end-of-volume";
 import { Viewer } from "./features/viewer/Viewer";
 import type {
   ReadingDirection,
@@ -64,6 +71,11 @@ export function App() {
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
+  const [endOfVolumePolicy, setEndOfVolumePolicy] =
+    useState<EndOfVolumePolicy>("auto_next");
+  const [endOfVolumeNotice, setEndOfVolumeNotice] = useState<string | null>(null);
+  const [pendingEndOfVolume, setPendingEndOfVolume] =
+    useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
@@ -83,6 +95,9 @@ export function App() {
         if (response.status === "ok") {
           setSortField(response.data.sortField);
           setSortDescending(response.data.sortDescending);
+          setEndOfVolumePolicy(
+            normalizeEndOfVolumePolicy(response.data.endOfVolumePolicy),
+          );
           setViewMode(response.data.viewMode);
           setReadingDirection(response.data.readingDirection);
           setViewerScaleMode(response.data.scaleMode);
@@ -312,6 +327,14 @@ export function App() {
     ).catch(() => undefined);
   }
 
+  function changeEndOfVolumePolicy(policy: EndOfVolumePolicy) {
+    setEndOfVolumePolicy(policy);
+    settingsGeneration.current += 1;
+    void saveEndOfVolumePolicy(policy, settingsGeneration.current).catch(
+      () => undefined,
+    );
+  }
+
   function persistViewerSettings(
     next: Partial<
       Pick<
@@ -334,44 +357,105 @@ export function App() {
     ).catch(() => undefined);
   }
 
+  function closeViewer() {
+    setPendingEndOfVolume(null);
+    setEndOfVolumeNotice(null);
+    setViewerSession(null);
+  }
+
+  function openComicEntry(entry: CatalogEntry) {
+    setPendingEndOfVolume(null);
+    setEndOfVolumeNotice(null);
+    viewerGeneration.current += 1;
+    const requestGeneration = viewerGeneration.current;
+    void openComic(entry.relativePath, requestGeneration).then((response) => {
+      if (response.status === "ok") {
+        setViewerSession(response.data);
+        setLoadState({ status: "ready" });
+      } else if (response.status === "error") {
+        setEndOfVolumeNotice(presentError(response.error));
+      }
+    });
+  }
+
+  function handleEndOfVolume() {
+    if (pendingEndOfVolume !== null || viewerSession === null) return;
+    const decision = resolveEndOfVolume(
+      sortedEntries,
+      viewerSession.itemKey,
+      endOfVolumePolicy,
+    );
+    if (decision.kind === "open") {
+      openComicEntry(decision.entry);
+    } else if (decision.kind === "confirm") {
+      setEndOfVolumeNotice(null);
+      setPendingEndOfVolume(decision);
+    } else if (decision.kind === "return_library") {
+      closeViewer();
+    } else {
+      setEndOfVolumeNotice(
+        decision.reason === "policy"
+          ? "巻末動作が停止に設定されています。"
+          : "巻末です。次の漫画はありません。",
+      );
+    }
+  }
+
   if (viewerSession !== null) {
     return (
-      <Viewer
-        key={viewerSession.itemKey}
-        session={viewerSession}
-        generation={viewerGeneration.current}
-        initialMode={viewMode}
-        initialDirection={readingDirection}
-        initialScaleMode={viewerScaleMode}
-        initialScale={viewerScale}
-        initialLoupeEnabled={loupeEnabled}
-        onSettingsChange={(mode, direction) => {
-          setViewMode(mode);
-          setReadingDirection(direction);
-          persistViewerSettings({ viewMode: mode, readingDirection: direction });
-        }}
-        onScaleChange={(next: ViewerScaleState) => {
-          setViewerScaleMode(next.mode);
-          setViewerScale(next.scale);
-          setLoupeEnabled(next.loupeEnabled);
-          persistViewerSettings({
-            scaleMode: next.mode,
-            scale: next.scale,
-            loupeEnabled: next.loupeEnabled,
-          });
-        }}
-        onClose={() => setViewerSession(null)}
-        onNextItem={() => {
-          const next = nextComicEntry(sortedEntries, viewerSession.itemKey);
-          if (next) {
-            viewerGeneration.current += 1;
-            void openComic(next.relativePath, viewerGeneration.current).then(
-              (response) =>
-                response.status === "ok" && setViewerSession(response.data),
-            );
-          }
-        }}
-      />
+      <div className="viewer-shell">
+        <Viewer
+          key={viewerSession.itemKey}
+          session={viewerSession}
+          generation={viewerGeneration.current}
+          initialMode={viewMode}
+          initialDirection={readingDirection}
+          initialScaleMode={viewerScaleMode}
+          initialScale={viewerScale}
+          initialLoupeEnabled={loupeEnabled}
+          onSettingsChange={(mode, direction) => {
+            setViewMode(mode);
+            setReadingDirection(direction);
+            persistViewerSettings({ viewMode: mode, readingDirection: direction });
+          }}
+          onScaleChange={(next: ViewerScaleState) => {
+            setViewerScaleMode(next.mode);
+            setViewerScale(next.scale);
+            setLoupeEnabled(next.loupeEnabled);
+            persistViewerSettings({
+              scaleMode: next.mode,
+              scale: next.scale,
+              loupeEnabled: next.loupeEnabled,
+            });
+          }}
+          onClose={closeViewer}
+          onNextItem={handleEndOfVolume}
+        />
+        {endOfVolumeNotice !== null && (
+          <p className="end-of-volume-notice" role="status">
+            {endOfVolumeNotice}
+          </p>
+        )}
+        {pendingEndOfVolume !== null && (
+          <div className="dialog-backdrop">
+            <div
+              className="end-of-volume-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="end-of-volume-title"
+            >
+              <h2 id="end-of-volume-title">次の漫画を開きますか？</h2>
+              <p>{pendingEndOfVolume.entry.relativePath}</p>
+              <button onClick={() => openComicEntry(pendingEndOfVolume.entry)}>
+                次の漫画を開く
+              </button>
+              <button onClick={() => setPendingEndOfVolume(null)}>
+                キャンセル
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -429,6 +513,24 @@ export function App() {
             <option value="modified">更新日時</option>
             <option value="size">サイズ</option>
             <option value="kind">種類</option>
+          </select>
+        </label>
+        <label>
+          巻末動作
+          <select
+            aria-label="巻末動作"
+            value={endOfVolumePolicy}
+            onChange={(event) =>
+              changeEndOfVolumePolicy(
+                normalizeEndOfVolumePolicy(event.target.value),
+              )
+            }
+          >
+            {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
+              <option key={policy} value={policy}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <button

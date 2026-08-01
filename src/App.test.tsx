@@ -11,6 +11,7 @@ import { App } from "./App";
 import {
   getCatalogSettings,
   getThumbnail,
+  loadPage,
   listTreeChildren,
   listFolder,
   openComic,
@@ -18,6 +19,8 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveEndOfVolumePolicy,
+  saveReadingPosition,
   saveViewerSettings,
   takeRecoveryNotice,
 } from "./features/library/client";
@@ -32,7 +35,10 @@ vi.mock("./features/library/client", () => ({
   openComic: vi.fn(),
   getCatalogSettings: vi.fn(),
   getThumbnail: vi.fn(),
+  loadPage: vi.fn(),
   saveCatalogSort: vi.fn(),
+  saveEndOfVolumePolicy: vi.fn(),
+  saveReadingPosition: vi.fn(),
   saveViewerSettings: vi.fn(),
   takeRecoveryNotice: vi.fn(),
 }));
@@ -45,7 +51,10 @@ const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
 const thumbnailMock = vi.mocked(getThumbnail);
+const loadPageMock = vi.mocked(loadPage);
 const saveSortMock = vi.mocked(saveCatalogSort);
+const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
+const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveViewerMock = vi.mocked(saveViewerSettings);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 
@@ -61,7 +70,10 @@ describe("application shell", () => {
     openMock.mockReset();
     settingsMock.mockReset();
     thumbnailMock.mockReset();
+    loadPageMock.mockReset();
     saveSortMock.mockReset();
+    saveEndPolicyMock.mockReset();
+    saveReadingMock.mockReset();
     saveViewerMock.mockReset();
     recoveryNoticeMock.mockReset();
     recoveryNoticeMock.mockResolvedValue({
@@ -77,6 +89,7 @@ describe("application shell", () => {
       data: {
         sortField: "name",
         sortDescending: false,
+        endOfVolumePolicy: "auto_next",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -91,12 +104,34 @@ describe("application shell", () => {
       data: {
         sortField: "name",
         sortDescending: false,
+        endOfVolumePolicy: "auto_next",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
         loupeEnabled: false,
       },
+    });
+    saveEndPolicyMock.mockResolvedValue({
+      status: "ok",
+      requestId: "save-end-policy" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "auto_next",
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
+      },
+    });
+    saveReadingMock.mockResolvedValue({
+      status: "ok",
+      requestId: "save-reading" as never,
+      generation: 1 as never,
+      data: undefined,
     });
     saveViewerMock.mockResolvedValue({
       status: "ok",
@@ -105,6 +140,7 @@ describe("application shell", () => {
       data: {
         sortField: "name",
         sortDescending: false,
+        endOfVolumePolicy: "auto_next",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -354,5 +390,112 @@ describe("application shell", () => {
     expect(priorities.filter((value) => value === "visible")).toHaveLength(25);
     expect(priorities.filter((value) => value === "near")).toHaveLength(15);
     expect(priorities.filter((value) => value === "background")).toHaveLength(5);
+  });
+
+  it("persists the selected end-of-volume policy without changing the catalog sort", async () => {
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      data: [],
+    });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+    const policy = await screen.findByLabelText("巻末動作");
+    fireEvent.change(policy, { target: { value: "loop" } });
+
+    expect(policy).toHaveValue("loop");
+    expect(saveEndPolicyMock).toHaveBeenCalledWith("loop", expect.any(Number));
+    expect(screen.getByLabelText("並べ替え条件")).toHaveValue("name");
+  });
+
+  it("shows confirm_next at the volume boundary and opens only after approval", async () => {
+    const first = {
+      relativePath: "01-first.cbz" as never,
+      kind: "archive" as const,
+      archiveKind: "cbz" as const,
+    };
+    const second = {
+      relativePath: "02-second.cbz" as never,
+      kind: "archive" as const,
+      archiveKind: "cbz" as const,
+    };
+    const session = (itemKey: string) => ({
+      itemKey,
+      displayName: itemKey,
+      pages: [
+        {
+          id: `${itemKey}-page` as never,
+          relativePath: "page-1.png" as never,
+          mediaUri: "data:image/png;base64,fixture",
+        },
+      ],
+      startIndex: 0,
+    });
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-1" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "request-2" as never,
+      generation: 2 as never,
+      data: [first, second],
+    });
+    thumbnailMock.mockResolvedValue({
+      status: "error",
+      requestId: "thumbnail" as never,
+      generation: 1 as never,
+      error: {
+        code: "NOT_FOUND",
+        message: "missing",
+        retryable: true,
+      },
+    });
+    openMock
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "open-1" as never,
+        generation: 1 as never,
+        data: session(first.relativePath),
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "open-2" as never,
+        generation: 2 as never,
+        data: session(second.relativePath),
+      });
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "C:\\Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    const policy = await screen.findByLabelText("巻末動作");
+    fireEvent.change(policy, { target: { value: "confirm_next" } });
+
+    fireEvent.keyDown(
+      await screen.findByRole("button", { name: /01-first/ }),
+      { key: "Enter" },
+    );
+    expect(await screen.findByLabelText("01-first.cbz ビューワ")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    expect(await screen.findByRole("dialog")).toHaveTextContent("02-second.cbz");
+    expect(openMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "次の漫画を開く" }));
+    expect(await screen.findByLabelText("02-second.cbz ビューワ")).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(2);
   });
 });

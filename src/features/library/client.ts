@@ -12,6 +12,7 @@ import type {
   RequestId,
 } from "../../types/domain";
 import type { ScaleMode } from "../viewer/model";
+import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 
 let requestSequence = 0;
 
@@ -53,6 +54,7 @@ export async function restoreLibraryRoot(
 export interface CatalogSettings {
   sortField: "name" | "modified" | "size" | "kind";
   sortDescending: boolean;
+  endOfVolumePolicy: EndOfVolumePolicy;
   viewMode: "single" | "spread";
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -101,6 +103,16 @@ export async function saveCatalogSort(
     context: context(generation),
     sortField: settings.sortField,
     sortDescending: settings.sortDescending,
+  });
+}
+
+export async function saveEndOfVolumePolicy(
+  policy: EndOfVolumePolicy,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("set_end_of_volume_policy", {
+    context: context(generation),
+    policy,
   });
 }
 
