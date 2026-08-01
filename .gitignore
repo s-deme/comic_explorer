@@ -2,6 +2,7 @@
 .venv/
 .codd/
 .tools/
+.codex/
 node_modules/
 dist/
 coverage/
