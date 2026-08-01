@@ -55,7 +55,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-bottom: 1px solid #c9cdd2;
   background: #f6f7f8;
 }
-.menu-bar button { border: 0; background: transparent; }
+.menu-bar button {
+  color: #1f2328;
+  border: 0;
+  background: transparent;
+}
 .toolbar label { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 .address-bar label { font-size: .82rem; }
 .address-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
@@ -100,7 +104,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tree-node[aria-selected="true"] { background: #dbeafe; font-weight: 600; }
+.tree-node[aria-selected="true"] {
+  color: #183b68;
+  background: #dbeafe;
+  font-weight: 600;
+}
 .tree-error { padding: 0 6px; color: #a01717; font-weight: 700; }
 .catalog-pane { position: relative; min-width: 0; min-height: 0; }
 .catalog-scroll { height: 100%; overflow: auto; padding: 12px; }
@@ -125,10 +133,15 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
+  color: #1f2328;
   text-align: center;
 }
 .catalog-item:hover { border-color: #aab4c0; background: #f2f6fb; }
-.catalog-item[data-selected="true"] { border-color: #1769c2; background: #dbeafe; }
+.catalog-item[data-selected="true"] {
+  color: #183b68;
+  border-color: #1769c2;
+  background: #dbeafe;
+}
 .thumbnail {
   display: grid;
   place-items: center;
