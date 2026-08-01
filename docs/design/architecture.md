@@ -290,6 +290,11 @@ installerを同梱する。これにより初回installをnetworkなしで完了
 は増える。Windows 10 1809、Windows 11のclean VMでinstall/launch/uninstallを測る。
 署名証明書は有料依存禁止とは別の配布信頼性事項として、取得可否をrelease前に決める。
 
+fixture generatorは固定seedを受け取り、malformed ZIP/image/security corpusを
+Windows、WSLおよび通常のLinux CIで同じ入力から再現する。実行時はplatformで利用可能な
+path変換interfaceを検出した場合だけ変換し、既存出力は明示的な置換指定なしに上書きしない。
+この規則は `NFR-MVP-006-AC6` のfixture/test sectionと一致させる。
+
 uninstall既定はapp binaryを削除し、`%LOCALAPPDATA%\ComicExplorer` のuser dataは
 残す。uninstallerに明示checkboxを設けた場合だけcache/settingsを削除し、library
 rootは絶対に対象にしない。THIRD-PARTY-NOTICESとlicense一覧を同梱する。

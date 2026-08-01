@@ -54,6 +54,10 @@ Windows実機の製品相当値は未測定である。このリスクを明示�
 | tests | cargo test、Vitest、WebdriverIO Tauri、Windows perf harness |
 | installer | NSIS setup + WebView2 Evergreen offline installer |
 
+custom URIのplatform mappingはTauriの規則に固定する。Windows WebView2では
+`http://comic.localhost/<token>`、その他の対応platformでは
+`comic://localhost/<token>`を使い、token以外のquery、fragment、絶対pathは受け付けない。
+
 依存のmajor/minorは製品実装開始時にlock fileで固定する。不要な`zip` format feature、
 network plugin、telemetryは入れない。
 

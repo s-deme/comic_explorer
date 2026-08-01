@@ -80,9 +80,36 @@ Windows 10の具体的エディション・ビルド、基準PC、HDDをリリ�
 
 ## 6. テストデータ方針
 
-`tests/fixtures/generate_fixtures.py` が固定シード `20260728` から著作権上問題のない幾何模様と5×7ピクセル文字を描く。外部画像・実作品・生成AI画像は使わない。通常生成は機能用の小規模セット、`--include-performance` は1,000／10,000項目と300ページを追加する。出力は `tests/fixtures/generated/` としGit対象外にする。
+`tests/fixtures/generate_fixtures.py` が固定シード `20260728` から著作権上問題のない幾何模様と5×7ピクセル文字を描く。外部画像・実作品・生成AI画像は使わない。通常生成は機能用の小規模セット、`--include-performance` は1,000／10,000項目と300ページを追加する。出力は `tests/fixtures/generated/` としGit対象外にする。ここでいう「同一入力」は、内部で定義された固定seed、同一generator version、同一command（fixture optionsを含む）の組合せであり、CLIに存在しない `--seed` を捏造して指定しない。
 
 `manifest.json` は相対パス、形式、寸法、期待順、表紙、ページ数、成功／エラー、SHA-256、サイズ、固定mtime、ディレクトリエントリを保持する。絶対パスは保存しない。`validate_fixtures.py` は再計算値、ZIPの構造、危険エントリが作業領域外へ生成されていないことを検証する。
+
+`NFR-MVP-006-AC6` は、fixture generatorのContract（固定seed `20260728`）と
+Integration（malformed ZIP／image／security corpus）で検証する。test modalityは
+Contractで内部seed・同一generator version・同一command（fixture optionsを含む）を
+「同一入力」として決定性を検証し、Integrationで生成物と非破壊境界を検証する。
+実行環境はWindows、WSL、通常のLinux CIを各1ケースとして記録し、各ケースで同一入力
+からmanifest、SHA-256、サイズ、固定mtime、ディレクトリエントリが一致することを
+expected evidenceとする。同一入力は内部seed、同一generator version、同一command
+（fixture optionsを含む）の組合せであり、CLIに存在しない`--seed`を捏造しない。platform
+固有のpath変換は、利用可能なpath変換interfaceを検出できた場合だけ実行する。WSLでは
+`wslpath`を検出できた場合だけpath変換を行い、検出できない場合は変換せず、その分岐も
+証跡へ記録する。これはPowerShell/System.DrawingによるPNG→JPEG生成とは別責務である。
+通常生成（非force）で既存outputがある場合はnonzeroで拒否し、生成前後のoutput hashと
+mtimeを比較して不変であることを要求する。Pythonの`--force`は既定の
+`tests/fixtures/generated` directory、またはbasenameが`comic-explorer-fixtures*`の
+fixture output directoryに対してだけ受け付け、許可外directoryはforceでもnonzeroで
+拒否し、内容・hash・mtimeを不変に保つ。force再生成は内部seed、同一generator version、
+同一commandの入力条件とmanifest／SHA-256／サイズ／固定mtime／ディレクトリエントリが
+一致することを検証し、再生成後のhashが必ず変化することは要求しない（同一hashは決定性
+の証拠になり得る）。明示的なreplace指定がない限り、既存outputの無断変更は失敗とする。
+PowerShell/System.Drawingを利用できない通常のLinux環境は、PNG→JPEG生成についての
+環境別`Blocked`（未実行を`PASS`へ変更しない）とする。interfaceを検出できた実行済み
+分岐で期待する拒否・不変性・決定性に違反した場合は`FAIL`とする。実装済みgeneratorと
+各環境が揃わない場合も`Blocked`として、原因と環境情報を報告する。停止条件は、許可外
+force、非force既存outputの上書き、または実行済み分岐のmanifest／hash／mtime不一致を
+検出した時点で当該ケースをFAILとして中断し、環境未整備はFAILへ変換せずBLOCKEDとして
+記録することである。
 
 ## 7. 原本非破壊のオラクル
 
@@ -227,7 +254,9 @@ L2/L3のUI・E2EをWebdriverIO Tauriへ割り当てる。Windows性能ハーネ�
 | AC-006 | TC-UI-007 |
 | AC-007 | TC-E2E-003 |
 
-`NFR-MVP-006` は依頼範囲外だが、フィクスチャは AC3 を支援する。技術候補比較・採否はアーキテクチャ作業のため本書では判定しない。
+`NFR-MVP-006` のAC6は上記のfixture Contract／Integrationで追跡する。Windows、WSL、
+通常のLinux CIの実機・CI結果が揃わない間は`Blocked`であり、未実行、skip、環境不足を
+成功扱いにしない。技術候補比較・採否はアーキテクチャ作業のため本書では判定しない。
 
 ## 19. 解決済み要件ギャップ
 

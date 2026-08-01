@@ -60,8 +60,21 @@ VM値は互いの回帰検出、実機値はUX判定に用い、混在集計し�
 
 ## 3. dataset
 
-`benchmarks/architecture-spike/windows/Generate-Dataset.ps1` を用い、manifestと
-dataset SHA-256一覧を保存する。
+Windowsのdataset生成は `benchmarks/architecture-spike/windows/Generate-Dataset.ps1`
+（既存出力を明示置換する場合だけ `-Force`）を用い、manifestとdataset SHA-256一覧を
+保存する。Pythonのfixture生成は `tests/fixtures/generate_fixtures.py` を用い、seed
+`20260728` はgenerator内部の固定値として使用し、生成したmanifestにも記録する（`--seed`
+入力は存在しない）。Pythonで既存の許可対象出力を明示置換する場合だけ `--force` を使う。
+
+malformed ZIP/image/security corpusを含む同一fixtureをWindows、WSLおよび通常のLinux CIで
+再現できることを確認する。ただし現行Python generatorのPNG→JPEG変換はPowerShell/
+System.Drawingに依存するため、通常Linuxでそのinterfaceが利用できず成功実測できない間は
+fixture再現を `not_measured`/`BLOCKED` とし、性能測定へ進まない。
+生成前に出力先のpathを、実行環境でpath変換interfaceが利用可能な場合だけそのinterface
+で変換する。interfaceがない場合は入力pathをそのまま使用し、変換を推測・代替実行しない。
+既存出力はmanifest、dataset、logを含めて明示的な置換指定がない限り上書きせず、既存出力が
+ある場合は停止して再生成しない。明示的な置換指定を受けた場合だけ、対象を記録してから
+置換する。
 
 | dataset | 内容 |
 | --- | --- |
@@ -139,18 +152,31 @@ contractとする。最低でもP01、P02、P06、P08、P09、distribution size�
 
 ## 7. 実行手順
 
-1. dataset生成、hash保存、PC再起動、環境情報採取。
-2. candidateをrelease buildしSHA-256、依存lock、WebView2 versionを記録。
-3. WPR traceを開始し、warm-upを1回実行して破棄。
-4. `Run-DesktopBenchmark.ps1` で7回。各run間にapp終了とhandle解放を確認。
-5. cold条件を作り直してcold 7回、warm条件でwarm 7回。
-6. ETL、JSONL、summary JSON、screenshot/errorをrun IDで関連付ける。
-7. scriptでmedian/p95を再計算し、raw sampleと一致させる。
-8. gate、外れ値をreviewして品質判定を記録する。代替比較を行った場合も、
+1. Pythonは `tests/fixtures/generate_fixtures.py` を実行し、generator内部の固定seed
+   `20260728` とmanifest記録を確認する。Windows用datasetは
+   `Generate-Dataset.ps1` を実行する。各generatorの既存出力を明示置換する場合だけ、
+   Pythonは `--force`、PowerShellは `-Force` を使う（対象directory制限を守る）。
+   Windows、WSL、通常のLinux CIで同じmanifest/hashを用い、各環境で再現できることを記録する。
+   出力先のpath変換は利用可能なinterfaceを検出した場合だけ行い、interfaceがなければ変換しない。
+   既存出力を検出したら、明示的な置換指定がない限り生成を停止する。
+2. dataset生成、hash保存、PC再起動、環境情報採取。
+3. candidateをrelease buildしSHA-256、依存lock、WebView2 versionを記録。
+4. WPR traceを開始し、warm-upを1回実行して破棄。
+5. `Run-DesktopBenchmark.ps1` で7回。各run間にapp終了とhandle解放を確認。
+6. cold条件を作り直してcold 7回、warm条件でwarm 7回。
+7. ETL、JSONL、summary JSON、screenshot/errorをrun IDで関連付ける。
+8. scriptでmedian/p95を再計算し、raw sampleと一致させる。
+9. gate、外れ値をreviewして品質判定を記録する。代替比較を行った場合も、
    ADR変更は別の承認手続きとする。
 
 ## 8. 妥当性と停止条件
 
+- generator内部の固定seed `20260728` とmanifest記録、三環境での再現、またはpath変換
+  interfaceの有無を確認できない場合はfixtureの妥当性を判定せず停止する。通常Linuxで
+  PowerShell/System.Drawingが利用できずPNG→JPEG成功実測がない場合は
+  `not_measured`/`BLOCKED` とし、interfaceがないのにpath変換が必要な場合も停止する。
+- 明示的な置換指定なしに既存出力のhashまたはmtimeが変化した場合、fixture生成を失敗とし、
+  既存出力を復元して原因を記録する。明示的な置換指定がある場合も対象と指定を記録する。
 - background update、thermal throttling、antivirus scanが発生したrunは理由を残し、
   勝手に除外せず再測定する。
 - dataset/outputが同じvolumeか、Defender除外、admin権限を候補間で変えない。
@@ -158,8 +184,17 @@ contractとする。最低でもP01、P02、P06、P08、P09、distribution size�
 - synthetic単色画像のdecode値だけで製品gateを確定しない。自由利用可能な写真的
   合成noise/gradient datasetもWindows generatorへ追加して再測定する。
 - 実装がない指標は`0`ではなく`not_measured`にする。
+- Windows製品UIの実測がない指標は`not_measured`のままとし、foundationまたは他環境の値を
+  Windows gateのPASSへ置き換えない。fixtureの再現確認だけでは性能gateの合格根拠としない。
 
 ## 9. 成果物
+
+期待結果は、三環境でgenerator内部の固定seed `20260728` から同一manifest/hashのfixtureを
+生成でき、seedがmanifestへ記録され、利用可能な場合だけpath変換が行われ、interfaceがない
+場合は入力pathが保持されることである。通常LinuxのPowerShell/System.Drawing依存が未実測
+なら成功扱いにせず `not_measured`/`BLOCKED` とする。置換指定なし
+では既存出力のhash/mtimeが不変で、置換指定時だけ対象出力が更新されることをfixture生成の
+failure oracleとする。いずれかを満たさない場合は性能測定へ進まず停止する。
 
 raw JSON/ETLは大容量ならrelease artifact、要約とmanifest/hashは
 `docs/testing/performance-benchmark-results.md` と

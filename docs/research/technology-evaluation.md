@@ -231,6 +231,11 @@ Windows/実漫画の絶対性能を代表しない。値は基礎I/Oパイプラ
 にはしない。段階的に最初のchunkを返す設計は維持する。生データは
 `benchmarks/architecture-spike/results/foundation-wsl.json` にある。
 
+fixtureの再現環境は、固定seedのmalformed ZIP/image/security corpus generatorを
+Windows、WSLおよび通常のLinux CIで実行する構成とする。platform固有のpath変換は
+利用可能なinterfaceを検出した場合だけ実行し、既存出力は明示的な置換指定なしに
+上書きしない。この運用を `NFR-MVP-006-AC6` の正本と同期する。
+
 ### 未測定
 
 コールド/ウォーム起動、TTI、process memory、JPEG/PNG decode、300 thumbnails、
