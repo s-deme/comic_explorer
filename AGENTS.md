@@ -31,3 +31,20 @@ Keep generated scan data under `codd/scan/` out of version control as configured
 by `codd/.gitignore`. Commit requirements, design documents, CoDD configuration,
 and project source alongside their tests.
 
+## Automatic publish workflow
+
+When the user explicitly requests a change to this repository, treat a successful
+implementation and verification as permission to publish the resulting change:
+
+1. Inspect `git status` before editing and do not include pre-existing unrelated
+   changes in the commit.
+2. Run the applicable tests and CoDD gates. Do not publish when a relevant red
+   gate or test failure remains.
+3. Review the staged diff for secrets, generated artifacts, and unrelated files.
+4. Commit the scoped change on the current branch and push that branch to its
+   configured upstream remote.
+
+If the change cannot be verified, the working tree contains unrelated changes
+that cannot be separated safely, or no upstream is configured, stop before
+commit/push and report the exact reason. A request to explain, review, or
+diagnose without asking for a change does not authorize publishing.

@@ -40,11 +40,11 @@ codd:
 採用構成はTauri 2、React、TypeScript、TanStack Virtual、Rust、Tokio、SQLite WALで
 ある。漫画原本は読み取り専用とし、ZIP/CBZは原本の隣へ展開しない。
 
-現在の実装はReactの最小シェル、Tauriの最小起動処理、基礎スパイクテストのみである。
-したがって、以下のフェーズは上から順に実施する。後続フェーズに依存しない探索的な
-作業は並行できるが、各フェーズの完了条件を満たすまで、その成果を前提とする後続機能を
-完了扱いにしない。製品全体、Windows実機、インストーラーを必要とする試験はPhase 6で
-実行し、それ以前のフェーズを不可能な試験でブロックしない。
+2026-08-01時点で、Phase 0〜5の実装とPhase 6の大部分の検証は完了している。
+主要機能の実装状況と証跡は`docs/testing/mvp-implementation-status.md`、個別ケースの
+判定は`docs/testing/phase6-case-results.md`を正とする。Phase 6にはWindows clean VM、
+OSレベル通信監視、製品UI性能、実機アクセシビリティなど12件のBLOCKEDが残っているため、
+実装済みとリリース判定済みを分けて扱う。
 
 ## 2. 製造ルール
 

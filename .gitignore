@@ -4,9 +4,15 @@
 .tools/
 node_modules/
 dist/
+coverage/
 target/
 src-tauri/target/
 src-tauri/gen/
+
+# Windows release artifacts; installers and debug symbols are generated locally.
+*.exe
+*.msi
+*.pdb
 src-tauri/icons/android/
 src-tauri/icons/ios/
 src-tauri/icons/StoreLogo.png
