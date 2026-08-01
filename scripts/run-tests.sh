@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+bash scripts/run-codd-consistency.sh
+
 python3 -B -m unittest discover -s tests -p 'test_*.py'
 
 if command -v npm >/dev/null 2>&1; then
