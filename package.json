@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "prepare:release": "npm run build && python scripts/prepare-release.py",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri"

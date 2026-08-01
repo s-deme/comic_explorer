@@ -26,6 +26,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Generate release SBOM
+        run: python scripts/prepare-release.py
+
       - name: Build Windows NSIS installer
         run: npm run tauri -- build --bundles nsis
 
