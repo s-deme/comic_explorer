@@ -58,6 +58,77 @@ const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveViewerMock = vi.mocked(saveViewerSettings);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 
+function testEntry(relativePath: string): CatalogEntry {
+  return {
+    relativePath: relativePath as never,
+    kind: "archive",
+    archiveKind: "cbz",
+  };
+}
+
+function testSession(itemKey: string) {
+  return {
+    itemKey,
+    displayName: itemKey,
+    pages: [
+      {
+        id: `${itemKey}-page` as never,
+        relativePath: "page-1.png" as never,
+        mediaUri: "data:image/png;base64,fixture",
+      },
+    ],
+    startIndex: 0,
+  };
+}
+
+function viewerResponse(itemKey: string) {
+  return {
+    status: "ok" as const,
+    requestId: `open-${itemKey}` as never,
+    generation: 1 as never,
+    data: testSession(itemKey),
+  };
+}
+
+async function registerTestLibrary(entries: CatalogEntry[]) {
+  registerMock.mockResolvedValue({
+    status: "ok",
+    requestId: "register" as never,
+    generation: 1 as never,
+    data: { absolutePath: "C:\\Comics" },
+  });
+  listMock.mockResolvedValue({
+    status: "ok",
+    requestId: "list" as never,
+    generation: 2 as never,
+    data: entries,
+  });
+  thumbnailMock.mockResolvedValue({
+    status: "error",
+    requestId: "thumbnail" as never,
+    generation: 1 as never,
+    error: {
+      code: "NOT_FOUND",
+      message: "missing",
+      retryable: true,
+    },
+  });
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+    target: { value: "C:\\Comics" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "登録" }));
+  await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+}
+
+async function openTestComic(relativePath: string) {
+  fireEvent.keyDown(
+    await screen.findByRole("button", { name: new RegExp(relativePath) }),
+    { key: "Enter" },
+  );
+  await screen.findByLabelText(`${relativePath} ビューワ`);
+}
+
 describe("application shell", () => {
   afterEach(cleanup);
 
@@ -497,5 +568,148 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "次の漫画を開く" }));
     expect(await screen.findByLabelText("02-second.cbz ビューワ")).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens the next comic automatically from the Viewer end callback", async () => {
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    openMock
+      .mockResolvedValueOnce(viewerResponse(first.relativePath))
+      .mockResolvedValueOnce(viewerResponse(second.relativePath));
+
+    await registerTestLibrary([first, second]);
+    await openTestComic(first.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    expect(
+      await screen.findByLabelText(`${second.relativePath} ビューワ`),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenNthCalledWith(
+      2,
+      second.relativePath,
+      expect.any(Number),
+    );
+  });
+
+  it("returns to the library from the Viewer end callback for return_library", async () => {
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
+
+    await registerTestLibrary([first, second]);
+    fireEvent.change(await screen.findByLabelText("巻末動作"), {
+      target: { value: "return_library" },
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
+    );
+    await openTestComic(first.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(`${first.relativePath} ビューワ`),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("grid", { name: "現在のフォルダの項目" }),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the Viewer open and reports a stop policy at the boundary", async () => {
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
+
+    await registerTestLibrary([first, second]);
+    fireEvent.change(await screen.findByLabelText("巻末動作"), {
+      target: { value: "stop" },
+    });
+    await openTestComic(first.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    const notice = await screen.findByText("巻末動作が停止に設定されています。");
+    expect(notice).toHaveAttribute("role", "status");
+    expect(
+      screen.getByLabelText(`${first.relativePath} ビューワ`),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the Viewer open and reports a safe stop when there is no next comic", async () => {
+    const only = testEntry("01-only.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(only.relativePath));
+
+    await registerTestLibrary([only]);
+    await openTestComic(only.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    const notice = await screen.findByText("巻末です。次の漫画はありません。");
+    expect(notice).toHaveAttribute("role", "status");
+    expect(
+      screen.getByLabelText(`${only.relativePath} ビューワ`),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the sorted first comic when loop is selected at the final comic", async () => {
+    const first = testEntry("01-first.cbz");
+    const last = testEntry("02-last.cbz");
+    openMock
+      .mockResolvedValueOnce(viewerResponse(last.relativePath))
+      .mockResolvedValueOnce(viewerResponse(first.relativePath));
+
+    await registerTestLibrary([last, first]);
+    fireEvent.change(await screen.findByLabelText("巻末動作"), {
+      target: { value: "loop" },
+    });
+    await openTestComic(last.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    expect(
+      await screen.findByLabelText(`${first.relativePath} ビューワ`),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenNthCalledWith(
+      2,
+      first.relativePath,
+      expect.any(Number),
+    );
+  });
+
+  it("uses the policy restored from settings for connected end-of-volume behavior", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "restored-settings" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "stop",
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
+      },
+    });
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
+
+    await registerTestLibrary([first, second]);
+    await waitFor(() =>
+      expect(screen.getByLabelText("巻末動作")).toHaveValue("stop"),
+    );
+    await openTestComic(first.relativePath);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+
+    expect(
+      await screen.findByText("巻末動作が停止に設定されています。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(`${first.relativePath} ビューワ`),
+    ).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
   });
 });
