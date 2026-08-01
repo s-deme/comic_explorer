@@ -196,13 +196,54 @@ pub struct LibraryRoot {
     pub absolute_path: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSettings {
     pub sort_field: String,
     pub sort_descending: bool,
     pub view_mode: String,
     pub reading_direction: String,
+    pub scale_mode: String,
+    pub scale: f64,
+    pub loupe_enabled: bool,
+}
+
+const MIN_VIEWER_SCALE: f64 = 0.25;
+const MAX_VIEWER_SCALE: f64 = 4.0;
+
+fn viewer_scale(settings: &crate::state::Settings) -> f64 {
+    settings
+        .scale
+        .parse::<f64>()
+        .ok()
+        .filter(|scale| scale.is_finite())
+        .filter(|scale| (MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(scale))
+        .unwrap_or(1.0)
+}
+
+fn viewer_scale_mode(settings: &crate::state::Settings) -> String {
+    if matches!(
+        settings.scale_mode.as_str(),
+        "fit" | "width" | "height" | "original" | "custom"
+    ) {
+        settings.scale_mode.clone()
+    } else {
+        "fit".into()
+    }
+}
+
+fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
+    let scale = viewer_scale(&settings);
+    let scale_mode = viewer_scale_mode(&settings);
+    CatalogSettings {
+        sort_field: settings.sort_field,
+        sort_descending: settings.sort_descending,
+        view_mode: settings.view_mode,
+        reading_direction: settings.reading_direction,
+        scale_mode,
+        scale,
+        loupe_enabled: settings.loupe_enabled,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -301,12 +342,7 @@ pub fn get_catalog_settings(
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: CatalogSettings {
-            sort_field: settings.sort_field,
-            sort_descending: settings.sort_descending,
-            view_mode: settings.view_mode,
-            reading_direction: settings.reading_direction,
-        },
+        data: catalog_settings(settings),
     })
 }
 
@@ -362,12 +398,7 @@ pub fn set_catalog_sort(
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: CatalogSettings {
-            sort_field,
-            sort_descending,
-            view_mode: settings.view_mode,
-            reading_direction: settings.reading_direction,
-        },
+        data: catalog_settings(settings),
     })
 }
 
@@ -377,12 +408,21 @@ pub fn set_viewer_settings(
     context: RequestContext,
     view_mode: String,
     reading_direction: String,
+    scale_mode: String,
+    scale: f64,
+    loupe_enabled: bool,
 ) -> Result<Response<CatalogSettings>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
     if !matches!(view_mode.as_str(), "single" | "spread")
         || !matches!(reading_direction.as_str(), "rightToLeft" | "leftToRight")
+        || !matches!(
+            scale_mode.as_str(),
+            "fit" | "width" | "height" | "original" | "custom"
+        )
+        || !scale.is_finite()
+        || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&scale)
     {
         return Ok(error_response(
             &context,
@@ -399,6 +439,9 @@ pub fn set_viewer_settings(
             .unwrap_or_default();
         settings.view_mode = view_mode;
         settings.reading_direction = reading_direction;
+        settings.scale_mode = scale_mode;
+        settings.scale = scale.to_string();
+        settings.loupe_enabled = loupe_enabled;
         if let Some(store) = stores.as_mut() {
             store
                 .save_settings(&settings)
@@ -409,12 +452,7 @@ pub fn set_viewer_settings(
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: CatalogSettings {
-            sort_field: settings.sort_field,
-            sort_descending: settings.sort_descending,
-            view_mode: settings.view_mode,
-            reading_direction: settings.reading_direction,
-        },
+        data: catalog_settings(settings),
     })
 }
 

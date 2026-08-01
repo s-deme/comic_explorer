@@ -11,6 +11,7 @@ import type {
   RelativePath,
   RequestId,
 } from "../../types/domain";
+import type { ScaleMode } from "../viewer/model";
 
 let requestSequence = 0;
 
@@ -54,16 +55,29 @@ export interface CatalogSettings {
   sortDescending: boolean;
   viewMode: "single" | "spread";
   readingDirection: "rightToLeft" | "leftToRight";
+  scaleMode: ScaleMode;
+  scale: number;
+  loupeEnabled: boolean;
 }
 
 export async function saveViewerSettings(
-  settings: Pick<CatalogSettings, "viewMode" | "readingDirection">,
+  settings: Pick<
+    CatalogSettings,
+    | "viewMode"
+    | "readingDirection"
+    | "scaleMode"
+    | "scale"
+    | "loupeEnabled"
+  >,
   generation: number,
 ): Promise<ApiResponse<CatalogSettings>> {
   return invoke("set_viewer_settings", {
     context: context(generation),
     viewMode: settings.viewMode,
     readingDirection: settings.readingDirection,
+    scaleMode: settings.scaleMode,
+    scale: settings.scale,
+    loupeEnabled: settings.loupeEnabled,
   });
 }
 

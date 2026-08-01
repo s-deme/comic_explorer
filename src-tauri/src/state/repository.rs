@@ -17,6 +17,9 @@ pub struct Settings {
     pub sort_descending: bool,
     pub view_mode: String,
     pub reading_direction: String,
+    pub scale_mode: String,
+    pub scale: String,
+    pub loupe_enabled: bool,
 }
 
 impl Default for Settings {
@@ -27,6 +30,9 @@ impl Default for Settings {
             sort_descending: false,
             view_mode: "single".into(),
             reading_direction: "rightToLeft".into(),
+            scale_mode: "fit".into(),
+            scale: "1".into(),
+            loupe_enabled: false,
         }
     }
 }
@@ -92,6 +98,9 @@ impl StateStore {
                 "sortDescending" => settings.sort_descending = value == "true",
                 "viewMode" => settings.view_mode = value,
                 "readingDirection" => settings.reading_direction = value,
+                "scaleMode" => settings.scale_mode = value,
+                "scale" => settings.scale = value,
+                "loupeEnabled" => settings.loupe_enabled = value == "true",
                 _ => {}
             }
         }
@@ -105,6 +114,9 @@ impl StateStore {
             ("sortDescending", settings.sort_descending.to_string()),
             ("viewMode", settings.view_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
+            ("scaleMode", settings.scale_mode.clone()),
+            ("scale", settings.scale.clone()),
+            ("loupeEnabled", settings.loupe_enabled.to_string()),
         ];
         if let Some(root) = &settings.library_root {
             values.push(("libraryRoot", root.to_string_lossy().into_owned()));
@@ -354,6 +366,9 @@ mod tests {
                 sort_descending: true,
                 view_mode: "spread".into(),
                 reading_direction: "leftToRight".into(),
+                scale_mode: "custom".into(),
+                scale: "1.7".into(),
+                loupe_enabled: true,
             };
             store.save_settings(&settings).unwrap();
             store
@@ -372,6 +387,10 @@ mod tests {
             store.load_settings().unwrap().library_root,
             Some(PathBuf::from(r"C:\Comics"))
         );
+        let restored = store.load_settings().unwrap();
+        assert_eq!(restored.scale_mode, "custom");
+        assert_eq!(restored.scale, "1.7");
+        assert!(restored.loupe_enabled);
         assert_eq!(
             store.reading_position("item-1").unwrap().unwrap().page_key,
             RelativePath::parse("page7.png").unwrap()

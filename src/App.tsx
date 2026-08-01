@@ -15,6 +15,7 @@ import {
   saveCatalogSort,
   saveViewerSettings,
   takeRecoveryNotice,
+  type CatalogSettings,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -23,7 +24,12 @@ import {
   type SortField,
 } from "./features/catalog/sort";
 import { Viewer } from "./features/viewer/Viewer";
-import type { ReadingDirection, ViewMode } from "./features/viewer/model";
+import type {
+  ReadingDirection,
+  ScaleMode,
+  ViewMode,
+  ViewerScaleState,
+} from "./features/viewer/model";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
@@ -61,6 +67,9 @@ export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
+  const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
+  const [viewerScale, setViewerScale] = useState(1);
+  const [loupeEnabled, setLoupeEnabled] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
@@ -76,6 +85,9 @@ export function App() {
           setSortDescending(response.data.sortDescending);
           setViewMode(response.data.viewMode);
           setReadingDirection(response.data.readingDirection);
+          setViewerScaleMode(response.data.scaleMode);
+          setViewerScale(response.data.scale);
+          setLoupeEnabled(response.data.loupeEnabled);
         }
       })
       .catch(() => undefined);
@@ -300,6 +312,28 @@ export function App() {
     ).catch(() => undefined);
   }
 
+  function persistViewerSettings(
+    next: Partial<
+      Pick<
+        CatalogSettings,
+        "viewMode" | "readingDirection" | "scaleMode" | "scale" | "loupeEnabled"
+      >
+    >,
+  ) {
+    settingsGeneration.current += 1;
+    void saveViewerSettings(
+      {
+        viewMode,
+        readingDirection,
+        scaleMode: viewerScaleMode,
+        scale: viewerScale,
+        loupeEnabled,
+        ...next,
+      },
+      settingsGeneration.current,
+    ).catch(() => undefined);
+  }
+
   if (viewerSession !== null) {
     return (
       <Viewer
@@ -308,14 +342,23 @@ export function App() {
         generation={viewerGeneration.current}
         initialMode={viewMode}
         initialDirection={readingDirection}
+        initialScaleMode={viewerScaleMode}
+        initialScale={viewerScale}
+        initialLoupeEnabled={loupeEnabled}
         onSettingsChange={(mode, direction) => {
           setViewMode(mode);
           setReadingDirection(direction);
-          settingsGeneration.current += 1;
-          void saveViewerSettings(
-            { viewMode: mode, readingDirection: direction },
-            settingsGeneration.current,
-          );
+          persistViewerSettings({ viewMode: mode, readingDirection: direction });
+        }}
+        onScaleChange={(next: ViewerScaleState) => {
+          setViewerScaleMode(next.mode);
+          setViewerScale(next.scale);
+          setLoupeEnabled(next.loupeEnabled);
+          persistViewerSettings({
+            scaleMode: next.mode,
+            scale: next.scale,
+            loupeEnabled: next.loupeEnabled,
+          });
         }}
         onClose={() => setViewerSession(null)}
         onNextItem={() => {

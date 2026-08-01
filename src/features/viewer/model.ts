@@ -1,5 +1,78 @@
 export type ViewMode = "single" | "spread";
 export type ReadingDirection = "rightToLeft" | "leftToRight";
+export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
+
+export const MIN_SCALE = 0.25;
+export const MAX_SCALE = 4;
+export const SCALE_STEP = 0.1;
+export const DEFAULT_SCALE = 1;
+export const LOUPE_ZOOM = 2;
+export const LOUPE_SIZE = 180;
+
+export interface ViewerScaleState {
+  mode: ScaleMode;
+  scale: number;
+  loupeEnabled: boolean;
+}
+
+export type ViewerScaleAction =
+  | { type: "mode"; mode: ScaleMode }
+  | { type: "scale"; scale: number }
+  | { type: "zoomIn" }
+  | { type: "zoomOut" }
+  | { type: "loupe"; enabled: boolean };
+
+export function normalizeScale(value: number): number {
+  const safeValue = Number.isFinite(value) ? value : DEFAULT_SCALE;
+  const rounded = Math.round(safeValue / SCALE_STEP) * SCALE_STEP;
+  return Number(Math.min(MAX_SCALE, Math.max(MIN_SCALE, rounded)).toFixed(2));
+}
+
+export function createViewerScaleState(
+  mode: ScaleMode,
+  scale: number,
+  loupeEnabled: boolean,
+): ViewerScaleState {
+  return { mode, scale: normalizeScale(scale), loupeEnabled };
+}
+
+export function scaleReducer(
+  state: ViewerScaleState,
+  action: ViewerScaleAction,
+): ViewerScaleState {
+  switch (action.type) {
+    case "mode":
+      return { ...state, mode: action.mode };
+    case "scale":
+      return { ...state, mode: "custom", scale: normalizeScale(action.scale) };
+    case "zoomIn":
+      return {
+        ...state,
+        mode: "custom",
+        scale: normalizeScale(state.scale + SCALE_STEP),
+      };
+    case "zoomOut":
+      return {
+        ...state,
+        mode: "custom",
+        scale: normalizeScale(state.scale - SCALE_STEP),
+      };
+    case "loupe":
+      return { ...state, loupeEnabled: action.enabled };
+  }
+}
+
+export function clampLoupePointer(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(x, 0), Math.max(0, width)),
+    y: Math.min(Math.max(y, 0), Math.max(0, height)),
+  };
+}
 
 export interface ViewerState {
   index: number;

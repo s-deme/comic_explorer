@@ -79,6 +79,9 @@ describe("application shell", () => {
         sortDescending: false,
         viewMode: "single",
         readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
       },
     });
     saveSortMock.mockResolvedValue({
@@ -90,6 +93,9 @@ describe("application shell", () => {
         sortDescending: false,
         viewMode: "single",
         readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
       },
     });
     saveViewerMock.mockResolvedValue({
@@ -101,6 +107,9 @@ describe("application shell", () => {
         sortDescending: false,
         viewMode: "single",
         readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
       },
     });
     restoreMock.mockResolvedValue({

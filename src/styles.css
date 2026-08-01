@@ -216,27 +216,75 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-items: center;
   gap: 14px;
   padding: 7px 12px;
+  flex-wrap: wrap;
   background: #262b31;
   box-shadow: 0 1px 0 #ffffff18;
 }
 .viewer-toolbar strong { margin-right: auto; }
-.viewer-stage { position: relative; display: grid; min-height: 0; place-items: center; }
+.viewer-scale-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.viewer-scale-control input[type="number"] { width: 64px; }
+.viewer-stage {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+  place-items: center;
+}
 .page-spread {
   z-index: 1;
   display: flex;
   width: calc(100% - 120px);
   height: calc(100% - 24px);
+  min-width: 0;
+  min-height: 0;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  overflow: auto;
 }
 .page-spread img {
+  flex: 0 1 auto;
+  width: auto;
+  height: auto;
   max-width: calc(50% - 4px);
   max-height: 100%;
   object-fit: contain;
   box-shadow: 0 4px 22px #0008;
 }
 .page-spread img:only-child { max-width: 100%; }
+.page-spread[data-scale-mode="width"] img {
+  width: calc(50% - 4px);
+  max-width: calc(50% - 4px);
+  max-height: none;
+}
+.page-spread[data-page-count="1"][data-scale-mode="width"] img {
+  width: 100%;
+  max-width: 100%;
+}
+.page-spread[data-scale-mode="height"] img {
+  width: auto;
+  height: 100%;
+  max-width: calc(50% - 4px);
+  max-height: 100%;
+}
+.page-spread[data-page-count="1"][data-scale-mode="height"] img {
+  max-width: 100%;
+}
+.page-spread[data-scale-mode="original"] img,
+.page-spread[data-scale-mode="custom"] img {
+  flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
+}
+.page-spread[data-scale-mode="custom"] img {
+  transform: scale(var(--viewer-custom-scale, 1));
+  transform-origin: center;
+}
 .page-zone {
   position: absolute;
   z-index: 2;
@@ -249,6 +297,19 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .page-zone:hover { background: #ffffff0b; }
 .page-zone-left { left: 0; }
 .page-zone-right { right: 0; }
+.viewer-loupe {
+  position: absolute;
+  z-index: 4;
+  width: 180px;
+  height: 180px;
+  border: 3px solid #f5f7fa;
+  border-radius: 50%;
+  box-shadow: 0 4px 22px #000b;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background-repeat: no-repeat;
+  background-color: #14171b;
+}
 .page-error {
   z-index: 4;
   max-width: 620px;

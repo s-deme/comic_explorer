@@ -52,7 +52,7 @@ codd:
 
 | 固定ID | Batch | 領域 | 対象 feature ID（台帳の原子ID） | 現在の運用状態 |
 |---|---:|---|---|---|
-| `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Planned`（重点QC） |
+| `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done`（重点QC完了） |
 | `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Planned` |
 | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Planned` |
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Planned` |
@@ -69,8 +69,8 @@ codd:
 
 ### FR-B01 — 表示倍率（Batch 1、重点QC）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。Q5-4 の記述を、任意倍率、
-  横幅フィット、高さフィット、原寸、状態維持、ルーペの原子機能へ分けた優先順位案である。
+- **状態:** `Done`。対象6行は採用要件化され、`Implemented / PASS`へ更新済み。Q5-4 の記述を、
+  任意倍率、横幅フィット、高さフィット、原寸、状態維持、ルーペの原子要件として実装した。
 - **対象 feature ID:** `FUT-C-018`, `FUT-C-033`, `FUT-C-034`, `FUT-C-035`,
   `FUT-C-036`, `FUT-C-037`（6原子機能。台帳の原子化を優先するため3〜5の例外）。
 - **user outcome:** 読者が、画像を読みやすい倍率または表示領域への fit へ切り替え、
@@ -86,6 +86,20 @@ codd:
   `FT-B01-005` 再起動復元。未作成の test ID は実測結果を表さない。
 - **batch末尾 gate:** `BATCH-1-FOCUSED-QC`（全 focused test を SKIP 0 で実測し、
   scale/fit の境界を重点QC）を通過した後、共通の `BATCH-END-GATE` を通過する。
+
+#### FR-B01 実装・直接観測証跡
+
+- **採用要件:** [FR-B01 表示倍率要件](../requirements/viewer-scale-requirements.md)。
+- **実装根拠:** `src/features/viewer/model.ts`、`src/features/viewer/Viewer.tsx`、
+  `src/styles.css`、`src/features/library/client.ts`、`src/App.tsx`、
+  `src-tauri/src/application/mod.rs`、`src-tauri/src/state/repository.rs`。
+- **直接観測:** [FR-B01 focused test結果](../testing/fr-b01-results.md)。FT-B01-001〜005は
+  12 tests、SKIP 0、失敗0でPASS。既存単頁・見開き・左右読み・page/作品遷移のcomponent
+  回帰も同じViewerテストで確認した。
+- **設定境界:** customは25%〜400%、0.1倍刻み。scale mode、倍率、ルーペを既存local
+  settingsへ保存し、library root外・外部通信0を維持する。
+- **未実行環境:** Windows WebView2製品harnessはLinux環境のため未実行。これはcomponent
+  focused test、Rust check/test、CoDD verifyのPASSとは別の製品実機gateとして保持する。
 
 ### FR-B02 — 巻末動作（Batch 2）
 
