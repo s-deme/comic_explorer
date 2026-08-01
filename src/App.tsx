@@ -84,6 +84,7 @@ export function App() {
   );
   const [endOfVolumePolicy, setEndOfVolumePolicy] =
     useState<EndOfVolumePolicy>("auto_next");
+  const endOfVolumePolicyRef = useRef<EndOfVolumePolicy>("auto_next");
   const [endOfVolumeNotice, setEndOfVolumeNotice] = useState<string | null>(null);
   const [pendingEndOfVolume, setPendingEndOfVolume] =
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
@@ -101,17 +102,21 @@ export function App() {
 
   useEffect(() => {
     settingsGeneration.current += 1;
-    void getCatalogSettings(settingsGeneration.current)
+    const settingsRequestGeneration = settingsGeneration.current;
+    void getCatalogSettings(settingsRequestGeneration)
       .then((response) => {
+        if (settingsRequestGeneration !== settingsGeneration.current) return;
         if (response.status === "ok") {
           setSortField(response.data.sortField);
           setSortDescending(response.data.sortDescending);
           setCatalogViewMode(
             normalizeCatalogViewMode(response.data.catalogViewMode),
           );
-          setEndOfVolumePolicy(
-            normalizeEndOfVolumePolicy(response.data.endOfVolumePolicy),
+          const restoredEndOfVolumePolicy = normalizeEndOfVolumePolicy(
+            response.data.endOfVolumePolicy,
           );
+          endOfVolumePolicyRef.current = restoredEndOfVolumePolicy;
+          setEndOfVolumePolicy(restoredEndOfVolumePolicy);
           setViewMode(response.data.viewMode);
           setReadingDirection(response.data.readingDirection);
           setViewerScaleMode(response.data.scaleMode);
@@ -342,6 +347,7 @@ export function App() {
   }
 
   function changeEndOfVolumePolicy(policy: EndOfVolumePolicy) {
+    endOfVolumePolicyRef.current = policy;
     setEndOfVolumePolicy(policy);
     settingsGeneration.current += 1;
     void saveEndOfVolumePolicy(policy, settingsGeneration.current).catch(
@@ -405,7 +411,7 @@ export function App() {
     const decision = resolveEndOfVolume(
       sortedEntries,
       viewerSession.itemKey,
-      endOfVolumePolicy,
+      endOfVolumePolicyRef.current,
     );
     if (decision.kind === "open") {
       openComicEntry(decision.entry);

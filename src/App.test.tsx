@@ -618,11 +618,38 @@ describe("application shell", () => {
   it("returns to the library from the Viewer end callback for return_library", async () => {
     const first = testEntry("01-first.cbz");
     const second = testEntry("02-second.cbz");
+    type SettingsResponse = Awaited<ReturnType<typeof getCatalogSettings>>;
+    let releaseSettings!: (response: SettingsResponse) => void;
+    settingsMock.mockImplementation(
+      () =>
+        new Promise<SettingsResponse>((resolve) => {
+          releaseSettings = resolve;
+        }),
+    );
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
     fireEvent.change(await screen.findByLabelText("巻末動作"), {
       target: { value: "return_library" },
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
+    );
+    releaseSettings({
+      status: "ok",
+      requestId: "stale-settings" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
+      },
     });
     await waitFor(() =>
       expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
