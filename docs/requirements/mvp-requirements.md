@@ -60,6 +60,11 @@ codd:
 
 対象外項目は削除された要求ではなく、MVP後の候補として扱う。
 
+## 3.3 配布ビルド
+
+- GitHubリポジトリの`main`へのpush完了後、GitHub Actions上でWindows向けNSISインストーラーを生成する。
+- 生成したインストーラー（`.exe`）は、Actionsの実行結果からArtifactとして取得できる。
+
 ## 4. 用語
 
 | 用語 | 定義 |

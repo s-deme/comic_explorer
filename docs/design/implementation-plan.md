@@ -46,6 +46,10 @@ codd:
 OSレベル通信監視、製品UI性能、実機アクセシビリティなど12件のBLOCKEDが残っているため、
 実装済みとリリース判定済みを分けて扱う。
 
+GitHub Actionsでは`main`へのpushを配布ビルドの契機とし、Windows runner上でTauriの
+NSISインストーラーを生成してArtifactへ保存する。タグ発行やGitHub Releaseの作成は
+MVPの自動化範囲に含めず、Actions実行からの取得を配布ビルドの完了条件とする。
+
 ## 2. 製造ルール
 
 - 要件を変更する場合は、先に`docs/requirements/`を更新する。
