@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef } from "react";
 import type { CatalogEntry } from "../../types/domain";
+import type { CatalogViewMode } from "./view-mode";
 
 interface CatalogGridProps {
   entries: CatalogEntry[];
@@ -8,6 +9,7 @@ interface CatalogGridProps {
   onSelect: (entry: CatalogEntry) => void;
   onNavigate: (entry: CatalogEntry) => void;
   onRead: (entry: CatalogEntry) => void;
+  viewMode?: CatalogViewMode;
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
 }
@@ -17,7 +19,14 @@ export type ThumbnailViewState =
   | { status: "ready"; mediaUri: string; cacheHit: boolean }
   | { status: "error" };
 
-const COLUMN_COUNT = 5;
+const VIEW_MODE_CONFIG: Record<
+  CatalogViewMode,
+  { columnCount: number; rowHeight: number }
+> = {
+  small_thumbnail: { columnCount: 8, rowHeight: 116 },
+  detail_list: { columnCount: 1, rowHeight: 62 },
+  cover_list: { columnCount: 5, rowHeight: 258 },
+};
 
 function displayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
@@ -38,28 +47,46 @@ function kindLabel(entry: CatalogEntry): string {
   }
 }
 
+function formatSize(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value) || value < 0) return "—";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatModified(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value) || value < 0) return "—";
+  return new Date(value).toLocaleString("ja-JP");
+}
+
 export function CatalogGrid({
   entries,
   selectedPath,
   onSelect,
   onNavigate,
   onRead,
+  viewMode = "cover_list",
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const modeConfig = VIEW_MODE_CONFIG[viewMode];
   const rows = useMemo(() => {
     const output: CatalogEntry[][] = [];
-    for (let index = 0; index < entries.length; index += COLUMN_COUNT) {
-      output.push(entries.slice(index, index + COLUMN_COUNT));
+    for (
+      let index = 0;
+      index < entries.length;
+      index += modeConfig.columnCount
+    ) {
+      output.push(entries.slice(index, index + modeConfig.columnCount));
     }
     return output;
-  }, [entries]);
+  }, [entries, modeConfig.columnCount]);
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 268,
+    estimateSize: () => modeConfig.rowHeight,
     overscan: 2,
     initialRect: { width: 900, height: 720 },
     observeElementRect: (instance, callback) => {
@@ -86,7 +113,7 @@ export function CatalogGrid({
     const next = entries[nextIndex];
     if (!next) return;
     onSelect(next);
-    virtualizer.scrollToIndex(Math.floor(nextIndex / COLUMN_COUNT));
+    virtualizer.scrollToIndex(Math.floor(nextIndex / modeConfig.columnCount));
     requestAnimationFrame(() => itemRefs.current.get(next.relativePath)?.focus());
   }
 
@@ -96,118 +123,160 @@ export function CatalogGrid({
       (entry) => entry.relativePath === selectedPath,
     );
     if (index >= 0) {
-      virtualizer.scrollToIndex(Math.floor(index / COLUMN_COUNT));
+      virtualizer.scrollToIndex(Math.floor(index / modeConfig.columnCount));
       requestAnimationFrame(() => itemRefs.current.get(selectedPath)?.focus());
     }
-  }, [entries, selectedPath, virtualizer]);
+  }, [entries, modeConfig.columnCount, selectedPath, virtualizer, viewMode]);
 
   return (
     <div
       ref={scrollRef}
-      className="catalog-scroll"
+      className={`catalog-scroll catalog-scroll--${viewMode}`}
       role="grid"
       aria-label="現在のフォルダの項目"
       aria-rowcount={rows.length}
+      data-catalog-view-mode={viewMode}
+      data-entry-count={entries.length}
     >
       {entries.length === 0 ? (
         <p className="empty-state">表示できる項目はありません。</p>
       ) : (
-        <div
-          className="virtual-canvas"
-          style={{ height: virtualizer.getTotalSize() }}
-        >
-          {virtualizer.getVirtualItems().map((virtualRow) => (
-            <div
-              className="catalog-row"
-              role="row"
-              aria-rowindex={virtualRow.index + 1}
-              key={virtualRow.key}
-              style={{ transform: `translateY(${virtualRow.start}px)` }}
-            >
-              {rows[virtualRow.index].map((entry, columnIndex) => {
-                const itemIndex = virtualRow.index * COLUMN_COUNT + columnIndex;
-                const name = displayName(entry);
-                const canNavigate =
-                  entry.kind === "folder" || entry.kind === "comicFolder";
-                const canRead =
-                  entry.kind === "comicFolder" || entry.kind === "archive";
-                return (
-                  <div
-                    role="gridcell"
-                    aria-selected={selectedPath === entry.relativePath}
-                    className="catalog-cell"
-                    key={entry.relativePath}
-                  >
-                    <button
-                      ref={(element) => {
-                        if (element) itemRefs.current.set(entry.relativePath, element);
-                        else itemRefs.current.delete(entry.relativePath);
-                      }}
-                      className="catalog-item"
-                      data-selected={selectedPath === entry.relativePath}
-                      data-relative-path={entry.relativePath}
-                      data-kind={entry.kind}
-                      data-archive-kind={entry.archiveKind}
-                      data-modified-ms={entry.modifiedMs}
-                      data-byte-size={entry.byteSize}
-                      title={`${name} — ${kindLabel(entry)}`}
-                      tabIndex={
-                        selectedPath === entry.relativePath ||
-                        (selectedPath === null && itemIndex === 0)
-                          ? 0
-                          : -1
-                      }
-                      onClick={() => onSelect(entry)}
-                      onDoubleClick={() =>
-                        canNavigate ? onNavigate(entry) : canRead && onRead(entry)
-                      }
-                      onKeyDown={(event) => {
-                        const offsets: Partial<Record<string, number>> = {
-                          ArrowLeft: -1,
-                          ArrowRight: 1,
-                          ArrowUp: -COLUMN_COUNT,
-                          ArrowDown: COLUMN_COUNT,
-                          Home: -itemIndex,
-                          End: entries.length - 1 - itemIndex,
-                        };
-                        const offset = offsets[event.key];
-                        if (offset !== undefined) {
-                          event.preventDefault();
-                          moveFocus(itemIndex, offset);
-                          return;
-                        }
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          onSelect(entry);
-                          if (event.ctrlKey && canRead) onRead(entry);
-                          else if (canNavigate) onNavigate(entry);
-                          else if (canRead) onRead(entry);
-                        }
-                      }}
-                    >
-                      <Thumbnail
-                        entry={entry}
-                        state={thumbnailFor(entry)}
-                        onNeeded={onThumbnailNeeded}
-                      />
-                      <span className="item-name">{name}</span>
-                      <span className="item-kind">{kindLabel(entry)}</span>
-                    </button>
-                    {entry.kind === "comicFolder" && (
-                      <button
-                        className="read-action"
-                        onClick={() => onRead(entry)}
-                        aria-label={`${name}を読む`}
-                      >
-                        読む
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+        <>
+          {viewMode === "detail_list" && (
+            <div className="catalog-list-header" aria-hidden="true">
+              <span>名前</span>
+              <span>種別</span>
+              <span>サイズ</span>
+              <span>更新日時</span>
             </div>
-          ))}
-        </div>
+          )}
+          <div
+            className="virtual-canvas"
+            style={{ height: virtualizer.getTotalSize() }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => (
+              <div
+                className={`catalog-row catalog-row--${viewMode}`}
+                role="row"
+                aria-rowindex={virtualRow.index + 1}
+                key={virtualRow.key}
+                style={{ transform: `translateY(${virtualRow.start}px)` }}
+              >
+                {rows[virtualRow.index].map((entry, columnIndex) => {
+                  const itemIndex =
+                    virtualRow.index * modeConfig.columnCount + columnIndex;
+                  const name = displayName(entry);
+                  const kind = kindLabel(entry);
+                  const size = formatSize(entry.byteSize);
+                  const modified = formatModified(entry.modifiedMs);
+                  const canNavigate =
+                    entry.kind === "folder" || entry.kind === "comicFolder";
+                  const canRead =
+                    entry.kind === "comicFolder" || entry.kind === "archive";
+                  const thumbnail = (
+                    <Thumbnail
+                      entry={entry}
+                      state={thumbnailFor(entry)}
+                      onNeeded={onThumbnailNeeded}
+                    />
+                  );
+                  return (
+                    <div
+                      role="gridcell"
+                      aria-selected={selectedPath === entry.relativePath}
+                      className="catalog-cell"
+                      key={entry.relativePath}
+                    >
+                      <button
+                        ref={(element) => {
+                          if (element)
+                            itemRefs.current.set(entry.relativePath, element);
+                          else itemRefs.current.delete(entry.relativePath);
+                        }}
+                        className={`catalog-item catalog-item--${viewMode}`}
+                        data-selected={selectedPath === entry.relativePath}
+                        data-relative-path={entry.relativePath}
+                        data-kind={entry.kind}
+                        data-archive-kind={entry.archiveKind ?? "missing"}
+                        data-modified-ms={entry.modifiedMs ?? "missing"}
+                        data-byte-size={entry.byteSize ?? "missing"}
+                        data-view-mode={viewMode}
+                        aria-label={`${name}、${kind}、サイズ ${size}、更新日時 ${modified}`}
+                        title={`${name} — ${kind}`}
+                        tabIndex={
+                          selectedPath === entry.relativePath ||
+                          (selectedPath === null && itemIndex === 0)
+                            ? 0
+                            : -1
+                        }
+                        onClick={() => onSelect(entry)}
+                        onDoubleClick={() =>
+                          canNavigate
+                            ? onNavigate(entry)
+                            : canRead && onRead(entry)
+                        }
+                        onKeyDown={(event) => {
+                          const offsets: Partial<Record<string, number>> = {
+                            ArrowLeft: -1,
+                            ArrowRight: 1,
+                            ArrowUp: -modeConfig.columnCount,
+                            ArrowDown: modeConfig.columnCount,
+                            Home: -itemIndex,
+                            End: entries.length - 1 - itemIndex,
+                          };
+                          const offset = offsets[event.key];
+                          if (offset !== undefined) {
+                            event.preventDefault();
+                            moveFocus(itemIndex, offset);
+                            return;
+                          }
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            onSelect(entry);
+                            if (event.ctrlKey && canRead) onRead(entry);
+                            else if (canNavigate) onNavigate(entry);
+                            else if (canRead) onRead(entry);
+                          }
+                        }}
+                      >
+                        {viewMode === "detail_list" ? (
+                          <>
+                            <span className="detail-primary">
+                              {thumbnail}
+                              <span className="item-name">{name}</span>
+                            </span>
+                            <span className="item-kind">{kind}</span>
+                            <span className="item-metadata item-size">
+                              {size}
+                            </span>
+                            <span className="item-metadata item-modified">
+                              {modified}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {thumbnail}
+                            <span className="item-name">{name}</span>
+                            <span className="item-kind">{kind}</span>
+                          </>
+                        )}
+                      </button>
+                      {entry.kind === "comicFolder" && (
+                        <button
+                          className="read-action"
+                          onClick={() => onRead(entry)}
+                          aria-label={`${name}を読む`}
+                        >
+                          読む
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

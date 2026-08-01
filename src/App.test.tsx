@@ -19,6 +19,7 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveReadingPosition,
   saveViewerSettings,
@@ -37,6 +38,7 @@ vi.mock("./features/library/client", () => ({
   getThumbnail: vi.fn(),
   loadPage: vi.fn(),
   saveCatalogSort: vi.fn(),
+  saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),
   saveReadingPosition: vi.fn(),
   saveViewerSettings: vi.fn(),
@@ -53,6 +55,7 @@ const settingsMock = vi.mocked(getCatalogSettings);
 const thumbnailMock = vi.mocked(getThumbnail);
 const loadPageMock = vi.mocked(loadPage);
 const saveSortMock = vi.mocked(saveCatalogSort);
+const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
 const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
 const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveViewerMock = vi.mocked(saveViewerSettings);
@@ -143,6 +146,7 @@ describe("application shell", () => {
     thumbnailMock.mockReset();
     loadPageMock.mockReset();
     saveSortMock.mockReset();
+    saveCatalogViewModeMock.mockReset();
     saveEndPolicyMock.mockReset();
     saveReadingMock.mockReset();
     saveViewerMock.mockReset();
@@ -161,6 +165,7 @@ describe("application shell", () => {
         sortField: "name",
         sortDescending: false,
         endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -176,6 +181,7 @@ describe("application shell", () => {
         sortField: "name",
         sortDescending: false,
         endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -191,6 +197,7 @@ describe("application shell", () => {
         sortField: "name",
         sortDescending: false,
         endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -204,6 +211,22 @@ describe("application shell", () => {
       generation: 1 as never,
       data: undefined,
     });
+    saveCatalogViewModeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "save-catalog-view-mode" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
+      },
+    });
     saveViewerMock.mockResolvedValue({
       status: "ok",
       requestId: "save-viewer" as never,
@@ -212,6 +235,7 @@ describe("application shell", () => {
         sortField: "name",
         sortDescending: false,
         endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -686,6 +710,7 @@ describe("application shell", () => {
         sortField: "name",
         sortDescending: false,
         endOfVolumePolicy: "stop",
+        catalogViewMode: "cover_list",
         viewMode: "single",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
@@ -711,5 +736,139 @@ describe("application shell", () => {
       screen.getByLabelText(`${first.relativePath} ビューワ`),
     ).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("FT-B03-001 switches all three catalog modes through the connected App", async () => {
+    const entries = [
+      testEntry("01-first.cbz"),
+      testEntry("02-second.cbz"),
+      testEntry("03-third.cbz"),
+    ];
+
+    await registerTestLibrary(entries);
+
+    const selector = await screen.findByLabelText("一覧表示形式");
+    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+    expect(selector).toHaveValue("cover_list");
+    expect(grid).toHaveAttribute("data-catalog-view-mode", "cover_list");
+
+    for (const mode of ["small_thumbnail", "detail_list", "cover_list"] as const) {
+      fireEvent.change(selector, { target: { value: mode } });
+      await waitFor(() => {
+        expect(selector).toHaveValue(mode);
+        expect(grid).toHaveAttribute("data-catalog-view-mode", mode);
+      });
+    }
+
+    expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
+      "small_thumbnail",
+      expect.any(Number),
+    );
+    expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
+      "detail_list",
+      expect.any(Number),
+    );
+  });
+
+  it("FT-B03-002 exposes long names, kinds, counts and missing metadata in every mode", async () => {
+    const entries: CatalogEntry[] = [
+      {
+        relativePath:
+          "A very long comic name that remains available to keyboard users.cbz" as never,
+        kind: "archive",
+        archiveKind: "cbz",
+        byteSize: 1234,
+        modifiedMs: 1_735_689_600_000,
+      },
+      {
+        relativePath: "missing-metadata" as never,
+        kind: "folder",
+      },
+      {
+        relativePath: "comic-folder" as never,
+        kind: "comicFolder",
+      },
+    ];
+
+    await registerTestLibrary(entries);
+    const selector = await screen.findByLabelText("一覧表示形式");
+    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+
+    for (const mode of ["cover_list", "small_thumbnail", "detail_list"] as const) {
+      fireEvent.change(selector, { target: { value: mode } });
+      await waitFor(() =>
+        expect(grid).toHaveAttribute("data-catalog-view-mode", mode),
+      );
+      expect(grid).toHaveAttribute("data-entry-count", "3");
+      expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
+        .toBeInTheDocument();
+      expect(screen.getByText("フォルダ")).toBeInTheDocument();
+      expect(screen.getByText("3項目")).toBeInTheDocument();
+    }
+
+    expect(screen.getByText("1.2 KB")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("FT-B03-003 keeps selection, keyboard focus and sorted navigation connected", async () => {
+    const entries: CatalogEntry[] = Array.from({ length: 20 }, (_, index) => ({
+      relativePath: `book-${index.toString().padStart(2, "0")}.cbz` as never,
+      kind: "archive",
+      archiveKind: "cbz",
+      byteSize: 20 - index,
+    }));
+
+    await registerTestLibrary(entries);
+    const selector = await screen.findByLabelText("一覧表示形式");
+    fireEvent.change(selector, { target: { value: "detail_list" } });
+    const first = await screen.findByRole("button", { name: /book-00/ });
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /book-01/ })).toHaveFocus();
+      expect(screen.getByText("選択: book-01.cbz")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("並べ替え条件"), {
+      target: { value: "size" },
+    });
+    expect(screen.getByRole("grid")).toHaveAttribute(
+      "data-catalog-view-mode",
+      "detail_list",
+    );
+    expect(screen.getByText("選択: book-01.cbz")).toBeInTheDocument();
+  });
+
+  it("FT-B03-004 restores the catalog mode from settings and persists a new choice", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "restored-catalog-settings" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "auto_next",
+        catalogViewMode: "detail_list",
+        viewMode: "single",
+        readingDirection: "rightToLeft",
+        scaleMode: "fit",
+        scale: 1,
+        loupeEnabled: false,
+      },
+    });
+
+    await registerTestLibrary([testEntry("restored.cbz")]);
+
+    const selector = await screen.findByLabelText("一覧表示形式");
+    expect(selector).toHaveValue("detail_list");
+    expect(screen.getByRole("grid")).toHaveAttribute(
+      "data-catalog-view-mode",
+      "detail_list",
+    );
+    fireEvent.change(selector, { target: { value: "small_thumbnail" } });
+    expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
+      "small_thumbnail",
+      expect.any(Number),
+    );
   });
 });

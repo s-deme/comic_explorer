@@ -13,6 +13,7 @@ import {
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
+  saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveViewerSettings,
   takeRecoveryNotice,
@@ -40,6 +41,13 @@ import type {
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
+import {
+  CATALOG_VIEW_MODE_LABELS,
+  CATALOG_VIEW_MODES,
+  DEFAULT_CATALOG_VIEW_MODE,
+  normalizeCatalogViewMode,
+  type CatalogViewMode,
+} from "./features/catalog/view-mode";
 import {
   presentError,
   presentUnexpectedError,
@@ -71,6 +79,9 @@ export function App() {
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
+  const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>(
+    DEFAULT_CATALOG_VIEW_MODE,
+  );
   const [endOfVolumePolicy, setEndOfVolumePolicy] =
     useState<EndOfVolumePolicy>("auto_next");
   const [endOfVolumeNotice, setEndOfVolumeNotice] = useState<string | null>(null);
@@ -95,6 +106,9 @@ export function App() {
         if (response.status === "ok") {
           setSortField(response.data.sortField);
           setSortDescending(response.data.sortDescending);
+          setCatalogViewMode(
+            normalizeCatalogViewMode(response.data.catalogViewMode),
+          );
           setEndOfVolumePolicy(
             normalizeEndOfVolumePolicy(response.data.endOfVolumePolicy),
           );
@@ -335,6 +349,14 @@ export function App() {
     );
   }
 
+  function changeCatalogViewMode(mode: CatalogViewMode) {
+    setCatalogViewMode(mode);
+    settingsGeneration.current += 1;
+    void saveCatalogViewMode(mode, settingsGeneration.current).catch(
+      () => undefined,
+    );
+  }
+
   function persistViewerSettings(
     next: Partial<
       Pick<
@@ -533,6 +555,25 @@ export function App() {
             ))}
           </select>
         </label>
+        <label>
+          一覧形式
+          <select
+            aria-label="一覧表示形式"
+            data-catalog-view-mode={catalogViewMode}
+            value={catalogViewMode}
+            onChange={(event) =>
+              changeCatalogViewMode(
+                normalizeCatalogViewMode(event.target.value),
+              )
+            }
+          >
+            {CATALOG_VIEW_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {CATALOG_VIEW_MODE_LABELS[mode]}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           data-sort-descending={sortDescending}
           onClick={() => {
@@ -629,6 +670,7 @@ export function App() {
             <CatalogGrid
               entries={sortedEntries}
               selectedPath={selectedPath}
+              viewMode={catalogViewMode}
               onSelect={(entry) => setSelectedPath(entry.relativePath)}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={(entry) => {

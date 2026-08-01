@@ -39,7 +39,8 @@ codd:
 | `Blocked` | 明示された依存、環境、ライセンス、安全設計、または採否判断が未解決。未着手の候補を先行割当しない。 |
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
-FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新した。FR-B03〜FR-B12は
+FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新した。FR-B03もC0/C1の
+connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新した。FR-B04〜FR-B12は
 引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
 
 ## 推奨実装順
@@ -54,7 +55,7 @@ FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新�
 |---|---:|---|---|---|
 | `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done`（重点QC完了） |
 | `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done`（pilot実装・重点QC完了） |
-| `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Planned` |
+| `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done`（重点QC完了） |
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Planned` |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
@@ -130,13 +131,13 @@ FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新�
   SKIP 0で実測する。
 - **C0/C1境界:** `auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を固定し、
   未知値と旧設定の既定値は`auto_next`。次項目なしはloopだけsort済み先頭へ戻り、他は
-  現在巻末に留まる。B03〜B12はpilot評価完了まで開始しない。
+  現在巻末に留まる。B04〜B12はB03の重点QC完了まで開始しない。
 - **非破壊境界:** policyはlibrary root外のapp-local SQLite settingsへ保存し、原本・書庫・
   library管理fileの新規作成0、外部通信0を維持する。
 
-### FR-B03 — 一覧表示形式（Batch 3）
+### FR-B03 — 一覧表示形式（Batch 3、serial完了）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。
+- **状態:** `Done`。対象3行はC0で採用要件化され、`Implemented / PASS`へ更新済み。
 - **対象 feature ID:** `FUT-C-012`, `FUT-C-013`, `FUT-C-014`。
 - **user outcome:** library の項目を小サムネイル、詳細リスト、表紙付きリストから選び、
   長い名前・種別・件数を文脈を失わず確認できる。
@@ -149,6 +150,19 @@ FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新�
   `FT-B03-003` 選択・scroll・focus、`FT-B03-004` 再起動復元と sort 退行。
 - **batch末尾 gate:** focused test を SKIP 0 で実測し、表示形式ごとに全項目へ到達できること、
   既存 `TC-UI-005`〜`TC-UI-007` 相当を退行させないことを確認して `BATCH-END-GATE`。
+
+#### FR-B03 実装・直接観測証跡
+
+- **採用要件:** [FR-B03 一覧表示形式要件](../requirements/catalog-view-requirements.md)。
+- **実装根拠:** `src/features/catalog/view-mode.ts`、`src/features/catalog/CatalogGrid.tsx`、
+  `src/App.tsx`、`src/styles.css`、`src/features/library/client.ts`、
+  `src-tauri/src/application/mod.rs`、`src-tauri/src/state/repository.rs`、`src-tauri/src/lib.rs`。
+- **直接観測:** [FR-B03 focused test結果](../testing/fr-b03-results.md)。FT-B03-001〜004は
+  接続済み`App`→`CatalogGrid`のmode切替、metadata、選択・focus、設定復元をSKIP 0で実測した。
+- **C0/C1境界:** `small_thumbnail`、`detail_list`、`cover_list`を固定し、既定値は`cover_list`。
+  detail listはサイズ・更新日時の欠損を`—`で表示し、全modeの件数を一覧snapshotとstatus barで同期する。
+- **非破壊境界:** `catalogViewMode`はlibrary root外のapp-local SQLite settingsへ保存し、
+  原本・書庫・library管理fileの新規作成0、外部通信0を維持する。B04〜B12は未着手のまま保持する。
 
 ### FR-B04 — 閲覧画面 mode（Batch 4）
 

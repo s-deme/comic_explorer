@@ -13,6 +13,7 @@ import type {
 } from "../../types/domain";
 import type { ScaleMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
+import type { CatalogViewMode } from "../catalog/view-mode";
 
 let requestSequence = 0;
 
@@ -55,6 +56,7 @@ export interface CatalogSettings {
   sortField: "name" | "modified" | "size" | "kind";
   sortDescending: boolean;
   endOfVolumePolicy: EndOfVolumePolicy;
+  catalogViewMode: CatalogViewMode;
   viewMode: "single" | "spread";
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -113,6 +115,16 @@ export async function saveEndOfVolumePolicy(
   return invoke("set_end_of_volume_policy", {
     context: context(generation),
     policy,
+  });
+}
+
+export async function saveCatalogViewMode(
+  catalogViewMode: CatalogViewMode,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("set_catalog_view_mode", {
+    context: context(generation),
+    catalogViewMode,
   });
 }
 

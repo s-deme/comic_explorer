@@ -202,6 +202,7 @@ pub struct CatalogSettings {
     pub sort_field: String,
     pub sort_descending: bool,
     pub end_of_volume_policy: String,
+    pub catalog_view_mode: String,
     pub view_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -244,14 +245,27 @@ fn end_of_volume_policy(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn catalog_view_mode(settings: &crate::state::Settings) -> String {
+    if matches!(
+        settings.catalog_view_mode.as_str(),
+        "small_thumbnail" | "detail_list" | "cover_list"
+    ) {
+        settings.catalog_view_mode.clone()
+    } else {
+        "cover_list".into()
+    }
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
     let end_of_volume_policy = end_of_volume_policy(&settings);
+    let catalog_view_mode = catalog_view_mode(&settings);
     CatalogSettings {
         sort_field: settings.sort_field,
         sort_descending: settings.sort_descending,
         end_of_volume_policy,
+        catalog_view_mode,
         view_mode: settings.view_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
@@ -446,6 +460,47 @@ pub fn set_end_of_volume_policy(
             .map_err(|error| error.message)?
             .unwrap_or_default();
         settings.end_of_volume_policy = policy;
+        if let Some(store) = stores.as_mut() {
+            store
+                .save_settings(&settings)
+                .map_err(|error| error.message)?;
+        }
+        settings
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: catalog_settings(settings),
+    })
+}
+
+#[tauri::command]
+pub fn set_catalog_view_mode(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    catalog_view_mode: String,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !matches!(
+        catalog_view_mode.as_str(),
+        "small_thumbnail" | "detail_list" | "cover_list"
+    ) {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Catalog view mode is invalid."),
+        ));
+    }
+    let settings = {
+        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
+        let mut settings = stores
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
+        settings.catalog_view_mode = catalog_view_mode;
         if let Some(store) = stores.as_mut() {
             store
                 .save_settings(&settings)
@@ -1281,6 +1336,18 @@ fn unix_millis() -> i64 {
 mod shutdown_tests {
     use super::*;
     use std::sync::Condvar;
+
+    #[test]
+    fn catalog_view_mode_defaults_to_cover_list_for_missing_or_unknown_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(catalog_view_mode(&settings), "cover_list");
+
+        settings.catalog_view_mode = "detail_list".into();
+        assert_eq!(catalog_view_mode(&settings), "detail_list");
+
+        settings.catalog_view_mode = "not-a-mode".into();
+        assert_eq!(catalog_view_mode(&settings), "cover_list");
+    }
 
     #[test]
     fn shutdown_is_idempotent_cancels_work_revokes_media_and_closes_store() {
