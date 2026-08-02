@@ -308,7 +308,17 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 5px;
   white-space: nowrap;
 }
+.viewer-layout-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
 .viewer-scale-control input[type="number"] { width: 64px; }
+.fullscreen-error {
+  flex-basis: 100%;
+  color: #ffd6d6;
+}
 .viewer-stage {
   position: relative;
   display: grid;
@@ -365,6 +375,53 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .page-spread[data-scale-mode="custom"] img {
   transform: scale(var(--viewer-custom-scale, 1));
   transform-origin: center;
+}
+.page-spread[data-layout-mode="vertical_scroll"] {
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0;
+  overflow: auto;
+  scroll-snap-type: y proximity;
+}
+.page-spread[data-layout-mode="horizontal_scroll"] {
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: row;
+  gap: 16px;
+  padding: 12px;
+  overflow: auto;
+  scroll-snap-type: x proximity;
+}
+.viewer-page-slot {
+  display: block;
+  flex: 0 0 auto;
+}
+.viewer-page {
+  display: grid;
+  min-width: 160px;
+  min-height: 160px;
+  place-items: center;
+  scroll-snap-align: start;
+}
+.viewer-page:focus-visible {
+  outline: 2px solid #8ec5ff;
+  outline-offset: 4px;
+}
+.page-spread[data-layout-mode="vertical_scroll"] .viewer-page {
+  width: min(100%, 960px);
+}
+.page-spread[data-layout-mode="horizontal_scroll"] .viewer-page {
+  height: 100%;
+}
+.page-spread[data-layout-mode="vertical_scroll"] .viewer-page img {
+  max-width: 100%;
+  max-height: none;
+}
+.page-spread[data-layout-mode="horizontal_scroll"] .viewer-page img {
+  max-width: none;
+  max-height: 100%;
 }
 .page-zone {
   position: absolute;

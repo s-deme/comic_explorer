@@ -40,8 +40,11 @@ codd:
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
 FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新した。FR-B03もC0/C1の
-connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新した。FR-B04〜FR-B12は
-引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
+connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新した。FR-B04は
+connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
+`scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
+FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
+FR-B05〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
 
 ## 推奨実装順
 
@@ -56,7 +59,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 | `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done`（重点QC完了） |
 | `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done`（pilot実装・重点QC完了） |
 | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done`（重点QC完了） |
-| `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Planned` |
+| `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
 | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Planned` |
@@ -162,11 +165,13 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 - **C0/C1境界:** `small_thumbnail`、`detail_list`、`cover_list`を固定し、既定値は`cover_list`。
   detail listはサイズ・更新日時の欠損を`—`で表示し、全modeの件数を一覧snapshotとstatus barで同期する。
 - **非破壊境界:** `catalogViewMode`はlibrary root外のapp-local SQLite settingsへ保存し、
-  原本・書庫・library管理fileの新規作成0、外部通信0を維持する。B04〜B12は未着手のまま保持する。
+  原本・書庫・library管理fileの新規作成0、外部通信0を維持する。B05〜B12は未着手のまま保持する。
 
 ### FR-B04 — 閲覧画面 mode（Batch 4）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。
+- **状態:** `Blocked`。focused connected evidenceは通過したが、canonical aggregateが
+  `scripts/run-tests.sh` exit 1で失敗したため、batch末尾gateは未達。`FUT-C-015`〜017は
+  台帳上`Partial / BLOCKED`へ保持し、新redoのRCA・軍師review後までPASS化しない。
 - **対象 feature ID:** `FUT-C-015`, `FUT-C-016`, `FUT-C-017`。
 - **user outcome:** 読者が縦スクロール、横スクロール、full-screen を選び、現在ページ、
   読み方向、focus を保ったまま閲覧できる。
@@ -176,11 +181,29 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
   OS 差は実機確認が必要で、未確認を PASS にしない。
 - **実装順:** (1) viewer mode state、(2) 縦/横 layout、(3) full-screen lifecycle、
   (4) 読み方向・page anchor・focus の復元、(5) error/escape 復帰。
-- **focused test 範囲:** `FT-B04-001` 縦スクロール、`FT-B04-002` 横スクロール、
-  `FT-B04-003` full-screen enter/exit、`FT-B04-004` page anchor・読み方向・Esc、
-  `FT-B04-005` 再起動と error 復帰。
-- **batch末尾 gate:** 全 focused test を SKIP 0 で実測し、既存 `TC-UI-009`〜`TC-UI-013` と
-  `TC-A11Y-001` 相当の viewer 操作を退行させないことを確認して `BATCH-END-GATE`。
+- **focused test 範囲:** `FT-B04-001` enum/default・設定保存、`FT-B04-002` 縦横layoutと
+  page anchor、`FT-B04-003` 読み方向・keyboard navigation・native wheel・Esc、
+  `FT-B04-004` full-screen enter/exit/error、`FT-B04-005` 設定復元と非永続window state。
+- **batch末尾 gate:** focused testはSKIP 0で通過したが、CoDD verify内のcanonical
+  `scripts/run-tests.sh`がexit 1となり未達。同一task内のaggregate再実行は禁止し、新redoで
+  失敗出力を保存してRCAする。
+
+#### FR-B04 実装・直接観測証跡
+
+- **採用要件:** [FR-B04 閲覧画面 mode要件](../requirements/viewer-layout-requirements.md)。
+- **実装根拠:** `src/features/viewer/model.ts`、`src/features/viewer/Viewer.tsx`、
+  `src/features/viewer/fullscreen.ts`、`src/App.tsx`、`src/features/library/client.ts`、
+  `src/styles.css`、`src-tauri/src/application/mod.rs`、`src-tauri/src/state/repository.rs`、
+  `src-tauri/capabilities/default.json`。
+- **直接観測:** [FR-B04 focused test結果](../testing/fr-b04-results.md)。FT-B04-001〜005は
+  selector、App→Viewer→DOM、page anchor/focus、読み方向・wheel・Esc、adapter lifecycle、
+  persistenceを接続境界で直接観測し、focused scopeではPASSした。ただしcanonical aggregate
+  がFAILのためbatch完了根拠には昇格していない。
+- **保存・非永続境界:** `layoutMode`だけを既存app-local SQLiteへ保存し、fullscreenはOS
+  window stateへ委譲して保存しない。旧値・未知値は`paged`へ戻し、B01のview/scale/fit/
+  loupe/reading positionを独立に保全する。原本・書庫・library root配下への書込みと外部通信は0。
+- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定はWSL/Linux環境外であり
+  `BLOCKED`。さらにcanonical aggregate FAILのため、未実行・未完了をPASSへ昇格しない。
 
 ### FR-B05 — 名前検索（Batch 5）
 

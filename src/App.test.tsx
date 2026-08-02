@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import {
   getCatalogSettings,
   getThumbnail,
@@ -93,7 +94,10 @@ function viewerResponse(itemKey: string) {
   };
 }
 
-async function registerTestLibrary(entries: CatalogEntry[]) {
+async function registerTestLibrary(
+  entries: CatalogEntry[],
+  fullscreenAdapter?: FullscreenAdapter,
+) {
   registerMock.mockResolvedValue({
     status: "ok",
     requestId: "register" as never,
@@ -116,7 +120,7 @@ async function registerTestLibrary(entries: CatalogEntry[]) {
       retryable: true,
     },
   });
-  render(<App />);
+  render(<App fullscreenAdapter={fullscreenAdapter} />);
   fireEvent.change(screen.getByLabelText("ライブラリルート"), {
     target: { value: "C:\\Comics" },
   });
@@ -167,6 +171,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -183,6 +188,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -199,6 +205,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -221,6 +228,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -237,6 +245,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -600,19 +609,28 @@ describe("application shell", () => {
     openMock
       .mockResolvedValueOnce(viewerResponse(first.relativePath))
       .mockResolvedValueOnce(viewerResponse(second.relativePath));
-
     await registerTestLibrary([first, second]);
-    await openTestComic(first.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    const addEventListenerSpy = vi.spyOn(window, "addEventListener");
+    try {
+      await openTestComic(first.relativePath);
+      await waitFor(() =>
+        expect(
+          addEventListenerSpy.mock.calls.some(([type]) => type === "keydown"),
+        ).toBe(true),
+      );
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
 
-    expect(
-      await screen.findByLabelText(`${second.relativePath} ビューワ`),
-    ).toBeInTheDocument();
-    expect(openMock).toHaveBeenNthCalledWith(
-      2,
-      second.relativePath,
-      expect.any(Number),
-    );
+      expect(
+        await screen.findByLabelText(`${second.relativePath} ビューワ`),
+      ).toBeInTheDocument();
+      expect(openMock).toHaveBeenNthCalledWith(
+        2,
+        second.relativePath,
+        expect.any(Number),
+      );
+    } finally {
+      addEventListenerSpy.mockRestore();
+    }
   });
 
   it("returns to the library from the Viewer end callback for return_library", async () => {
@@ -645,6 +663,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -739,6 +758,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "stop",
         catalogViewMode: "cover_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,
@@ -763,6 +783,149 @@ describe("application shell", () => {
       screen.getByLabelText(`${first.relativePath} ビューワ`),
     ).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
+  });
+  it("FT-B04-001 keeps paged as the default and persists layout mode through the App", async () => {
+    openMock.mockResolvedValueOnce(viewerResponse("layout.cbz"));
+    await registerTestLibrary([testEntry("layout.cbz")]);
+
+    fireEvent.keyDown(
+      await screen.findByRole("button", { name: /layout\.cbz/ }),
+      { key: "Enter" },
+    );
+    await screen.findByLabelText("layout.cbz ビューワ");
+    const selector = screen.getByLabelText("閲覧レイアウト");
+    expect(selector).toHaveValue("paged");
+    expect(screen.getByRole("combobox", { name: "閲覧レイアウト" })).toHaveValue(
+      "paged",
+    );
+
+    fireEvent.change(screen.getByLabelText("閲覧レイアウト"), {
+      target: { value: "vertical_scroll" },
+    });
+    expect(screen.getByLabelText("閲覧レイアウト")).toHaveValue("vertical_scroll");
+    expect(saveViewerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ layoutMode: "vertical_scroll" }),
+      expect.any(Number),
+    );
+  });
+
+  it("FT-B04-002 observes both connected scroll layouts without changing the page anchor", async () => {
+    const entry = testEntry("scroll.cbz");
+    openMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "scroll-open" as never,
+      generation: 1 as never,
+      data: {
+        itemKey: entry.relativePath,
+        displayName: entry.relativePath,
+        pages: [
+          { id: "page-1" as never, relativePath: "1.png" as never, mediaUri: "data:image/png;base64,one" },
+          { id: "page-2" as never, relativePath: "2.png" as never, mediaUri: "data:image/png;base64,two" },
+          { id: "page-3" as never, relativePath: "3.png" as never, mediaUri: "data:image/png;base64,three" },
+        ],
+        startIndex: 1,
+      },
+    });
+    await registerTestLibrary([entry]);
+    await openTestComic(entry.relativePath);
+
+    const selector = screen.getByLabelText("閲覧レイアウト");
+    fireEvent.change(selector, { target: { value: "vertical_scroll" } });
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` })).toHaveAttribute(
+        "data-layout-mode",
+        "vertical_scroll",
+      );
+      expect(document.querySelector(".page-spread")).toHaveAttribute(
+        "data-page-anchor",
+        "1",
+      );
+    });
+    expect(screen.getByRole("article", { name: "ページ 2" })).toHaveFocus();
+
+    fireEvent.change(selector, { target: { value: "horizontal_scroll" } });
+    await waitFor(() =>
+      expect(document.querySelector(".page-spread")).toHaveAttribute(
+        "data-layout-mode",
+        "horizontal_scroll",
+      ),
+    );
+    expect(document.querySelector(".page-spread")).toHaveAttribute(
+      "data-page-anchor",
+      "1",
+    );
+  });
+
+  it("FT-B04-004 observes the App-to-window adapter fullscreen lifecycle and Esc exit", async () => {
+    const adapter: FullscreenAdapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    const entry = testEntry("fullscreen.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry], adapter);
+    await openTestComic(entry.relativePath);
+
+    fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` })).toHaveAttribute(
+        "data-fullscreen",
+        "true",
+      ),
+    );
+    expect(adapter.enter).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "全画面表示" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      ),
+    );
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText(`${entry.relativePath} ビューワ`)).toBeInTheDocument();
+  });
+
+  it("FT-B04-005 restores layout from App settings while leaving fullscreen as window state", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "restored-layout" as never,
+      generation: 1 as never,
+      data: {
+        sortField: "name",
+        sortDescending: false,
+        endOfVolumePolicy: "auto_next",
+        catalogViewMode: "cover_list",
+        viewMode: "spread",
+        layoutMode: "horizontal_scroll",
+        readingDirection: "leftToRight",
+        scaleMode: "custom",
+        scale: 1.7,
+        loupeEnabled: true,
+      },
+    });
+    const entry = testEntry("restored-layout.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry]);
+    await openTestComic(entry.relativePath);
+
+    expect(screen.getByLabelText("閲覧レイアウト")).toHaveValue("horizontal_scroll");
+    expect(document.querySelector(".page-spread")).toHaveAttribute(
+      "data-scale-mode",
+      "custom",
+    );
+    expect(document.querySelector(".page-spread")).toHaveAttribute(
+      "data-scale",
+      "1.7",
+    );
+    expect(screen.getByRole("button", { name: "ルーペ" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "全画面表示" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("FT-B03-001 switches all three catalog modes through the connected App", async () => {
@@ -877,6 +1040,7 @@ describe("application shell", () => {
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "detail_list",
         viewMode: "single",
+        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,

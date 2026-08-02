@@ -32,11 +32,18 @@ import {
   type EndOfVolumePolicy,
 } from "./features/catalog/end-of-volume";
 import { Viewer } from "./features/viewer/Viewer";
+import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import type {
   ReadingDirection,
   ScaleMode,
   ViewMode,
   ViewerScaleState,
+  ViewerLayoutMode,
+} from "./features/viewer/model";
+import {
+  normalizeViewerLayoutMode,
+  VIEWER_LAYOUT_MODE_LABELS,
+  VIEWER_LAYOUT_MODES,
 } from "./features/viewer/model";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
@@ -59,7 +66,11 @@ type LoadState =
   | { status: "error"; path: string; message: string }
   | { status: "ready" };
 
-export function App() {
+interface AppProps {
+  fullscreenAdapter?: FullscreenAdapter;
+}
+
+export function App({ fullscreenAdapter }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
@@ -89,6 +100,7 @@ export function App() {
   const [pendingEndOfVolume, setPendingEndOfVolume] =
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("single");
+  const [layoutMode, setLayoutMode] = useState<ViewerLayoutMode>("paged");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
@@ -118,6 +130,7 @@ export function App() {
           endOfVolumePolicyRef.current = restoredEndOfVolumePolicy;
           setEndOfVolumePolicy(restoredEndOfVolumePolicy);
           setViewMode(response.data.viewMode);
+          setLayoutMode(normalizeViewerLayoutMode(response.data.layoutMode));
           setReadingDirection(response.data.readingDirection);
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
@@ -368,6 +381,7 @@ export function App() {
       Pick<
         CatalogSettings,
         "viewMode" | "readingDirection" | "scaleMode" | "scale" | "loupeEnabled"
+        | "layoutMode"
       >
     >,
   ) {
@@ -375,6 +389,7 @@ export function App() {
     void saveViewerSettings(
       {
         viewMode,
+        layoutMode,
         readingDirection,
         scaleMode: viewerScaleMode,
         scale: viewerScale,
@@ -446,6 +461,12 @@ export function App() {
             setReadingDirection(direction);
             persistViewerSettings({ viewMode: mode, readingDirection: direction });
           }}
+          initialLayoutMode={layoutMode}
+          onLayoutChange={(next: ViewerLayoutMode) => {
+            setLayoutMode(next);
+            persistViewerSettings({ layoutMode: next });
+          }}
+          fullscreenAdapter={fullscreenAdapter}
           onScaleChange={(next: ViewerScaleState) => {
             setViewerScaleMode(next.mode);
             setViewerScale(next.scale);

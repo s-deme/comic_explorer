@@ -204,6 +204,7 @@ pub struct CatalogSettings {
     pub end_of_volume_policy: String,
     pub catalog_view_mode: String,
     pub view_mode: String,
+    pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
     pub scale: f64,
@@ -256,17 +257,30 @@ fn catalog_view_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn viewer_layout_mode(settings: &crate::state::Settings) -> String {
+    if matches!(
+        settings.layout_mode.as_str(),
+        "paged" | "vertical_scroll" | "horizontal_scroll"
+    ) {
+        settings.layout_mode.clone()
+    } else {
+        "paged".into()
+    }
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
     let end_of_volume_policy = end_of_volume_policy(&settings);
     let catalog_view_mode = catalog_view_mode(&settings);
+    let layout_mode = viewer_layout_mode(&settings);
     CatalogSettings {
         sort_field: settings.sort_field,
         sort_descending: settings.sort_descending,
         end_of_volume_policy,
         catalog_view_mode,
         view_mode: settings.view_mode,
+        layout_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
         scale,
@@ -520,6 +534,7 @@ pub fn set_viewer_settings(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
     view_mode: String,
+    layout_mode: String,
     reading_direction: String,
     scale_mode: String,
     scale: f64,
@@ -529,6 +544,10 @@ pub fn set_viewer_settings(
         return Ok(error_response(&context, error));
     }
     if !matches!(view_mode.as_str(), "single" | "spread")
+        || !matches!(
+            layout_mode.as_str(),
+            "paged" | "vertical_scroll" | "horizontal_scroll"
+        )
         || !matches!(reading_direction.as_str(), "rightToLeft" | "leftToRight")
         || !matches!(
             scale_mode.as_str(),
@@ -551,6 +570,7 @@ pub fn set_viewer_settings(
             .map_err(|error| error.message)?
             .unwrap_or_default();
         settings.view_mode = view_mode;
+        settings.layout_mode = layout_mode;
         settings.reading_direction = reading_direction;
         settings.scale_mode = scale_mode;
         settings.scale = scale.to_string();
@@ -1347,6 +1367,21 @@ mod shutdown_tests {
 
         settings.catalog_view_mode = "not-a-mode".into();
         assert_eq!(catalog_view_mode(&settings), "cover_list");
+    }
+
+    #[test]
+    fn viewer_layout_mode_defaults_to_paged_for_missing_or_unknown_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(viewer_layout_mode(&settings), "paged");
+
+        settings.layout_mode = "vertical_scroll".into();
+        assert_eq!(viewer_layout_mode(&settings), "vertical_scroll");
+
+        settings.layout_mode = "horizontal_scroll".into();
+        assert_eq!(viewer_layout_mode(&settings), "horizontal_scroll");
+
+        settings.layout_mode = "fullscreen".into();
+        assert_eq!(viewer_layout_mode(&settings), "paged");
     }
 
     #[test]

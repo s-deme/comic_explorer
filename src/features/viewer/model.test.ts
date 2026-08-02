@@ -5,7 +5,9 @@ import {
   MAX_SCALE,
   MIN_SCALE,
   normalizeScale,
+  normalizeViewerLayoutMode,
   scaleReducer,
+  VIEWER_LAYOUT_MODES,
   viewerReducer,
   visibleIndices,
   type ViewerState,
@@ -99,5 +101,19 @@ describe("FR-B01 scale model", () => {
       scale: 1.7,
       loupeEnabled: true,
     });
+  });
+});
+
+describe("FR-B04 viewer layout model", () => {
+  it("FT-B04-001 fixes the three layout modes and keeps paged as the fallback", () => {
+    expect(VIEWER_LAYOUT_MODES).toEqual([
+      "paged",
+      "vertical_scroll",
+      "horizontal_scroll",
+    ]);
+    expect(normalizeViewerLayoutMode("paged")).toBe("paged");
+    expect(normalizeViewerLayoutMode("vertical_scroll")).toBe("vertical_scroll");
+    expect(normalizeViewerLayoutMode("horizontal_scroll")).toBe("horizontal_scroll");
+    expect(normalizeViewerLayoutMode("fullscreen")).toBe("paged");
   });
 });

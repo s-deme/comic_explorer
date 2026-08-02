@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import {
   loadPage,
@@ -18,7 +18,16 @@ import {
   type ViewerScaleAction,
   type ViewerScaleState,
   type ViewMode,
+  type ViewerLayoutMode,
 } from "./model";
+import {
+  VIEWER_LAYOUT_MODE_LABELS,
+  VIEWER_LAYOUT_MODES,
+} from "./model";
+import {
+  tauriFullscreenAdapter,
+  type FullscreenAdapter,
+} from "./fullscreen";
 
 interface ViewerProps {
   session: ViewerSession;
@@ -26,12 +35,15 @@ interface ViewerProps {
   onClose: () => void;
   onNextItem?: () => void;
   initialMode: ViewMode;
+  initialLayoutMode?: ViewerLayoutMode;
   initialDirection: ReadingDirection;
   onSettingsChange: (mode: ViewMode, direction: ReadingDirection) => void;
+  onLayoutChange?: (layoutMode: ViewerLayoutMode) => void;
   initialScaleMode?: ScaleMode;
   initialScale?: number;
   initialLoupeEnabled?: boolean;
   onScaleChange?: (scale: ViewerScaleState) => void;
+  fullscreenAdapter?: FullscreenAdapter;
 }
 
 interface LoupeState {
@@ -50,12 +62,15 @@ export function Viewer({
   onClose,
   onNextItem,
   initialMode,
+  initialLayoutMode = "paged",
   initialDirection,
   onSettingsChange,
+  onLayoutChange,
   initialScaleMode = "fit",
   initialScale = 1,
   initialLoupeEnabled = false,
   onScaleChange,
+  fullscreenAdapter = tauriFullscreenAdapter,
 }: ViewerProps) {
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
@@ -71,17 +86,28 @@ export function Viewer({
   const [scale, setScale] = useState<ViewerScaleState>(() =>
     createViewerScaleState(initialScaleMode, initialScale, initialLoupeEnabled),
   );
+  const [layoutMode, setLayoutMode] =
+    useState<ViewerLayoutMode>(initialLayoutMode);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
+  const layoutInitialized = useRef(false);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
     [landscape, session.pages.length, state],
   );
 
   useEffect(() => {
-    const wanted = [...visible];
+    const wanted =
+      layoutMode === "paged"
+        ? [...visible]
+        : session.pages.map((_, index) => index);
     const nextIndex = state.index + Math.max(1, visible.length);
-    if (nextIndex < session.pages.length) wanted.push(nextIndex);
+    if (layoutMode === "paged" && nextIndex < session.pages.length) {
+      wanted.push(nextIndex);
+    }
     wanted.forEach((index) => {
       if (mediaUris[index] || imageErrors.has(index)) return;
       void loadPage(session, index, generation, visible.includes(index) ? "visible" : "near")
@@ -94,7 +120,7 @@ export function Viewer({
         })
         .catch(() => setImageErrors((current) => new Set(current).add(index)));
     });
-  }, [generation, imageErrors, mediaUris, session, state.index, visible]);
+  }, [generation, imageErrors, layoutMode, mediaUris, session, state.index, visible]);
 
   function next() {
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
@@ -110,13 +136,34 @@ export function Viewer({
     });
   }
 
-  function close() {
-    void saveReadingPosition(session, state.index, generation).finally(onClose);
+  async function requestFullscreen(next: boolean): Promise<boolean> {
+    setFullscreenError(null);
+    try {
+      if (next) await fullscreenAdapter.enter();
+      else await fullscreenAdapter.exit();
+      setFullscreen(next);
+      requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
+      return true;
+    } catch {
+      setFullscreenError("全画面表示を切り替えられません。もう一度お試しください。");
+      return false;
+    }
+  }
+
+  async function close() {
+    if (fullscreen && !(await requestFullscreen(false))) return;
+    await saveReadingPosition(session, state.index, generation);
+    onClose();
   }
 
   function changeMode(mode: ViewMode) {
     dispatch({ type: "mode", mode });
     onSettingsChange(mode, state.direction);
+  }
+
+  function changeLayout(next: ViewerLayoutMode) {
+    setLayoutMode(next);
+    onLayoutChange?.(next);
   }
 
   function toggleDirection() {
@@ -183,6 +230,33 @@ export function Viewer({
   }, [scale.mode, scale.scale, state.index]);
 
   useEffect(() => {
+    let mounted = true;
+    void fullscreenAdapter
+      .isFullscreen()
+      .then((current) => {
+        if (mounted) setFullscreen(current);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [fullscreenAdapter]);
+
+  useEffect(() => {
+    if (!layoutInitialized.current) {
+      layoutInitialized.current = true;
+      return;
+    }
+    if (layoutMode === "paged") return;
+    const anchor = stageRef.current?.querySelector<HTMLElement>(
+      `[data-page-index="${state.index}"].viewer-page`,
+    );
+    if (!anchor) return;
+    anchor.focus({ preventScroll: true });
+    anchor.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [layoutMode, state.index]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       void saveReadingPosition(session, state.index, generation);
     }, 250);
@@ -191,7 +265,11 @@ export function Viewer({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (fullscreen) void requestFullscreen(false);
+        else void close();
+      }
       else if (
         event.key === "PageDown" ||
         event.key === " " ||
@@ -225,14 +303,77 @@ export function Viewer({
     state.direction === "rightToLeft" && visible.length === 2
       ? [...visible].reverse()
       : visible;
+  const scrollLayout = layoutMode !== "paged";
+  const scrollIndices = session.pages.map((_, index) => index);
+  const renderPage = (index: number, withAnchor = false) => {
+    const page = session.pages[index];
+    const content = imageErrors.has(index) ? (
+      <div className="page-error" role="alert">
+        <h2>画像を読み込めません</h2>
+        <p>{page.relativePath}</p>
+        <button onClick={() => dispatch({ type: "previous" })}>前ページ</button>
+        <button onClick={next}>次ページ</button>
+        <button onClick={close}>一覧へ戻る</button>
+      </div>
+    ) : mediaUris[index] ? (
+      <img
+        src={mediaUris[index]}
+        alt={`${session.displayName} ${index + 1}ページ`}
+        data-page-index={index}
+        onLoad={(event) => {
+          if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
+            setLandscape((current) => new Set(current).add(index));
+          }
+        }}
+        onError={() => setImageErrors((current) => new Set(current).add(index))}
+      />
+    ) : (
+      <p role="status">ページを読み込んでいます。</p>
+    );
+    if (!withAnchor) return content;
+    return (
+      <article
+        className="viewer-page"
+        data-page-index={index}
+        aria-label={`ページ ${index + 1}`}
+        tabIndex={index === state.index ? 0 : -1}
+        onFocus={() => {
+          if (index !== state.index) dispatch({ type: "go", index });
+        }}
+      >
+        {content}
+      </article>
+    );
+  };
 
   return (
-    <section className="viewer" aria-label={`${session.displayName} ビューワ`}>
+    <section
+      className="viewer"
+      aria-label={`${session.displayName} ビューワ`}
+      data-layout-mode={layoutMode}
+      data-fullscreen={fullscreen}
+    >
       <header className="viewer-toolbar">
         <strong>{session.displayName}</strong>
         <span>{state.mode === "single" ? "単ページ" : "見開き"}</span>
         <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>
         <span>{progress}</span>
+        <label className="viewer-layout-control">
+          レイアウト
+          <select
+            aria-label="閲覧レイアウト"
+            value={layoutMode}
+            onChange={(event) =>
+              changeLayout(event.target.value as ViewerLayoutMode)
+            }
+          >
+            {VIEWER_LAYOUT_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {VIEWER_LAYOUT_MODE_LABELS[mode]}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="viewer-scale-control">
           倍率
           <select
@@ -290,7 +431,20 @@ export function Viewer({
         <button onClick={toggleDirection}>
           読み方向
         </button>
+        <button
+          ref={fullscreenButtonRef}
+          aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
+          aria-pressed={fullscreen}
+          onClick={() => void requestFullscreen(!fullscreen)}
+        >
+          {fullscreen ? "全画面終了" : "全画面"}
+        </button>
         <button onClick={close}>一覧へ戻る</button>
+        {fullscreenError !== null && (
+          <span className="fullscreen-error" role="status">
+            {fullscreenError}
+          </span>
+        )}
       </header>
       <div
         ref={stageRef}
@@ -301,53 +455,46 @@ export function Viewer({
           if (event.ctrlKey) {
             event.preventDefault();
             applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
-          } else if (event.deltaY > 0) next();
-          else if (event.deltaY < 0) dispatch({ type: "previous" });
+          } else if (!scrollLayout) {
+            if (event.deltaY > 0) next();
+            else if (event.deltaY < 0) dispatch({ type: "previous" });
+          }
         }}
       >
-        <button
-          className="page-zone page-zone-left"
-          aria-label={
-            state.direction === "rightToLeft" ? "次ページ" : "前ページ"
-          }
-          onClick={() =>
-            state.direction === "rightToLeft"
-              ? next()
-              : dispatch({ type: "previous" })
-          }
-        />
+        {!scrollLayout && (
+          <button
+            className="page-zone page-zone-left"
+            aria-label={
+              state.direction === "rightToLeft" ? "次ページ" : "前ページ"
+            }
+            onClick={() =>
+              state.direction === "rightToLeft"
+                ? next()
+                : dispatch({ type: "previous" })
+            }
+          />
+        )}
         <div
           className="page-spread"
+          data-layout-mode={layoutMode}
           data-direction={state.direction}
           data-scale-mode={scale.mode}
           data-scale={scale.scale}
-          data-page-count={ordered.length}
+          data-page-count={scrollLayout ? session.pages.length : ordered.length}
+          data-page-anchor={state.index}
           data-loupe-enabled={scale.loupeEnabled}
           style={{ "--viewer-custom-scale": scale.scale } as CSSProperties}
         >
-          {ordered.map((index) =>
-            imageErrors.has(index) ? (
-              <div className="page-error" role="alert" key={session.pages[index].id}>
-                <h2>画像を読み込めません</h2>
-                <p>{session.pages[index].relativePath}</p>
-                <button onClick={() => dispatch({ type: "previous" })}>前ページ</button>
-                <button onClick={next}>次ページ</button>
-                <button onClick={close}>一覧へ戻る</button>
-              </div>
-            ) : mediaUris[index] ? (
-              <img
-                key={session.pages[index].id}
-                src={mediaUris[index]}
-                alt={`${session.displayName} ${index + 1}ページ`}
-                data-page-index={index}
-                onLoad={(event) => {
-                  if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
-                    setLandscape((current) => new Set(current).add(index));
-                  }
-                }}
-                onError={() => setImageErrors((current) => new Set(current).add(index))}
-              />
-            ) : <p role="status" key={session.pages[index].id}>ページを読み込んでいます。</p>,
+          {(scrollLayout ? scrollIndices : ordered).map((index) =>
+            scrollLayout ? (
+              <span key={session.pages[index].id} className="viewer-page-slot">
+                {renderPage(index, true)}
+              </span>
+            ) : (
+              <Fragment key={session.pages[index].id}>
+                {renderPage(index)}
+              </Fragment>
+            ),
           )}
         </div>
         {scale.loupeEnabled && loupe && mediaUris[loupe.index] && (
@@ -366,18 +513,20 @@ export function Viewer({
             }
           />
         )}
-        <button
-          className="page-zone page-zone-right"
-          aria-label={
-            state.direction === "rightToLeft" ? "前ページ" : "次ページ"
-          }
-          onClick={() =>
-            state.direction === "rightToLeft"
-              ? dispatch({ type: "previous" })
-              : next()
-          }
-        />
-        {mediaUris[state.index + visible.length] && (
+        {!scrollLayout && (
+          <button
+            className="page-zone page-zone-right"
+            aria-label={
+              state.direction === "rightToLeft" ? "前ページ" : "次ページ"
+            }
+            onClick={() =>
+              state.direction === "rightToLeft"
+                ? dispatch({ type: "previous" })
+                : next()
+            }
+          />
+        )}
+        {!scrollLayout && mediaUris[state.index + visible.length] && (
           <img
             className="prefetch-page"
             src={mediaUris[state.index + visible.length]}

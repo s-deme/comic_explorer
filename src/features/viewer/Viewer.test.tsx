@@ -189,4 +189,140 @@ describe("Viewer settings", () => {
       "1.5",
     );
   });
+
+  it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="paged"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onLayoutChange={vi.fn()}
+        onClose={() => undefined}
+      />,
+    );
+
+    const selector = screen.getByRole("combobox", { name: "閲覧レイアウト" });
+    const spread = document.querySelector(".page-spread");
+    fireEvent.change(selector, { target: { value: "vertical_scroll" } });
+    await waitFor(() => {
+      expect(spread).toHaveAttribute("data-layout-mode", "vertical_scroll");
+      expect(spread).toHaveAttribute("data-page-anchor", "0");
+      expect(screen.getByRole("article", { name: "ページ 1" })).toHaveFocus();
+    });
+
+    fireEvent.change(selector, { target: { value: "horizontal_scroll" } });
+    await waitFor(() => {
+      expect(spread).toHaveAttribute("data-layout-mode", "horizontal_scroll");
+      expect(spread).toHaveAttribute("data-page-anchor", "0");
+    });
+  });
+
+  it("FT-B04-003 preserves reading direction, keyboard navigation, native wheel and Escape", async () => {
+    const onSettingsChange = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="vertical_scroll"
+        initialDirection="leftToRight"
+        onSettingsChange={onSettingsChange}
+        onClose={onClose}
+      />,
+    );
+
+    expect(screen.getByText("左開き")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "r" });
+    expect(screen.getByText("右開き")).toBeInTheDocument();
+    expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
+
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await waitFor(() =>
+      expect(document.querySelector(".page-spread")).toHaveAttribute(
+        "data-page-anchor",
+        "1",
+      ),
+    );
+    expect(screen.getByRole("article", { name: "ページ 2" })).toHaveFocus();
+
+    const stage = document.querySelector(".viewer-stage");
+    expect(stage).not.toBeNull();
+    fireEvent.wheel(stage as HTMLElement, { deltaY: 120 });
+    expect(document.querySelector(".page-spread")).toHaveAttribute(
+      "data-page-anchor",
+      "1",
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("FT-B04-004 connects fullscreen enter, exit and Escape without closing the Viewer", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={vi.fn()}
+        fullscreenAdapter={adapter}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "全画面表示を終了" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    expect(adapter.enter).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "全画面表示" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      ),
+    );
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("FT-B04-004 reports an adapter error without claiming fullscreen", async () => {
+    const adapter = {
+      enter: vi.fn().mockRejectedValue(new Error("window unavailable")),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        fullscreenAdapter={adapter}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
+    expect(
+      await screen.findByText("全画面表示を切り替えられません。もう一度お試しください。"),
+    ).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "全画面表示" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
 });

@@ -11,7 +11,7 @@ import type {
   RelativePath,
   RequestId,
 } from "../../types/domain";
-import type { ScaleMode } from "../viewer/model";
+import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogViewMode } from "../catalog/view-mode";
 
@@ -58,6 +58,7 @@ export interface CatalogSettings {
   endOfVolumePolicy: EndOfVolumePolicy;
   catalogViewMode: CatalogViewMode;
   viewMode: "single" | "spread";
+  layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
   scale: number;
@@ -68,6 +69,7 @@ export async function saveViewerSettings(
   settings: Pick<
     CatalogSettings,
     | "viewMode"
+    | "layoutMode"
     | "readingDirection"
     | "scaleMode"
     | "scale"
@@ -78,6 +80,7 @@ export async function saveViewerSettings(
   return invoke("set_viewer_settings", {
     context: context(generation),
     viewMode: settings.viewMode,
+    layoutMode: settings.layoutMode,
     readingDirection: settings.readingDirection,
     scaleMode: settings.scaleMode,
     scale: settings.scale,

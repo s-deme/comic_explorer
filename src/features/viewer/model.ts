@@ -1,6 +1,28 @@
 export type ViewMode = "single" | "spread";
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
+export type ViewerLayoutMode =
+  | "paged"
+  | "vertical_scroll"
+  | "horizontal_scroll";
+
+export const VIEWER_LAYOUT_MODES: ViewerLayoutMode[] = [
+  "paged",
+  "vertical_scroll",
+  "horizontal_scroll",
+];
+
+export const VIEWER_LAYOUT_MODE_LABELS: Record<ViewerLayoutMode, string> = {
+  paged: "ページ",
+  vertical_scroll: "縦スクロール",
+  horizontal_scroll: "横スクロール",
+};
+
+export function normalizeViewerLayoutMode(value: string): ViewerLayoutMode {
+  return VIEWER_LAYOUT_MODES.includes(value as ViewerLayoutMode)
+    ? (value as ViewerLayoutMode)
+    : "paged";
+}
 
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 4;

@@ -18,6 +18,7 @@ pub struct Settings {
     pub end_of_volume_policy: String,
     pub catalog_view_mode: String,
     pub view_mode: String,
+    pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
     pub scale: String,
@@ -33,6 +34,7 @@ impl Default for Settings {
             end_of_volume_policy: "auto_next".into(),
             catalog_view_mode: "cover_list".into(),
             view_mode: "single".into(),
+            layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
             scale: "1".into(),
@@ -103,6 +105,7 @@ impl StateStore {
                 "endOfVolumePolicy" => settings.end_of_volume_policy = value,
                 "catalogViewMode" => settings.catalog_view_mode = value,
                 "viewMode" => settings.view_mode = value,
+                "layoutMode" => settings.layout_mode = value,
                 "readingDirection" => settings.reading_direction = value,
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
@@ -121,6 +124,7 @@ impl StateStore {
             ("endOfVolumePolicy", settings.end_of_volume_policy.clone()),
             ("catalogViewMode", settings.catalog_view_mode.clone()),
             ("viewMode", settings.view_mode.clone()),
+            ("layoutMode", settings.layout_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
@@ -375,6 +379,7 @@ mod tests {
                 end_of_volume_policy: "loop".into(),
                 catalog_view_mode: "detail_list".into(),
                 view_mode: "spread".into(),
+                layout_mode: "vertical_scroll".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
@@ -402,6 +407,7 @@ mod tests {
         assert_eq!(restored.scale, "1.7");
         assert_eq!(restored.end_of_volume_policy, "loop");
         assert_eq!(restored.catalog_view_mode, "detail_list");
+        assert_eq!(restored.layout_mode, "vertical_scroll");
         assert!(restored.loupe_enabled);
         assert_eq!(
             store.reading_position("item-1").unwrap().unwrap().page_key,
