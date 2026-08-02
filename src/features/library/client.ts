@@ -141,6 +141,16 @@ export async function listFolder(
   });
 }
 
+export async function searchLibrary(
+  query: string,
+  generation: number,
+): Promise<ApiResponse<CatalogEntry[]>> {
+  return invoke("search_library", {
+    context: context(generation),
+    query,
+  });
+}
+
 export interface ThumbnailData {
   itemRelativePath: RelativePath;
   contentHash: string;

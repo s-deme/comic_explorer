@@ -19,7 +19,8 @@ use crate::catalog::{
     CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages,
 };
 use crate::domain::{
-    AppError, ErrorCode, FileKind, PageId, RelativePath, RequestId, classify_file_name, page_id_for,
+    AppError, ErrorCode, FileKind, ItemKind, PageId, RelativePath, RequestId, classify_file_name,
+    page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
 use crate::state::{AppPaths, StateStore, ThumbnailPipeline};
@@ -757,6 +758,50 @@ pub async fn list_folder(
 }
 
 #[tauri::command]
+pub async fn search_library(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    query: String,
+) -> Result<Response<Vec<CatalogEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let normalized_query = normalize_search_text(&query);
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let cancellation = state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .begin(context.generation);
+    let worker_root = root.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        search_library_port(&worker_root, &normalized_query, &cancellation)
+    })
+    .await
+    .map_err(|error| format!("search worker failed: {error}"))?;
+
+    let is_current = state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation);
+    Ok(port_response(context, result, is_current))
+}
+
+#[tauri::command]
 pub async fn get_thumbnail(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
@@ -937,6 +982,97 @@ fn enumerate_folder_port(
     } else {
         result
     }
+}
+
+fn search_library_port(
+    root: &std::path::Path,
+    query: &str,
+    cancellation: &CancellationToken,
+) -> Result<Vec<CatalogEntry>, AppError> {
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let root = root.canonicalize().map_err(|source| {
+        let code = match source.kind() {
+            std::io::ErrorKind::NotFound => ErrorCode::NotFound,
+            std::io::ErrorKind::PermissionDenied => ErrorCode::AccessDenied,
+            _ => ErrorCode::InvalidPath,
+        };
+        request_error(code, "Cannot read the library root.")
+    })?;
+    if !root.is_dir() {
+        return Err(request_error(
+            ErrorCode::InvalidPath,
+            "Library root is not a directory.",
+        ));
+    }
+    let mut results = Vec::new();
+    search_directory(&root, &root, query, cancellation, &mut results)?;
+    results.sort_by(|left, right| {
+        crate::domain::natural_cmp(left.relative_path.as_str(), right.relative_path.as_str())
+    });
+    if cancellation.is_cancelled() {
+        Err(AppError::cancelled())
+    } else {
+        Ok(results)
+    }
+}
+
+fn search_directory(
+    root: &std::path::Path,
+    directory: &std::path::Path,
+    query: &str,
+    cancellation: &CancellationToken,
+    results: &mut Vec<CatalogEntry>,
+) -> Result<(), AppError> {
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let entries = crate::catalog::enumerate_folder(root, directory)?;
+    for entry in entries {
+        if cancellation.is_cancelled() {
+            return Err(AppError::cancelled());
+        }
+        let name = entry
+            .relative_path
+            .as_str()
+            .rsplit('/')
+            .next()
+            .unwrap_or(entry.relative_path.as_str());
+        if normalize_search_text(name).contains(query) {
+            results.push(entry.clone());
+        }
+        if matches!(entry.kind, ItemKind::Folder | ItemKind::ComicFolder) {
+            search_directory(
+                root,
+                &root.join(entry.relative_path.as_str()),
+                query,
+                cancellation,
+                results,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn normalize_search_text(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .flat_map(|character| {
+            let folded = match character {
+                '\u{3000}' => ' ',
+                '\u{ff01}'..='\u{ff5e}' => {
+                    char::from_u32(character as u32 - 0xfee0).unwrap_or(character)
+                }
+                _ => character,
+            };
+            folded.to_lowercase()
+        })
+        .collect()
 }
 
 fn enumerate_pages_port(
@@ -1593,6 +1729,61 @@ mod shutdown_tests {
             .code,
             ErrorCode::Cancelled
         );
+    }
+
+    #[test]
+    fn search_port_matches_case_width_and_unicode_normalized_names_across_kinds() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-search-kinds-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(root.join("Sample Folder")).unwrap();
+        std::fs::write(root.join("Ｓａｍｐｌｅ.cbz"), b"archive").unwrap();
+        std::fs::write(root.join("Café.png"), b"image").unwrap();
+
+        let cancellation = CancellationToken::new();
+        let sample =
+            search_library_port(&root, &normalize_search_text("  SAMPLE  "), &cancellation)
+                .unwrap();
+        assert_eq!(
+            sample
+                .iter()
+                .map(|entry| entry.relative_path.as_str())
+                .collect::<Vec<_>>(),
+            ["Sample Folder", "Ｓａｍｐｌｅ.cbz"]
+        );
+        assert_eq!(sample[0].kind, ItemKind::Folder);
+        assert_eq!(sample[1].kind, ItemKind::Archive);
+
+        let unicode =
+            search_library_port(&root, &normalize_search_text("CAFÉ"), &cancellation).unwrap();
+        assert_eq!(unicode.len(), 1);
+        assert_eq!(unicode[0].kind, ItemKind::Page);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn search_port_rescans_the_library_and_returns_new_entries_without_an_index() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-search-rescan-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let cancellation = CancellationToken::new();
+
+        let before =
+            search_library_port(&root, &normalize_search_text("new volume"), &cancellation)
+                .unwrap();
+        assert!(before.is_empty());
+
+        std::fs::write(root.join("New Volume.cbz"), b"archive").unwrap();
+        let after = search_library_port(&root, &normalize_search_text("new volume"), &cancellation)
+            .unwrap();
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].relative_path.as_str(), "New Volume.cbz");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

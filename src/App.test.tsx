@@ -24,6 +24,7 @@ import {
   saveEndOfVolumePolicy,
   saveReadingPosition,
   saveViewerSettings,
+  searchLibrary,
   takeRecoveryNotice,
 } from "./features/library/client";
 import type { CatalogEntry, ErrorCode } from "./types/domain";
@@ -43,6 +44,7 @@ vi.mock("./features/library/client", () => ({
   saveEndOfVolumePolicy: vi.fn(),
   saveReadingPosition: vi.fn(),
   saveViewerSettings: vi.fn(),
+  searchLibrary: vi.fn(),
   takeRecoveryNotice: vi.fn(),
 }));
 
@@ -60,6 +62,7 @@ const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
 const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
 const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveViewerMock = vi.mocked(saveViewerSettings);
+const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 
 function testEntry(relativePath: string): CatalogEntry {
@@ -91,6 +94,15 @@ function viewerResponse(itemKey: string) {
     requestId: `open-${itemKey}` as never,
     generation: 1 as never,
     data: testSession(itemKey),
+  };
+}
+
+function searchResponse(results: CatalogEntry[]) {
+  return {
+    status: "ok" as const,
+    requestId: "search" as never,
+    generation: 1 as never,
+    data: results,
   };
 }
 
@@ -154,6 +166,7 @@ describe("application shell", () => {
     saveEndPolicyMock.mockReset();
     saveReadingMock.mockReset();
     saveViewerMock.mockReset();
+    searchMock.mockReset();
     recoveryNoticeMock.mockReset();
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
@@ -712,15 +725,25 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(only.relativePath));
 
     await registerTestLibrary([only]);
-    await openTestComic(only.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    const addEventListenerSpy = vi.spyOn(window, "addEventListener");
+    try {
+      await openTestComic(only.relativePath);
+      await waitFor(() =>
+        expect(
+          addEventListenerSpy.mock.calls.some(([type]) => type === "keydown"),
+        ).toBe(true),
+      );
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
 
-    const notice = await screen.findByText("巻末です。次の漫画はありません。");
-    expect(notice).toHaveAttribute("role", "status");
-    expect(
-      screen.getByLabelText(`${only.relativePath} ビューワ`),
-    ).toBeInTheDocument();
-    expect(openMock).toHaveBeenCalledTimes(1);
+      const notice = await screen.findByText("巻末です。次の漫画はありません。");
+      expect(notice).toHaveAttribute("role", "status");
+      expect(
+        screen.getByLabelText(`${only.relativePath} ビューワ`),
+      ).toBeInTheDocument();
+      expect(openMock).toHaveBeenCalledTimes(1);
+    } finally {
+      addEventListenerSpy.mockRestore();
+    }
   });
 
   it("opens the sorted first comic when loop is selected at the final comic", async () => {
@@ -1061,5 +1084,138 @@ describe("application shell", () => {
       "small_thumbnail",
       expect.any(Number),
     );
+  });
+
+  it("FT-B05-001 connects exact and partial normalized name queries", async () => {
+    const results = [
+      { ...testEntry("Series/Volume 01.cbz"), kind: "archive" as const },
+      { ...testEntry("Series/Volume 02.cbz"), kind: "archive" as const },
+    ];
+    searchMock.mockResolvedValueOnce(searchResponse(results));
+    await registerTestLibrary([testEntry("root.cbz")]);
+
+    const input = await screen.findByLabelText("名前検索");
+    fireEvent.change(input, { target: { value: "  ＶＯＬＵＭＥ  " } });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+
+    const region = await screen.findByRole("region", { name: "名前検索結果" });
+    expect(region).toHaveAttribute("data-search-result-count", "2");
+    expect(region).toHaveTextContent("Volume 01.cbz");
+    expect(region).toHaveTextContent("Volume 02.cbz");
+    expect(searchMock).toHaveBeenCalledWith("  ＶＯＬＵＭＥ  ", expect.any(Number));
+  });
+
+  it("FT-B05-002 keeps mixed file and folder result kinds visible", async () => {
+    const results: CatalogEntry[] = [
+      { relativePath: "Series" as never, kind: "folder" },
+      { relativePath: "Series/Volume.cbz" as never, kind: "archive", archiveKind: "cbz" },
+      { relativePath: "Series/cover.png" as never, kind: "page" },
+    ];
+    searchMock.mockResolvedValueOnce(searchResponse(results));
+    await registerTestLibrary([testEntry("root.cbz")]);
+
+    fireEvent.change(await screen.findByLabelText("名前検索"), {
+      target: { value: "series" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+
+    const region = await screen.findByRole("region", { name: "名前検索結果" });
+    expect(region).toHaveAttribute("data-search-result-count", "3");
+    expect(region).toHaveTextContent("フォルダ");
+    expect(region).toHaveTextContent("ZIP / CBZ");
+    expect(region).toHaveTextContent("画像");
+    expect(region.querySelector('[data-search-result-kind="folder"]')).toBeInTheDocument();
+    expect(region.querySelector('[data-search-result-kind="archive"]')).toBeInTheDocument();
+  });
+
+  it("FT-B05-003 returns a result to its parent path and restores selection", async () => {
+    const result: CatalogEntry = {
+      relativePath: "Series/Volume.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    };
+    searchMock.mockResolvedValueOnce(searchResponse([result]));
+    await registerTestLibrary([testEntry("root.cbz")]);
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "parent-list" as never,
+      generation: 2 as never,
+      data: [result],
+    });
+
+    fireEvent.change(await screen.findByLabelText("名前検索"), {
+      target: { value: "volume" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Series\/Volume\.cbz/ }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series");
+      expect(screen.getByText("選択: Series/Volume.cbz")).toBeInTheDocument();
+    });
+    expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+  });
+
+  it("FT-B05-004 exposes empty and error states and clears back to the catalog", async () => {
+    searchMock
+      .mockResolvedValueOnce(searchResponse([]))
+      .mockResolvedValueOnce({
+        status: "error",
+        requestId: "search-error" as never,
+        generation: 2 as never,
+        error: {
+          code: "ACCESS_DENIED",
+          message: "internal detail must stay hidden",
+          retryable: true,
+        },
+      });
+    await registerTestLibrary([testEntry("root.cbz")]);
+
+    const input = await screen.findByLabelText("名前検索");
+    fireEvent.change(input, { target: { value: "missing" } });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    expect(await screen.findByText("検索結果はありません。"))
+      .toHaveAttribute("role", "status");
+
+    fireEvent.change(input, { target: { value: "denied" } });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("アクセスできません");
+    expect(alert).not.toHaveTextContent("internal detail");
+
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+    expect(screen.getByRole("grid", { name: "現在のフォルダの項目" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "名前検索結果" })).not.toBeInTheDocument();
+  });
+
+  it("FT-B05-005 replaces results on a fresh search request after a rescan", async () => {
+    const oldResult: CatalogEntry = {
+      relativePath: "Old/Volume.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    };
+    const newResult: CatalogEntry = {
+      relativePath: "New/Volume.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    };
+    searchMock
+      .mockResolvedValueOnce(searchResponse([oldResult]))
+      .mockResolvedValueOnce(searchResponse([newResult]));
+    await registerTestLibrary([testEntry("root.cbz")]);
+
+    const input = await screen.findByLabelText("名前検索");
+    fireEvent.change(input, { target: { value: "volume" } });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    expect(await screen.findByText("Old/Volume.cbz")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    expect(await screen.findByText("New/Volume.cbz")).toBeInTheDocument();
+    expect(screen.queryByText("Old/Volume.cbz")).not.toBeInTheDocument();
+    expect(searchMock).toHaveBeenCalledTimes(2);
+    expect(searchMock.mock.calls[1][1]).toBeGreaterThan(searchMock.mock.calls[0][1]);
   });
 });

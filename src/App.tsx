@@ -16,6 +16,7 @@ import {
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveViewerSettings,
+  searchLibrary,
   takeRecoveryNotice,
   type CatalogSettings,
   type ViewerSession,
@@ -66,8 +67,33 @@ type LoadState =
   | { status: "error"; path: string; message: string }
   | { status: "ready" };
 
+type SearchState =
+  | { status: "idle" }
+  | { status: "loading"; query: string }
+  | { status: "ready"; query: string; results: CatalogEntry[] }
+  | { status: "error"; query: string; message: string };
+
 interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
+}
+
+function entryDisplayName(entry: CatalogEntry): string {
+  return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
+}
+
+function entryKindLabel(entry: CatalogEntry): string {
+  switch (entry.kind) {
+    case "folder":
+      return "フォルダ";
+    case "comicFolder":
+      return "漫画フォルダ";
+    case "archive":
+      return "ZIP / CBZ";
+    case "page":
+      return "画像";
+    default:
+      return "未対応";
+  }
 }
 
 export function App({ fullscreenAdapter }: AppProps = {}) {
@@ -111,6 +137,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -191,7 +219,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     });
   }, [sortedEntries, thumbnails]);
 
-  async function load(relativePath: string) {
+  async function load(relativePath: string, selectionPath: string | null = null) {
     generation.current += 1;
     const requestGeneration = generation.current;
     setLoadState({ status: "loading", path: relativePath });
@@ -203,6 +231,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
         setEntries(response.data);
+        setSelectedPath(selectionPath);
         setLoadState({ status: "ready" });
       } else if (response.status === "error") {
         setLoadState({
@@ -224,6 +253,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   async function chooseRoot(event: React.FormEvent) {
     event.preventDefault();
+    clearSearch();
     generation.current += 1;
     const response = await registerLibraryRoot(rootInput, generation.current);
     if (response.status === "ok") {
@@ -236,6 +266,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   async function chooseRootWithPicker() {
+    clearSearch();
     generation.current += 1;
     const response = await pickLibraryRoot(generation.current);
     if (response.status === "ok" && response.data) {
@@ -252,10 +283,65 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     }
   }
 
-  function navigate(path: string, history: "push" | "back" | "forward" = "push") {
+  function navigate(
+    path: string,
+    history: "push" | "back" | "forward" = "push",
+    selectionPath: string | null = null,
+  ) {
+    setSearchState({ status: "idle" });
     if (history === "push") dispatch({ type: "navigate", path });
     else dispatch({ type: history });
-    void load(path);
+    void load(path, selectionPath);
+  }
+
+  function clearSearch() {
+    setSearchQuery("");
+    setSearchState({ status: "idle" });
+  }
+
+  async function runSearch() {
+    const query = searchQuery;
+    if (query.trim() === "") {
+      clearSearch();
+      return;
+    }
+    generation.current += 1;
+    const requestGeneration = generation.current;
+    setSearchState({ status: "loading", query });
+    setSelectedPath(null);
+    setThumbnails({});
+    thumbnailRequests.current.clear();
+    try {
+      const response = await searchLibrary(query, requestGeneration);
+      if (requestGeneration !== generation.current) return;
+      if (response.status === "ok") {
+        setSearchState({ status: "ready", query, results: response.data });
+      } else if (response.status === "error") {
+        setSearchState({
+          status: "error",
+          query,
+          message: presentError(response.error),
+        });
+      }
+    } catch {
+      if (requestGeneration === generation.current) {
+        setSearchState({
+          status: "error",
+          query,
+          message: presentUnexpectedError(),
+        });
+      }
+    }
+  }
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault();
+    void runSearch();
+  }
+
+  function navigateToSearchResult(entry: CatalogEntry) {
+    const resultParent = parentPath(entry.relativePath);
+    navigate(resultParent ?? "", "push", entry.relativePath);
   }
 
   function closeHelp() {
@@ -641,6 +727,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         />
         <button type="submit">移動</button>
       </form>
+      <form className="search-bar" aria-label="名前検索フォーム" onSubmit={submitSearch}>
+        <label htmlFor="catalog-search">名前検索</label>
+        <input
+          id="catalog-search"
+          aria-label="名前検索"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="ファイル名・フォルダ名"
+        />
+        <button type="submit">検索</button>
+        {searchState.status !== "idle" && (
+          <button type="button" onClick={clearSearch}>
+            クリア
+          </button>
+        )}
+      </form>
       <div
         className="workspace"
         style={{ gridTemplateColumns: `${treeWidth}px 6px minmax(0, 1fr)` }}
@@ -674,12 +776,58 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
         />
         <section className="catalog-pane" aria-busy={loadState.status === "loading"}>
-          {loadState.status === "loading" && (
+          {searchState.status === "loading" && (
+            <p className="loading-state" role="status">
+              検索中: {searchState.query}
+            </p>
+          )}
+          {searchState.status === "error" && (
+            <div className="error-panel" role="alert">
+              <h2>検索に失敗しました</h2>
+              <p>対象: {searchState.query}</p>
+              <p>{searchState.message}</p>
+              <button onClick={() => void runSearch()}>再検索</button>
+              <button onClick={clearSearch}>一覧へ戻る</button>
+            </div>
+          )}
+          {searchState.status === "ready" && (
+            <section
+              className="search-results"
+              aria-label="名前検索結果"
+              data-search-result-count={searchState.results.length}
+            >
+              {searchState.results.length === 0 ? (
+                <p className="empty-state" role="status">
+                  検索結果はありません。
+                </p>
+              ) : (
+                <ul>
+                  {searchState.results.map((entry) => (
+                    <li key={entry.relativePath}>
+                      <button
+                        type="button"
+                        data-search-result-path={entry.relativePath}
+                        data-search-result-kind={entry.kind}
+                        aria-label={`${entry.relativePath}、${entryKindLabel(entry)}、元階層へ移動`}
+                        onClick={() => navigateToSearchResult(entry)}
+                      >
+                        <span>{entryDisplayName(entry)}</span>
+                        <span>{entryKindLabel(entry)}</span>
+                        <span>{entry.relativePath}</span>
+                        <span>元階層へ移動</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+          {searchState.status === "idle" && loadState.status === "loading" && (
             <p className="loading-state" role="status">
               読み込み中: {loadState.path || libraryRoot}
             </p>
           )}
-          {loadState.status === "error" ? (
+          {searchState.status === "idle" && loadState.status === "error" ? (
             <div className="error-panel" role="alert">
               <h2>読み込みに失敗しました</h2>
               <p>対象: {loadState.path || libraryRoot}</p>
@@ -693,7 +841,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               {up !== null && <button onClick={() => navigate(up)}>親フォルダへ</button>}
               <button onClick={() => void chooseRootWithPicker()}>別のフォルダを選択</button>
             </div>
-          ) : (
+          ) : searchState.status === "idle" && loadState.status !== "error" ? (
             <CatalogGrid
               entries={sortedEntries}
               selectedPath={selectedPath}
@@ -727,7 +875,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 queueThumbnail(entry, generation.current, "visible");
               }}
             />
-          )}
+          ) : null}
         </section>
       </div>
       <footer className="status-bar" aria-live="polite">

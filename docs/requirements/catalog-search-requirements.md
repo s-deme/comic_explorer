@@ -1,0 +1,101 @@
+---
+codd:
+  node_id: "req:fr-b05"
+  type: requirement
+  status: approved
+  confidence: 0.92
+  depends_on:
+    - id: "req:mvp-requirements"
+      relation: "extends"
+      semantic: "catalog-path-contract"
+    - id: "req:product-questionnaire"
+      relation: "derives_from"
+      semantic: "Q4-1-Q4-4-adoption"
+---
+
+# FR-B05 名前検索要件
+
+## 採用記録
+
+Q4-1/Q4-4由来の候補について、LordのOption B受理（2026-08-02）により
+`FUT-C-010`をFR-B05の機能契約として採用する。対象はlibrary内の可視なfile/folder
+name検索であり、外部書誌情報、tag、favorite、破壊的file operationは含めない。
+
+検索機能の正しさは本要件で扱い、10,000項目・1秒以内の性能受入（`FUT-D-001`）は
+`FR-S03`へ分離する。性能未実測をFR-B05の機能PASSへ混ぜない。
+
+## REQ-FR-B05-001: query and matching boundary
+
+検索対象は、登録済みlibrary root配下の可視なfileとfolderのbasenameである。既存の
+catalog列挙と同じく隠し名、root外のsymlink、読めない項目の無断追跡は行わない。
+queryとbasenameは次の順で検索用に正規化する。
+
+1. Unicode空白を前後からtrimする。
+2. 全角ASCII（`U+FF01`〜`U+FF5E`）を半角へ、全角空白（`U+3000`）をASCII空白へ折りたたむ。
+3. Unicode lowercaseへ変換する。
+
+正規化後のqueryがbasenameに含まれる場合を一致とするため、exactとpartialを同じ
+substring契約で扱う。大小文字、全角／半角、Unicode文字をlocaleへ依存せず処理する。
+空queryは検索を実行せず、検索結果を空に戻す。
+
+## REQ-FR-B05-002: mixed results and navigation
+
+結果は相対path、basename、catalog種別、取得できたsize/modified/archive kindを保持し、
+file、folder、comicFolder、archive、page、unsupportedを混在して表示できる。結果の
+`元階層へ移動`操作は、結果の親relative pathを現在folderとして読み込み、対象結果を
+選択状態へ戻す。表示中のaddress、folder tree、catalog、status barはその現在folderと
+整合する。
+
+## REQ-FR-B05-003: empty, error, and clear
+
+一致0件は「検索結果はありません。」として通知し、一覧を破壊せずに再検索できる。
+backendの分類付きerrorは対象queryを含む再試行可能なerror panelへ表示し、検索結果の
+`クリア`操作で通常の現在folder一覧へ復帰できる。内部例外やstack traceを表示しない。
+
+## REQ-FR-B05-004: rescan freshness
+
+検索要求ごとにlibrary rootを再走査して検索結果を構築する。永続化した古いindexを
+正本にしないため、検索中に追加・改名・削除された可視file/folderは、次の検索要求で
+結果へ反映される。各要求はgenerationで識別し、古い走査結果を現在画面へ反映しない。
+
+このfreshness契約は検索の正しさと更新可視性だけを定め、検索時間・memory・p95の
+empirical evidenceを提供しない。これらは`FR-S03`のWindows基準環境gateで別途測定する。
+
+## REQ-FR-B05-005: local-only and non-destructive boundary
+
+検索はTauriのlocal filesystem列挙だけで完結し、network、外部サービス、書誌APIを呼ばない。
+library root、file、folder、archive、library管理fileへ書込み、rename、delete、cache、
+sidecar、temporary file作成を行わない。設定SQLiteへ検索queryやindexを保存しない。
+
+## C0/C1 ownership checkpoint
+
+FR-B05はserial1の一名integration ownerで実装する。C0でquery normalization、basename
+substring、mixed kind、fresh rescan、FR-S03性能分離を固定し、C1で次のpath ownershipと
+connected evidence matrixを凍結する。
+
+| boundary | owned paths | contract |
+|---|---|---|
+| backend search | `src-tauri/src/application/mod.rs`, `src-tauri/src/lib.rs` | local recursive rescan、normalization、kind/path保持、generation/cancel |
+| API client | `src/features/library/client.ts` | `search_library` request/responseをlocal Appへ接続 |
+| UI integration | `src/App.tsx`, `src/App.test.tsx` | query、results、empty/error/clear、parent navigation、selection |
+| direct evidence | `docs/requirements/catalog-search-requirements.md`, `docs/testing/fr-b05-results.md`, `docs/product/feature-status.md`, `docs/product/feature-roadmap.md` | adopted ID、FT-B05 matrix、gate、非PASS性能境界 |
+
+### Connected evidence matrix
+
+| checkpoint | observable contract | required evidence |
+|---|---|---|
+| C0 query | exact/partial、大小文字、全角／半角・Unicode、empty query | `FT-B05-001` connected App query + Rust normalization |
+| C1 mixed catalog | file/folder混在、kind、relative path | `FT-B05-002` connected App/catalog + Rust search result |
+| C1 navigation | resultの元階層、種別、現在位置、selection | `FT-B05-003` connected App result navigation |
+| C1 recovery | empty/error/clear/retry可能な状態 | `FT-B05-004` connected App states |
+| C1 freshness | 再走査後の追加・更新結果、再起動相当の新request | `FT-B05-005` connected App/backend rescan |
+
+pure unitだけでは完了扱いにせず、AppからAPI client、catalog/backendへ接続した結果を
+直接観測する。FT-B05-001〜005のいずれかがFAILまたはSKIPなら、FUT-C-010をPASSへ更新しない。
+
+## Batch and evidence boundary
+
+focused機能テストはSKIP 0で実測する。canonical aggregateはfocused成功後に一回だけ実行し、
+CoDDの構造検査が同条件で非PASSとなる場合は、生値・check名・影響をledgerとreportへ残す。
+その場合も機能証跡PASSとCoDD structural certificationを分離し、「全gate PASS」と称しない。
+性能、Windows WebView2製品実機、FR-S03の10,000項目測定は本batchのPASS根拠ではない。
