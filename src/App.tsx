@@ -18,7 +18,12 @@ import {
   saveViewerSettings,
   searchLibrary,
   takeRecoveryNotice,
+  addFavorite,
+  listFavorites,
+  removeFavorite,
+  resolveFavorite,
   type CatalogSettings,
+  type FavoriteEntry,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -56,6 +61,7 @@ import {
   normalizeCatalogViewMode,
   type CatalogViewMode,
 } from "./features/catalog/view-mode";
+import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
   presentError,
   presentUnexpectedError,
@@ -100,6 +106,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
+  const favoriteGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
@@ -139,6 +146,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [recoveryNotice, setRecoveryNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
+  const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -297,6 +308,99 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   function clearSearch() {
     setSearchQuery("");
     setSearchState({ status: "idle" });
+  }
+
+  async function refreshFavorites() {
+    const requestGeneration = ++favoriteGeneration.current;
+    setFavoritesLoading(true);
+    setFavoriteNotice(null);
+    try {
+      const response = await listFavorites(requestGeneration);
+      if (requestGeneration !== favoriteGeneration.current) return;
+      if (response.status === "ok") {
+        setFavorites(response.data);
+      } else if (response.status === "error") {
+        setFavoriteNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === favoriteGeneration.current) {
+        setFavoriteNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === favoriteGeneration.current) {
+        setFavoritesLoading(false);
+      }
+    }
+  }
+
+  async function applyFavoriteOperation(
+    operation: Promise<Awaited<ReturnType<typeof listFavorites>>>,
+  ) {
+    const requestGeneration = favoriteGeneration.current;
+    setFavoriteNotice(null);
+    try {
+      const response = await operation;
+      if (requestGeneration !== favoriteGeneration.current) return;
+      if (response.status === "ok") {
+        setFavorites(response.data);
+      } else if (response.status === "error") {
+        setFavoriteNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === favoriteGeneration.current) {
+        setFavoriteNotice(presentUnexpectedError());
+      }
+    }
+  }
+
+  function favoriteForPath(path: string): FavoriteEntry | undefined {
+    return favorites.find(
+      (favorite) =>
+        favorite.status === "available" && favorite.resolvedPath === path,
+    );
+  }
+
+  function toggleFavorite(entry: CatalogEntry) {
+    const existing = favoriteForPath(entry.relativePath);
+    const requestGeneration = ++favoriteGeneration.current;
+    if (existing !== undefined) {
+      void applyFavoriteOperation(removeFavorite(existing.favoriteId, requestGeneration));
+    } else {
+      void applyFavoriteOperation(addFavorite(entry.relativePath, requestGeneration));
+    }
+  }
+
+  function openFavorite(favorite: FavoriteEntry) {
+    if (favorite.status !== "available" || favorite.resolvedPath === null) return;
+    setFavoritesOpen(false);
+    if (favorite.kind === "folder") {
+      navigate(favorite.resolvedPath);
+      return;
+    }
+    if (favorite.kind === "comicFolder" || favorite.kind === "archive") {
+      openComicEntry({
+        relativePath: favorite.resolvedPath,
+        kind: favorite.kind,
+        ...(favorite.kind === "archive" ? { archiveKind: "cbz" } : {}),
+      });
+    }
+  }
+
+  function reResolveFavorite(favorite: FavoriteEntry) {
+    if (favorite.resolvedPath === null) return;
+    const requestGeneration = ++favoriteGeneration.current;
+    void applyFavoriteOperation(
+      resolveFavorite(
+        favorite.favoriteId,
+        favorite.resolvedPath,
+        requestGeneration,
+      ),
+    );
+  }
+
+  function removeFavoriteEntry(favorite: FavoriteEntry) {
+    const requestGeneration = ++favoriteGeneration.current;
+    void applyFavoriteOperation(removeFavorite(favorite.favoriteId, requestGeneration));
   }
 
   async function runSearch() {
@@ -604,6 +708,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       <nav className="menu-bar" aria-label="メニューバー">
         <button onClick={() => setLibraryRoot(null)}>ファイル</button>
         <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>
+        <button
+          onClick={() => {
+            setFavoritesOpen(true);
+            void refreshFavorites();
+          }}
+        >
+          お気に入り
+        </button>
         <button ref={helpTriggerRef} onClick={() => setHelpOpen(true)}>ヘルプ</button>
       </nav>
       <div className="toolbar" aria-label="ナビゲーション">
@@ -870,6 +982,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               thumbnailFor={(entry) =>
                 thumbnails[entry.relativePath] ?? { status: "loading" }
               }
+              isFavorite={(entry) => favoriteForPath(entry.relativePath) !== undefined}
+              onToggleFavorite={toggleFavorite}
               onThumbnailNeeded={(entry) => {
                 if (thumbnails[entry.relativePath]?.status === "ready") return;
                 queueThumbnail(entry, generation.current, "visible");
@@ -900,6 +1014,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <button autoFocus onClick={closeHelp}>閉じる</button>
           </div>
         </div>
+      )}
+      {favoritesOpen && (
+        <QuickAccess
+          favorites={favorites}
+          loading={favoritesLoading}
+          notice={favoriteNotice}
+          onClose={() => setFavoritesOpen(false)}
+          onRefresh={() => void refreshFavorites()}
+          onOpen={openFavorite}
+          onResolve={reResolveFavorite}
+          onRemove={removeFavoriteEntry}
+        />
       )}
     </main>
   );

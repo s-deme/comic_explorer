@@ -12,6 +12,8 @@ interface CatalogGridProps {
   viewMode?: CatalogViewMode;
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
+  isFavorite?: (entry: CatalogEntry) => boolean;
+  onToggleFavorite?: (entry: CatalogEntry) => void;
 }
 
 export type ThumbnailViewState =
@@ -68,6 +70,8 @@ export function CatalogGrid({
   viewMode = "cover_list",
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
+  isFavorite = () => false,
+  onToggleFavorite = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -173,6 +177,9 @@ export function CatalogGrid({
                     entry.kind === "folder" || entry.kind === "comicFolder";
                   const canRead =
                     entry.kind === "comicFolder" || entry.kind === "archive";
+                  const canFavorite =
+                    entry.kind === "folder" || entry.kind === "comicFolder" || entry.kind === "archive";
+                  const favorite = canFavorite && isFavorite(entry);
                   const thumbnail = (
                     <Thumbnail
                       entry={entry}
@@ -261,6 +268,22 @@ export function CatalogGrid({
                           </>
                         )}
                       </button>
+                      {canFavorite && (
+                        <button
+                          type="button"
+                          className="favorite-toggle"
+                          aria-label={favorite ? "お気に入りから解除" : "お気に入りに追加"}
+                          aria-pressed={favorite}
+                          data-favorite={favorite}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleFavorite(entry);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          {favorite ? "★" : "☆"}
+                        </button>
+                      )}
                       {entry.kind === "comicFolder" && (
                         <button
                           className="read-action"

@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,12 +13,15 @@ import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import {
   getCatalogSettings,
   getThumbnail,
+  addFavorite,
+  listFavorites,
   loadPage,
   listTreeChildren,
   listFolder,
   openComic,
   pickLibraryRoot,
   registerLibraryRoot,
+  removeFavorite,
   restoreLibraryRoot,
   saveCatalogSort,
   saveCatalogViewMode,
@@ -26,6 +30,8 @@ import {
   saveViewerSettings,
   searchLibrary,
   takeRecoveryNotice,
+  resolveFavorite,
+  type FavoriteEntry,
 } from "./features/library/client";
 import type { CatalogEntry, ErrorCode } from "./types/domain";
 
@@ -36,6 +42,10 @@ vi.mock("./features/library/client", () => ({
   listTreeChildren: vi.fn(),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
+  addFavorite: vi.fn(),
+  listFavorites: vi.fn(),
+  removeFavorite: vi.fn(),
+  resolveFavorite: vi.fn(),
   getCatalogSettings: vi.fn(),
   getThumbnail: vi.fn(),
   loadPage: vi.fn(),
@@ -56,6 +66,10 @@ const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
 const thumbnailMock = vi.mocked(getThumbnail);
+const addFavoriteMock = vi.mocked(addFavorite);
+const listFavoritesMock = vi.mocked(listFavorites);
+const removeFavoriteMock = vi.mocked(removeFavorite);
+const resolveFavoriteMock = vi.mocked(resolveFavorite);
 const loadPageMock = vi.mocked(loadPage);
 const saveSortMock = vi.mocked(saveCatalogSort);
 const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
@@ -103,6 +117,30 @@ function searchResponse(results: CatalogEntry[]) {
     requestId: "search" as never,
     generation: 1 as never,
     data: results,
+  };
+}
+
+function favoriteEntry(
+  relativePath: string,
+  overrides: Partial<FavoriteEntry> = {},
+): FavoriteEntry {
+  return {
+    favoriteId: `favorite-${relativePath.replaceAll("/", "-")}`,
+    itemIdentity: `item-${relativePath.replaceAll("/", "-")}`,
+    relativePath: relativePath as never,
+    resolvedPath: relativePath as never,
+    kind: "folder",
+    status: "available",
+    ...overrides,
+  };
+}
+
+function favoritesResponse(data: FavoriteEntry[]) {
+  return {
+    status: "ok" as const,
+    requestId: "favorites" as never,
+    generation: 1 as never,
+    data,
   };
 }
 
@@ -160,6 +198,10 @@ describe("application shell", () => {
     openMock.mockReset();
     settingsMock.mockReset();
     thumbnailMock.mockReset();
+    addFavoriteMock.mockReset();
+    listFavoritesMock.mockReset();
+    removeFavoriteMock.mockReset();
+    resolveFavoriteMock.mockReset();
     loadPageMock.mockReset();
     saveSortMock.mockReset();
     saveCatalogViewModeMock.mockReset();
@@ -174,6 +216,10 @@ describe("application shell", () => {
       generation: 1 as never,
       data: false,
     });
+    listFavoritesMock.mockResolvedValue(favoritesResponse([]));
+    addFavoriteMock.mockResolvedValue(favoritesResponse([]));
+    removeFavoriteMock.mockResolvedValue(favoritesResponse([]));
+    resolveFavoriteMock.mockResolvedValue(favoritesResponse([]));
     settingsMock.mockResolvedValue({
       status: "ok",
       requestId: "settings" as never,
@@ -1217,5 +1263,138 @@ describe("application shell", () => {
     expect(screen.queryByText("Old/Volume.cbz")).not.toBeInTheDocument();
     expect(searchMock).toHaveBeenCalledTimes(2);
     expect(searchMock.mock.calls[1][1]).toBeGreaterThan(searchMock.mock.calls[0][1]);
+  });
+
+  it("FT-B06-001 adds and removes one favorite idempotently without duplicate UI rows", async () => {
+    const folder: CatalogEntry = { relativePath: "Series" as never, kind: "folder" };
+    const comic = testEntry("Series/01.cbz");
+    const added = favoriteEntry("Series", { kind: "folder" });
+    addFavoriteMock.mockResolvedValue(favoritesResponse([added]));
+    removeFavoriteMock.mockResolvedValue(favoritesResponse([]));
+    await registerTestLibrary([folder, comic]);
+
+    const item = screen.getByRole("button", { name: /^Series、フォルダ/ });
+    const cell = item.closest('[role="gridcell"]') as HTMLElement;
+    fireEvent.click(within(cell).getByRole("button", { name: "お気に入りに追加" }));
+    expect(addFavoriteMock).toHaveBeenCalledWith("Series", expect.any(Number));
+    await waitFor(() =>
+      expect(within(cell).getByRole("button", { name: "お気に入りから解除" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(within(cell).getByRole("button", { name: "お気に入りから解除" }));
+    expect(removeFavoriteMock).toHaveBeenCalledWith(added.favoriteId, expect.any(Number));
+    await waitFor(() =>
+      expect(within(cell).getByRole("button", { name: "お気に入りに追加" })).toBeInTheDocument(),
+    );
+
+    addFavoriteMock.mockResolvedValue(favoritesResponse([added]));
+    fireEvent.click(within(cell).getByRole("button", { name: "お気に入りに追加" }));
+    await waitFor(() =>
+      expect(within(cell).getAllByRole("button", { name: "お気に入りから解除" })).toHaveLength(1),
+    );
+    expect(addFavoriteMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("FT-B06-002 opens quick-access folders and comics through their connected boundaries", async () => {
+    const folder: CatalogEntry = { relativePath: "Series" as never, kind: "folder" };
+    const comic = testEntry("Series/01.cbz");
+    const quickFavorites = [
+      favoriteEntry("Series", { kind: "folder" }),
+      favoriteEntry("Series/01.cbz", { kind: "archive" }),
+    ];
+    listFavoritesMock.mockResolvedValue(favoritesResponse(quickFavorites));
+    openMock.mockResolvedValueOnce(viewerResponse(comic.relativePath));
+    await registerTestLibrary([folder, comic]);
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    let dialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[0]);
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"));
+    expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    dialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[1]);
+    expect(await screen.findByLabelText("Series/01.cbz ビューワ")).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledWith("Series/01.cbz", expect.any(Number));
+  });
+
+  it("FT-B06-003 restores favorites from the local API each time quick access is reopened", async () => {
+    const favorite = favoriteEntry("Series", { kind: "folder" });
+    listFavoritesMock.mockResolvedValue(favoritesResponse([favorite]));
+    await registerTestLibrary([{ relativePath: "Series" as never, kind: "folder" }]);
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    const firstDialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    expect(within(firstDialog).getByText("Series")).toBeInTheDocument();
+    fireEvent.click(within(firstDialog).getByRole("button", { name: "閉じる" }));
+    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    const secondDialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    expect(within(secondDialog).getByText("Series")).toBeInTheDocument();
+    expect(listFavoritesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("FT-B06-004 displays missing and moved favorites safely and supports explicit re-resolution/removal", async () => {
+    const moved = favoriteEntry("Old/01.cbz", {
+      favoriteId: "favorite-moved",
+      kind: "archive",
+      resolvedPath: "New/01.cbz" as never,
+      status: "moved",
+    });
+    const missing = favoriteEntry("Gone/01.cbz", {
+      favoriteId: "favorite-missing",
+      kind: "archive",
+      resolvedPath: null,
+      status: "missing",
+    });
+    listFavoritesMock.mockResolvedValue(favoritesResponse([moved, missing]));
+    resolveFavoriteMock.mockResolvedValue(
+      favoritesResponse([
+        favoriteEntry("Old/01.cbz", {
+          favoriteId: moved.favoriteId,
+          kind: "archive",
+          resolvedPath: "New/01.cbz" as never,
+          status: "available",
+        }),
+        missing,
+      ]),
+    );
+    removeFavoriteMock.mockResolvedValue(favoritesResponse([missing]));
+    await registerTestLibrary([testEntry("root.cbz")]);
+
+    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    const dialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    const movedRow = dialog.querySelector('[data-favorite-id="favorite-moved"]') as HTMLElement;
+    const missingRow = dialog.querySelector('[data-favorite-id="favorite-missing"]') as HTMLElement;
+    expect(within(movedRow).getByText("移動を検出")).toBeInTheDocument();
+    expect(within(movedRow).getByText("現在: New/01.cbz")).toBeInTheDocument();
+    expect(within(missingRow).getByText("見つかりません")).toBeInTheDocument();
+    expect(within(missingRow).getByRole("button", { name: "開く" })).toBeDisabled();
+    fireEvent.click(within(movedRow).getByRole("button", { name: "再解決" }));
+    expect(resolveFavoriteMock).toHaveBeenCalledWith(
+      moved.favoriteId,
+      "New/01.cbz",
+      expect.any(Number),
+    );
+    await waitFor(() => expect(within(movedRow).getByText("利用可能")).toBeInTheDocument());
+    fireEvent.click(within(movedRow).getByRole("button", { name: "解除" }));
+    expect(removeFavoriteMock).toHaveBeenCalledWith(moved.favoriteId, expect.any(Number));
+    await waitFor(() => expect(dialog.querySelector('[data-favorite-id="favorite-moved"]')).toBeNull());
+    expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it("FT-B06-005 exposes favorite controls only for local folder/comic targets", async () => {
+    const entries: CatalogEntry[] = [
+      { relativePath: "folder" as never, kind: "folder" },
+      testEntry("book.cbz"),
+      { relativePath: "cover.png" as never, kind: "page" },
+    ];
+    await registerTestLibrary(entries);
+
+    expect(screen.getAllByRole("button", { name: "お気に入りに追加" })).toHaveLength(2);
+    expect(addFavoriteMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "お気に入りに追加" })[0]);
+    expect(addFavoriteMock).toHaveBeenCalledWith("book.cbz", expect.any(Number));
+    expect(addFavoriteMock.mock.calls[0][0]).not.toMatch(/^[A-Za-z]:[\\/]/);
   });
 });

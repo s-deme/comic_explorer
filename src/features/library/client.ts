@@ -7,6 +7,7 @@ import {
 import type {
   CatalogEntry,
   Generation,
+  ItemKind,
   PageId,
   RelativePath,
   RequestId,
@@ -92,6 +93,55 @@ export async function getCatalogSettings(
   generation: number,
 ): Promise<ApiResponse<CatalogSettings>> {
   return invoke("get_catalog_settings", { context: context(generation) });
+}
+
+export type FavoriteStatus = "available" | "moved" | "missing";
+
+export interface FavoriteEntry {
+  favoriteId: string;
+  itemIdentity: string;
+  relativePath: RelativePath;
+  resolvedPath: RelativePath | null;
+  kind: ItemKind | null;
+  status: FavoriteStatus;
+}
+
+export async function listFavorites(
+  generation: number,
+): Promise<ApiResponse<FavoriteEntry[]>> {
+  return invoke("list_favorites", { context: context(generation) });
+}
+
+export async function addFavorite(
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FavoriteEntry[]>> {
+  return invoke("add_favorite", {
+    context: context(generation),
+    itemRelativePath,
+  });
+}
+
+export async function removeFavorite(
+  favoriteId: string,
+  generation: number,
+): Promise<ApiResponse<FavoriteEntry[]>> {
+  return invoke("remove_favorite", {
+    context: context(generation),
+    favoriteId,
+  });
+}
+
+export async function resolveFavorite(
+  favoriteId: string,
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FavoriteEntry[]>> {
+  return invoke("resolve_favorite", {
+    context: context(generation),
+    favoriteId,
+    itemRelativePath,
+  });
 }
 
 export async function takeRecoveryNotice(

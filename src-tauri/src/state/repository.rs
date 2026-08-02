@@ -4,11 +4,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::domain::{AppError, ErrorCode, RelativePath};
+use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath};
 
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
-const SCHEMA_VERSION: i64 = 1;
+const INITIAL_SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -23,6 +24,16 @@ pub struct Settings {
     pub scale_mode: String,
     pub scale: String,
     pub loupe_enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FavoriteRecord {
+    pub favorite_id: String,
+    pub item_identity: String,
+    pub relative_path: RelativePath,
+    pub kind: ItemKind,
+    pub size_bytes: Option<u64>,
+    pub modified_ms: Option<u64>,
 }
 
 impl Default for Settings {
@@ -207,6 +218,73 @@ impl StateStore {
         Ok(())
     }
 
+    pub fn list_favorites(&self) -> Result<Vec<FavoriteRecord>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT favorite_id, item_identity, relative_path, item_kind, size_bytes, modified_ms
+                 FROM favorites
+                 ORDER BY created_at_ms, favorite_id",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map([], favorite_from_row)
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn favorite(&self, favorite_id: &str) -> Result<Option<FavoriteRecord>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT favorite_id, item_identity, relative_path, item_kind, size_bytes, modified_ms
+                 FROM favorites WHERE favorite_id=?1",
+                [favorite_id],
+                favorite_from_row,
+            )
+            .optional()
+            .map_err(database_error)
+    }
+
+    pub fn upsert_favorite(&self, favorite: &FavoriteRecord, now_ms: i64) -> Result<(), AppError> {
+        self.connection
+            .execute(
+                "INSERT INTO favorites(
+                    favorite_id, item_identity, relative_path, item_kind,
+                    size_bytes, modified_ms, created_at_ms, updated_at_ms
+                 ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+                 ON CONFLICT(item_identity) DO UPDATE SET
+                   relative_path=excluded.relative_path,
+                   item_kind=excluded.item_kind,
+                   size_bytes=excluded.size_bytes,
+                   modified_ms=excluded.modified_ms,
+                   updated_at_ms=excluded.updated_at_ms",
+                params![
+                    favorite.favorite_id,
+                    favorite.item_identity,
+                    favorite.relative_path.as_str(),
+                    item_kind_storage(favorite.kind),
+                    favorite
+                        .size_bytes
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    favorite
+                        .modified_ms
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    now_ms,
+                ],
+            )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub fn remove_favorite(&self, favorite_id: &str) -> Result<(), AppError> {
+        self.connection
+            .execute("DELETE FROM favorites WHERE favorite_id=?1", [favorite_id])
+            .map_err(database_error)?;
+        Ok(())
+    }
+
     pub fn source_fingerprint(
         &self,
         item_key: &str,
@@ -306,6 +384,35 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
         transaction
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![INITIAL_SCHEMA_VERSION, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", INITIAL_SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 2 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS favorites (
+                    favorite_id TEXT PRIMARY KEY NOT NULL,
+                    item_identity TEXT NOT NULL UNIQUE,
+                    relative_path TEXT NOT NULL,
+                    item_kind TEXT NOT NULL,
+                    size_bytes INTEGER,
+                    modified_ms INTEGER,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS favorites_relative_path
+                   ON favorites(relative_path);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![SCHEMA_VERSION, unix_millis()],
             )
             .map_err(database_error)?;
@@ -318,6 +425,61 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
         .execute_batch("PRAGMA quick_check;")
         .map_err(database_error)?;
     Ok(())
+}
+
+fn favorite_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FavoriteRecord> {
+    let kind = item_kind_from_storage(&row.get::<_, String>(3)?).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(
+            3,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::other(error.message)),
+        )
+    })?;
+    let relative_path = RelativePath::parse(row.get::<_, String>(2)?).map_err(|message| {
+        rusqlite::Error::FromSqlConversionFailure(
+            2,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::other(message)),
+        )
+    })?;
+    Ok(FavoriteRecord {
+        favorite_id: row.get(0)?,
+        item_identity: row.get(1)?,
+        relative_path,
+        kind,
+        size_bytes: row
+            .get::<_, Option<i64>>(4)?
+            .map(|value| value.max(0) as u64),
+        modified_ms: row
+            .get::<_, Option<i64>>(5)?
+            .map(|value| value.max(0) as u64),
+    })
+}
+
+fn item_kind_storage(kind: ItemKind) -> &'static str {
+    match kind {
+        ItemKind::Folder => "folder",
+        ItemKind::ComicFolder => "comicFolder",
+        ItemKind::Archive => "archive",
+        ItemKind::Page => "page",
+        ItemKind::Unsupported => "unsupported",
+    }
+}
+
+fn item_kind_from_storage(value: &str) -> Result<ItemKind, AppError> {
+    match value {
+        "folder" => Ok(ItemKind::Folder),
+        "comicFolder" => Ok(ItemKind::ComicFolder),
+        "archive" => Ok(ItemKind::Archive),
+        "page" => Ok(ItemKind::Page),
+        "unsupported" => Ok(ItemKind::Unsupported),
+        _ => Err(AppError {
+            code: ErrorCode::Internal,
+            message: "Stored favorite kind is invalid.".into(),
+            target: None,
+            retryable: false,
+        }),
+    }
 }
 
 fn isolate_database(paths: &AppPaths) -> Result<PathBuf, AppError> {
@@ -396,6 +558,19 @@ mod tests {
                     42,
                 )
                 .unwrap();
+            store
+                .upsert_favorite(
+                    &FavoriteRecord {
+                        favorite_id: "favorite-item-1".into(),
+                        item_identity: "item-1".into(),
+                        relative_path: RelativePath::parse("Series/Volume 1").unwrap(),
+                        kind: ItemKind::ComicFolder,
+                        size_bytes: None,
+                        modified_ms: Some(42),
+                    },
+                    42,
+                )
+                .unwrap();
         }
         let (store, _) = StateStore::open(&paths).unwrap();
         assert_eq!(
@@ -413,6 +588,39 @@ mod tests {
             store.reading_position("item-1").unwrap().unwrap().page_key,
             RelativePath::parse("page7.png").unwrap()
         );
+        assert_eq!(
+            store.list_favorites().unwrap(),
+            vec![FavoriteRecord {
+                favorite_id: "favorite-item-1".into(),
+                item_identity: "item-1".into(),
+                relative_path: RelativePath::parse("Series/Volume 1").unwrap(),
+                kind: ItemKind::ComicFolder,
+                size_bytes: None,
+                modified_ms: Some(42),
+            }]
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn favorite_upsert_and_remove_are_idempotent_and_deduplicate_identity() {
+        let paths = temporary_paths("favorite-idempotence");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let favorite = FavoriteRecord {
+            favorite_id: "favorite-item-2".into(),
+            item_identity: "item-2".into(),
+            relative_path: RelativePath::parse("Series/Volume 2.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            size_bytes: Some(12),
+            modified_ms: Some(13),
+        };
+        store.upsert_favorite(&favorite, 1).unwrap();
+        store.upsert_favorite(&favorite, 2).unwrap();
+        assert_eq!(store.list_favorites().unwrap(), vec![favorite.clone()]);
+        store.remove_favorite(&favorite.favorite_id).unwrap();
+        store.remove_favorite(&favorite.favorite_id).unwrap();
+        assert!(store.list_favorites().unwrap().is_empty());
         drop(store);
         fs::remove_dir_all(paths.root).unwrap();
     }

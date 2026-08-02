@@ -30,6 +30,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             application::get_library_root,
             application::get_catalog_settings,
+            application::list_favorites,
+            application::add_favorite,
+            application::remove_favorite,
+            application::resolve_favorite,
             application::take_recovery_notice,
             application::set_catalog_sort,
             application::set_end_of_volume_policy,

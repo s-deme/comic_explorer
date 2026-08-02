@@ -6,7 +6,7 @@ pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -20,10 +20,10 @@ use crate::catalog::{
 };
 use crate::domain::{
     AppError, ErrorCode, FileKind, ItemKind, PageId, RelativePath, RequestId, classify_file_name,
-    page_id_for,
+    item_id_for, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
-use crate::state::{AppPaths, StateStore, ThumbnailPipeline};
+use crate::state::{AppPaths, FavoriteRecord, StateStore, ThumbnailPipeline};
 use library_root::validate_library_root;
 
 pub struct AppState {
@@ -212,6 +212,25 @@ pub struct CatalogSettings {
     pub loupe_enabled: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FavoriteStatus {
+    Available,
+    Moved,
+    Missing,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteEntry {
+    pub favorite_id: String,
+    pub item_identity: String,
+    pub relative_path: RelativePath,
+    pub resolved_path: Option<RelativePath>,
+    pub kind: Option<ItemKind>,
+    pub status: FavoriteStatus,
+}
+
 const MIN_VIEWER_SCALE: f64 = 0.25;
 const MAX_VIEWER_SCALE: f64 = 4.0;
 
@@ -386,6 +405,211 @@ pub fn get_catalog_settings(
         request_id: context.request_id,
         generation: context.generation,
         data: catalog_settings(settings),
+    })
+}
+
+#[tauri::command]
+pub fn list_favorites(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<FavoriteEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let Some(root) = state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    else {
+        return Ok(Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data: Vec::new(),
+        });
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let data = match favorite_views(store, &root) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn add_favorite(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_path: String,
+) -> Result<Response<Vec<FavoriteEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let relative_path = match RelativePath::parse(item_relative_path) {
+        Ok(path) if !path.as_str().is_empty() => path,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Favorite item path is invalid."),
+            ));
+        }
+    };
+    let root = match configured_library_root(&state)? {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let target = match favorite_target(&root, &relative_path) {
+        Ok(target) => target,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let identity = item_id_for(target.relative_path.as_str()).to_string();
+    let favorite = FavoriteRecord {
+        favorite_id: format!("favorite-{identity}"),
+        item_identity: identity,
+        relative_path: target.relative_path,
+        kind: target.kind,
+        size_bytes: target.byte_size,
+        modified_ms: target.modified_ms,
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    store
+        .upsert_favorite(&favorite, unix_millis())
+        .map_err(|error| error.message)?;
+    let data = favorite_views(store, &root).map_err(|error| error.message)?;
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn remove_favorite(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    favorite_id: String,
+) -> Result<Response<Vec<FavoriteEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if favorite_id.trim().is_empty() {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Favorite id is invalid."),
+        ));
+    }
+    let root = configured_library_root(&state)?;
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    store
+        .remove_favorite(&favorite_id)
+        .map_err(|error| error.message)?;
+    let data = match root {
+        Some(root) => favorite_views(store, &root).map_err(|error| error.message)?,
+        None => Vec::new(),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn resolve_favorite(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    favorite_id: String,
+    item_relative_path: String,
+) -> Result<Response<Vec<FavoriteEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let relative_path = match RelativePath::parse(item_relative_path) {
+        Ok(path) if !path.as_str().is_empty() => path,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Favorite item path is invalid."),
+            ));
+        }
+    };
+    let root = match configured_library_root(&state)? {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let target = match favorite_target(&root, &relative_path) {
+        Ok(target) => target,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let Some(existing) = store
+        .favorite(&favorite_id)
+        .map_err(|error| error.message)?
+    else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::NotFound, "Favorite was not found."),
+        ));
+    };
+    if existing.kind != target.kind {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Favorite kind does not match."),
+        ));
+    }
+    let updated = FavoriteRecord {
+        relative_path: target.relative_path,
+        kind: target.kind,
+        size_bytes: target.byte_size,
+        modified_ms: target.modified_ms,
+        ..existing
+    };
+    store
+        .upsert_favorite(&updated, unix_millis())
+        .map_err(|error| error.message)?;
+    let data = favorite_views(store, &root).map_err(|error| error.message)?;
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
     })
 }
 
@@ -966,6 +1190,169 @@ fn read_page_bytes(grant: &MediaGrant, target: &RelativePath) -> Result<Vec<u8>,
         error.target = Some(target.clone());
         error
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FavoriteTarget {
+    relative_path: RelativePath,
+    kind: ItemKind,
+    byte_size: Option<u64>,
+    modified_ms: Option<u64>,
+}
+
+fn configured_library_root(state: &AppState) -> Result<Option<PathBuf>, String> {
+    state
+        .library_root
+        .lock()
+        .map(|root| root.clone())
+        .map_err(|_| "state poisoned".into())
+}
+
+fn favorite_target(root: &Path, relative_path: &RelativePath) -> Result<FavoriteTarget, AppError> {
+    let parent = relative_path
+        .as_str()
+        .rsplit_once('/')
+        .map(|(parent, _)| parent)
+        .unwrap_or("");
+    let parent_path = RelativePath::parse(parent).map_err(|message| AppError {
+        code: ErrorCode::InvalidPath,
+        message: message.into(),
+        target: Some(relative_path.clone()),
+        retryable: false,
+    })?;
+    let entries = enumerate_folder(root, &root.join(parent_path.as_str()))?;
+    let Some(entry) = entries
+        .into_iter()
+        .find(|entry| entry.relative_path.as_str() == relative_path.as_str())
+    else {
+        return Err(request_error(
+            ErrorCode::NotFound,
+            "Favorite target was not found in the library.",
+        ));
+    };
+    if !favorite_kind(entry.kind) {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Only folders and comic items can be favorited.",
+        ));
+    }
+    Ok(FavoriteTarget {
+        relative_path: entry.relative_path,
+        kind: entry.kind,
+        byte_size: entry.byte_size,
+        modified_ms: entry.modified_ms,
+    })
+}
+
+fn favorite_kind(kind: ItemKind) -> bool {
+    matches!(
+        kind,
+        ItemKind::Folder | ItemKind::ComicFolder | ItemKind::Archive
+    )
+}
+
+fn favorite_views(store: &StateStore, root: &Path) -> Result<Vec<FavoriteEntry>, AppError> {
+    let records = store.list_favorites()?;
+    if records.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut entries = Vec::new();
+    enumerate_all_catalog_entries(root, root, &mut entries)?;
+    Ok(records
+        .iter()
+        .map(|record| favorite_view(record, &entries))
+        .collect())
+}
+
+fn enumerate_all_catalog_entries(
+    root: &Path,
+    directory: &Path,
+    output: &mut Vec<crate::catalog::CatalogEntry>,
+) -> Result<(), AppError> {
+    let entries = enumerate_folder(root, directory)?;
+    for entry in entries {
+        let child_directory = entry.kind == ItemKind::Folder || entry.kind == ItemKind::ComicFolder;
+        let child_path = root.join(entry.relative_path.as_str());
+        output.push(entry);
+        if child_directory {
+            enumerate_all_catalog_entries(root, &child_path, output)?;
+        }
+    }
+    Ok(())
+}
+
+fn favorite_view(
+    record: &FavoriteRecord,
+    entries: &[crate::catalog::CatalogEntry],
+) -> FavoriteEntry {
+    if let Some(current) = entries
+        .iter()
+        .find(|entry| entry.relative_path == record.relative_path && entry.kind == record.kind)
+    {
+        return FavoriteEntry {
+            favorite_id: record.favorite_id.clone(),
+            item_identity: record.item_identity.clone(),
+            relative_path: record.relative_path.clone(),
+            resolved_path: Some(current.relative_path.clone()),
+            kind: Some(current.kind),
+            status: FavoriteStatus::Available,
+        };
+    }
+
+    let moved = moved_favorite_candidate(record, entries);
+    let status = if moved.is_some() {
+        FavoriteStatus::Moved
+    } else {
+        FavoriteStatus::Missing
+    };
+    FavoriteEntry {
+        favorite_id: record.favorite_id.clone(),
+        item_identity: record.item_identity.clone(),
+        relative_path: record.relative_path.clone(),
+        resolved_path: moved.map(|entry| entry.relative_path.clone()),
+        kind: Some(record.kind),
+        status,
+    }
+}
+
+fn moved_favorite_candidate<'a>(
+    record: &FavoriteRecord,
+    entries: &'a [crate::catalog::CatalogEntry],
+) -> Option<&'a crate::catalog::CatalogEntry> {
+    let name = record.relative_path.as_str().rsplit('/').next()?;
+    let candidates = entries
+        .iter()
+        .filter(|entry| {
+            entry.kind == record.kind
+                && entry.relative_path != record.relative_path
+                && entry.relative_path.as_str().rsplit('/').next() == Some(name)
+        })
+        .collect::<Vec<_>>();
+    let fingerprint_matches = candidates
+        .iter()
+        .copied()
+        .filter(|entry| {
+            entry.byte_size == record.size_bytes && entry.modified_ms == record.modified_ms
+        })
+        .collect::<Vec<_>>();
+    if fingerprint_matches.len() == 1 {
+        return fingerprint_matches.into_iter().next();
+    }
+    if fingerprint_matches.len() > 1 {
+        return None;
+    }
+    let size_matches = candidates
+        .iter()
+        .copied()
+        .filter(|entry| entry.byte_size == record.size_bytes)
+        .collect::<Vec<_>>();
+    if size_matches.len() == 1 {
+        return size_matches.into_iter().next();
+    }
+    if candidates.len() == 1 {
+        return candidates.into_iter().next();
+    }
+    None
 }
 
 fn enumerate_folder_port(
@@ -1847,6 +2234,54 @@ mod shutdown_tests {
                 generation: Generation(40)
             } if request_id.as_str() == "fixture-stale"
         ));
+    }
+
+    #[test]
+    fn favorite_target_enforces_relative_path_and_eligible_kind_boundaries() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-favorite-target-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(root.join("folder")).unwrap();
+        std::fs::write(root.join("page.png"), b"not an image").unwrap();
+
+        let folder = favorite_target(&root, &RelativePath::parse("folder").unwrap()).unwrap();
+        assert_eq!(folder.kind, ItemKind::Folder);
+        assert_eq!(
+            favorite_target(&root, &RelativePath::parse("page.png").unwrap())
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+        assert!(RelativePath::parse("../outside").is_err());
+        assert!(RelativePath::parse(r"C:\\outside").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn favorite_view_marks_a_unique_fingerprint_match_as_moved() {
+        let record = FavoriteRecord {
+            favorite_id: "favorite-old".into(),
+            item_identity: "item-old".into(),
+            relative_path: RelativePath::parse("Old/01.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            size_bytes: Some(12),
+            modified_ms: Some(13),
+        };
+        let entries = vec![crate::catalog::CatalogEntry {
+            relative_path: RelativePath::parse("New/01.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            byte_size: Some(12),
+            modified_ms: Some(13),
+            archive_kind: Some(crate::catalog::ArchiveKind::Cbz),
+        }];
+        let view = favorite_view(&record, &entries);
+        assert_eq!(view.status, FavoriteStatus::Moved);
+        assert_eq!(
+            view.resolved_path,
+            Some(RelativePath::parse("New/01.cbz").unwrap())
+        );
     }
 
     #[cfg(target_os = "windows")]

@@ -235,6 +235,19 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .item-kind { color: #59636f; font-size: .76rem; }
 .read-action { position: absolute; right: 8px; bottom: 8px; }
+.favorite-toggle {
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  right: 4px;
+  min-width: 30px;
+  padding: 0 5px;
+  border: 1px solid #aab4c0;
+  border-radius: 4px;
+  color: #a66a00;
+  background: #fff;
+}
+.favorite-toggle[data-favorite="true"] { color: #b34b00; background: #fff4d6; }
 .loading-state {
   position: absolute;
   z-index: 2;
@@ -265,6 +278,38 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .help-dialog { width: 440px; padding: 24px; border-radius: 6px; background: white; box-shadow: 0 12px 40px #0005; }
 .end-of-volume-dialog { width: min(440px, calc(100vw - 48px)); padding: 24px; border-radius: 6px; color: #1f2328; background: white; box-shadow: 0 12px 40px #0005; }
 .end-of-volume-dialog button + button { margin-left: 8px; }
+.quick-access-dialog {
+  width: min(760px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 22px;
+  border-radius: 6px;
+  color: #1f2328;
+  background: white;
+  box-shadow: 0 12px 40px #0005;
+}
+.quick-access-heading { display: flex; align-items: center; gap: 12px; }
+.quick-access-heading h2 { margin: 0; margin-right: auto; }
+.quick-access-heading button + button { margin-left: 8px; }
+.quick-access-list { display: grid; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+.quick-access-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid #c9cdd2;
+  border-radius: 4px;
+}
+.quick-access-main { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.quick-access-path, .quick-access-resolved { overflow-wrap: anywhere; }
+.quick-access-kind { color: #59636f; font-size: .8rem; }
+.quick-access-status { font-size: .8rem; font-weight: 600; }
+.quick-access-status--available { color: #176b3a; }
+.quick-access-status--moved { color: #8a5a00; }
+.quick-access-status--missing { color: #a01717; }
+.quick-access-resolved { color: #6b4b00; font-size: .8rem; }
+.quick-access-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-access-actions button { white-space: nowrap; }
 
 @media (prefers-contrast: more) {
   .catalog-item[data-selected="true"] { border-width: 3px; }
