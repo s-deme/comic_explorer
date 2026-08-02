@@ -329,9 +329,12 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B09 — library 診断（Batch 9）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。
+- **状態:** `Partial / BLOCKED`。機能semantic gateは受理済みだが、CoDD構造gateとWindows
+  WebView2 native product UIが未完了・未測定である。
 - **対象 feature ID:** `FUT-C-030`, `FUT-C-031`, `FUT-C-032`（変更検出、重複作品検出、
   壊れた書庫検出）。
+- **実装path:** `src/App.tsx`; `src/features/library/client.ts`;
+  `src-tauri/src/application/mod.rs`; `src-tauri/src/diagnostics/mod.rs`。
 - **user outcome:** library 内の変更、重複、壊れた書庫を read-only の診断結果として把握し、
   原本を変えずに次の対応を選べる。
 - **共通基盤:** read-only scanner、stable identity/hash policy、diagnostic result model、
@@ -343,8 +346,35 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 - **focused test 範囲:** `FT-B09-001` added/changed/missing、`FT-B09-002` duplicate identity、
   `FT-B09-003` corrupt archive、`FT-B09-004` mixed result/severity、`FT-B09-005` cancel/retry と
   snapshot/hash 不変。
-- **batch末尾 gate:** read-only focused test を SKIP 0 で実測し、診断が file operation を
-  発行しないこと、既存書庫閲覧を退行させないことを確認して `BATCH-END-GATE`。
+- **最終受入:** `FT-B09-001`〜`FT-B09-005` は 5 PASS / 0 FAIL / 0 SKIP のfocused exact5、
+  App回帰は39 PASS / 0 FAIL / 0 SKIP、Windows offline Rustは74 unit + 1 process PASS /
+  failed 0 / ignored 0 / SKIP 0、typecheck/buildはPASS・SKIP0である。FT-B09-005はcancelled
+  response、loading=false、cancel notice、stale=0、新generation retryに加え、real folderと
+  ZIP/CBZのpath、bytes、SHA、entry setのcancel/retry前後exact equalityを含む。
+- **accepted evidence:** frontend exact5・typecheck・buildは
+  `queue/reports/evidence/cmd_400/fr_b09_callback_typing_final_resume/`、App回帰は
+  `queue/reports/evidence/cmd_400/fr_b09_ft005_normal_workflow_repair/`、Windows fullは
+  `queue/reports/evidence/cmd_400/fr_b09_diagnostics_rustfmt_resume/` に保存された不変rawを参照する。
+  最終focused source SHAは
+  `6701c3465e24a481e899a07d1aa5e41b8dd30881962c8f9ab68dead99626c0fe`。
+- **raw SHA ledger:** focused manifest/stdout/stderrは
+  `88d8dd15f3fd1c81be344fbc6fcebeaba0af407c527b9b4a6f9f612f59c40587` /
+  `768f6a0a53adc17991a10330344683aa616a3d1a56be03b192f97219c4189bfe` /
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`、App回帰は
+  `b48e8bcc41b56a78eccd17c7a9f98c392639d3d9778487aed34709354a021f05` /
+  `6d5de88aacf157bcddd42d42666130742ca20aea91a8b87dad45ee10b18f844a` /
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`、Windows fullは
+  `b7a5d353a0cfd2f644abd34149a981eb375229362e78d1c94ec674456c1218b3` /
+  `ab2ac9e49fd58008d826665914faf8b7f21dd256dd6edb55469c1ca77d80ef6d` /
+  `c3b80068c26dca16ac167f6e78bd7e8f233c03f70973b4c47145e54a5e50beab` である。
+  typecheck/buildとCoDD structural exceptionの全SHAは [FR-B09結果](../testing/fr-b09-results.md) と
+  [FR-B09要件](../requirements/library-diagnostics-requirements.md) の最終ledgerに固定する。
+- **境界と履歴:** CoDDは `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification
+  tests 0の `INCOMPLETE / NOT APPLICABLE` でありPASSへ加算しない。Windows WebView2 native product
+  UIは `BLOCKED_UNMEASURED`、OS syscallは `UNMEASURED / BLOCKED`。Feature Lane fallback、wrapper
+  起動失敗、typing failure、canonical resume停止の旧rawは履歴のみで、受入証跡には再利用しない。
+- **batch末尾 gate:** 上記のaccepted rawを不変参照し、今回の同期ではfunctional、Rust、typecheck、
+  build、CoDDの再実行・commit・pushを行わない。
 
 ### FR-B10 — tag 管理（Batch 10）
 

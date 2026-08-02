@@ -64,6 +64,8 @@ vi.mock("./features/library/client", () => ({
   saveViewerSettings: vi.fn(),
   setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
+  diagnoseLibrary: vi.fn(),
+  cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
 }));

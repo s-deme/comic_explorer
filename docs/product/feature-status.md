@@ -95,9 +95,9 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-027 | 新規フォルダ | フォルダ作成 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-028 | ごみ箱移動 | 確認付き削除 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 確認必須。ユーザー明示操作が前提 |
 | FUT-C-029 | 完全削除 | 二段階確認付き削除 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2/TBD-007 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | TBD-007はMVP対象外。安全設計を再評価 |
-| FUT-C-030 | ファイル変更検出 | 自動監視 | Candidate | NOT TESTED | MVP後 | 将来 | Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
-| FUT-C-031 | 重複作品検出 | 重複判定 | Candidate | NOT TESTED | MVP後 | 将来 | Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
-| FUT-C-032 | 壊れた書庫検出 | 事前検出 | Candidate | NOT TESTED | MVP後 | 将来 | Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
+| FUT-C-030 | ファイル変更検出 | 自動監視 | Partial | BLOCKED | MVP後 | FR-B09 | [FR-B09要件](../requirements/library-diagnostics-requirements.md#fr-b09-library-diagnostics); Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/diagnostics/mod.rs` | [FT-B09-001](../testing/fr-b09-results.md#ft-b09-001)、[FT-B09-004](../testing/fr-b09-results.md#ft-b09-004) | semantic gate ACCEPT、focused exact5 5/5 PASS・SKIP0、App回帰39/39、Windows 74 unit+1 process、typecheck/build PASS。CoDD構造gateとWindows WebView2 product UIはBLOCKED。 |
+| FUT-C-031 | 重複作品検出 | 重複判定 | Partial | BLOCKED | MVP後 | FR-B09 | [FR-B09要件](../requirements/library-diagnostics-requirements.md#fr-b09-library-diagnostics); Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/diagnostics/mod.rs` | [FT-B09-002](../testing/fr-b09-results.md#ft-b09-002)、[FT-B09-004](../testing/fr-b09-results.md#ft-b09-004) | semantic gate ACCEPT、focused exact5 5/5 PASS・SKIP0、App回帰39/39、Windows 74 unit+1 process、typecheck/build PASS。CoDD構造gateとWindows WebView2 product UIはBLOCKED。 |
+| FUT-C-032 | 壊れた書庫検出 | 事前検出 | Partial | BLOCKED | MVP後 | FR-B09 | [FR-B09要件](../requirements/library-diagnostics-requirements.md#fr-b09-library-diagnostics); Q7-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/diagnostics/mod.rs` | [FT-B09-003](../testing/fr-b09-results.md#ft-b09-003)、[FT-B09-004](../testing/fr-b09-results.md#ft-b09-004) | semantic gate ACCEPT、focused exact5 5/5 PASS・SKIP0、App回帰39/39、Windows 74 unit+1 process、typecheck/build PASS。CoDD構造gateとWindows WebView2 product UIはBLOCKED。 |
 | FUT-C-033 | 横幅フィット | 表示領域の横幅に合わせる | Implemented | PASS | 希望 | FR-B01 | [FR-B01要件](../requirements/viewer-scale-requirements.md#req-fr-b01-001-共通scale-model); Q5-4 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/Viewer.tsx`; `src/styles.css` | [FT-B01-002](../testing/fr-b01-results.md#ft-b01-002) | FR-B01採用、接続済みViewerのmode切替を実測 |
 | FUT-C-034 | 高さフィット | 表示領域の高さに合わせる | Implemented | PASS | 希望 | FR-B01 | [FR-B01要件](../requirements/viewer-scale-requirements.md#req-fr-b01-001-共通scale-model); Q5-4 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/Viewer.tsx`; `src/styles.css` | [FT-B01-002](../testing/fr-b01-results.md#ft-b01-002) | FR-B01採用、接続済みViewerのmode切替を実測 |
 | FUT-C-035 | 原寸表示 | 画像を原寸で表示する | Implemented | PASS | 希望 | FR-B01 | [FR-B01要件](../requirements/viewer-scale-requirements.md#req-fr-b01-001-共通scale-model); Q5-4 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/Viewer.tsx`; `src/styles.css` | [FT-B01-003](../testing/fr-b01-results.md#ft-b01-003) | FR-B01採用、page遷移時の原寸mode維持を実測 |
@@ -162,6 +162,36 @@ VACUOUS（`task_completion`）はPASSへ加算しない。Windows WebView2 nativ
 あり、四文書以外の7機能pathはbyte不変として保全した。Gunshiのcomplete diff QC前のcommit/pushは行わない。
 
 受理済み機能rawと復旧後CoDD rawの出典は [FR-B07結果](../testing/fr-b07-results.md) に集約する。
+
+## FR-B09 最終受入証跡（cmd_400）
+
+FR-B09の機能semantic gateは受理済みだが、CoDDの構造的未完了とWindows WebView2 native
+product UIの未実測が残るため、対象3行は `Partial / BLOCKED` とする。最終focused source SHAは
+`6701c3465e24a481e899a07d1aa5e41b8dd30881962c8f9ab68dead99626c0fe`、diagnostics Rust source SHAは
+`55ffa76c9790b8df0589fbc9e0c43d14e632f01eae06e2b923fd59ff327275cc`である。以下はcmd_400で
+受理した不変rawの参照であり、今回の同期ではテスト・typecheck・build・CoDDを再実行していない。
+
+| Gate | Accepted evidence root/file | 結果 | manifest SHA-256 | stdout SHA-256 | stderr SHA-256 |
+|---|---|---|---|---|---|
+| frontend focused exact5 | `queue/reports/evidence/cmd_400/fr_b09_callback_typing_final_resume/focused-ft-b09-exact5.*` | 5 PASS / 0 FAIL / 0 SKIP | `88d8dd15f3fd1c81be344fbc6fcebeaba0af407c527b9b4a6f9f612f59c40587` | `768f6a0a53adc17991a10330344683aa616a3d1a56be03b192f97219c4189bfe` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| App regression | `queue/reports/evidence/cmd_400/fr_b09_ft005_normal_workflow_repair/app-regression.*` | 39 PASS / 0 FAIL / 0 SKIP | `b48e8bcc41b56a78eccd17c7a9f98c392639d3d9778487aed34709354a021f05` | `6d5de88aacf157bcddd42d42666130742ca20aea91a8b87dad45ee10b18f844a` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| Windows full canonical | `queue/reports/evidence/cmd_400/fr_b09_diagnostics_rustfmt_resume/windows-full-canonical.*` | 74 unit + 1 process PASS / failed 0 / ignored 0 / SKIP 0 | `b7a5d353a0cfd2f644abd34149a981eb375229362e78d1c94ec674456c1218b3` | `ab2ac9e49fd58008d826665914faf8b7f21dd256dd6edb55469c1ca77d80ef6d` | `c3b80068c26dca16ac167f6e78bd7e8f233c03f70973b4c47145e54a5e50beab` |
+| typecheck | `queue/reports/evidence/cmd_400/fr_b09_callback_typing_final_resume/typecheck.*` | PASS / SKIP 0 | `837d3079151c3534f711234b9e9e35467377f46afbe15f51d8f33fe7a6e63a2f` | `fb100a56d0a368d58a22d86a65c113d01397c7923af4bfb6cfb941cc3c9bce3a` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| build | `queue/reports/evidence/cmd_400/fr_b09_callback_typing_final_resume/build.*` | PASS / SKIP 0 | `5dca2635c63d5bfc9ae89bf439f3aacfca99658e3691d2cef3b3fa8ac837ebb2` | `eecee5cbb9f91cabc738d6047d78c1084b2056a44ec69cef955e6013cf0b8387` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+FT-B09-001〜005はsemantic gate ACCEPTである。特にFT-B09-005は、frontendのcancelled response、
+loading=false、cancel notice、stale=0、新generation retryを観測し、Rustではreal folderとZIP/CBZの
+path、bytes、SHA、entry setをcancel/retry前後でexact equalityとして確認した。CoDD rawは既存の
+cmd_400 approved structural exception reference `queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate/`
+を参照し、`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
+`deployment_completeness`、`user_journey_coherence`、`environment_coverage`のSKIPと
+`task_completion`のVACUOUSをPASSへ加算しない。Windows WebView2 native product UIは
+`BLOCKED_UNMEASURED`、OS syscall完全観測は `UNMEASURED / BLOCKED` とする。
+
+Feature Lane fallback、quoted wrapper起動失敗、callback typing failure、canonical resume停止の
+旧rootは [FR-B09結果](../testing/fr-b09-results.md) に履歴として記録し、受理PASS証跡へ再利用しない。
+最終差分は許可された四文書だけを対象とし、draft contamination 0、staged path 0、
+`git diff --check PASS`を確認した。commit/pushは行っていない。
 
 ## 正本運用規則
 

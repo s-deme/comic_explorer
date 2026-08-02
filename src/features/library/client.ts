@@ -201,6 +201,75 @@ export async function searchLibrary(
   });
 }
 
+export type DiagnosticStatus =
+  | "added"
+  | "changed"
+  | "missing"
+  | "duplicate"
+  | "corrupt";
+export type DiagnosticSeverity = "info" | "warning" | "error";
+
+export interface DiagnosticSnapshotEntry {
+  itemIdentity: string;
+  relativePath: RelativePath;
+  kind: ItemKind;
+  byteSize: number | null;
+  modifiedMs: number | null;
+  contentHash: string;
+}
+
+export interface DiagnosticFinding {
+  status: DiagnosticStatus;
+  severity: DiagnosticSeverity;
+  itemIdentity: string;
+  relativePath: RelativePath | null;
+  kind: ItemKind | null;
+  contentHash: string | null;
+  message: string;
+  retryable: boolean;
+}
+
+export interface DiagnosticSummary {
+  scanned: number;
+  findings: number;
+  added: number;
+  changed: number;
+  missing: number;
+  duplicates: number;
+  corrupt: number;
+  errors: number;
+}
+
+export interface DiagnosticReport {
+  schema: "fr-b09/v1";
+  snapshot: DiagnosticSnapshotEntry[];
+  findings: DiagnosticFinding[];
+  summary: DiagnosticSummary;
+  retryRequested: boolean;
+}
+
+export async function diagnoseLibrary(
+  baseline: DiagnosticSnapshotEntry[] | null,
+  generation: number,
+  retry = false,
+): Promise<ApiResponse<DiagnosticReport>> {
+  return invoke("diagnose_library", {
+    context: context(generation),
+    baseline,
+    retry,
+  });
+}
+
+export async function cancelLibraryDiagnostics(
+  generation: number,
+): Promise<ApiResponse<void>> {
+  const request = context(generation);
+  return invoke("cancel_library_diagnostics", {
+    requestId: request.requestId,
+    generation: request.generation,
+  });
+}
+
 export interface ThumbnailData {
   itemRelativePath: RelativePath;
   contentHash: string;

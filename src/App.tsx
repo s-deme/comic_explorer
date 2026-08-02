@@ -21,12 +21,15 @@ import {
   saveViewerSettings,
   setItemRating,
   searchLibrary,
+  diagnoseLibrary,
+  cancelLibraryDiagnostics,
   takeRecoveryNotice,
   addFavorite,
   listFavorites,
   removeFavorite,
   resolveFavorite,
   type CatalogSettings,
+  type DiagnosticReport,
   type FavoriteEntry,
   type ItemMetadata,
   type ReadingHistoryEntry,
@@ -108,6 +111,34 @@ function entryKindLabel(entry: CatalogEntry): string {
   }
 }
 
+function diagnosticStatusLabel(status: DiagnosticReport["findings"][number]["status"]): string {
+  switch (status) {
+    case "added":
+      return "追加";
+    case "changed":
+      return "変更";
+    case "missing":
+      return "欠落";
+    case "duplicate":
+      return "重複";
+    case "corrupt":
+      return "破損書庫";
+  }
+}
+
+function diagnosticSeverityLabel(
+  severity: DiagnosticReport["findings"][number]["severity"],
+): string {
+  switch (severity) {
+    case "info":
+      return "情報";
+    case "warning":
+      return "警告";
+    case "error":
+      return "エラー";
+  }
+}
+
 export function App({ fullscreenAdapter }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
@@ -115,6 +146,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const favoriteGeneration = useRef(0);
   const metadataGeneration = useRef(0);
   const historyGeneration = useRef(0);
+  const diagnosticGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
@@ -166,6 +198,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
+  const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -281,6 +317,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   async function chooseRoot(event: React.FormEvent) {
     event.preventDefault();
     clearSearch();
+    setDiagnosticReport(null);
+    setDiagnosticNotice(null);
     generation.current += 1;
     const response = await registerLibraryRoot(rootInput, generation.current);
     if (response.status === "ok") {
@@ -294,6 +332,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   async function chooseRootWithPicker() {
     clearSearch();
+    setDiagnosticReport(null);
+    setDiagnosticNotice(null);
     generation.current += 1;
     const response = await pickLibraryRoot(generation.current);
     if (response.status === "ok" && response.data) {
@@ -523,6 +563,37 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         setHistoryLoading(false);
       }
     }
+  }
+
+  async function runDiagnostics(retry = false) {
+    const requestGeneration = ++diagnosticGeneration.current;
+    const baseline = diagnosticReport?.snapshot ?? null;
+    setDiagnosticsOpen(true);
+    setDiagnosticsLoading(true);
+    setDiagnosticNotice(null);
+    try {
+      const response = await diagnoseLibrary(baseline, requestGeneration, retry);
+      if (requestGeneration !== diagnosticGeneration.current) return;
+      if (response.status === "ok") {
+        setDiagnosticReport(response.data);
+      } else if (response.status === "cancelled") {
+        setDiagnosticNotice("ライブラリ診断をキャンセルしました。");
+      } else {
+        setDiagnosticNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === diagnosticGeneration.current) {
+        setDiagnosticNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === diagnosticGeneration.current) {
+        setDiagnosticsLoading(false);
+      }
+    }
+  }
+
+  function cancelDiagnostics() {
+    void cancelLibraryDiagnostics(diagnosticGeneration.current).catch(() => undefined);
   }
 
   async function runSearch() {
@@ -910,6 +981,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           閲覧履歴
         </button>
+        <button type="button" onClick={() => void runDiagnostics(false)}>
+          ライブラリ診断
+        </button>
         <button ref={helpTriggerRef} onClick={() => setHelpOpen(true)}>ヘルプ</button>
       </nav>
       <div className="toolbar" aria-label="ナビゲーション">
@@ -1002,6 +1076,78 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           {sortDescending ? "降順 ▼" : "昇順 ▲"}
         </button>
       </div>
+      {(diagnosticsOpen || diagnosticsLoading || diagnosticNotice !== null) && (
+        <section
+          className="diagnostic-panel"
+          aria-label="ライブラリ診断"
+          aria-busy={diagnosticsLoading}
+        >
+          <div className="diagnostic-panel-heading">
+            <h2>ライブラリ診断</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setDiagnosticsOpen(false);
+                setDiagnosticNotice(null);
+              }}
+            >
+              閉じる
+            </button>
+          </div>
+          {diagnosticsLoading && (
+            <div role="status" data-diagnostic-loading="true">
+              ライブラリを読み取り中です。
+              <button type="button" onClick={cancelDiagnostics}>
+                診断をキャンセル
+              </button>
+            </div>
+          )}
+          {diagnosticNotice !== null && (
+            <p role="alert" data-diagnostic-notice="true">
+              {diagnosticNotice}
+            </p>
+          )}
+          {diagnosticReport !== null && (
+            <>
+              <p
+                data-diagnostic-summary
+                data-scanned-count={diagnosticReport.summary.scanned}
+                data-finding-count={diagnosticReport.summary.findings}
+              >
+                検査 {diagnosticReport.summary.scanned}項目、問題 {diagnosticReport.summary.findings}件
+                （追加 {diagnosticReport.summary.added} / 変更 {diagnosticReport.summary.changed} /
+                欠落 {diagnosticReport.summary.missing} / 重複 {diagnosticReport.summary.duplicates} /
+                破損 {diagnosticReport.summary.corrupt}）
+              </p>
+              {diagnosticReport.findings.length === 0 ? (
+                <p role="status">問題は見つかりませんでした。</p>
+              ) : (
+                <ul aria-label="診断結果">
+                  {diagnosticReport.findings.map((finding, index) => (
+                    <li
+                      key={`${finding.itemIdentity}-${finding.status}-${index}`}
+                      data-diagnostic-status={finding.status}
+                      data-diagnostic-severity={finding.severity}
+                      data-diagnostic-path={finding.relativePath ?? finding.itemIdentity}
+                    >
+                      <span>{finding.relativePath ?? finding.itemIdentity}</span>
+                      <span>{diagnosticStatusLabel(finding.status)}</span>
+                      <span>{diagnosticSeverityLabel(finding.severity)}</span>
+                      <span>{finding.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button type="button" onClick={() => void runDiagnostics(true)}>
+                診断を再実行
+              </button>
+            </>
+          )}
+          {diagnosticReport === null && !diagnosticsLoading && diagnosticNotice === null && (
+            <p role="status">診断結果はまだありません。</p>
+          )}
+        </section>
+      )}
       <form
         className="address-bar"
         onSubmit={(event) => {

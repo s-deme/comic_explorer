@@ -18,6 +18,7 @@ use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::catalog::{
     CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages,
 };
+use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
     AppError, ErrorCode, FileKind, ItemKind, PageId, RelativePath, RequestId, classify_file_name,
     item_id_for, page_id_for,
@@ -29,6 +30,7 @@ use library_root::validate_library_root;
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
+    diagnostics: Mutex<NavigationCoordinator>,
     viewer: Arc<Mutex<NavigationCoordinator>>,
     store: Arc<Mutex<Option<StateStore>>>,
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
@@ -56,6 +58,7 @@ impl Default for AppState {
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
+            diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(store)),
             thumbnails: Arc::new(Mutex::new(thumbnails)),
@@ -75,6 +78,9 @@ impl AppState {
         }
         if let Ok(mut navigation) = self.navigation.lock() {
             navigation.shutdown();
+        }
+        if let Ok(mut diagnostics) = self.diagnostics.lock() {
+            diagnostics.shutdown();
         }
         if let Ok(mut viewer) = self.viewer.lock() {
             viewer.shutdown();
@@ -1208,6 +1214,57 @@ pub async fn search_library(
     Ok(port_response(context, result, is_current))
 }
 
+/// Run the read-only FR-B09 scanner against the configured library root.
+///
+/// The baseline stays in the caller so a diagnostic report never creates a
+/// sidecar or mutates the library.  Starting a new generation cancels the
+/// previous diagnostic worker and stale results are discarded at this
+/// boundary.
+#[tauri::command]
+pub async fn diagnose_library(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    baseline: Option<Vec<DiagnosticSnapshotEntry>>,
+    retry: bool,
+) -> Result<Response<DiagnosticReport>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let cancellation = state
+        .diagnostics
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .begin(context.generation);
+    let worker_root = root.clone();
+    let worker_baseline = baseline.unwrap_or_default();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        scan_library(&worker_root, &worker_baseline, retry, &cancellation)
+    })
+    .await
+    .map_err(|error| format!("diagnostics worker failed: {error}"))?;
+
+    let is_current = state
+        .diagnostics
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation);
+    Ok(port_response(context, result, is_current))
+}
+
 #[tauri::command]
 pub async fn get_thumbnail(
     state: tauri::State<'_, AppState>,
@@ -1770,6 +1827,23 @@ pub fn cancel_navigation(
     })
 }
 
+#[tauri::command]
+pub fn cancel_library_diagnostics(
+    state: tauri::State<'_, AppState>,
+    request_id: RequestId,
+    generation: Generation,
+) -> Result<Response<()>, String> {
+    state
+        .diagnostics
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .cancel(generation);
+    Ok(Response::Cancelled {
+        request_id,
+        generation,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ComicOpenHistoryBoundary {
     Success {
@@ -2135,6 +2209,7 @@ mod shutdown_tests {
         let state = AppState {
             library_root: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
+            diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
@@ -2177,6 +2252,7 @@ mod shutdown_tests {
         let state = AppState {
             library_root: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
+            diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),

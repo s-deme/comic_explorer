@@ -1,6 +1,7 @@
 pub mod api;
 pub mod application;
 pub mod catalog;
+pub mod diagnostics;
 pub mod domain;
 pub mod media;
 pub mod state;
@@ -47,9 +48,11 @@ pub fn run() {
             application::set_library_root,
             application::list_folder,
             application::search_library,
+            application::diagnose_library,
             application::get_thumbnail,
             application::list_tree_children,
             application::cancel_navigation,
+            application::cancel_library_diagnostics,
             application::open_comic,
             application::load_page,
             application::save_reading_position
