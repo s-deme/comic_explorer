@@ -44,7 +44,9 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B05〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
+FR-B05、FR-B06、FR-B08〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
+FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWindows product gateが残るため
+`Partial / BLOCKED`で保持する。
 
 ## 推奨実装順
 
@@ -62,7 +64,7 @@ FR-B05〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行�
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
-| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Planned` |
+| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Partial / BLOCKED`（機能raw受理、CoDD INCOMPLETE、Windows product gate BLOCKED） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Planned` |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Planned` |
@@ -244,7 +246,9 @@ FR-B05〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行�
 
 ### FR-B07 — 読書情報（Batch 7）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。`FUT-D-005` の読書状態ラベルは
+- **状態:** `Partial / BLOCKED`。実装境界と機能測定は受理済みだが、CoDD verifyの3 SKIP・1
+  VACUOUS・verification tests 0により構造ゲートは `INCOMPLETE / NOT APPLICABLE`、Windows
+  WebView2 native product gateは `BLOCKED_UNMEASURED` のままである。`FUT-D-005` の読書状態ラベルは
   未決定のため本バッチへ先行投入しない。
 - **対象 feature ID:** `FUT-C-023`, `FUT-R-004`, `FUT-R-005`（memo、閲覧履歴、評価）。
 - **user outcome:** 読者が作品にメモ、閲覧履歴、評価をローカル保存し、後から同じ作品の
@@ -258,8 +262,50 @@ FR-B05〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行�
 - **focused test 範囲:** `FT-B07-001` memo CRUD、`FT-B07-002` history の順序と重複、
   `FT-B07-003` rating の境界/未設定、`FT-B07-004` migration・restart、`FT-B07-005`
   reading position との分離と原本差分0。
-- **batch末尾 gate:** focused test を SKIP 0 で実測し、metadata migration、原本非破壊、
-  外部通信0を確認して `BATCH-END-GATE`。`FUT-D-005` の採否判断は別トラックで行う。
+- **実装path:** `src-tauri/src/state/repository.rs`、`src-tauri/src/application/mod.rs`、
+  `src-tauri/src/lib.rs`、`src/features/library/client.ts`、`src/App.tsx`、`src/App.test.tsx`、
+  `src/App.fr-b07.test.tsx`。
+- **batch末尾 gate:** 受理済みrawを再実行せず、変更後source SHA
+  `f7031d69365005301961896db87da20ace8b9c5086531c6ad7501e9b68aa9c83` のfocused exact5
+  （5/5 PASS、0 FAIL、0 SKIP、duplicate 0）、App回帰（1 file、39/39 PASS、0 FAIL、0 SKIP、
+  direct web adapter calls 0）、Windows offline Rust（FR-B07 exact5、5 PASS、0 failed、0 ignored、
+  0 SKIP、およびfull canonical 66 unit + 1 process、0 failed、0 ignored、0 SKIP）、typecheck、
+  buildをそれぞれ一回のaccepted rawとして照合した。FT-B07-002はproduction `open_comic`へ接続した
+  open-history seamで、成功したcurrent-generation・非空openだけを一行記録し、failed/empty/cancelled
+  は記録せず、履歴表示の順序と重複0を観測した。FT-B07-005は実一時original/library fixtureを
+  metadata・history・rating・reading-position操作の前後でbyte/SHA snapshotし、差分0と
+  `library.index`不変を観測した。CoDD scan/check/verifyも各exit 0だが、verifyの生値は
+  3 SKIP・1 VACUOUS・verification tests 0であり、SKIP=FAIL規則により `BATCH-END-GATE` は
+  未達のまま保持する。`FUT-D-005` の採否判断は別トラックで行う。
+
+#### FR-B07 最終同期の受入証跡
+
+- **機能raw:** [FR-B07結果](../testing/fr-b07-results.md) と、次のaccepted rawを参照する。
+  focused exact5・typecheck・buildは
+  `queue/reports/evidence/cmd_400/fr_b07_node_fs_type_final_resume`、App回帰は
+  `queue/reports/evidence/cmd_400/fr_b07_production_open_seam_semantic_redo`、Rust exact5/fullは
+  `queue/reports/evidence/cmd_400/fr_b07_rustfmt_final_resume` に保存されている。
+
+  | Gate | manifest SHA-256 | stdout SHA-256 | stderr SHA-256 |
+  |---|---|---|---|
+  | frontend focused exact5 | `e8b2f80dc8a888d6b1d30d77a92de91a37924666d70ae6b0ab1ce41acb5f96e5` | `fa650fbaf4ff41c316ece825d4eb854c158ac34186792fb7b108e082bc50c82c` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+  | App regression 39 | `61e315c69353832f1c5bd0d3654946ef00f9e3282c50b0ca34ea44589ec9ef22` | `08a87b125f0e0a53a0bd2e2c716e6f758e344ff6b1906c2bbc244c725354c840` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+  | Rust exact5 | `cfda35406b78a9f54b9802e778742662bd8e52cb84db23949891f1e6a1b89233` | `183e3903947eb258abe21709870766315345cf246b5b78479fed95e509303a10` | `ae905bcf7333addf0b0de89c426235ed167ef5e4292bd2cf66e3430236751265` |
+  | Rust full canonical 66 unit + 1 process | `8570b03c8b8906d4f7a4abc80ddb0f62e2169aacbcdc42aa1ef2b9ce35813a36` | `d61c8d92af8474b90aa2d4aa39adbc8f0f1b383e025a4d7b2306be3128c2312c` | `ada375b0eba1d9560e9bfaf926b522177d4d257295c7aeea8c15d4f8ce3f4734` |
+  | typecheck | `f9e29543ebc74c92a00c457eec8d972600407e264670331143f4a09153b0948d` | `d2297a8e6a87dc32114bcda90f5c007ec0f1b287e38f677de0314e929ea78294` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+  | build | `54fccdea2a0a31370659e48ad9d605bcf45c7a560e8c8a35c1cbe9b8edd97954` | `5145cd83897a30cbd37916d882fffa259f125353c0115cf3d3a3b774d733eedc` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+- **CoDD raw・境界:** 復元後の既存scan/check/verify rawを参照し、manifest SHAは順に
+  `d5b843479ee8a5635bd6aa92678144b67813c6f87c1141177f61d2dec2554384`、
+  `a1cf36608fe80076dce202252b0dbd6387f1b717711afb914a635ed32681de6f`、
+  `93f6aeef90bfacde5a7f1f76eddbbdb1510dc83adb7f97fd3739069acb7685a6`。verifyは
+  `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
+  `INCOMPLETE / NOT APPLICABLE`としてPASS数へ加算しない。accepted functional raw、CoDD rawの
+  再実行、retry、commit、pushは行わない。Windows WebView2 native product UIとOS syscallの完全観測は
+  `UNMEASURED / BLOCKED`のまま維持し、WSL/local evidenceをPASSへ代替しない。
+
+- **最終diff境界:** 最終11-path product diff、draft contamination 0、staged path 0、
+  `git diff --check PASS`を確認し、四文書以外の7機能pathはbyte不変として保全する。Gunshiの
+  complete diff QC前のcommitは行わない。
 
 ### FR-B08 — 追加画像形式（Batch 8）
 

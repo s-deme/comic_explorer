@@ -9,7 +9,7 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -218,6 +218,128 @@ impl StateStore {
         Ok(())
     }
 
+    pub fn memo(&self, item_identity: &str) -> Result<Option<String>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT body FROM memos WHERE item_identity=?1",
+                [item_identity],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(database_error)
+    }
+
+    pub fn save_memo(
+        &self,
+        item_identity: &str,
+        body: &str,
+        updated_at_ms: i64,
+    ) -> Result<Option<String>, AppError> {
+        if body.trim().is_empty() {
+            self.connection
+                .execute("DELETE FROM memos WHERE item_identity=?1", [item_identity])
+                .map_err(database_error)?;
+            return Ok(None);
+        }
+        self.connection
+            .execute(
+                "INSERT INTO memos(item_identity, body, updated_at_ms)
+                 VALUES(?1, ?2, ?3)
+                 ON CONFLICT(item_identity) DO UPDATE SET
+                   body=excluded.body,
+                   updated_at_ms=excluded.updated_at_ms",
+                params![item_identity, body, updated_at_ms],
+            )
+            .map_err(database_error)?;
+        Ok(Some(body.to_owned()))
+    }
+
+    pub fn list_reading_history(&self) -> Result<Vec<(String, i64)>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT item_identity, last_viewed_at_ms
+                 FROM reading_history
+                 ORDER BY last_viewed_at_ms DESC, item_identity ASC",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn record_reading_history(
+        &self,
+        item_identity: &str,
+        last_viewed_at_ms: i64,
+    ) -> Result<(), AppError> {
+        self.connection
+            .execute(
+                "INSERT INTO reading_history(item_identity, last_viewed_at_ms)
+                 VALUES(?1, ?2)
+                 ON CONFLICT(item_identity) DO UPDATE SET
+                   last_viewed_at_ms=excluded.last_viewed_at_ms",
+                params![item_identity, last_viewed_at_ms],
+            )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub fn rating(&self, item_identity: &str) -> Result<Option<i64>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT rating FROM ratings WHERE item_identity=?1",
+                [item_identity],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map_err(database_error)
+    }
+
+    pub fn set_rating(
+        &self,
+        item_identity: &str,
+        rating: Option<i64>,
+        updated_at_ms: i64,
+    ) -> Result<Option<i64>, AppError> {
+        if rating.is_some_and(|value| !(1..=5).contains(&value)) {
+            return Err(AppError {
+                code: ErrorCode::InvalidRequest,
+                message: "Rating must be an integer from 1 to 5 or unset.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        match rating {
+            Some(rating) => {
+                self.connection
+                    .execute(
+                        "INSERT INTO ratings(item_identity, rating, updated_at_ms)
+                         VALUES(?1, ?2, ?3)
+                         ON CONFLICT(item_identity) DO UPDATE SET
+                           rating=excluded.rating,
+                           updated_at_ms=excluded.updated_at_ms",
+                        params![item_identity, rating, updated_at_ms],
+                    )
+                    .map_err(database_error)?;
+            }
+            None => {
+                self.connection
+                    .execute(
+                        "DELETE FROM ratings WHERE item_identity=?1",
+                        [item_identity],
+                    )
+                    .map_err(database_error)?;
+            }
+        }
+        Ok(rating)
+    }
+
     pub fn list_favorites(&self) -> Result<Vec<FavoriteRecord>, AppError> {
         let mut statement = self
             .connection
@@ -413,7 +535,40 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
         transaction
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
-                params![SCHEMA_VERSION, unix_millis()],
+                params![2, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", 2)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 3 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS memos (
+                    item_identity TEXT PRIMARY KEY NOT NULL,
+                    body TEXT NOT NULL,
+                    updated_at_ms INTEGER NOT NULL
+                 );
+                 CREATE TABLE IF NOT EXISTS reading_history (
+                    item_identity TEXT PRIMARY KEY NOT NULL,
+                    last_viewed_at_ms INTEGER NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS reading_history_last_viewed
+                   ON reading_history(last_viewed_at_ms DESC, item_identity ASC);
+                 CREATE TABLE IF NOT EXISTS ratings (
+                    item_identity TEXT PRIMARY KEY NOT NULL,
+                    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                    updated_at_ms INTEGER NOT NULL
+                 );",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![3, unix_millis()],
             )
             .map_err(database_error)?;
         transaction
@@ -519,6 +674,7 @@ fn database_error(error: impl std::fmt::Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::params;
 
     fn temporary_paths(test_name: &str) -> AppPaths {
         AppPaths::under(std::env::temp_dir().join(format!(
@@ -636,5 +792,257 @@ mod tests {
         assert!(notice.isolated_database.starts_with(&paths.recovery));
         assert_eq!(fs::read(notice.isolated_database).unwrap(), b"not sqlite");
         fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b07_memo_crud_clear_and_reopen() {
+        let paths = temporary_paths("fr-b07-memo");
+        {
+            let (store, _) = StateStore::open(&paths).unwrap();
+            assert_eq!(store.memo("Series/01.cbz").unwrap(), None);
+            assert_eq!(
+                store.save_memo("Series/01.cbz", "first memo", 10).unwrap(),
+                Some("first memo".into())
+            );
+            assert_eq!(
+                store.memo("Series/01.cbz").unwrap(),
+                Some("first memo".into())
+            );
+            assert_eq!(
+                store
+                    .save_memo("Series/01.cbz", "updated memo", 20)
+                    .unwrap(),
+                Some("updated memo".into())
+            );
+            assert_eq!(store.save_memo("Series/01.cbz", " \t\n", 30).unwrap(), None);
+        }
+        let (store, _) = StateStore::open(&paths).unwrap();
+        assert_eq!(store.memo("Series/01.cbz").unwrap(), None);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b07_rating_boundaries_and_invalid_rejection() {
+        let paths = temporary_paths("fr-b07-rating");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        assert_eq!(
+            store.set_rating("Series/01.cbz", Some(1), 10).unwrap(),
+            Some(1)
+        );
+        assert_eq!(store.rating("Series/01.cbz").unwrap(), Some(1));
+        assert_eq!(
+            store.set_rating("Series/01.cbz", Some(5), 20).unwrap(),
+            Some(5)
+        );
+        assert_eq!(store.rating("Series/01.cbz").unwrap(), Some(5));
+        let error = store.set_rating("Series/01.cbz", Some(0), 30).unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidRequest);
+        assert_eq!(store.rating("Series/01.cbz").unwrap(), Some(5));
+        let error = store.set_rating("Series/01.cbz", Some(6), 40).unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidRequest);
+        assert_eq!(store.set_rating("Series/01.cbz", None, 50).unwrap(), None);
+        assert_eq!(store.rating("Series/01.cbz").unwrap(), None);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b07_v2_migration_preserves_old_values_and_is_idempotent() {
+        let paths = temporary_paths("fr-b07-migration");
+        paths.create(None).unwrap();
+        {
+            let connection = rusqlite::Connection::open(&paths.database).unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE settings (
+                        key TEXT PRIMARY KEY NOT NULL,
+                        value TEXT NOT NULL
+                     );
+                     CREATE TABLE reading_positions (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        page_key TEXT NOT NULL,
+                        natural_ordinal INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE source_fingerprints (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        modified_ns TEXT NOT NULL,
+                        detail_hash TEXT
+                     );
+                     CREATE TABLE thumbnail_index (
+                        content_hash TEXT PRIMARY KEY NOT NULL,
+                        relative_path TEXT NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        width INTEGER NOT NULL,
+                        height INTEGER NOT NULL,
+                        last_access_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE schema_migrations (
+                        version INTEGER PRIMARY KEY NOT NULL,
+                        applied_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE favorites (
+                        favorite_id TEXT PRIMARY KEY NOT NULL,
+                        item_identity TEXT NOT NULL UNIQUE,
+                        relative_path TEXT NOT NULL,
+                        item_kind TEXT NOT NULL,
+                        size_bytes INTEGER,
+                        modified_ms INTEGER,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(1, 1);
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(2, 2);
+                     PRAGMA user_version=2;",
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES(?1, ?2)",
+                    params!["sortField", "modified"],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO reading_positions(item_key, page_key, natural_ordinal, updated_at_ms)
+                     VALUES(?1, ?2, ?3, ?4)",
+                    params!["Series/01.cbz", "page-2.png", 1, 7],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO favorites(
+                        favorite_id, item_identity, relative_path, item_kind,
+                        size_bytes, modified_ms, created_at_ms, updated_at_ms
+                     ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+                    params![
+                        "favorite-series-01",
+                        "Series/01.cbz",
+                        "Series/01.cbz",
+                        "archive",
+                        12,
+                        13,
+                        14
+                    ],
+                )
+                .unwrap();
+        }
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store
+                .connection()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        assert_eq!(store.load_settings().unwrap().sort_field, "modified");
+        assert_eq!(
+            store
+                .reading_position("Series/01.cbz")
+                .unwrap()
+                .unwrap()
+                .page_key,
+            RelativePath::parse("page-2.png").unwrap()
+        );
+        assert_eq!(store.list_favorites().unwrap().len(), 1);
+        store.save_memo("Series/01.cbz", "persisted", 20).unwrap();
+        store.record_reading_history("Series/01.cbz", 21).unwrap();
+        store.set_rating("Series/01.cbz", Some(4), 22).unwrap();
+        drop(store);
+
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store.memo("Series/01.cbz").unwrap(),
+            Some("persisted".into())
+        );
+        assert_eq!(
+            store.list_reading_history().unwrap(),
+            vec![("Series/01.cbz".into(), 21)]
+        );
+        assert_eq!(store.rating("Series/01.cbz").unwrap(), Some(4));
+        assert_eq!(store.list_favorites().unwrap().len(), 1);
+        assert_eq!(store.load_settings().unwrap().sort_field, "modified");
+        assert_eq!(
+            store
+                .reading_position("Series/01.cbz")
+                .unwrap()
+                .unwrap()
+                .natural_ordinal,
+            1
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b07_reading_position_separation_survives_metadata_crud() {
+        let paths = temporary_paths("fr-b07-separation");
+        let fixture_root = std::env::temp_dir().join(format!(
+            "comic-explorer-fr-b07-fixture-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let original_file = fixture_root.join("original/Series/01.cbz");
+        let library_file = fixture_root.join("library/Series/01.cbz");
+        let library_management_file = fixture_root.join("library/library.index");
+        fs::create_dir_all(original_file.parent().unwrap()).unwrap();
+        fs::create_dir_all(library_file.parent().unwrap()).unwrap();
+        fs::write(&original_file, b"fixture-original-bytes").unwrap();
+        fs::write(&library_file, b"fixture-original-bytes").unwrap();
+        fs::write(&library_management_file, b"fixture-library-management").unwrap();
+        let original_before = fs::read(&original_file).unwrap();
+        let library_before = fs::read(&library_file).unwrap();
+        let library_management_before = fs::read(&library_management_file).unwrap();
+        assert_eq!(original_before, library_before);
+
+        let (store, _) = StateStore::open(&paths).unwrap();
+        store
+            .save_reading_position(
+                "Series/01.cbz",
+                &ReadingPosition {
+                    page_key: RelativePath::parse("page-7.png").unwrap(),
+                    natural_ordinal: 6,
+                },
+                10,
+            )
+            .unwrap();
+        store.save_memo("Series/01.cbz", "memo", 11).unwrap();
+        store.record_reading_history("Series/01.cbz", 12).unwrap();
+        store.set_rating("Series/01.cbz", Some(3), 13).unwrap();
+        let position = store.reading_position("Series/01.cbz").unwrap().unwrap();
+        assert_eq!(
+            position.page_key,
+            RelativePath::parse("page-7.png").unwrap()
+        );
+        assert_eq!(position.natural_ordinal, 6);
+        assert_eq!(
+            store.list_reading_history().unwrap(),
+            vec![("Series/01.cbz".into(), 12)]
+        );
+        assert_eq!(
+            store
+                .connection()
+                .query_row(
+                    "SELECT page_key, natural_ordinal FROM reading_positions WHERE item_key=?1",
+                    ["Series/01.cbz"],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .unwrap(),
+            ("page-7.png".into(), 6)
+        );
+        drop(store);
+
+        assert_eq!(fs::read(&original_file).unwrap(), original_before);
+        assert_eq!(fs::read(&library_file).unwrap(), library_before);
+        assert_eq!(
+            fs::read(&library_management_file).unwrap(),
+            library_management_before
+        );
+        fs::remove_dir_all(paths.root).unwrap();
+        fs::remove_dir_all(fixture_root).unwrap();
     }
 }

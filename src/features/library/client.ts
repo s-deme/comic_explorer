@@ -245,6 +245,17 @@ export interface ViewerSession {
   startIndex: number;
 }
 
+export interface ItemMetadata {
+  itemIdentity: RelativePath;
+  memo: string | null;
+  rating: number | null;
+}
+
+export interface ReadingHistoryEntry {
+  itemIdentity: RelativePath;
+  lastViewedAtMs: number;
+}
+
 export async function openComic(
   itemRelativePath: string,
   generation: number,
@@ -253,6 +264,46 @@ export async function openComic(
     context: context(generation),
     itemRelativePath,
   });
+}
+
+export async function getItemMetadata(
+  itemIdentity: string,
+  generation: number,
+): Promise<ApiResponse<ItemMetadata>> {
+  return invoke("get_item_metadata", {
+    context: context(generation),
+    itemIdentity,
+  });
+}
+
+export async function saveItemMemo(
+  itemIdentity: string,
+  body: string,
+  generation: number,
+): Promise<ApiResponse<ItemMetadata>> {
+  return invoke("save_item_memo", {
+    context: context(generation),
+    itemIdentity,
+    body,
+  });
+}
+
+export async function setItemRating(
+  itemIdentity: string,
+  rating: number | null,
+  generation: number,
+): Promise<ApiResponse<ItemMetadata>> {
+  return invoke("set_item_rating", {
+    context: context(generation),
+    itemIdentity,
+    rating,
+  });
+}
+
+export async function listReadingHistory(
+  generation: number,
+): Promise<ApiResponse<ReadingHistoryEntry[]>> {
+  return invoke("list_reading_history", { context: context(generation) });
 }
 
 export async function loadPage(

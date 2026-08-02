@@ -88,7 +88,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-020 | 巻末動作設定・自動遷移 | 自動的に次の巻を開く設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/application/mod.rs` | [FT-B02-001](../testing/fr-b02-results.md#ft-b02-001) | C0採用、既定値auto_nextでREQ-MVP-016互換 |
 | FUT-C-021 | お気に入り保存 | お気に入り永続化 | Candidate | NOT TESTED | 希望 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-022 | タグ付与・検索 | タグ管理 | Candidate | NOT TESTED | 将来 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
-| FUT-C-023 | メモ保存 | メモ管理 | Candidate | NOT TESTED | 将来 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
+| FUT-C-023 | メモ保存 | メモ管理 | Partial | BLOCKED | 将来 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-001-作品identityとmemo); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07 exact5は5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、type/build exit0 | CoDDは3 SKIP/1 VACUOUS/verification 0のためINCOMPLETE/NOT APPLICABLE。Windows product gateはBLOCKED。 |
 | FUT-C-024 | 名前変更 | ファイル名変更 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-025 | 移動 | ファイル移動 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-026 | コピー | ファイルコピー | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
@@ -115,11 +115,53 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-001 | クラウド同期 | 外部同期 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q8-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 外部送信禁止の恒久方針。方針変更時のみ再評価 |
 | FUT-R-002 | 外部書誌情報 | 外部サービスからの情報取得 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q6-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ファイル名・フォルダ名のみを使う方針 |
 | FUT-R-003 | 外部データ送信 | 利用状況等の送信 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q8-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | いかなるデータも外部送信しない方針 |
-| FUT-R-004 | 閲覧履歴 | 閲覧履歴の管理 | Candidate | NOT TESTED | 未定 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
-| FUT-R-005 | 評価 | 評価情報の管理 | Candidate | NOT TESTED | 未定 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
+| FUT-R-004 | 閲覧履歴 | 閲覧履歴の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-002-成功した閲覧のhistory); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-002を含むfocused exact5 5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、production open-history seam接続済み | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
+| FUT-R-005 | 評価 | 評価情報の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-003-rating); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-003を含むfocused exact5 5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、FT-B07-005 real snapshot/hash diff0 | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
 | FUT-R-006 | タッチ操作 | タッチ入力 | Candidate | NOT TESTED | 未定 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
 | FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
 | FUT-R-008 | 閲覧時の原本自動変更 | 原本への自動書込み | Rejected | NOT TESTED | 非採用 | — | Q7-2/Q8-4 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 読取専用・原本非破壊の恒久方針。方針変更時のみ再評価 |
+
+## FR-B07 最終受入証跡（cmd_400）
+
+実装根拠と機能rawは受理済みであるが、CoDDの構造的未完了とWindows WebView2 product gateの未実測が
+残るため、FR-B07および対象3行は `Partial / BLOCKED` とする。accepted rawは不変SHA参照であり、
+frontend、App回帰、Rust、typecheck、build、CoDDの再実行は行っていない。
+
+accepted evidence rootは、frontend exact5・typecheck・buildが
+`queue/reports/evidence/cmd_400/fr_b07_node_fs_type_final_resume`、App回帰が
+`queue/reports/evidence/cmd_400/fr_b07_production_open_seam_semantic_redo`、Rust exact5/fullが
+`queue/reports/evidence/cmd_400/fr_b07_rustfmt_final_resume`である。frontend exact5はsource SHA
+`f7031d69365005301961896db87da20ace8b9c5086531c6ad7501e9b68aa9c83`に束縛されている。
+
+| Gate | 実測状態 | exit / 件数 / SKIP | manifest SHA-256 | stdout SHA-256 | stderr SHA-256 |
+|---|---|---|---|---|---|
+| frontend focused | ACCEPTED immutable reference | 0 / FT-B07-001〜005 exact5、5 PASS、0 FAIL、0 SKIP、duplicate 0 | `e8b2f80dc8a888d6b1d30d77a92de91a37924666d70ae6b0ab1ce41acb5f96e5` | `fa650fbaf4ff41c316ece825d4eb854c158ac34186792fb7b108e082bc50c82c` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| App regression | ACCEPTED immutable reference | 0 / 1 file、39 PASS、0 FAIL、0 SKIP、direct web adapter calls 0 | `61e315c69353832f1c5bd0d3654946ef00f9e3282c50b0ca34ea44589ec9ef22` | `08a87b125f0e0a53a0bd2e2c716e6f758e344ff6b1906c2bbc244c725354c840` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| Windows offline Rust focused | PASS | 0 / FR-B07 exact5、5 PASS、0 failed、0 ignored、0 SKIP | `cfda35406b78a9f54b9802e778742662bd8e52cb84db23949891f1e6a1b89233` | `183e3903947eb258abe21709870766315345cf246b5b78479fed95e509303a10` | `ae905bcf7333addf0b0de89c426235ed167ef5e4292bd2cf66e3430236751265` |
+| Windows offline Rust canonical wrapper | PASS | 0 / 66 unit + 1 process、67 PASS、0 failed、0 ignored、0 SKIP | `8570b03c8b8906d4f7a4abc80ddb0f62e2169aacbcdc42aa1ef2b9ce35813a36` | `d61c8d92af8474b90aa2d4aa39adbc8f0f1b383e025a4d7b2306be3128c2312c` | `ada375b0eba1d9560e9bfaf926b522177d4d257295c7aeea8c15d4f8ce3f4734` |
+| typecheck | PASS | 0 / executed、SKIP 0 | `f9e29543ebc74c92a00c457eec8d972600407e264670331143f4a09153b0948d` | `d2297a8e6a87dc32114bcda90f5c007ec0f1b287e38f677de0314e929ea78294` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| build | PASS | 0 / executed、SKIP 0 | `54fccdea2a0a31370659e48ad9d605bcf45c7a560e8c8a35c1cbe9b8edd97954` | `5145cd83897a30cbd37916d882fffa259f125353c0115cf3d3a3b774d733eedc` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| CoDD scan | PASS process / raw accepted from restoration gate | 0 / 58 nodes、120 edges、SKIP 0 | `d5b843479ee8a5635bd6aa92678144b67813c6f87c1141177f61d2dec2554384` | `428e31b7481958f2c90a66a3d8ed04b4a681834a9f886951e20db732106f9fc4` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| CoDD check | PASS process / raw accepted from restoration gate | 0 / red gate failures 0、advisory 4、SKIP 0 | `a1cf36608fe80076dce202252b0dbd6387f1b717711afb914a635ed32681de6f` | `0c264281dd7e2b56db04817e83ebe28b851f000b8f4e643f62348967f59715b7` | `ff63d03aa6cd827fa8efdda2b33e28428e263010bce88bd89b3a9b8bae719b37` |
+| CoDD verify | INCOMPLETE / NOT APPLICABLE（非PASS） | 0 / 3 DAG SKIP、1 task_completion VACUOUS、verification tests 0 PASS/0 FAIL/0 SKIP/0 total | `93f6aeef90bfacde5a7f1f76eddbbdb1510dc83adb7f97fd3739069acb7685a6` | `a316eb93fd73616896c371b3debd777400e5a77db2ff97366f4b8461f6f4231c` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+FT-B07-002はproduction `open_comic`に接続したopen-history seamで、成功したcurrent-generation・非空
+openだけを一行記録し、failed、empty、cancelledは0行とする境界、historyの決定順序、重複0を受理した。
+FT-B07-005は実一時original/library fixtureのmetadata・history・rating・reading-position操作前後を
+byte/SHA snapshotし、original、library、`library.index`の差分0を受理した。Rust exact5は
+`fr_b07_memo_crud_clear_and_reopen`、`fr_b07_history_deterministic_order_and_dedup`、
+`fr_b07_rating_boundaries_and_invalid_rejection`、`fr_b07_v2_migration_preserves_old_values_and_is_idempotent`、
+`fr_b07_reading_position_separation_survives_metadata_crud` である。
+
+CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0で
+あり、3 SKIP（`deployment_completeness`、`user_journey_coherence`、`environment_coverage`）と1
+VACUOUS（`task_completion`）はPASSへ加算しない。Windows WebView2 native product UIとOS syscallの
+完全観測は `UNMEASURED / BLOCKED` であり、WSL/local evidenceで代替しない。
+
+最終worktreeは11-path product diff、draft contamination 0、staged path 0、`git diff --check PASS`で
+あり、四文書以外の7機能pathはbyte不変として保全した。Gunshiのcomplete diff QC前のcommit/pushは行わない。
+
+受理済み機能rawと復旧後CoDD rawの出典は [FR-B07結果](../testing/fr-b07-results.md) に集約する。
 
 ## 正本運用規則
 

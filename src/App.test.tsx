@@ -12,12 +12,14 @@ import { App } from "./App";
 import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import {
   getCatalogSettings,
+  getItemMetadata,
   getThumbnail,
   addFavorite,
   listFavorites,
   loadPage,
   listTreeChildren,
   listFolder,
+  listReadingHistory,
   openComic,
   pickLibraryRoot,
   registerLibraryRoot,
@@ -26,12 +28,16 @@ import {
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
+  saveItemMemo,
   saveReadingPosition,
   saveViewerSettings,
+  setItemRating,
   searchLibrary,
   takeRecoveryNotice,
   resolveFavorite,
   type FavoriteEntry,
+  type ItemMetadata,
+  type ReadingHistoryEntry,
 } from "./features/library/client";
 import type { CatalogEntry, ErrorCode } from "./types/domain";
 
@@ -47,15 +53,19 @@ vi.mock("./features/library/client", () => ({
   removeFavorite: vi.fn(),
   resolveFavorite: vi.fn(),
   getCatalogSettings: vi.fn(),
+  getItemMetadata: vi.fn(),
   getThumbnail: vi.fn(),
   loadPage: vi.fn(),
   saveCatalogSort: vi.fn(),
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),
+  saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
   saveViewerSettings: vi.fn(),
+  setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
   takeRecoveryNotice: vi.fn(),
+  listReadingHistory: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
@@ -65,6 +75,7 @@ const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
+const metadataMock = vi.mocked(getItemMetadata);
 const thumbnailMock = vi.mocked(getThumbnail);
 const addFavoriteMock = vi.mocked(addFavorite);
 const listFavoritesMock = vi.mocked(listFavorites);
@@ -74,10 +85,13 @@ const loadPageMock = vi.mocked(loadPage);
 const saveSortMock = vi.mocked(saveCatalogSort);
 const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
 const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
+const saveMemoMock = vi.mocked(saveItemMemo);
 const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveViewerMock = vi.mocked(saveViewerSettings);
+const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
+const historyMock = vi.mocked(listReadingHistory);
 
 function testEntry(relativePath: string): CatalogEntry {
   return {
@@ -144,6 +158,32 @@ function favoritesResponse(data: FavoriteEntry[]) {
   };
 }
 
+function metadataResponse(
+  itemIdentity: string,
+  overrides: Partial<ItemMetadata> = {},
+) {
+  return {
+    status: "ok" as const,
+    requestId: `metadata-${itemIdentity}` as never,
+    generation: 1 as never,
+    data: {
+      itemIdentity: itemIdentity as never,
+      memo: null,
+      rating: null,
+      ...overrides,
+    },
+  };
+}
+
+function historyResponse(data: ReadingHistoryEntry[]) {
+  return {
+    status: "ok" as const,
+    requestId: "history" as never,
+    generation: 1 as never,
+    data,
+  };
+}
+
 async function registerTestLibrary(
   entries: CatalogEntry[],
   fullscreenAdapter?: FullscreenAdapter,
@@ -179,10 +219,15 @@ async function registerTestLibrary(
 }
 
 async function openTestComic(relativePath: string) {
-  fireEvent.keyDown(
-    await screen.findByRole("button", { name: new RegExp(relativePath) }),
-    { key: "Enter" },
-  );
+  const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  const comicButton = within(grid)
+    .getAllByRole("button")
+    .find((button) => button.getAttribute("data-relative-path") === relativePath);
+  expect(comicButton).toBeDefined();
+  expect(comicButton).toHaveAttribute("data-relative-path", relativePath);
+  const basename = relativePath.split("/").at(-1) ?? relativePath;
+  expect(comicButton).toHaveAccessibleName(expect.stringContaining(basename));
+  fireEvent.keyDown(comicButton!, { key: "Enter" });
   await screen.findByLabelText(`${relativePath} ビューワ`);
 }
 
@@ -197,6 +242,7 @@ describe("application shell", () => {
     restoreMock.mockReset();
     openMock.mockReset();
     settingsMock.mockReset();
+    metadataMock.mockReset();
     thumbnailMock.mockReset();
     addFavoriteMock.mockReset();
     listFavoritesMock.mockReset();
@@ -206,16 +252,27 @@ describe("application shell", () => {
     saveSortMock.mockReset();
     saveCatalogViewModeMock.mockReset();
     saveEndPolicyMock.mockReset();
+    saveMemoMock.mockReset();
     saveReadingMock.mockReset();
     saveViewerMock.mockReset();
+    setRatingMock.mockReset();
     searchMock.mockReset();
     recoveryNoticeMock.mockReset();
+    historyMock.mockReset();
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
       requestId: "recovery" as never,
       generation: 1 as never,
       data: false,
     });
+    metadataMock.mockImplementation(async (itemIdentity) => metadataResponse(itemIdentity));
+    saveMemoMock.mockImplementation(async (itemIdentity, body) =>
+      metadataResponse(itemIdentity, { memo: body.trim() === "" ? null : body }),
+    );
+    setRatingMock.mockImplementation(async (itemIdentity, rating) =>
+      metadataResponse(itemIdentity, { rating }),
+    );
+    historyMock.mockResolvedValue(historyResponse([]));
     listFavoritesMock.mockResolvedValue(favoritesResponse([]));
     addFavoriteMock.mockResolvedValue(favoritesResponse([]));
     removeFavoriteMock.mockResolvedValue(favoritesResponse([]));
@@ -1397,4 +1454,5 @@ describe("application shell", () => {
     expect(addFavoriteMock).toHaveBeenCalledWith("book.cbz", expect.any(Number));
     expect(addFavoriteMock.mock.calls[0][0]).not.toMatch(/^[A-Za-z]:[\\/]/);
   });
+
 });

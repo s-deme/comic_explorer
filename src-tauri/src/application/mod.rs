@@ -327,6 +327,21 @@ pub struct ViewerSession {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ItemMetadata {
+    pub item_identity: RelativePath,
+    pub memo: Option<String>,
+    pub rating: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadingHistoryEntry {
+    pub item_identity: RelativePath,
+    pub last_viewed_at_ms: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThumbnailResponse {
     pub item_relative_path: RelativePath,
     pub content_hash: String,
@@ -626,6 +641,174 @@ pub fn take_recovery_notice(
         request_id: context.request_id,
         generation: context.generation,
         data: recovered,
+    })
+}
+
+fn metadata_item_identity(value: String) -> Result<RelativePath, AppError> {
+    match RelativePath::parse(value) {
+        Ok(path) if !path.as_str().is_empty() => Ok(path),
+        _ => Err(request_error(
+            ErrorCode::InvalidPath,
+            "Metadata item identity must be a non-empty relative path.",
+        )),
+    }
+}
+
+fn load_item_metadata(
+    store: &StateStore,
+    item_identity: &RelativePath,
+) -> Result<ItemMetadata, AppError> {
+    Ok(ItemMetadata {
+        item_identity: item_identity.clone(),
+        memo: store.memo(item_identity.as_str())?,
+        rating: store.rating(item_identity.as_str())?,
+    })
+}
+
+#[tauri::command]
+pub fn get_item_metadata(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+) -> Result<Response<ItemMetadata>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let data = match load_item_metadata(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn save_item_memo(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+    body: String,
+) -> Result<Response<ItemMetadata>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    if let Err(error) = store.save_memo(&item_identity.to_string(), &body, unix_millis()) {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_item_metadata(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn set_item_rating(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+    rating: Option<i64>,
+) -> Result<Response<ItemMetadata>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    if let Err(error) = store.set_rating(&item_identity.to_string(), rating, unix_millis()) {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_item_metadata(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn list_reading_history(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<ReadingHistoryEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let entries = match store.list_reading_history() {
+        Ok(entries) => entries,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let data = entries
+        .into_iter()
+        .map(|(item_identity, last_viewed_at_ms)| {
+            RelativePath::parse(item_identity)
+                .map(|item_identity| ReadingHistoryEntry {
+                    item_identity,
+                    last_viewed_at_ms,
+                })
+                .map_err(|message| AppError {
+                    code: ErrorCode::Internal,
+                    message: message.into(),
+                    target: None,
+                    retryable: false,
+                })
+        })
+        .collect::<Result<Vec<_>, _>>();
+    let data = match data {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
     })
 }
 
@@ -1587,6 +1770,37 @@ pub fn cancel_navigation(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ComicOpenHistoryBoundary {
+    Success {
+        page_count: usize,
+        generation_current: bool,
+    },
+    Failed,
+    Cancelled,
+}
+
+fn record_history_at_open_boundary(
+    store: Option<&StateStore>,
+    item_identity: &RelativePath,
+    boundary: ComicOpenHistoryBoundary,
+    last_viewed_at_ms: i64,
+) -> Result<(), AppError> {
+    if let (
+        Some(store),
+        ComicOpenHistoryBoundary::Success {
+            page_count,
+            generation_current: true,
+        },
+    ) = (store, boundary)
+    {
+        if page_count > 0 {
+            store.record_reading_history(item_identity.as_str(), last_viewed_at_ms)?;
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_comic(
     state: tauri::State<'_, AppState>,
@@ -1653,6 +1867,15 @@ pub async fn open_comic(
             request_id: context.request_id,
             generation: context.generation,
         });
+    }
+
+    let boundary = ComicOpenHistoryBoundary::Success {
+        page_count: page_paths.len(),
+        generation_current: true,
+    };
+    if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_ref() {
+        record_history_at_open_boundary(Some(store), &item_relative, boundary, unix_millis())
+            .map_err(|error| error.message)?;
     }
 
     let mut registry = state.media.lock().map_err(|_| "state poisoned")?;
@@ -2234,6 +2457,81 @@ mod shutdown_tests {
                 generation: Generation(40)
             } if request_id.as_str() == "fixture-stale"
         ));
+    }
+
+    #[test]
+    fn fr_b07_history_deterministic_order_and_dedup() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-fr-b07-history-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let paths = AppPaths::under(root.clone());
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let item = RelativePath::parse("Series/A.cbz").unwrap();
+
+        for boundary in [
+            ComicOpenHistoryBoundary::Failed,
+            ComicOpenHistoryBoundary::Success {
+                page_count: 0,
+                generation_current: true,
+            },
+            ComicOpenHistoryBoundary::Cancelled,
+            ComicOpenHistoryBoundary::Success {
+                page_count: 1,
+                generation_current: false,
+            },
+        ] {
+            record_history_at_open_boundary(Some(&store), &item, boundary, 100).unwrap();
+            assert!(store.list_reading_history().unwrap().is_empty());
+        }
+
+        let other = RelativePath::parse("Series/B.cbz").unwrap();
+        record_history_at_open_boundary(
+            Some(&store),
+            &other,
+            ComicOpenHistoryBoundary::Success {
+                page_count: 1,
+                generation_current: true,
+            },
+            200,
+        )
+        .unwrap();
+        record_history_at_open_boundary(
+            Some(&store),
+            &item,
+            ComicOpenHistoryBoundary::Success {
+                page_count: 1,
+                generation_current: true,
+            },
+            200,
+        )
+        .unwrap();
+        record_history_at_open_boundary(
+            Some(&store),
+            &item,
+            ComicOpenHistoryBoundary::Success {
+                page_count: 1,
+                generation_current: true,
+            },
+            300,
+        )
+        .unwrap();
+
+        assert_eq!(
+            store.list_reading_history().unwrap(),
+            vec![("Series/A.cbz".into(), 300), ("Series/B.cbz".into(), 200)]
+        );
+        assert_eq!(
+            store
+                .connection()
+                .query_row("SELECT COUNT(*) FROM reading_history", [], |row| row
+                    .get::<_, i64>(0),)
+                .unwrap(),
+            2
+        );
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

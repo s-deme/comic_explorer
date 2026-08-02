@@ -7,7 +7,9 @@ import {
 import {
   listFolder,
   getCatalogSettings,
+  getItemMetadata,
   getThumbnail,
+  listReadingHistory,
   openComic,
   pickLibraryRoot,
   registerLibraryRoot,
@@ -15,7 +17,9 @@ import {
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
+  saveItemMemo,
   saveViewerSettings,
+  setItemRating,
   searchLibrary,
   takeRecoveryNotice,
   addFavorite,
@@ -24,6 +28,8 @@ import {
   resolveFavorite,
   type CatalogSettings,
   type FavoriteEntry,
+  type ItemMetadata,
+  type ReadingHistoryEntry,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -107,6 +113,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
+  const metadataGeneration = useRef(0);
+  const historyGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const [rootInput, setRootInput] = useState("");
@@ -150,6 +158,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
+  const [itemMetadata, setItemMetadata] = useState<ItemMetadata | null>(null);
+  const [memoDraft, setMemoDraft] = useState("");
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -403,6 +419,112 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     void applyFavoriteOperation(removeFavorite(favorite.favoriteId, requestGeneration));
   }
 
+  async function loadItemMetadata(itemIdentity: string) {
+    const requestGeneration = ++metadataGeneration.current;
+    setItemMetadata(null);
+    setMemoDraft("");
+    setMetadataLoading(true);
+    setMetadataNotice(null);
+    try {
+      const response = await getItemMetadata(itemIdentity, requestGeneration);
+      if (requestGeneration !== metadataGeneration.current) return;
+      if (response.status === "ok") {
+        setItemMetadata(response.data);
+        setMemoDraft(response.data.memo ?? "");
+      } else if (response.status === "error") {
+        setMetadataNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataLoading(false);
+      }
+    }
+  }
+
+  async function persistMemo(body: string) {
+    if (itemMetadata === null) return;
+    const requestGeneration = metadataGeneration.current;
+    setMetadataLoading(true);
+    setMetadataNotice(null);
+    try {
+      const response = await saveItemMemo(
+        itemMetadata.itemIdentity,
+        body,
+        requestGeneration,
+      );
+      if (requestGeneration !== metadataGeneration.current) return;
+      if (response.status === "ok") {
+        setItemMetadata(response.data);
+        setMemoDraft(response.data.memo ?? "");
+      } else if (response.status === "error") {
+        setMetadataNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataLoading(false);
+      }
+    }
+  }
+
+  async function persistRating(rating: number | null) {
+    if (itemMetadata === null) return;
+    const requestGeneration = metadataGeneration.current;
+    setMetadataLoading(true);
+    setMetadataNotice(null);
+    try {
+      const response = await setItemRating(
+        itemMetadata.itemIdentity,
+        rating,
+        requestGeneration,
+      );
+      if (requestGeneration !== metadataGeneration.current) return;
+      if (response.status === "ok") {
+        setItemMetadata(response.data);
+      } else if (response.status === "error") {
+        setMetadataNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === metadataGeneration.current) {
+        setMetadataLoading(false);
+      }
+    }
+  }
+
+  async function refreshHistory() {
+    const requestGeneration = ++historyGeneration.current;
+    setHistoryLoading(true);
+    setHistoryNotice(null);
+    try {
+      const response = await listReadingHistory(requestGeneration);
+      if (requestGeneration !== historyGeneration.current) return;
+      if (response.status === "ok") {
+        setReadingHistory(response.data);
+      } else if (response.status === "error") {
+        setHistoryNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === historyGeneration.current) {
+        setHistoryNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === historyGeneration.current) {
+        setHistoryLoading(false);
+      }
+    }
+  }
+
   async function runSearch() {
     const query = searchQuery;
     if (query.trim() === "") {
@@ -594,19 +716,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setViewerSession(null);
+    metadataGeneration.current += 1;
+    setItemMetadata(null);
+    setMemoDraft("");
+    setMetadataNotice(null);
   }
 
   function openComicEntry(entry: CatalogEntry) {
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
+    setLoadState({ status: "loading", path: entry.relativePath });
     viewerGeneration.current += 1;
     const requestGeneration = viewerGeneration.current;
     void openComic(entry.relativePath, requestGeneration).then((response) => {
       if (response.status === "ok") {
         setViewerSession(response.data);
         setLoadState({ status: "ready" });
+        void loadItemMetadata(response.data.itemKey);
       } else if (response.status === "error") {
-        setEndOfVolumeNotice(presentError(response.error));
+        setLoadState({
+          status: "error",
+          path: entry.relativePath,
+          message: presentError(response.error),
+        });
       }
     });
   }
@@ -670,6 +802,60 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onClose={closeViewer}
           onNextItem={handleEndOfVolume}
         />
+        <section aria-label="作品メタデータ">
+          <h2>作品メタデータ</h2>
+          {metadataLoading && <p role="status">メタデータを読み込み中です。</p>}
+          {itemMetadata !== null && (
+            <>
+              <p>{itemMetadata.itemIdentity}</p>
+              <label>
+                作品メモ
+                <textarea
+                  aria-label="作品メモ"
+                  value={memoDraft}
+                  onChange={(event) => setMemoDraft(event.target.value)}
+                  rows={4}
+                />
+              </label>
+              <div>
+                <button
+                  type="button"
+                  disabled={metadataLoading}
+                  onClick={() => void persistMemo(memoDraft)}
+                >
+                  メモを保存
+                </button>
+                <button
+                  type="button"
+                  disabled={metadataLoading}
+                  onClick={() => void persistMemo("")}
+                >
+                  メモを消去
+                </button>
+              </div>
+              <label>
+                作品評価
+                <select
+                  aria-label="作品評価"
+                  value={itemMetadata.rating?.toString() ?? ""}
+                  disabled={metadataLoading}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    void persistRating(value === "" ? null : Number(value));
+                  }}
+                >
+                  <option value="">未設定</option>
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <option key={rating} value={rating}>
+                      {rating}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          {metadataNotice !== null && <p role="alert">{metadataNotice}</p>}
+        </section>
         {endOfVolumeNotice !== null && (
           <p className="end-of-volume-notice" role="status">
             {endOfVolumeNotice}
@@ -715,6 +901,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
         >
           お気に入り
+        </button>
+        <button
+          onClick={() => {
+            setHistoryOpen(true);
+            void refreshHistory();
+          }}
+        >
+          閲覧履歴
         </button>
         <button ref={helpTriggerRef} onClick={() => setHelpOpen(true)}>ヘルプ</button>
       </nav>
@@ -960,25 +1154,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               viewMode={catalogViewMode}
               onSelect={(entry) => setSelectedPath(entry.relativePath)}
               onNavigate={(entry) => navigate(entry.relativePath)}
-              onRead={(entry) => {
-                viewerGeneration.current += 1;
-                const requestGeneration = viewerGeneration.current;
-                setLoadState({ status: "loading", path: entry.relativePath });
-                void openComic(entry.relativePath, requestGeneration).then(
-                  (response) => {
-                    if (response.status === "ok") {
-                      setViewerSession(response.data);
-                      setLoadState({ status: "ready" });
-                    } else if (response.status === "error") {
-                      setLoadState({
-                        status: "error",
-                        path: entry.relativePath,
-                        message: presentError(response.error),
-                      });
-                    }
-                  },
-                );
-              }}
+              onRead={openComicEntry}
               thumbnailFor={(entry) =>
                 thumbnails[entry.relativePath] ?? { status: "loading" }
               }
@@ -1026,6 +1202,36 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onResolve={reResolveFavorite}
           onRemove={removeFavoriteEntry}
         />
+      )}
+      {historyOpen && (
+        <div className="dialog-backdrop">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="閲覧履歴"
+            className="history-dialog"
+          >
+            <h2>閲覧履歴</h2>
+            {historyLoading && <p role="status">履歴を読み込み中です。</p>}
+            {historyNotice !== null && <p role="alert">{historyNotice}</p>}
+            {!historyLoading && historyNotice === null && (
+              <ol>
+                {readingHistory.map((entry) => (
+                  <li key={entry.itemIdentity} data-history-item={entry.itemIdentity}>
+                    <span>{entry.itemIdentity}</span>
+                    <span>{entry.lastViewedAtMs}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <button type="button" onClick={() => void refreshHistory()}>
+              更新
+            </button>
+            <button type="button" onClick={() => setHistoryOpen(false)}>
+              閉じる
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );
