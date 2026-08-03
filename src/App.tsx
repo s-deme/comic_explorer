@@ -8,7 +8,9 @@ import {
   listFolder,
   getCatalogSettings,
   getItemMetadata,
+  getItemTags,
   getThumbnail,
+  listTags,
   listReadingHistory,
   openComic,
   pickLibraryRoot,
@@ -19,6 +21,10 @@ import {
   saveEndOfVolumePolicy,
   saveItemMemo,
   saveViewerSettings,
+  assignTag,
+  removeTag,
+  renameTag,
+  queryTags,
   setItemRating,
   searchLibrary,
   diagnoseLibrary,
@@ -32,6 +38,7 @@ import {
   type DiagnosticReport,
   type FavoriteEntry,
   type ItemMetadata,
+  type TagEntry,
   type ReadingHistoryEntry,
   type ViewerSession,
 } from "./features/library/client";
@@ -146,6 +153,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const favoriteGeneration = useRef(0);
   const metadataGeneration = useRef(0);
   const historyGeneration = useRef(0);
+  const tagGeneration = useRef(0);
+  const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -198,6 +207,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [tagQuery, setTagQuery] = useState("");
+  const [tagResults, setTagResults] = useState<TagEntry[]>([]);
+  const [selectedTags, setSelectedTags] = useState<TagEntry[]>([]);
+  const [tagNameDraft, setTagNameDraft] = useState("");
+  const [tagRenameDrafts, setTagRenameDrafts] = useState<Record<string, string>>({});
+  const [tagNotice, setTagNotice] = useState<string | null>(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
@@ -564,6 +581,166 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       }
     }
   }
+
+  async function refreshItemTags(itemIdentity: string) {
+    const requestGeneration = ++itemTagGeneration.current;
+    setTagNotice(null);
+    try {
+      const response = await getItemTags(itemIdentity, requestGeneration);
+      if (requestGeneration !== itemTagGeneration.current) return;
+      if (response.status === "ok") {
+        setSelectedTags(response.data.tags);
+      } else if (response.status === "error") {
+        setTagNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === itemTagGeneration.current) {
+        setTagNotice(presentUnexpectedError());
+      }
+    }
+  }
+
+  async function refreshTags(query = tagQuery) {
+    const requestGeneration = ++tagGeneration.current;
+    setTagsLoading(true);
+    setTagNotice(null);
+    try {
+      const response =
+        query.trim() === ""
+          ? await listTags(requestGeneration)
+          : await queryTags(query, requestGeneration);
+      if (requestGeneration !== tagGeneration.current) return;
+      if (response.status === "ok") {
+        setTagResults(response.data);
+        setTagRenameDrafts((current) => {
+          const next = { ...current };
+          for (const tag of response.data) {
+            if (next[tag.tagId] === undefined) next[tag.tagId] = tag.name;
+          }
+          return next;
+        });
+      } else if (response.status === "error") {
+        setTagNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === tagGeneration.current) {
+        setTagNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === tagGeneration.current) {
+        setTagsLoading(false);
+      }
+    }
+  }
+
+  function openTagsPanel() {
+    setTagsOpen(true);
+    setTagNotice(null);
+    void refreshTags("");
+    if (selectedPath !== null) void refreshItemTags(selectedPath);
+  }
+
+  function closeTagsPanel() {
+    setTagsOpen(false);
+    setTagNotice(null);
+  }
+
+  async function assignTagToSelected() {
+    if (selectedPath === null) return;
+    const requestGeneration = ++itemTagGeneration.current;
+    setTagsLoading(true);
+    setTagNotice(null);
+    try {
+      const response = await assignTag(
+        selectedPath,
+        tagNameDraft,
+        requestGeneration,
+      );
+      if (requestGeneration !== itemTagGeneration.current) return;
+      if (response.status === "ok") {
+        setSelectedTags(response.data.tags);
+        setTagNameDraft("");
+        await refreshTags(tagQuery);
+      } else if (response.status === "error") {
+        setTagNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === itemTagGeneration.current) {
+        setTagNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === itemTagGeneration.current) {
+        setTagsLoading(false);
+      }
+    }
+  }
+
+  async function removeTagFromSelected(tag: TagEntry) {
+    if (selectedPath === null) return;
+    const requestGeneration = ++itemTagGeneration.current;
+    setTagsLoading(true);
+    setTagNotice(null);
+    try {
+      const response = await removeTag(
+        selectedPath,
+        tag.tagId,
+        requestGeneration,
+      );
+      if (requestGeneration !== itemTagGeneration.current) return;
+      if (response.status === "ok") {
+        setSelectedTags(response.data.tags);
+        await refreshTags(tagQuery);
+      } else if (response.status === "error") {
+        setTagNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === itemTagGeneration.current) {
+        setTagNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === itemTagGeneration.current) {
+        setTagsLoading(false);
+      }
+    }
+  }
+
+  async function renameTagEntry(tag: TagEntry) {
+    const newName = tagRenameDrafts[tag.tagId] ?? tag.name;
+    const requestGeneration = ++tagGeneration.current;
+    setTagsLoading(true);
+    setTagNotice(null);
+    try {
+      const response = await renameTag(tag.tagId, newName, requestGeneration);
+      if (requestGeneration !== tagGeneration.current) return;
+      if (response.status === "ok") {
+        setTagRenameDrafts((current) => ({
+          ...current,
+          [response.data.tagId]: response.data.name,
+        }));
+        await refreshTags(tagQuery);
+        if (selectedPath !== null) await refreshItemTags(selectedPath);
+      } else if (response.status === "error") {
+        setTagNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === tagGeneration.current) {
+        setTagNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === tagGeneration.current) {
+        setTagsLoading(false);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!tagsOpen) return;
+    if (selectedPath === null) {
+      setSelectedTags([]);
+      return;
+    }
+    void refreshItemTags(selectedPath);
+  }, [selectedPath, tagsOpen]);
 
   async function runDiagnostics(retry = false) {
     const requestGeneration = ++diagnosticGeneration.current;
@@ -966,6 +1143,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <button onClick={() => setLibraryRoot(null)}>ファイル</button>
         <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>
         <button
+          type="button"
+          onClick={openTagsPanel}
+          aria-label="タグ管理"
+        >
+          タグ
+        </button>
+        <button
           onClick={() => {
             setFavoritesOpen(true);
             void refreshFavorites();
@@ -1335,6 +1519,124 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
             <button autoFocus onClick={closeHelp}>閉じる</button>
           </div>
+        </div>
+      )}
+      {tagsOpen && (
+        <div className="dialog-backdrop">
+          <section
+            className="tag-manager-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="タグ管理"
+          >
+            <div className="quick-access-heading">
+              <h2>タグ管理</h2>
+              <button type="button" onClick={closeTagsPanel}>
+                閉じる
+              </button>
+            </div>
+            <p>
+              選択中: {selectedPath ?? "項目を選択するとタグを付与できます。"}
+            </p>
+            {selectedPath !== null && (
+              <>
+                <form
+                  aria-label="タグ付与フォーム"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void assignTagToSelected();
+                  }}
+                >
+                  <label htmlFor="tag-name">タグ名</label>
+                  <input
+                    id="tag-name"
+                    aria-label="タグ名"
+                    value={tagNameDraft}
+                    onChange={(event) => setTagNameDraft(event.target.value)}
+                  />
+                  <button type="submit" disabled={tagsLoading}>
+                    タグを付与
+                  </button>
+                </form>
+                <div aria-label="選択項目のタグ">
+                  {selectedTags.length === 0 ? (
+                    <p role="status">タグはありません。</p>
+                  ) : (
+                    <ul>
+                      {selectedTags.map((tag) => (
+                        <li key={tag.tagId} data-item-tag-id={tag.tagId}>
+                          <span>{tag.name}</span>
+                          <button
+                            type="button"
+                            aria-label={`${tag.name}を除去`}
+                            onClick={() => void removeTagFromSelected(tag)}
+                            disabled={tagsLoading}
+                          >
+                            除去
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
+            <form
+              aria-label="タグ検索フォーム"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void refreshTags(tagQuery);
+              }}
+            >
+              <label htmlFor="tag-query">タグ検索</label>
+              <input
+                id="tag-query"
+                aria-label="タグ検索"
+                value={tagQuery}
+                onChange={(event) => {
+                  const query = event.target.value;
+                  setTagQuery(query);
+                  void refreshTags(query);
+                }}
+              />
+              <button type="submit" disabled={tagsLoading}>
+                検索
+              </button>
+            </form>
+            {tagNotice !== null && <p role="alert">{tagNotice}</p>}
+            {tagsLoading && <p role="status">タグを読み込み中です。</p>}
+            {!tagsLoading && tagResults.length === 0 && (
+              <p role="status">タグはありません。</p>
+            )}
+            {tagResults.length > 0 && (
+              <ul aria-label="タグ一覧">
+                {tagResults.map((tag) => (
+                  <li key={tag.tagId} data-tag-id={tag.tagId}>
+                    <span>{tag.name}</span>
+                    <span>{tag.itemCount}件</span>
+                    <input
+                      aria-label={`${tag.name}の新名称`}
+                      value={tagRenameDrafts[tag.tagId] ?? tag.name}
+                      onChange={(event) =>
+                        setTagRenameDrafts((current) => ({
+                          ...current,
+                          [tag.tagId]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label={`${tag.name}をrename`}
+                      onClick={() => void renameTagEntry(tag)}
+                      disabled={tagsLoading}
+                    >
+                      名前変更
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       )}
       {favoritesOpen && (

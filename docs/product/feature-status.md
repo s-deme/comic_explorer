@@ -87,7 +87,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-019 | ユーザー定義ショートカット | 操作割当変更 | Candidate | NOT TESTED | 希望 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-020 | 巻末動作設定・自動遷移 | 自動的に次の巻を開く設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/application/mod.rs` | [FT-B02-001](../testing/fr-b02-results.md#ft-b02-001) | C0採用、既定値auto_nextでREQ-MVP-016互換 |
 | FUT-C-021 | お気に入り保存 | お気に入り永続化 | Candidate | NOT TESTED | 希望 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
-| FUT-C-022 | タグ付与・検索 | タグ管理 | Candidate | NOT TESTED | 将来 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
+| FUT-C-022 | タグ付与・検索 | タグ管理 | Partial | BLOCKED | 将来 | FR-B10 | [FR-B10要件](../requirements/tag-management-requirements.md#fr-b10タグ管理要件); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/state/repository.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/lib.rs`; `src/features/library/client.ts`; `src/App.tsx`; `src/App.fr-b10.test.tsx` | [FR-B10結果](../testing/fr-b10-results.md)（semantic ACCEPT、focused exact4 4/4 PASS、App回帰39/39 PASS、Windows Rust 78 unit+1 process、typecheck/build PASS） | 最終frontend source SHA `6ee91612`、repository SHA `dc564575`。CoDDは`INCOMPLETE / NOT APPLICABLE`、Windows WebView2 native product UIは`UNMEASURED / BLOCKED`のため総合状態はPartial/BLOCKED。 |
 | FUT-C-023 | メモ保存 | メモ管理 | Partial | BLOCKED | 将来 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-001-作品identityとmemo); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07 exact5は5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、type/build exit0 | CoDDは3 SKIP/1 VACUOUS/verification 0のためINCOMPLETE/NOT APPLICABLE。Windows product gateはBLOCKED。 |
 | FUT-C-024 | 名前変更 | ファイル名変更 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-025 | 移動 | ファイル移動 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
@@ -192,6 +192,36 @@ Feature Lane fallback、quoted wrapper起動失敗、callback typing failure、c
 旧rootは [FR-B09結果](../testing/fr-b09-results.md) に履歴として記録し、受理PASS証跡へ再利用しない。
 最終差分は許可された四文書だけを対象とし、draft contamination 0、staged path 0、
 `git diff --check PASS`を確認した。commit/pushは行っていない。
+
+## FR-B10 最終受入証跡（cmd_400）
+
+FR-B10の実装とconnected semantic gateは受理済みである。focused exact4は4 PASS / 0 FAIL / 0 SKIP、
+App回帰は39 PASS / 0 FAIL / 0 SKIP、Windows offline Rustは78 unit + 1 process PASS / failed 0 /
+ignored 0 / SKIP 0、typecheck/buildはPASSである。最終focused source SHAは
+`6ee91612e6710ff20d97795110306324a14e584c8c9149ce18ffb90da1bc61ff`、repository source SHAは
+`dc56457520e18ed7b1e7a56e9257ee7e1d7a41417eadadf64d93ef5d88386913`である。
+
+accepted evidenceは[FR-B10結果](../testing/fr-b10-results.md)の不変ledgerに集約する。focused exact4・
+typecheck・buildは`queue/reports/evidence/cmd_400/fr_b10_byrole_exact_typing_resume/`、App回帰は
+`queue/reports/evidence/cmd_400/fr_b10_canonical_downstream_gates/`、Rustは
+`queue/reports/evidence/cmd_400/fr_b10_schema_v4_migration_repair/`を参照し、今回これらを再実行していない。
+App回帰は変更されていない`src/App.test.tsx`のSHA `1b23b6de8eff500101da99a480d39b604d24538e3ecfd5c9cceeaf71be4197ba`
+に束縛されたrawを再利用した。
+
+FT-B10-001はstable identity付きassign/removeと冪等性、FT-B10-002はquery・Unicode・empty queryのlocal-only
+挙動、FT-B10-003はrename・duplicate merge・invalid拒否、FT-B10-004はv1→v2→v3→v4 migration・reopen/
+restart persistence・原本/sidecar差分0を受理した。migrationは各versionを一段ずつtransactionで進め、v4で
+`tags`、`item_tags`、query indexを追加する。
+
+Feature Lane fallback、selector、migration、typingのrejected rootsは受入PASSへ昇格させず履歴として保持する。
+CoDDは承認済み`queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate/`のrawを参照する。
+verifyの生値は`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
+`INCOMPLETE / NOT APPLICABLE`としてPASS数へ加算しない。例外は三つの構造的SKIPだけで、functional testの
+SKIPを免除しない。Windows WebView2 native product UIとOS syscallは`UNMEASURED / BLOCKED`のまま保持する。
+初回FAIL、selector、migration、typingのrejected rootsは結果文書で履歴のみとして開示する。
+
+最終project diffは機能/test 6 path + 本四文書4 path = exact 10、contamination 0、staged path 0、
+`git diff --check PASS`であり、commit/pushは行わない。
 
 ## 正本運用規則
 

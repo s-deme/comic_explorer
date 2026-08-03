@@ -4,12 +4,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath};
+use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -407,6 +407,195 @@ impl StateStore {
         Ok(())
     }
 
+    pub fn list_tags(&self) -> Result<Vec<(String, String, u64)>, AppError> {
+        self.query_tags("")
+    }
+
+    pub fn query_tags(&self, query: &str) -> Result<Vec<(String, String, u64)>, AppError> {
+        let normalized_query = normalize_tag_query(query)?;
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT t.tag_id, t.name, COUNT(it.item_identity) AS item_count
+                 FROM tags t
+                 LEFT JOIN item_tags it ON it.tag_id=t.tag_id
+                 GROUP BY t.tag_id, t.name
+                 ORDER BY t.name ASC, t.tag_id ASC",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map([], tag_from_row)
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .filter(|value| match value {
+                Ok(tag) => normalized_query.is_empty() || tag.1.contains(&normalized_query),
+                Err(_) => true,
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn tags_for_item(
+        &self,
+        item_identity: &str,
+    ) -> Result<Vec<(String, String, u64)>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT t.tag_id, t.name, COUNT(all_assignments.item_identity) AS item_count
+                 FROM tags t
+                 INNER JOIN item_tags selected ON selected.tag_id=t.tag_id
+                 LEFT JOIN item_tags all_assignments ON all_assignments.tag_id=t.tag_id
+                 WHERE selected.item_identity=?1
+                 GROUP BY t.tag_id, t.name
+                 ORDER BY t.name ASC, t.tag_id ASC",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map([item_identity], tag_from_row)
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn assign_tag(
+        &self,
+        item_identity: &str,
+        tag_name: &str,
+        now_ms: i64,
+    ) -> Result<Vec<(String, String, u64)>, AppError> {
+        let normalized = normalize_tag_name(tag_name)?;
+        let tag_id = tag_id_for_name(&normalized);
+        let transaction = self
+            .connection
+            .unchecked_transaction()
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO tags(tag_id, name, created_at_ms, updated_at_ms)
+                 VALUES(?1, ?2, ?3, ?3)
+                 ON CONFLICT(name) DO UPDATE SET updated_at_ms=excluded.updated_at_ms",
+                params![tag_id, normalized, now_ms],
+            )
+            .map_err(database_error)?;
+        let canonical_tag_id = transaction
+            .query_row(
+                "SELECT tag_id FROM tags WHERE name=?1",
+                [normalized.as_str()],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO item_tags(item_identity, tag_id, assigned_at_ms)
+                 VALUES(?1, ?2, ?3)
+                 ON CONFLICT(item_identity, tag_id) DO NOTHING",
+                params![item_identity, canonical_tag_id, now_ms],
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+        self.tags_for_item(item_identity)
+    }
+
+    pub fn remove_tag(
+        &self,
+        item_identity: &str,
+        tag_id: &str,
+    ) -> Result<Vec<(String, String, u64)>, AppError> {
+        self.connection
+            .execute(
+                "DELETE FROM item_tags WHERE item_identity=?1 AND tag_id=?2",
+                params![item_identity, tag_id],
+            )
+            .map_err(database_error)?;
+        self.tags_for_item(item_identity)
+    }
+
+    pub fn rename_tag(
+        &self,
+        tag_id: &str,
+        new_name: &str,
+        now_ms: i64,
+    ) -> Result<(String, String, u64), AppError> {
+        let normalized = normalize_tag_name(new_name)?;
+        let target_id = tag_id_for_name(&normalized);
+        let transaction = self
+            .connection
+            .unchecked_transaction()
+            .map_err(database_error)?;
+        let exists = transaction
+            .query_row(
+                "SELECT 1 FROM tags WHERE tag_id=?1",
+                [tag_id],
+                |_row| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?;
+        if exists.is_none() {
+            return Err(AppError {
+                code: ErrorCode::NotFound,
+                message: "Tag was not found.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        if tag_id == target_id {
+            transaction
+                .execute(
+                    "UPDATE tags SET name=?1, updated_at_ms=?2 WHERE tag_id=?3",
+                    params![normalized, now_ms, tag_id],
+                )
+                .map_err(database_error)?;
+        } else {
+            let target_exists = transaction
+                .query_row(
+                    "SELECT 1 FROM tags WHERE tag_id=?1",
+                    [target_id.as_str()],
+                    |_row| Ok(()),
+                )
+                .optional()
+                .map_err(database_error)?
+                .is_some();
+            if !target_exists {
+                transaction
+                    .execute(
+                        "INSERT INTO tags(tag_id, name, created_at_ms, updated_at_ms)
+                         SELECT ?1, ?2, created_at_ms, ?3 FROM tags WHERE tag_id=?4",
+                        params![target_id, normalized, now_ms, tag_id],
+                    )
+                    .map_err(database_error)?;
+            }
+            transaction
+                .execute(
+                    "INSERT INTO item_tags(item_identity, tag_id, assigned_at_ms)
+                     SELECT item_identity, ?1, assigned_at_ms FROM item_tags WHERE tag_id=?2
+                     ON CONFLICT(item_identity, tag_id) DO NOTHING",
+                    params![target_id, tag_id],
+                )
+                .map_err(database_error)?;
+            transaction
+                .execute("DELETE FROM item_tags WHERE tag_id=?1", [tag_id])
+                .map_err(database_error)?;
+            transaction
+                .execute("DELETE FROM tags WHERE tag_id=?1", [tag_id])
+                .map_err(database_error)?;
+        }
+        let renamed = transaction
+            .query_row(
+                "SELECT t.tag_id, t.name, COUNT(it.item_identity)
+                 FROM tags t
+                 LEFT JOIN item_tags it ON it.tag_id=t.tag_id
+                 WHERE t.tag_id=?1
+                 GROUP BY t.tag_id, t.name",
+                [target_id.as_str()],
+                tag_from_row,
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+        Ok(renamed)
+    }
+
     pub fn source_fingerprint(
         &self,
         item_key: &str,
@@ -572,6 +761,40 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
+            .pragma_update(None, "user_version", 3)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 4 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS tags (
+                    tag_id TEXT PRIMARY KEY NOT NULL,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL
+                 );
+                 CREATE TABLE IF NOT EXISTS item_tags (
+                    item_identity TEXT NOT NULL,
+                    tag_id TEXT NOT NULL,
+                    assigned_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY(item_identity, tag_id),
+                    FOREIGN KEY(tag_id) REFERENCES tags(tag_id) ON DELETE CASCADE
+                 );
+                 CREATE INDEX IF NOT EXISTS tags_name
+                   ON tags(name);
+                 CREATE INDEX IF NOT EXISTS item_tags_tag_id
+                   ON item_tags(tag_id, item_identity);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![4, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
             .pragma_update(None, "user_version", SCHEMA_VERSION)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
@@ -635,6 +858,77 @@ fn item_kind_from_storage(value: &str) -> Result<ItemKind, AppError> {
             retryable: false,
         }),
     }
+}
+
+fn tag_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<(String, String, u64)> {
+    Ok((
+        row.get(0)?,
+        row.get(1)?,
+        row.get::<_, i64>(2)?.max(0) as u64,
+    ))
+}
+
+fn tag_id_for_name(name: &str) -> String {
+    item_id_for(&format!("tag:{name}"))
+        .to_string()
+        .replacen("item-", "tag-", 1)
+}
+
+fn normalize_tag_name(value: &str) -> Result<String, AppError> {
+    let mut output = String::new();
+    let mut pending_space = false;
+    for character in value.chars() {
+        if character == '\0' {
+            return Err(AppError {
+                code: ErrorCode::InvalidRequest,
+                message: "Tag name contains an invalid character.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        let folded = match character {
+            '\u{3000}' => ' ',
+            '\u{ff01}'..='\u{ff5e}' => {
+                char::from_u32(character as u32 - 0xfee0).unwrap_or(character)
+            }
+            _ => character,
+        };
+        if folded.is_whitespace() {
+            if !output.is_empty() {
+                pending_space = true;
+            }
+            continue;
+        }
+        if pending_space {
+            output.push(' ');
+            pending_space = false;
+        }
+        output.extend(folded.to_lowercase());
+    }
+    if output.len() > 128 {
+        return Err(AppError {
+            code: ErrorCode::InvalidRequest,
+            message: "Tag name exceeds 128 bytes.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    if output.is_empty() {
+        return Err(AppError {
+            code: ErrorCode::InvalidRequest,
+            message: "Tag name must not be empty.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    Ok(output)
+}
+
+fn normalize_tag_query(value: &str) -> Result<String, AppError> {
+    if value.trim().is_empty() {
+        return Ok(String::new());
+    }
+    normalize_tag_name(value)
 }
 
 fn isolate_database(paths: &AppPaths) -> Result<PathBuf, AppError> {
@@ -936,7 +1230,7 @@ mod tests {
                 .connection()
                 .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
                 .unwrap(),
-            3
+            SCHEMA_VERSION
         );
         assert_eq!(store.load_settings().unwrap().sort_field, "modified");
         assert_eq!(
@@ -1042,6 +1336,217 @@ mod tests {
             fs::read(&library_management_file).unwrap(),
             library_management_before
         );
+        fs::remove_dir_all(paths.root).unwrap();
+        fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[test]
+    fn fr_b10_ft_b10_001_assign_remove_is_idempotent_and_stable() {
+        let paths = temporary_paths("fr-b10-assign-remove");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let item_identity = item_id_for("Series/01.cbz").to_string();
+        let expected_tag_id = tag_id_for_name("favorite");
+
+        let first = store
+            .assign_tag(&item_identity, " Ｆａｖｏｒｉｔｅ ", 1)
+            .unwrap();
+        let second = store.assign_tag(&item_identity, "favorite", 2).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first, vec![(expected_tag_id.clone(), "favorite".into(), 1)]);
+        assert_eq!(item_id_for("Series/01.cbz").to_string(), item_identity);
+
+        let removed = store.remove_tag(&item_identity, &expected_tag_id).unwrap();
+        assert!(removed.is_empty());
+        assert!(
+            store
+                .remove_tag(&item_identity, &expected_tag_id)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            store.query_tags("").unwrap(),
+            vec![(expected_tag_id, "favorite".into(), 0)]
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b10_ft_b10_002_query_handles_unicode_and_empty_input() {
+        let paths = temporary_paths("fr-b10-query");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        store
+            .assign_tag(
+                &item_id_for("Series/01.cbz").to_string(),
+                " Ｆａｖｏｒｉｔｅ ",
+                1,
+            )
+            .unwrap();
+        store
+            .assign_tag(&item_id_for("Series/02.cbz").to_string(), "読書", 2)
+            .unwrap();
+
+        let favorite = store.query_tags("ＦＡＶ").unwrap();
+        assert_eq!(favorite.len(), 1);
+        assert_eq!(favorite[0].1, "favorite");
+        assert_eq!(store.query_tags("読").unwrap().len(), 1);
+        assert_eq!(store.query_tags(" \u{3000} ").unwrap().len(), 2);
+        assert_eq!(store.list_tags().unwrap().len(), 2);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b10_ft_b10_003_rename_merges_duplicates_and_rejects_invalid_names() {
+        let paths = temporary_paths("fr-b10-rename");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let first_item = item_id_for("Series/01.cbz").to_string();
+        let second_item = item_id_for("Series/02.cbz").to_string();
+        store.assign_tag(&first_item, "red", 1).unwrap();
+        store.assign_tag(&first_item, "blue", 2).unwrap();
+        store.assign_tag(&second_item, "blue", 3).unwrap();
+
+        let renamed = store
+            .rename_tag(&tag_id_for_name("red"), " Ｂｌｕｅ ", 4)
+            .unwrap();
+        assert_eq!(renamed, (tag_id_for_name("blue"), "blue".into(), 2));
+        assert_eq!(store.tags_for_item(&first_item).unwrap().len(), 1);
+        assert_eq!(store.tags_for_item(&second_item).unwrap().len(), 1);
+        assert_eq!(store.query_tags("").unwrap().len(), 1);
+
+        let same_tag = store
+            .rename_tag(&tag_id_for_name("blue"), "blue", 5)
+            .unwrap();
+        assert_eq!(same_tag, renamed);
+        assert_eq!(
+            store.assign_tag(&first_item, " \t\n ", 6).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        assert_eq!(
+            store
+                .rename_tag(&tag_id_for_name("blue"), "\0bad", 7)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+        assert_eq!(
+            store
+                .rename_tag("tag-does-not-exist", "new", 8)
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn fr_b10_ft_b10_004_v3_migration_restart_and_source_separation() {
+        let paths = temporary_paths("fr-b10-migration");
+        let fixture_root = std::env::temp_dir().join(format!(
+            "comic-explorer-fr-b10-fixture-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let original_file = fixture_root.join("original/Series/01.cbz");
+        let sidecar_file = fixture_root.join("sidecar/Series/01.cbz.json");
+        fs::create_dir_all(original_file.parent().unwrap()).unwrap();
+        fs::create_dir_all(sidecar_file.parent().unwrap()).unwrap();
+        fs::write(&original_file, b"original comic bytes").unwrap();
+        fs::write(&sidecar_file, b"sidecar metadata bytes").unwrap();
+        let original_before = fs::read(&original_file).unwrap();
+        let sidecar_before = fs::read(&sidecar_file).unwrap();
+
+        paths.create(None).unwrap();
+        {
+            let connection = Connection::open(&paths.database).unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE settings (
+                        key TEXT PRIMARY KEY NOT NULL,
+                        value TEXT NOT NULL
+                     );
+                     CREATE TABLE reading_positions (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        page_key TEXT NOT NULL,
+                        natural_ordinal INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE source_fingerprints (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        modified_ns TEXT NOT NULL,
+                        detail_hash TEXT
+                     );
+                     CREATE TABLE thumbnail_index (
+                        content_hash TEXT PRIMARY KEY NOT NULL,
+                        relative_path TEXT NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        width INTEGER NOT NULL,
+                        height INTEGER NOT NULL,
+                        last_access_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE schema_migrations (
+                        version INTEGER PRIMARY KEY NOT NULL,
+                        applied_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE favorites (
+                        favorite_id TEXT PRIMARY KEY NOT NULL,
+                        item_identity TEXT NOT NULL UNIQUE,
+                        relative_path TEXT NOT NULL,
+                        item_kind TEXT NOT NULL,
+                        size_bytes INTEGER,
+                        modified_ms INTEGER,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE memos (
+                        item_identity TEXT PRIMARY KEY NOT NULL,
+                        body TEXT NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE reading_history (
+                        item_identity TEXT PRIMARY KEY NOT NULL,
+                        last_viewed_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE ratings (
+                        item_identity TEXT PRIMARY KEY NOT NULL,
+                        rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(1, 1);
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(2, 2);
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(3, 3);
+                     PRAGMA user_version=3;",
+                )
+                .unwrap();
+        }
+
+        {
+            let (store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            assert_eq!(
+                store
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                4
+            );
+            let item_identity = item_id_for("Series/01.cbz").to_string();
+            store.assign_tag(&item_identity, "migrated", 10).unwrap();
+            assert_eq!(store.query_tags("migrated").unwrap().len(), 1);
+        }
+
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        let restored = store
+            .tags_for_item(&item_id_for("Series/01.cbz").to_string())
+            .unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].1, "migrated");
+        drop(store);
+        assert_eq!(fs::read(&original_file).unwrap(), original_before);
+        assert_eq!(fs::read(&sidecar_file).unwrap(), sidecar_before);
         fs::remove_dir_all(paths.root).unwrap();
         fs::remove_dir_all(fixture_root).unwrap();
     }

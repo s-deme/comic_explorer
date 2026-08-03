@@ -341,6 +341,21 @@ pub struct ItemMetadata {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TagEntry {
+    pub tag_id: String,
+    pub name: String,
+    pub item_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemTags {
+    pub item_identity: RelativePath,
+    pub tags: Vec<TagEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReadingHistoryEntry {
     pub item_identity: RelativePath,
     pub last_viewed_at_ms: i64,
@@ -668,6 +683,206 @@ fn load_item_metadata(
         item_identity: item_identity.clone(),
         memo: store.memo(item_identity.as_str())?,
         rating: store.rating(item_identity.as_str())?,
+    })
+}
+
+fn tag_entries(rows: Vec<(String, String, u64)>) -> Vec<TagEntry> {
+    rows.into_iter()
+        .map(|(tag_id, name, item_count)| TagEntry {
+            tag_id,
+            name,
+            item_count,
+        })
+        .collect()
+}
+
+fn load_item_tags(store: &StateStore, item_identity: &RelativePath) -> Result<ItemTags, AppError> {
+    let stable_identity = item_id_for(item_identity.as_str()).to_string();
+    Ok(ItemTags {
+        item_identity: item_identity.clone(),
+        tags: tag_entries(store.tags_for_item(&stable_identity)?),
+    })
+}
+
+#[tauri::command]
+pub fn get_item_tags(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+) -> Result<Response<ItemTags>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let data = match load_item_tags(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn list_tags(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<TagEntry>>, String> {
+    query_tags(state, context, String::new())
+}
+
+#[tauri::command]
+pub fn query_tags(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    query: String,
+) -> Result<Response<Vec<TagEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let rows = match store.query_tags(&query) {
+        Ok(rows) => rows,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: tag_entries(rows),
+    })
+}
+
+#[tauri::command]
+pub fn assign_tag(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+    tag_name: String,
+) -> Result<Response<ItemTags>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stable_identity = item_id_for(item_identity.as_str()).to_string();
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    if let Err(error) = store.assign_tag(&stable_identity, &tag_name, unix_millis()) {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_item_tags(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn remove_tag(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_identity: String,
+    tag_id: String,
+) -> Result<Response<ItemTags>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_identity = match metadata_item_identity(item_identity) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if tag_id.trim().is_empty() {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Tag id is invalid."),
+        ));
+    }
+    let stable_identity = item_id_for(item_identity.as_str()).to_string();
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    if let Err(error) = store.remove_tag(&stable_identity, &tag_id) {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_item_tags(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn rename_tag(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    tag_id: String,
+    new_name: String,
+) -> Result<Response<TagEntry>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if tag_id.trim().is_empty() {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::InvalidRequest, "Tag id is invalid."),
+        ));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    let (tag_id, name, item_count) = match store.rename_tag(&tag_id, &new_name, unix_millis()) {
+        Ok(tag) => tag,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: TagEntry {
+            tag_id,
+            name,
+            item_count,
+        },
     })
 }
 

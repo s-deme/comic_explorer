@@ -320,6 +320,79 @@ export interface ItemMetadata {
   rating: number | null;
 }
 
+export interface TagEntry {
+  tagId: string;
+  name: string;
+  itemCount: number;
+}
+
+export interface ItemTags {
+  itemIdentity: RelativePath;
+  tags: TagEntry[];
+}
+
+export async function getItemTags(
+  itemIdentity: string,
+  generation: number,
+): Promise<ApiResponse<ItemTags>> {
+  return invoke("get_item_tags", {
+    context: context(generation),
+    itemIdentity,
+  });
+}
+
+export async function listTags(
+  generation: number,
+): Promise<ApiResponse<TagEntry[]>> {
+  return invoke("list_tags", { context: context(generation) });
+}
+
+export async function queryTags(
+  query: string,
+  generation: number,
+): Promise<ApiResponse<TagEntry[]>> {
+  return invoke("query_tags", {
+    context: context(generation),
+    query,
+  });
+}
+
+export async function assignTag(
+  itemIdentity: string,
+  tagName: string,
+  generation: number,
+): Promise<ApiResponse<ItemTags>> {
+  return invoke("assign_tag", {
+    context: context(generation),
+    itemIdentity,
+    tagName,
+  });
+}
+
+export async function removeTag(
+  itemIdentity: string,
+  tagId: string,
+  generation: number,
+): Promise<ApiResponse<ItemTags>> {
+  return invoke("remove_tag", {
+    context: context(generation),
+    itemIdentity,
+    tagId,
+  });
+}
+
+export async function renameTag(
+  tagId: string,
+  newName: string,
+  generation: number,
+): Promise<ApiResponse<TagEntry>> {
+  return invoke("rename_tag", {
+    context: context(generation),
+    tagId,
+    newName,
+  });
+}
+
 export interface ReadingHistoryEntry {
   itemIdentity: RelativePath;
   lastViewedAtMs: number;

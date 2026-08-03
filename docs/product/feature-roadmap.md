@@ -44,7 +44,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B05、FR-B06、FR-B08〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。
+FR-B05、FR-B06、FR-B08、FR-B11〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はsemantic gateを受理し、accepted rawを同期済みだが、CoDD structural exceptionとWindows WebView2 native product UI未測定のため`Blocked`で保持する。
 FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWindows product gateが残るため
 `Partial / BLOCKED`で保持する。
 
@@ -66,8 +66,8 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
 | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Partial / BLOCKED`（機能raw受理、CoDD INCOMPLETE、Windows product gate BLOCKED） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
-| `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Planned` |
-| `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Planned` |
+| `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
+| `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Blocked`（semantic ACCEPT、CoDD非PASS・Windows UI未測定） |
 | `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Planned` |
 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned` |
 
@@ -378,8 +378,11 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B10 — tag 管理（Batch 10）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。台帳上の原子機能が1件なので、
-  3〜5機能へ人工分割せず、付与・検索・永続化を一つの縦切りで扱う。
+- **状態:** `Blocked`。実装とconnected semantic gateは受理済みだが、CoDD structural exceptionの生値が
+  `INCOMPLETE / NOT APPLICABLE`であり、Windows WebView2 native product UIが`UNMEASURED / BLOCKED`のため、
+  台帳上の原子機能は `Partial / BLOCKED` とする。初回FAIL、selector、migration、typingのrejected rootsは
+  受入証跡へ昇格せず履歴として保持する。台帳上の原子機能が1件なので、3〜5機能へ人工分割せず、付与・検索・
+  永続化を一つの縦切りで扱う。
 - **対象 feature ID:** `FUT-C-022`。
 - **user outcome:** 読者が作品へ tag を付け、tag で検索し、再起動後も同じ分類を利用できる。
 - **共通基盤:** B06/B07 と共有できる local metadata schema、tag normalization、query index、
@@ -387,11 +390,38 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 - **依存:** local-only metadata と stable path identity。`FUT-D-004` の作品別表示設定とは
   別機能であり、未決定のまま結合しない。
 - **実装順:** (1) tag schema/normalization、(2) assign/remove、(3) tag query、
-  (4) rename/merge/empty、(5) migration と restart persistence。
+  (4) rename/merge/invalid/empty、(5) migration と restart persistence。
 - **focused test 範囲:** `FT-B10-001` assign/remove、`FT-B10-002` query/Unicode/empty、
-  `FT-B10-003` rename/duplicate、`FT-B10-004` migration/restart/原本差分0。
-- **batch末尾 gate:** focused test を SKIP 0 で実測し、metadata の局所性、外部通信0、
-  library navigation の回帰0を確認して `BATCH-END-GATE`。
+  `FT-B10-003` rename/merge/invalid、`FT-B10-004` migration/restart/原本差分0。
+- **accepted source binding:** frontend focused source SHA `6ee91612e6710ff20d97795110306324a14e584c8c9149ce18ffb90da1bc61ff`、
+  repository SHA `dc56457520e18ed7b1e7a56e9257ee7e1d7a41417eadadf64d93ef5d88386913`。
+- **accepted gates:** focused exact4 `4 PASS / 0 FAIL / 0 SKIP`、App回帰 `39 PASS / 0 FAIL / 0 SKIP`、
+  Windows offline Rust `78 unit + 1 process PASS / failed 0 / ignored 0 / SKIP 0`、typecheck/build PASS。
+  詳細なmanifest/stdout/stderr SHAは[FR-B10結果](../testing/fr-b10-results.md)のledgerを正本とする。
+- **batch末尾 gate:** accepted rawを再実行せず、metadataの局所性、外部通信0、library navigationの回帰0を
+  受理する。ただしCoDD verifyは`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification
+  tests 0の`INCOMPLETE / NOT APPLICABLE`であり、Windows WebView2 native product UIは`UNMEASURED / BLOCKED`。
+
+#### FR-B10 実装・受入証跡
+
+- **採用要件:** [FR-B10 タグ管理要件](../requirements/tag-management-requirements.md)。
+- **実装根拠:** `src-tauri/src/state/repository.rs`、`src-tauri/src/application/mod.rs`、
+  `src-tauri/src/lib.rs`、`src/features/library/client.ts`、`src/App.tsx`、
+  `src/App.fr-b10.test.tsx`。
+- **C0/Feature guard:** Executable C0はexact FT-B10-001〜004、selected_count 4、canonical command、owned SHA、
+  raw destinationを固定した。Feature guard checkpoints（before_first_edit/before_test/before_evidence）はPASSであり、
+  新validator、plugin、contract、schema版は追加していない。
+- **canonical-preflightの履歴:** `canonical-preflight`は`validate_incident_attempt.py`不在によりfail-closedとなった。
+  standalone validator/toolchain matrixはPASSだったという履歴事実として記録するが、これは受入PASS証跡ではなく、
+  canonical-preflightの全面PASSへ読み替えない。
+- **migration:** v1のbase metadata、v2のfavorites、v3のmemo/history/rating、v4の`tags`/`item_tags`/
+  indexを各一段のtransactionで適用し、schema markerをv3からv4へ直接昇格させない。accepted Rustで再open後の
+  tag復元、既存値保持、original/sidecar差分0を確認した。
+- **CoDD:** approved structural reference `queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate/`
+  を不変参照する。三つの構造的SKIPだけを例外とし、`task_completion`のVacuousはPASSへ加算しない。
+- **最終差分:** Feature Lane fallbackと各rejected rootは履歴のみとし、機能/test 6 path + 四文書4 path = exact 10、
+  contamination 0、staged path 0、
+  `git diff --check PASS`。commit/pushは行わず、Gunshiのcomplete diff QCを待つ。
 
 ### FR-B11 — 入力拡張（Batch 11）
 
