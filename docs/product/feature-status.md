@@ -84,7 +84,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-016 | 横スクロール | 閲覧方式切替 | Partial | BLOCKED | 希望 | FR-B04 | [FR-B04要件](../requirements/viewer-layout-requirements.md#req-fr-b04-001-layout-enum-and-default); Q5-1 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/model.ts`; `src/features/viewer/Viewer.tsx`; `src/styles.css`; `src/App.tsx` | [FT-B04-002](../testing/fr-b04-results.md#ft-b04-002), [FT-B04-003](../testing/fr-b04-results.md#ft-b04-003), [FT-B04-005](../testing/fr-b04-results.md#ft-b04-005) | focused connected evidenceはPASSだがcanonical aggregateがFAIL。新redoのRCA完了までPASS化しない |
 | FUT-C-017 | フルスクリーン | 全画面閲覧 | Partial | BLOCKED | 希望 | FR-B04 | [FR-B04要件](../requirements/viewer-layout-requirements.md#req-fr-b04-004-orthogonal-os-fullscreen); Q5-1 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/fullscreen.ts`; `src/features/viewer/Viewer.tsx`; `src/App.tsx`; `src-tauri/capabilities/default.json` | [FT-B04-004](../testing/fr-b04-results.md#ft-b04-004) | connected adapter/component evidenceはfocused PASSだがcanonical aggregate FAIL、Windows WebView2製品実機gateもBLOCKED。未実測をPASS化しない |
 | FUT-C-018 | 任意倍率ズーム | 任意倍率で拡大・縮小 | Implemented | PASS | 希望 | FR-B01 | [FR-B01要件](../requirements/viewer-scale-requirements.md#req-fr-b01-002-任意倍率の境界); Q5-4 [questionnaire](../requirements/product-questionnaire.md) | `src/features/viewer/model.ts`; `src/features/viewer/Viewer.tsx` | [FT-B01-001](../testing/fr-b01-results.md#ft-b01-001) | FR-B01採用、25%〜400%を0.1倍刻みで実測 |
-| FUT-C-019 | ユーザー定義ショートカット | 操作割当変更 | Candidate | NOT TESTED | 希望 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
+| FUT-C-019 | ユーザー定義ショートカット | 操作割当変更 | Partial | BLOCKED | 希望 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md) | `src/features/input/shortcuts.ts`; `src/App.tsx`; `src/features/viewer/Viewer.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs`; `src-tauri/src/lib.rs`; `src/App.fr-b11.test.tsx` | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-001/004/005 semantic ACCEPT、focused exact3 3/3 PASS・SKIP0） | keyboard三契約は受理済み。CoDD structural gateとWindows WebView2 native product UIは未完了・未測定のためFR-B11総合はPartial/BLOCKED。 |
 | FUT-C-020 | 巻末動作設定・自動遷移 | 自動的に次の巻を開く設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/application/mod.rs` | [FT-B02-001](../testing/fr-b02-results.md#ft-b02-001) | C0採用、既定値auto_nextでREQ-MVP-016互換 |
 | FUT-C-021 | お気に入り保存 | お気に入り永続化 | Candidate | NOT TESTED | 希望 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-022 | タグ付与・検索 | タグ管理 | Partial | BLOCKED | 将来 | FR-B10 | [FR-B10要件](../requirements/tag-management-requirements.md#fr-b10タグ管理要件); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/state/repository.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/lib.rs`; `src/features/library/client.ts`; `src/App.tsx`; `src/App.fr-b10.test.tsx` | [FR-B10結果](../testing/fr-b10-results.md)（semantic ACCEPT、focused exact4 4/4 PASS、App回帰39/39 PASS、Windows Rust 78 unit+1 process、typecheck/build PASS） | 最終frontend source SHA `6ee91612`、repository SHA `dc564575`。CoDDは`INCOMPLETE / NOT APPLICABLE`、Windows WebView2 native product UIは`UNMEASURED / BLOCKED`のため総合状態はPartial/BLOCKED。 |
@@ -117,8 +117,8 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-003 | 外部データ送信 | 利用状況等の送信 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q8-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | いかなるデータも外部送信しない方針 |
 | FUT-R-004 | 閲覧履歴 | 閲覧履歴の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-002-成功した閲覧のhistory); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-002を含むfocused exact5 5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、production open-history seam接続済み | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
 | FUT-R-005 | 評価 | 評価情報の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-003-rating); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-003を含むfocused exact5 5/5 PASS・SKIP0、App回帰39/39、Rust exact5・66 unit+1 process、FT-B07-005 real snapshot/hash diff0 | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
-| FUT-R-006 | タッチ操作 | タッチ入力 | Candidate | NOT TESTED | 未定 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
-| FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | 将来 | Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 未選択だがMVP対象外。恒久拒否とはせず候補として保持 |
+| FUT-R-006 | タッチ操作 | タッチ入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-002 `BLOCKED_UNMEASURED`） | touch実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
+| FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-003 `BLOCKED_UNMEASURED`） | gamepad実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-008 | 閲覧時の原本自動変更 | 原本への自動書込み | Rejected | NOT TESTED | 非採用 | — | Q7-2/Q8-4 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 読取専用・原本非破壊の恒久方針。方針変更時のみ再評価 |
 
 ## FR-B07 最終受入証跡（cmd_400）
@@ -222,6 +222,23 @@ SKIPを免除しない。Windows WebView2 native product UIとOS syscallは`UNME
 
 最終project diffは機能/test 6 path + 本四文書4 path = exact 10、contamination 0、staged path 0、
 `git diff --check PASS`であり、commit/pushは行わない。
+
+## FR-B11 最終受入証跡（cmd_400）
+
+FR-B11はkeyboard入力の三契約（FT-B11-001、FT-B11-004、FT-B11-005）をsemantic ACCEPTする。
+touch（FT-B11-002）とgamepad（FT-B11-003）は実機観測ができず `BLOCKED_UNMEASURED` とし、PASS/SKIPへ
+加算しない。したがってFR-B11全体と台帳上の実装済み部分は `Partial / BLOCKED` である。
+
+accepted evidenceの詳細なmanifest、source SHA、stdout/stderr SHA、却下履歴、CoDD境界は
+[FR-B11結果](../testing/fr-b11-results.md)に集約する。今回の文書同期ではfunctional test、App回帰、
+Windows Rust、typecheck、build、CoDDを再実行していない。
+
+最終の機能/test 8 pathは、`src-tauri/src/application/mod.rs`、`src-tauri/src/lib.rs`、
+`src-tauri/src/state/repository.rs`、`src/App.tsx`、`src/features/library/client.ts`、
+`src/features/viewer/Viewer.tsx`、`src/features/input/shortcuts.ts`、
+`src/App.fr-b11.test.tsx`である。四文書を加えたexact 12 pathだけを今回の最終差分境界とし、
+false C0、rustfmt、E0382、TS2322の旧rootはaccepted PASS証跡へ混入させない。commit/pushは行わず、
+Gunshiのcomplete diff QCを待つ。
 
 ## 正本運用規則
 

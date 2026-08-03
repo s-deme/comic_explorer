@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,6 +11,33 @@ use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
 const SCHEMA_VERSION: i64 = 4;
+
+const SHORTCUT_COMMANDS: [&str; 8] = [
+    "nextPage",
+    "previousPage",
+    "closeViewer",
+    "singlePage",
+    "spreadPage",
+    "toggleDirection",
+    "zoomIn",
+    "zoomOut",
+];
+
+fn default_shortcut_bindings() -> BTreeMap<String, String> {
+    [
+        ("nextPage", "PageDown"),
+        ("previousPage", "PageUp"),
+        ("closeViewer", "Escape"),
+        ("singlePage", "1"),
+        ("spreadPage", "2"),
+        ("toggleDirection", "R"),
+        ("zoomIn", "+"),
+        ("zoomOut", "-"),
+    ]
+    .into_iter()
+    .map(|(command, shortcut)| (command.to_owned(), shortcut.to_owned()))
+    .collect()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -24,6 +52,7 @@ pub struct Settings {
     pub scale_mode: String,
     pub scale: String,
     pub loupe_enabled: bool,
+    pub shortcut_bindings: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +79,7 @@ impl Default for Settings {
             scale_mode: "fit".into(),
             scale: "1".into(),
             loupe_enabled: false,
+            shortcut_bindings: default_shortcut_bindings(),
         }
     }
 }
@@ -121,6 +151,11 @@ impl StateStore {
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
                 "loupeEnabled" => settings.loupe_enabled = value == "true",
+                "shortcutBindings" => {
+                    if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
+                        settings.shortcut_bindings = bindings;
+                    }
+                }
                 _ => {}
             }
         }
@@ -129,6 +164,13 @@ impl StateStore {
 
     pub fn save_settings(&mut self, settings: &Settings) -> Result<(), AppError> {
         let transaction = self.connection.transaction().map_err(database_error)?;
+        let shortcut_bindings =
+            serde_json::to_string(&settings.shortcut_bindings).map_err(|error| AppError {
+                code: ErrorCode::Internal,
+                message: format!("Shortcut settings could not be encoded: {error}"),
+                target: None,
+                retryable: false,
+            })?;
         let mut values = vec![
             ("sortField", settings.sort_field.clone()),
             ("sortDescending", settings.sort_descending.to_string()),
@@ -140,6 +182,7 @@ impl StateStore {
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
             ("loupeEnabled", settings.loupe_enabled.to_string()),
+            ("shortcutBindings", shortcut_bindings),
         ];
         if let Some(root) = &settings.library_root {
             values.push(("libraryRoot", root.to_string_lossy().into_owned()));
@@ -996,6 +1039,18 @@ mod tests {
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
                 loupe_enabled: true,
+                shortcut_bindings: [
+                    ("nextPage".into(), "N".into()),
+                    ("previousPage".into(), "P".into()),
+                    ("closeViewer".into(), "Escape".into()),
+                    ("singlePage".into(), "1".into()),
+                    ("spreadPage".into(), "2".into()),
+                    ("toggleDirection".into(), "R".into()),
+                    ("zoomIn".into(), "+".into()),
+                    ("zoomOut".into(), "-".into()),
+                ]
+                .into_iter()
+                .collect(),
             };
             store.save_settings(&settings).unwrap();
             store
@@ -1034,6 +1089,7 @@ mod tests {
         assert_eq!(restored.catalog_view_mode, "detail_list");
         assert_eq!(restored.layout_mode, "vertical_scroll");
         assert!(restored.loupe_enabled);
+        assert_eq!(restored.shortcut_bindings["nextPage"], "N");
         assert_eq!(
             store.reading_position("item-1").unwrap().unwrap().page_key,
             RelativePath::parse("page7.png").unwrap()

@@ -15,6 +15,7 @@ import type {
 import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogViewMode } from "../catalog/view-mode";
+import type { ShortcutBindings } from "../input/shortcuts";
 
 let requestSequence = 0;
 
@@ -64,6 +65,17 @@ export interface CatalogSettings {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  shortcuts?: ShortcutBindings;
+}
+
+export async function saveShortcutBindings(
+  shortcuts: ShortcutBindings,
+  generation: number,
+): Promise<ApiResponse<ShortcutBindings>> {
+  return invoke("set_shortcut_bindings", {
+    context: context(generation),
+    shortcuts,
+  });
 }
 
 export async function saveViewerSettings(

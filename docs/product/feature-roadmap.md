@@ -44,7 +44,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B05、FR-B06、FR-B08、FR-B11〜FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はsemantic gateを受理し、accepted rawを同期済みだが、CoDD structural exceptionとWindows WebView2 native product UI未測定のため`Blocked`で保持する。
+FR-B05、FR-B06、FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はsemantic gateを受理し、accepted rawを同期済みだが、CoDD structural exceptionとWindows WebView2 native product UI未測定のため`Blocked`で保持する。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
 FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWindows product gateが残るため
 `Partial / BLOCKED`で保持する。
 
@@ -68,7 +68,7 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Blocked`（semantic ACCEPT、CoDD非PASS・Windows UI未測定） |
-| `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Planned` |
+| `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（keyboard三契約semantic ACCEPT、touch/gamepad `BLOCKED_UNMEASURED`、CoDD/native UI未完了） |
 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned` |
 
 ## バッチ仕様
@@ -425,22 +425,57 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B11 — 入力拡張（Batch 11）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。
+- **状態:** `Partial / BLOCKED`。keyboard三契約（FT-B11-001/004/005）のsemantic gateは受理したが、
+  touch/gamepadは `BLOCKED_UNMEASURED`、CoDD structural gateとWindows WebView2 native product UIも
+  未完了・未測定である。FR-B11全体を `Partial / BLOCKED` とし、未測定をPASSへ昇格しない。
 - **対象 feature ID:** `FUT-C-019`, `FUT-R-006`, `FUT-R-007`（user-defined shortcut、
-  touch、gamepad）。
-- **user outcome:** 読者が操作割当を自分の環境へ合わせ、keyboard 以外の入力でも安全に
-  page/navigation/viewer 操作を行える。
+  touch、gamepad）。`FUT-C-019`はkeyboard部分を`Partial / BLOCKED`として台帳へ同期し、
+  touch/gamepad候補は候補性を維持したまま未測定境界を記録する。
+- **user outcome:** 読者が操作割当を自分の環境へ合わせ、keyboard fallbackとfocus境界を保ったまま
+  page/navigation/viewer操作を行える。touch/gamepadは対応機器上で同じ操作契約を検証できる状態を
+  将来の解除条件とする。
 - **共通基盤:** input abstraction、event-to-command mapping、conflict resolution、focus/
-  accessibility fallback、device capability detection、local settings。
-- **依存:** `REQ-MVP-014` の keyboard/click/wheel/Esc 契約。touch/gamepad 実機がない環境は
-  `Blocked` と記録し、skip を PASS にしない。
+  accessibility fallback、device capability detection、local settings。今回受理した実装は
+  `src/features/input/shortcuts.ts`を中心とするkeyboard command mappingである。
+- **依存:** `REQ-MVP-014` の keyboard/click/wheel/Esc 契約。touch/gamepad実機がない環境は
+  `BLOCKED_UNMEASURED` と記録し、SKIPをPASSへ読み替えない。Windows WebView2 native product UI、
+  UIA/screen-reader/DPI、OS syscallの未観測もlocal/component evidenceで代替しない。
 - **実装順:** (1) command/input abstraction、(2) shortcut remap と conflict、
   (3) touch gesture、(4) gamepad mapping、(5) reset/import-safe persistence と help。
-- **focused test 範囲:** `FT-B11-001` remap/conflict/reset、`FT-B11-002` touch gesture と
-  boundary、`FT-B11-003` gamepad mapping/disconnect、`FT-B11-004` keyboard fallback/focus、
-  `FT-B11-005` restart/accessibility。
-- **batch末尾 gate:** 各入力経路を利用可能な環境で focused test を SKIP 0 で実測し、
-  unavailable device は環境別 `Blocked` と明記して `BATCH-END-GATE`。
+  今回は(1)、(2)、(5)のkeyboard connected sliceを受理した。
+- **focused test 範囲:** `FT-B11-001` remap/conflict/reset（ACCEPT）、`FT-B11-002` touch gesture と
+  boundary（`BLOCKED_UNMEASURED`）、`FT-B11-003` gamepad mapping/disconnect（`BLOCKED_UNMEASURED`）、
+  `FT-B11-004` keyboard fallback/focus（ACCEPT）、`FT-B11-005` restart/accessibility（ACCEPT）。
+- **accepted source binding:** 最終keyboard test source manifestは
+  `fr_b11_branded_identity_type_resume/source-sha.tsv` SHA-256
+  `553b821a818756c1f260caef7443cd59968c23c776a2d9bee4743df84e426751`であり、最終test source
+  `src/App.fr-b11.test.tsx` SHA-256は
+  `f58e45d04ddaab3d2e4c0ef376ee5b16f5208c7d66dc9fdd70fe6a6bef78633a`である。詳細は[FR-B11結果](../testing/fr-b11-results.md)を正本とする。
+- **accepted gates:** focused exact3 `3 PASS / 0 FAIL / 0 SKIP`、App回帰 `39 PASS / 0 FAIL / 0 SKIP`、
+  Windows offline Rust `78 unit + 1 process PASS / failed 0 / ignored 0 / SKIP 0`、typecheck `PASS / SKIP 0`、
+  build `PASS / SKIP 0`。各manifest/stdout/stderr SHAはaccepted raw ledgerから転記し、今回再実行していない。
+- **batch末尾 gate:** keyboard semantic evidenceは受理するが、touch/gamepadが`BLOCKED_UNMEASURED`であり、
+  CoDD verifyの生値も`INCOMPLETE / NOT APPLICABLE`のためbatch末尾gateは未達。Windows WebView2 native
+  product UIとhardware accessibility observationをPASSへ昇格しない。
+
+#### FR-B11 実装・受入証跡
+
+- **採用要件:** [FR-B11 入力拡張要件](../requirements/input-customization-requirements.md)。
+- **実装根拠:** `src/features/input/shortcuts.ts`、`src/App.tsx`、`src/features/viewer/Viewer.tsx`、
+  `src/features/library/client.ts`、`src-tauri/src/application/mod.rs`、
+  `src-tauri/src/state/repository.rs`、`src-tauri/src/lib.rs`、`src/App.fr-b11.test.tsx`。
+- **直接観測:** FT-B11-001はproduction Appのremap/conflict/reset、FT-B11-004はkeyboard fallback・
+  focused input suppression・Viewer/navigation boundary、FT-B11-005はrestart persistence・accessible
+  help/name・safe default recoveryを接続境界で受理した。FT-B11-002/003はhardware unavailableのため
+  `BLOCKED_UNMEASURED`であり、PASS/SKIP countには含めない。
+- **rejected history:** false C0のselected path/command不一致、rustfmt失敗、E0382 partial-move、
+  TS2322 branded identity typing failureは履歴のみとし、accepted PASS証跡へ混入させない。
+- **CoDDと環境境界:** 承認済みstructural referenceの生値は`3 PASS / 0 red FAIL / 1 amber WARN /
+  3 SKIP / 1 VACUOUS`、verification tests 0の`INCOMPLETE / NOT APPLICABLE`である。構造的SKIP三件以外の
+  functional SKIPを免除せず、Windows WebView2 native product UI・touch/gamepad hardwareを未測定のまま保持する。
+- **最終差分:** 機能/test 8 path + 文書4 path = exact 12、contamination 0、staged path 0、
+  `git diff --check PASS`を確認対象とする。今回のtaskではcommit/push、functional/Rust/typecheck/build/
+  CoDD再実行を行わず、Gunshiのcomplete diff QCへ引き渡す。
 
 ### FR-B12 — 追加書庫形式（Batch 12）
 

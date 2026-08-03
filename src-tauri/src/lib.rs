@@ -49,6 +49,7 @@ pub fn run() {
             application::set_catalog_sort,
             application::set_end_of_volume_policy,
             application::set_catalog_view_mode,
+            application::set_shortcut_bindings,
             application::set_viewer_settings,
             application::pick_library_root,
             application::set_library_root,

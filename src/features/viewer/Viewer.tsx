@@ -28,6 +28,12 @@ import {
   tauriFullscreenAdapter,
   type FullscreenAdapter,
 } from "./fullscreen";
+import {
+  customShortcutCommand,
+  fallbackShortcutCommand,
+  normalizeShortcutBindings,
+  type ShortcutBindings,
+} from "../input/shortcuts";
 
 interface ViewerProps {
   session: ViewerSession;
@@ -43,6 +49,7 @@ interface ViewerProps {
   initialScale?: number;
   initialLoupeEnabled?: boolean;
   onScaleChange?: (scale: ViewerScaleState) => void;
+  shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
 }
 
@@ -70,6 +77,7 @@ export function Viewer({
   initialScale = 1,
   initialLoupeEnabled = false,
   onScaleChange,
+  shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
 }: ViewerProps) {
   const [state, dispatch] = useReducer(viewerReducer, {
@@ -91,6 +99,10 @@ export function Viewer({
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
+  const activeShortcuts = useMemo(
+    () => normalizeShortcutBindings(shortcuts),
+    [shortcuts],
+  );
   const stageRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const layoutInitialized = useRef(false);
@@ -265,31 +277,38 @@ export function Viewer({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (fullscreen) void requestFullscreen(false);
-        else void close();
+      const command =
+        customShortcutCommand(event, activeShortcuts) ??
+        fallbackShortcutCommand(event, state.direction);
+      if (command === undefined) return;
+      event.preventDefault();
+      switch (command) {
+        case "closeViewer":
+          if (fullscreen) void requestFullscreen(false);
+          else void close();
+          break;
+        case "nextPage":
+          next();
+          break;
+        case "previousPage":
+          dispatch({ type: "previous" });
+          break;
+        case "singlePage":
+          changeMode("single");
+          break;
+        case "spreadPage":
+          changeMode("spread");
+          break;
+        case "toggleDirection":
+          toggleDirection();
+          break;
+        case "zoomIn":
+          applyScale({ type: "zoomIn" });
+          break;
+        case "zoomOut":
+          applyScale({ type: "zoomOut" });
+          break;
       }
-      else if (
-        event.key === "PageDown" ||
-        event.key === " " ||
-        (event.key === "ArrowLeft" && state.direction === "rightToLeft") ||
-        (event.key === "ArrowRight" && state.direction === "leftToRight")
-      ) {
-        event.preventDefault();
-        next();
-      } else if (
-        event.key === "PageUp" ||
-        (event.key === "ArrowRight" && state.direction === "rightToLeft") ||
-        (event.key === "ArrowLeft" && state.direction === "leftToRight")
-      ) {
-        event.preventDefault();
-        dispatch({ type: "previous" });
-      } else if (event.key === "1") changeMode("single");
-      else if (event.key === "2") changeMode("spread");
-      else if (event.key.toLowerCase() === "r") toggleDirection();
-      else if (event.key === "+" || event.key === "=") applyScale({ type: "zoomIn" });
-      else if (event.key === "-" || event.key === "_") applyScale({ type: "zoomOut" });
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);

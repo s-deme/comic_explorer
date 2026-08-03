@@ -5,6 +5,7 @@ mod scheduler;
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
+use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -216,6 +217,7 @@ pub struct CatalogSettings {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub shortcuts: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,6 +241,110 @@ pub struct FavoriteEntry {
 
 const MIN_VIEWER_SCALE: f64 = 0.25;
 const MAX_VIEWER_SCALE: f64 = 4.0;
+
+const SHORTCUT_COMMANDS: [&str; 8] = [
+    "nextPage",
+    "previousPage",
+    "closeViewer",
+    "singlePage",
+    "spreadPage",
+    "toggleDirection",
+    "zoomIn",
+    "zoomOut",
+];
+
+fn default_shortcuts() -> BTreeMap<String, String> {
+    [
+        ("nextPage", "PageDown"),
+        ("previousPage", "PageUp"),
+        ("closeViewer", "Escape"),
+        ("singlePage", "1"),
+        ("spreadPage", "2"),
+        ("toggleDirection", "R"),
+        ("zoomIn", "+"),
+        ("zoomOut", "-"),
+    ]
+    .into_iter()
+    .map(|(command, shortcut)| (command.to_owned(), shortcut.to_owned()))
+    .collect()
+}
+
+fn valid_shortcut_key(value: &str) -> bool {
+    if value.is_empty() || value.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let mut remainder = value;
+    for modifier in ["Ctrl+", "Alt+", "Shift+", "Meta+"] {
+        if remainder.starts_with(modifier) {
+            remainder = &remainder[modifier.len()..];
+        }
+    }
+    if remainder.is_empty() || remainder.contains('+') {
+        return false;
+    }
+    matches!(
+        remainder,
+        "Escape"
+            | "Space"
+            | "PageUp"
+            | "PageDown"
+            | "ArrowLeft"
+            | "ArrowRight"
+            | "ArrowUp"
+            | "ArrowDown"
+            | "+"
+            | "-"
+            | "_"
+            | "="
+            | "Enter"
+            | "Tab"
+            | "Home"
+            | "End"
+            | "R"
+            | "N"
+            | "P"
+            | "1"
+            | "2"
+            | "3"
+            | "4"
+            | "5"
+            | "6"
+            | "7"
+            | "8"
+            | "9"
+            | "0"
+    ) || (remainder.len() == 1 && remainder.as_bytes()[0].is_ascii_alphabetic())
+        || (remainder.starts_with('F')
+            && remainder[1..]
+                .parse::<u8>()
+                .ok()
+                .is_some_and(|value| (1..=12).contains(&value)))
+}
+
+fn normalize_shortcuts(shortcuts: &BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
+    if shortcuts.len() != SHORTCUT_COMMANDS.len()
+        || shortcuts
+            .keys()
+            .any(|command| !SHORTCUT_COMMANDS.contains(&command.as_str()))
+        || shortcuts
+            .values()
+            .any(|shortcut| !valid_shortcut_key(shortcut))
+    {
+        return None;
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    if shortcuts
+        .values()
+        .any(|shortcut| !seen.insert(shortcut.clone()))
+    {
+        return None;
+    }
+    Some(shortcuts.clone())
+}
+
+fn shortcuts_for_settings(settings: &crate::state::Settings) -> BTreeMap<String, String> {
+    normalize_shortcuts(&settings.shortcut_bindings).unwrap_or_else(default_shortcuts)
+}
 
 fn viewer_scale(settings: &crate::state::Settings) -> f64 {
     settings
@@ -300,6 +406,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let end_of_volume_policy = end_of_volume_policy(&settings);
     let catalog_view_mode = catalog_view_mode(&settings);
     let layout_mode = viewer_layout_mode(&settings);
+    let shortcuts = shortcuts_for_settings(&settings);
     CatalogSettings {
         sort_field: settings.sort_field,
         sort_descending: settings.sort_descending,
@@ -311,6 +418,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         scale_mode,
         scale,
         loupe_enabled: settings.loupe_enabled,
+        shortcuts,
     }
 }
 
@@ -1155,6 +1263,48 @@ pub fn set_catalog_view_mode(
         request_id: context.request_id,
         generation: context.generation,
         data: catalog_settings(settings),
+    })
+}
+
+#[tauri::command]
+pub fn set_shortcut_bindings(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    shortcuts: BTreeMap<String, String>,
+) -> Result<Response<BTreeMap<String, String>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let Some(normalized) = normalize_shortcuts(&shortcuts) else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Shortcut bindings are invalid or conflicting.",
+            ),
+        ));
+    };
+    let settings = {
+        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
+        let mut settings = stores
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
+        settings.shortcut_bindings = normalized.clone();
+        if let Some(store) = stores.as_mut() {
+            store
+                .save_settings(&settings)
+                .map_err(|error| error.message)?;
+        }
+        settings
+    };
+    let _ = settings;
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: normalized,
     })
 }
 

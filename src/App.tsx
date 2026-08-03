@@ -20,6 +20,7 @@ import {
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveItemMemo,
+  saveShortcutBindings,
   saveViewerSettings,
   assignTag,
   removeTag,
@@ -67,6 +68,18 @@ import {
   VIEWER_LAYOUT_MODE_LABELS,
   VIEWER_LAYOUT_MODES,
 } from "./features/viewer/model";
+import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_COMMANDS,
+  SHORTCUT_FALLBACKS,
+  SHORTCUT_LABELS,
+  eventShortcut,
+  normalizeShortcutBindings,
+  remapShortcut,
+  resetShortcutBindings,
+  type ShortcutBindings,
+  type ShortcutCommand,
+} from "./features/input/shortcuts";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
@@ -188,6 +201,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
   const [viewerScale, setViewerScale] = useState(1);
   const [loupeEnabled, setLoupeEnabled] = useState(false);
+  const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
+    ...DEFAULT_SHORTCUTS,
+  }));
+  const [shortcutNotice, setShortcutNotice] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
@@ -243,6 +260,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
           setLoupeEnabled(response.data.loupeEnabled);
+          setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
         }
       })
       .catch(() => undefined);
@@ -820,7 +838,63 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function closeHelp() {
     setHelpOpen(false);
+    setShortcutNotice(null);
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
+  }
+
+  function persistShortcutBindings(next: ShortcutBindings) {
+    setShortcuts(next);
+    setShortcutNotice(null);
+    settingsGeneration.current += 1;
+    void saveShortcutBindings(next, settingsGeneration.current)
+      .then((response) => {
+        if (response.status === "ok") {
+          setShortcuts(normalizeShortcutBindings(response.data));
+        }
+      })
+      .catch(() => setShortcutNotice("ショートカットを保存できませんでした。"));
+  }
+
+  function captureShortcut(
+    command: ShortcutCommand,
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const pressed = eventShortcut(event.nativeEvent);
+    if (pressed === null) {
+      setShortcutNotice("修飾キーだけでは割り当てできません。");
+      return;
+    }
+    const result = remapShortcut(shortcuts, command, pressed);
+    if (!result.ok) {
+      setShortcutNotice(
+        result.reason === "conflict"
+          ? `${SHORTCUT_LABELS[result.conflict ?? command]} と同じキーは割り当てできません。`
+          : "このキーは割り当てできません。",
+      );
+      return;
+    }
+    persistShortcutBindings(result.bindings);
+  }
+
+  function resetShortcut(command: ShortcutCommand) {
+    const result = remapShortcut(
+      shortcuts,
+      command,
+      DEFAULT_SHORTCUTS[command],
+    );
+    if (!result.ok) {
+      setShortcutNotice(
+        `${SHORTCUT_LABELS[result.conflict ?? command]} を先に変更してください。`,
+      );
+      return;
+    }
+    persistShortcutBindings(result.bindings);
+  }
+
+  function resetAllShortcuts() {
+    persistShortcutBindings(resetShortcutBindings());
   }
 
   function queueThumbnail(
@@ -1026,6 +1100,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           initialScaleMode={viewerScaleMode}
           initialScale={viewerScale}
           initialLoupeEnabled={loupeEnabled}
+          shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
             setViewMode(mode);
             setReadingDirection(direction);
@@ -1514,9 +1589,42 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               if (event.key === "Escape") closeHelp();
             }}
           >
-            <h2 id="help-title">キー操作</h2>
+            <h2 id="help-title">キー操作とショートカット</h2>
             <p>Enter: フォルダを開く / Ctrl+Enter: 漫画として読む</p>
             <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
+            <section aria-label="ショートカット設定">
+              <h3>ショートカット設定</h3>
+              <p>変更はこの端末のアプリデータだけに保存され、漫画ファイルや外部通信には影響しません。</p>
+              {SHORTCUT_COMMANDS.map((command) => (
+                <div key={command} data-shortcut-command={command}>
+                  <label htmlFor={`shortcut-${command}`}>
+                    {SHORTCUT_LABELS[command]}
+                  </label>
+                  <input
+                    id={`shortcut-${command}`}
+                    aria-label={`${SHORTCUT_LABELS[command]}ショートカット`}
+                    value={shortcuts[command]}
+                    readOnly
+                    onKeyDown={(event) => captureShortcut(command, event)}
+                  />
+                  <span>
+                    既定: {DEFAULT_SHORTCUTS[command]} / フォールバック:{" "}
+                    {SHORTCUT_FALLBACKS[command]}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`}
+                    onClick={() => resetShortcut(command)}
+                  >
+                    既定に戻す
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={resetAllShortcuts}>
+                すべて既定に戻す
+              </button>
+              {shortcutNotice !== null && <p role="alert">{shortcutNotice}</p>}
+            </section>
             <button autoFocus onClick={closeHelp}>閉じる</button>
           </div>
         </div>
