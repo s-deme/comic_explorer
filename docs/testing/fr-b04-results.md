@@ -15,9 +15,9 @@ codd:
 
 # FR-B04 閲覧画面 mode 直接観測結果
 
-**batch判定:** `BLOCKED`。focused scopeはPASSしたが、aggregate初回実行のcanonical
-`scripts/run-tests.sh`がCoDD verify内でexit 1となったため、同一task内では再実行しない。
-失敗原因のRCAと再実測は新redoへ引き継ぐ。
+**batch判定:** `BLOCKED`。縦・横スクロールのfocused scopeとcanonical aggregateはPASSした。
+フルスクリーンのWindows WebView2 product gateだけが未測定のため、FR-B04 batch全体は
+BLOCKEDを維持する。
 
 ## 実測範囲
 
@@ -54,6 +54,16 @@ npm test -- --run src/features/catalog/view-mode.test.ts src/features/catalog/Ca
 
 ## batch末尾 gate
 
+### aggregate redo RCA / resolution
+
+`src/features/viewer/`と接続済み`App`のfocused testは失敗しない一方、
+`tests/test_codd_consistency_producer.py`の実CoDD呼出しと
+`scripts/run-codd-consistency.sh`の`codd dag verify --path /mnt/e/...`は
+`p9_client_rpc`で停止していた。`scripts/run-codd-dag-verify.sh`を追加し、WSL時だけ
+`.codd`入力をext4一時ミラーへ置き、CoDD本体を`/tmp`キャッシュから起動するようにした。
+その結果、`depends_on_consistency`は`pass / skipped=false / violations=0 /
+records_compared=5 / checked_count=5`となった。
+
 | Gate | 結果 | 備考 |
 |---|---|---|
 | FT-B04-001〜005 focused | PASS | 67/67、SKIP 0、失敗0。5本すべてconnected evidence。FT-B04-004はconnected判定のみPASS |
@@ -61,8 +71,8 @@ npm test -- --run src/features/catalog/view-mode.test.ts src/features/catalog/Ca
 | TypeScript typecheck | PASS | `npm run typecheck` exit 0 |
 | production build | PASS | Vite 7.3.6、52 modules transformed、exit 0 |
 | Rust fmt/check/test | PASS | canonical `scripts/run-rust-check.cmd`、56 lib + 1 shutdown integration、ignored 0、SKIP 0、exit 0 |
-| CoDD scan/check | PASS | scan/check exit 0。checkはred gate 0、advisory 4件 |
-| CoDD verify / canonical aggregate | FAIL | `scripts/run-tests.sh` exit 1。CoDD verifyがtest command failureを返したため、同一task内で再実行しない |
+| CoDD scan/check | BLOCKED (v9fs root) | `/mnt/e`直実行は9p I/O待ち。ext4ミラーでの`codd check`はred gate 0、advisory 3件 |
+| CoDD verify / canonical aggregate | PASS | WSL ext4ミラー経路で実CoDDを実行。`scripts/run-tests.sh`全体もexit 0 |
 | Windows WebView2 product fullscreen | BLOCKED disclosed | WSL/Linux sessionでは実行しない。未実行をPASS化しない |
 
 ## 実装・保存境界

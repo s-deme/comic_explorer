@@ -80,8 +80,8 @@ codd:
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
-| 1 | `IMP-001` | `FUT-C-015` | 縦スクロール | Partial / BLOCKED | **Next** | FR-B04 aggregateのRCAとfocused test再実行 |
-| 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Partial / BLOCKED | Blocked | `IMP-001`と共通するViewer問題を確認後に実装・検証 |
+| 1 | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
+| 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Partial / BLOCKED | **Next** | `IMP-001`で解消したaggregate経路でfocused testを再確認 |
 | 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Partial / BLOCKED | Blocked | Windows WebView2製品ゲートとfocused testを実行 |
 | 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Partial / BLOCKED | Blocked | CoDD/native product UI gateを解消 |
 | 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Partial / BLOCKED | Blocked | CoDD structural exceptionとWindows UI gateを解消 |

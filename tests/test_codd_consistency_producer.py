@@ -217,17 +217,7 @@ class CoddConsistencyProducerTests(unittest.TestCase):
         for record in payload["records"]:
             self.assertTrue(all(record.values()))
         completed = subprocess.run(
-            [
-                str(ROOT / ".venv/bin/codd"),
-                "dag",
-                "verify",
-                "--path",
-                str(ROOT),
-                "--check",
-                "depends_on_consistency",
-                "--format",
-                "json",
-            ],
+            ["bash", str(ROOT / "scripts/run-codd-dag-verify.sh"), str(ROOT)],
             cwd=ROOT,
             check=False,
             capture_output=True,

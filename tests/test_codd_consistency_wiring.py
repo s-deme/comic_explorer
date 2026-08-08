@@ -39,9 +39,12 @@ class CoddConsistencyWiringTests(unittest.TestCase):
         generate_at = source.index('"${producer}"')
         validate_at = source.index('"${producer}"', generate_at + 1)
         validate_flag_at = source.index("--validate", validate_at)
-        codd_at = source.index('"${codd_bin}" dag verify', validate_flag_at)
-        check_at = source.index("--check depends_on_consistency", codd_at)
-        format_at = source.index("--format json", check_at)
+        codd_at = source.index('bash "${dag_verify}"', validate_flag_at)
+        dag_verify_source = (ROOT / "scripts/run-codd-dag-verify.sh").read_text(
+            encoding="utf-8"
+        )
+        check_at = dag_verify_source.index("--check depends_on_consistency")
+        format_at = dag_verify_source.index("--format json", check_at)
         self.assertLess(generate_at, validate_at)
         self.assertLess(validate_flag_at, codd_at)
         self.assertLess(check_at, format_at)

@@ -7,6 +7,7 @@ python_bin="${project_root}/.venv/bin/python"
 codd_bin="${project_root}/.venv/bin/codd"
 producer="${project_root}/scripts/generate_codd_consistency.py"
 output="${project_root}/.codd/propagation_results.json"
+dag_verify="${project_root}/scripts/run-codd-dag-verify.sh"
 
 "${python_bin}" "${producer}" \
   --project-root "${project_root}" \
@@ -17,10 +18,7 @@ output="${project_root}/.codd/propagation_results.json"
   --output "${output}" \
   --validate
 
-"${codd_bin}" dag verify \
-  --path "${project_root}" \
-  --check depends_on_consistency \
-  --format json |
+bash "${dag_verify}" "${project_root}" |
   "${python_bin}" -c '
 import json
 import sys

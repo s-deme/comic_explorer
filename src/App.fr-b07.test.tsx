@@ -253,7 +253,10 @@ function snapshotTree(root: string): Record<string, FileSnapshot> {
   function visit(current: string, relativePath: string) {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
       const fullPath = join(current, entry.name);
-      const childPath = relativePath === "" ? entry.name : join(relativePath, entry.name);
+      const childPath =
+        relativePath === ""
+          ? entry.name
+          : join(relativePath, entry.name).replaceAll("\\", "/");
       if (entry.isDirectory()) {
         visit(fullPath, childPath);
       } else if (entry.isFile()) {
