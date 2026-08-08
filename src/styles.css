@@ -55,10 +55,92 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-bottom: 1px solid #c9cdd2;
   background: #f6f7f8;
 }
-.menu-bar button {
+.menu-bar {
+  position: relative;
+  z-index: 6;
+  overflow: visible;
+}
+.menu-group {
+  position: relative;
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+.menu-bar .menu-trigger {
+  min-height: 28px;
+  padding: 2px 8px;
   color: #1f2328;
   border: 0;
   background: transparent;
+}
+.menu-bar .menu-trigger[aria-expanded="true"],
+.menu-bar .menu-trigger:hover {
+  background: #e4e8ed;
+}
+.menu-popup {
+  position: absolute;
+  z-index: 7;
+  top: calc(100% - 1px);
+  left: 0;
+  display: grid;
+  min-width: 230px;
+  max-height: calc(100vh - 42px);
+  gap: 1px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid #aeb6c0;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 8px 24px #1f293733;
+}
+.menu-popup--view { min-width: 250px; }
+.menu-popup button {
+  display: flex;
+  width: 100%;
+  min-height: 30px;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 4px 10px 4px 28px;
+  color: #1f2328;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+.menu-popup button:hover,
+.menu-popup button:focus-visible {
+  background: #e7f1fc;
+}
+.menu-popup button[aria-disabled="true"] {
+  color: #7a828c;
+  background: transparent;
+  cursor: default;
+}
+.menu-popup button[role="menuitemradio"]::before {
+  position: absolute;
+  margin-left: -18px;
+  content: "";
+}
+.menu-popup button[role="menuitemradio"][aria-checked="true"]::before {
+  content: "✓";
+  font-weight: 700;
+}
+.menu-heading {
+  padding: 5px 10px 2px;
+  color: #59636f;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.menu-separator {
+  height: 1px;
+  margin: 3px 6px;
+  background: #d4d9df;
+}
+.menu-shortcut {
+  color: #59636f;
+  font-size: .78rem;
 }
 .toolbar label { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 .address-bar label { font-size: .82rem; }

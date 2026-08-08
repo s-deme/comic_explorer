@@ -112,6 +112,17 @@ interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
 }
 
+type MenuId = "file" | "navigation" | "view" | "library" | "help";
+
+const MENU_ORDER: MenuId[] = ["file", "navigation", "view", "library", "help"];
+const MENU_MNEMONICS: Record<string, MenuId> = {
+  f: "file",
+  n: "navigation",
+  v: "view",
+  l: "library",
+  h: "help",
+};
+
 function entryDisplayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
 }
@@ -171,6 +182,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const diagnosticGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuBarRef = useRef<HTMLElement>(null);
+  const menuTriggerRefs = useRef<Record<MenuId, HTMLButtonElement | null>>({
+    file: null,
+    navigation: null,
+    view: null,
+    library: null,
+    help: null,
+  });
+  const menuPopupRefs = useRef<Record<MenuId, HTMLDivElement | null>>({
+    file: null,
+    navigation: null,
+    view: null,
+    library: null,
+    help: null,
+  });
+  const pendingMenuFocus = useRef<"first" | "last">("first");
   const [rootInput, setRootInput] = useState("");
   const [libraryRoot, setLibraryRoot] = useState<string | null>(null);
   const [navigation, dispatch] = useReducer(navigationReducer, {
@@ -206,6 +233,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }));
   const [shortcutNotice, setShortcutNotice] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
+  const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(240);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
@@ -236,6 +265,76 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeMenu === null) return;
+    const frame = requestAnimationFrame(() => {
+      const items = getMenuItems(activeMenu);
+      focusMenuItem(
+        activeMenu,
+        pendingMenuFocus.current === "last" ? items.length - 1 : 0,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeMenu]);
+
+  useEffect(() => {
+    function handleMnemonic(event: KeyboardEvent) {
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      if (libraryRoot === null || viewerSession !== null) return;
+      if (event.key === "ArrowLeft") {
+        const target = navigation.back.at(-1);
+        if (target !== undefined) {
+          event.preventDefault();
+          setActiveMenu(null);
+          navigate(target, "back");
+        }
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        const target = navigation.forward[0];
+        if (target !== undefined) {
+          event.preventDefault();
+          setActiveMenu(null);
+          navigate(target, "forward");
+        }
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        const target = parentPath(navigation.current);
+        if (target !== null) {
+          event.preventDefault();
+          setActiveMenu(null);
+          navigate(target);
+        }
+        return;
+      }
+      const menuId = MENU_MNEMONICS[event.key.toLowerCase()];
+      if (menuId === undefined) return;
+      event.preventDefault();
+      pendingMenuFocus.current = "first";
+      setMenuTabStop(menuId);
+      setActiveMenu(menuId);
+      requestAnimationFrame(() => focusMenuItem(menuId, 0));
+    }
+
+    function handleOutsidePointer(event: PointerEvent) {
+      if (
+        activeMenu !== null &&
+        event.target instanceof Node &&
+        !menuBarRef.current?.contains(event.target)
+      ) {
+        setActiveMenu(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleMnemonic);
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => {
+      window.removeEventListener("keydown", handleMnemonic);
+      document.removeEventListener("pointerdown", handleOutsidePointer);
+    };
+  }, [activeMenu, libraryRoot, navigation, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -983,6 +1082,132 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   );
   const up = parentPath(navigation.current);
 
+  function getMenuItems(menuId: MenuId): HTMLButtonElement[] {
+    const menu = menuPopupRefs.current[menuId];
+    return menu === null
+      ? []
+      : Array.from(
+          menu.querySelectorAll<HTMLButtonElement>(
+            '[role="menuitem"], [role="menuitemradio"]',
+          ),
+        );
+  }
+
+  function focusMenuItem(menuId: MenuId, index: number) {
+    const items = getMenuItems(menuId);
+    if (items.length === 0) return;
+    const normalizedIndex = (index + items.length) % items.length;
+    items.forEach((item, itemIndex) => {
+      item.tabIndex = itemIndex === normalizedIndex ? 0 : -1;
+    });
+    items[normalizedIndex].focus();
+  }
+
+  function markMenuItemActive(item: HTMLButtonElement) {
+    const menu = item.closest('[role="menu"]');
+    if (menu === null) return;
+    menu
+      .querySelectorAll<HTMLButtonElement>(
+        '[role="menuitem"], [role="menuitemradio"]',
+      )
+      .forEach((candidate) => {
+        candidate.tabIndex = candidate === item ? 0 : -1;
+      });
+  }
+
+  function toggleMenu(menuId: MenuId, focus: "first" | "last" = "first") {
+    pendingMenuFocus.current = focus;
+    setActiveMenu((current) => (current === menuId ? null : menuId));
+  }
+
+  function closeMenu(restoreFocus: boolean) {
+    const menuId = activeMenu;
+    setActiveMenu(null);
+    if (restoreFocus && menuId !== null) {
+      requestAnimationFrame(() => menuTriggerRefs.current[menuId]?.focus());
+    }
+  }
+
+  function runMenuAction(action: () => void, disabled = false) {
+    if (disabled) return;
+    setActiveMenu(null);
+    action();
+  }
+
+  function handleMenuTriggerKeyDown(
+    menuId: MenuId,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) {
+    const menuIndex = MENU_ORDER.indexOf(menuId);
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      const offset = event.key === "ArrowLeft" ? -1 : 1;
+      const nextMenu = MENU_ORDER[(menuIndex + offset + MENU_ORDER.length) % MENU_ORDER.length];
+      setMenuTabStop(nextMenu);
+      if (activeMenu !== null) {
+        pendingMenuFocus.current = "first";
+        setActiveMenu(nextMenu);
+      } else {
+        menuTriggerRefs.current[nextMenu]?.focus();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      pendingMenuFocus.current = event.key === "ArrowUp" ? "last" : "first";
+      setActiveMenu(menuId);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleMenu(menuId);
+      return;
+    }
+    if (event.key === "Escape" && activeMenu !== null) {
+      event.preventDefault();
+      closeMenu(true);
+    }
+  }
+
+  function handleMenuItemKeyDown(
+    menuId: MenuId,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) {
+    const items = getMenuItems(menuId);
+    const currentIndex = items.indexOf(event.currentTarget);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      focusMenuItem(menuId, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusMenuItem(menuId, event.key === "Home" ? 0 : items.length - 1);
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      const menuIndex = MENU_ORDER.indexOf(menuId);
+      const offset = event.key === "ArrowLeft" ? -1 : 1;
+      const nextMenu = MENU_ORDER[(menuIndex + offset + MENU_ORDER.length) % MENU_ORDER.length];
+      pendingMenuFocus.current = "first";
+      setMenuTabStop(nextMenu);
+      setActiveMenu(nextMenu);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu(true);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (event.currentTarget.getAttribute("aria-disabled") !== "true") {
+        event.currentTarget.click();
+      }
+    }
+  }
+
   function changeSort(nextField: SortField, nextDescending: boolean) {
     setSortField(nextField);
     setSortDescending(nextDescending);
@@ -1214,36 +1439,391 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           アプリデータを再初期化しました。漫画ファイルは変更していません。
         </p>
       )}
-      <nav className="menu-bar" aria-label="メニューバー">
-        <button onClick={() => setLibraryRoot(null)}>ファイル</button>
-        <button onClick={() => changeSort(sortField, !sortDescending)}>表示</button>
-        <button
-          type="button"
-          onClick={openTagsPanel}
-          aria-label="タグ管理"
-        >
-          タグ
-        </button>
-        <button
-          onClick={() => {
-            setFavoritesOpen(true);
-            void refreshFavorites();
-          }}
-        >
-          お気に入り
-        </button>
-        <button
-          onClick={() => {
-            setHistoryOpen(true);
-            void refreshHistory();
-          }}
-        >
-          閲覧履歴
-        </button>
-        <button type="button" onClick={() => void runDiagnostics(false)}>
-          ライブラリ診断
-        </button>
-        <button ref={helpTriggerRef} onClick={() => setHelpOpen(true)}>ヘルプ</button>
+      <nav
+        ref={menuBarRef}
+        className="menu-bar"
+        aria-label="メニューバー"
+        role="menubar"
+      >
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.file = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="ファイル"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "file"}
+            aria-controls="file-menu"
+            aria-keyshortcuts="Alt+F"
+            tabIndex={menuTabStop === "file" ? 0 : -1}
+            onFocus={() => setMenuTabStop("file")}
+            onClick={() => {
+              setMenuTabStop("file");
+              toggleMenu("file");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("file", event)}
+          >
+            ファイル(F)
+          </button>
+          {activeMenu === "file" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.file = node;
+              }}
+              id="file-menu"
+              className="menu-popup"
+              role="menu"
+              aria-label="ファイル"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => setLibraryRoot(null))}
+              >
+                ライブラリを変更…
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.navigation = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="移動"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "navigation"}
+            aria-controls="navigation-menu"
+            aria-keyshortcuts="Alt+N"
+            tabIndex={menuTabStop === "navigation" ? 0 : -1}
+            onFocus={() => setMenuTabStop("navigation")}
+            onClick={() => {
+              setMenuTabStop("navigation");
+              toggleMenu("navigation");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("navigation", event)}
+          >
+            移動(N)
+          </button>
+          {activeMenu === "navigation" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.navigation = node;
+              }}
+              id="navigation-menu"
+              className="menu-popup"
+              role="menu"
+              aria-label="移動"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                aria-disabled={navigation.back.length === 0}
+                aria-keyshortcuts="Alt+ArrowLeft"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    const target = navigation.back.at(-1);
+                    if (target !== undefined) navigate(target, "back");
+                  }, navigation.back.length === 0)
+                }
+              >
+                戻る
+                <span className="menu-shortcut">Alt+←</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={navigation.forward.length === 0}
+                aria-keyshortcuts="Alt+ArrowRight"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    const target = navigation.forward[0];
+                    if (target !== undefined) navigate(target, "forward");
+                  }, navigation.forward.length === 0)
+                }
+              >
+                進む
+                <span className="menu-shortcut">Alt+→</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={up === null}
+                aria-keyshortcuts="Alt+ArrowUp"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    if (up !== null) navigate(up);
+                  }, up === null)
+                }
+              >
+                上のフォルダへ
+                <span className="menu-shortcut">Alt+↑</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.view = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="表示"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "view"}
+            aria-controls="view-menu"
+            aria-keyshortcuts="Alt+V"
+            tabIndex={menuTabStop === "view" ? 0 : -1}
+            onFocus={() => setMenuTabStop("view")}
+            onClick={() => {
+              setMenuTabStop("view");
+              toggleMenu("view");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("view", event)}
+          >
+            表示(V)
+          </button>
+          {activeMenu === "view" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.view = node;
+              }}
+              id="view-menu"
+              className="menu-popup menu-popup--view"
+              role="menu"
+              aria-label="表示"
+            >
+              <span className="menu-heading">並べ替え条件</span>
+              {([
+                ["name", "名前"],
+                ["modified", "更新日時"],
+                ["size", "サイズ"],
+                ["kind", "種類"],
+              ] as const).map(([field, label], index) => (
+                <button
+                  key={field}
+                  type="button"
+                  role="menuitemradio"
+                  tabIndex={index === 0 ? 0 : -1}
+                  aria-checked={sortField === field}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                  onClick={() =>
+                    runMenuAction(() => changeSort(field, sortDescending))
+                  }
+                >
+                  {label}で並べ替え
+                </button>
+              ))}
+              <div className="menu-separator" role="separator" />
+              <span className="menu-heading">順序</span>
+              <button
+                type="button"
+                role="menuitemradio"
+                tabIndex={-1}
+                aria-checked={!sortDescending}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => changeSort(sortField, false))}
+              >
+                昇順
+              </button>
+              <button
+                type="button"
+                role="menuitemradio"
+                tabIndex={-1}
+                aria-checked={sortDescending}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => changeSort(sortField, true))}
+              >
+                降順
+              </button>
+              <div className="menu-separator" role="separator" />
+              <span className="menu-heading">一覧形式</span>
+              {CATALOG_VIEW_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="menuitemradio"
+                  tabIndex={-1}
+                  aria-checked={catalogViewMode === mode}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                  onClick={() =>
+                    runMenuAction(() => changeCatalogViewMode(mode))
+                  }
+                >
+                  {CATALOG_VIEW_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.library = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="ライブラリ"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "library"}
+            aria-controls="library-menu"
+            aria-keyshortcuts="Alt+L"
+            tabIndex={menuTabStop === "library" ? 0 : -1}
+            onFocus={() => setMenuTabStop("library")}
+            onClick={() => {
+              setMenuTabStop("library");
+              toggleMenu("library");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("library", event)}
+          >
+            ライブラリ(L)
+          </button>
+          {activeMenu === "library" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.library = node;
+              }}
+              id="library-menu"
+              className="menu-popup"
+              role="menu"
+              aria-label="ライブラリ"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    setFavoritesOpen(true);
+                    void refreshFavorites();
+                  })
+                }
+              >
+                お気に入り
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    setHistoryOpen(true);
+                    void refreshHistory();
+                  })
+                }
+              >
+                閲覧履歴
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() => runMenuAction(openTagsPanel)}
+              >
+                タグ管理
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={diagnosticsLoading}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() =>
+                  runMenuAction(
+                    () => void runDiagnostics(false),
+                    diagnosticsLoading,
+                  )
+                }
+              >
+                ライブラリ診断…
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.help = node;
+              helpTriggerRef.current = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="ヘルプ"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "help"}
+            aria-controls="help-menu"
+            aria-keyshortcuts="Alt+H"
+            tabIndex={menuTabStop === "help" ? 0 : -1}
+            onFocus={() => setMenuTabStop("help")}
+            onClick={() => {
+              setMenuTabStop("help");
+              toggleMenu("help");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("help", event)}
+          >
+            ヘルプ(H)
+          </button>
+          {activeMenu === "help" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.help = node;
+              }}
+              id="help-menu"
+              className="menu-popup"
+              role="menu"
+              aria-label="ヘルプ"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
+                onClick={() => runMenuAction(() => setHelpOpen(true))}
+              >
+                キー操作とショートカット…
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
       <div className="toolbar" aria-label="ナビゲーション">
         <button

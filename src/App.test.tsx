@@ -35,6 +35,7 @@ import {
   searchLibrary,
   takeRecoveryNotice,
   resolveFavorite,
+  diagnoseLibrary,
   type FavoriteEntry,
   type ItemMetadata,
   type ReadingHistoryEntry,
@@ -94,6 +95,7 @@ const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
+const diagnoseMock = vi.mocked(diagnoseLibrary);
 
 function testEntry(relativePath: string): CatalogEntry {
   return {
@@ -233,6 +235,19 @@ async function openTestComic(relativePath: string) {
   await screen.findByLabelText(`${relativePath} ビューワ`);
 }
 
+function openAppMenu(name: "ファイル" | "移動" | "表示" | "ライブラリ" | "ヘルプ") {
+  fireEvent.click(screen.getByRole("menuitem", { name }));
+  return screen.getByRole("menu", { name });
+}
+
+function chooseAppMenuItem(
+  menuName: "ファイル" | "移動" | "表示" | "ライブラリ" | "ヘルプ",
+  itemName: string | RegExp,
+) {
+  const menu = openAppMenu(menuName);
+  fireEvent.click(within(menu).getByRole("menuitem", { name: itemName }));
+}
+
 describe("application shell", () => {
   afterEach(cleanup);
 
@@ -261,6 +276,7 @@ describe("application shell", () => {
     searchMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
+    diagnoseMock.mockReset();
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
       requestId: "recovery" as never,
@@ -576,10 +592,246 @@ describe("application shell", () => {
     fireEvent.keyDown(splitter, { key: "ArrowLeft" });
     expect(splitter).toHaveAttribute("aria-valuenow", "230");
 
-    const trigger = screen.getByRole("button", { name: "ヘルプ" });
-    fireEvent.click(trigger);
+    const trigger = screen.getByRole("menuitem", { name: "ヘルプ" });
+    chooseAppMenuItem("ヘルプ", "キー操作とショートカット…");
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("opens five top-level menus without firing their actions and runs File exactly once", async () => {
+    await registerTestLibrary([]);
+
+    const menubar = screen.getByRole("menubar", { name: "メニューバー" });
+    expect(
+      within(menubar).getAllByRole("menuitem").map((item) => item.getAttribute("aria-label")),
+    ).toEqual(["ファイル", "移動", "表示", "ライブラリ", "ヘルプ"]);
+    const fileTrigger = within(menubar).getByRole("menuitem", { name: "ファイル" });
+    expect(fileTrigger).toHaveAttribute("aria-keyshortcuts", "Alt+F");
+
+    fireEvent.keyDown(fileTrigger, { key: "Enter" });
+    expect(fileTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics");
+
+    const changeRoot = within(screen.getByRole("menu", { name: "ファイル" }))
+      .getByRole("menuitem", { name: "ライブラリを変更…" });
+    fireEvent.keyDown(changeRoot, { key: "Enter" });
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Comic Explorer" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
+    await registerTestLibrary([]);
+
+    const menubar = screen.getByRole("menubar", { name: "メニューバー" });
+    const triggers = within(menubar).getAllByRole("menuitem");
+    expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([0, -1, -1, -1, -1]);
+
+    const viewTrigger = within(menubar).getByRole("menuitem", { name: "表示" });
+    fireEvent.focus(viewTrigger);
+    await waitFor(() =>
+      expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([-1, -1, 0, -1, -1]),
+    );
+
+    fireEvent.keyDown(viewTrigger, { key: "ArrowRight" });
+    const libraryTrigger = within(menubar).getByRole("menuitem", {
+      name: "ライブラリ",
+    });
+    await waitFor(() => {
+      expect(libraryTrigger).toHaveFocus();
+      expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([-1, -1, -1, 0, -1]);
+    });
+
+    fireEvent.keyDown(libraryTrigger, { key: "ArrowLeft" });
+    await waitFor(() => {
+      expect(viewTrigger).toHaveFocus();
+      expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
+    });
+  });
+
+  it("leaves Viewer Alt handling to the Viewer without catalog or hidden menu actions", async () => {
+    const entry = testEntry("Series/two-pages.cbz");
+    openMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "open-two-pages" as never,
+      generation: 1 as never,
+      data: {
+        itemKey: entry.relativePath,
+        displayName: entry.relativePath,
+        pages: [
+          {
+            id: "page-1" as never,
+            relativePath: "1.png" as never,
+            mediaUri: "data:image/png;base64,one",
+          },
+          {
+            id: "page-2" as never,
+            relativePath: "2.png" as never,
+            mediaUri: "data:image/png;base64,two",
+          },
+        ],
+        startIndex: 0,
+      },
+    });
+    await registerTestLibrary([entry]);
+    fireEvent.change(screen.getByLabelText("アドレス"), {
+      target: { value: "C:\\Comics\\Series" },
+    });
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
+    );
+    await openTestComic(entry.relativePath);
+    const catalogLoadsBeforeAlt = listMock.mock.calls.length;
+
+    fireEvent.keyDown(window, { key: "f", altKey: true });
+    fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
+
+    expect(await screen.findByText("2 / 2")).toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(catalogLoadsBeforeAlt);
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+    expect(await screen.findByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series");
+    expect(screen.queryByRole("menu", { name: "ファイル" })).not.toBeInTheDocument();
+  });
+
+  it("shares View radio state with the toolbar and invokes each existing callback once", async () => {
+    await registerTestLibrary([]);
+
+    let viewMenu = openAppMenu("表示");
+    const nameSort = within(viewMenu).getByRole("menuitemradio", {
+      name: "名前で並べ替え",
+    });
+    expect(nameSort).toHaveAttribute("aria-checked", "true");
+    expect(within(viewMenu).getByRole("menuitemradio", { name: "昇順" }))
+      .toHaveAttribute("aria-checked", "true");
+    expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }))
+      .toHaveAttribute("aria-checked", "true");
+    expect(saveSortMock).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(
+      within(viewMenu).getByRole("menuitemradio", {
+        name: "更新日時で並べ替え",
+      }),
+      { key: " " },
+    );
+    expect(saveSortMock).toHaveBeenCalledTimes(1);
+    expect(saveSortMock).toHaveBeenLastCalledWith(
+      { sortField: "modified", sortDescending: false },
+      expect.any(Number),
+    );
+    expect(screen.getByLabelText("並べ替え条件")).toHaveValue("modified");
+
+    viewMenu = openAppMenu("表示");
+    fireEvent.click(within(viewMenu).getByRole("menuitemradio", { name: "降順" }));
+    expect(saveSortMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("降順 ▼")).toHaveAttribute(
+      "data-sort-descending",
+      "true",
+    );
+
+    viewMenu = openAppMenu("表示");
+    fireEvent.click(
+      within(viewMenu).getByRole("menuitemradio", { name: "詳細リスト" }),
+    );
+    expect(saveCatalogViewModeMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("detail_list");
+  });
+
+  it("supports mnemonic, item traversal, cross-menu arrows and Escape focus return", async () => {
+    await registerTestLibrary([]);
+
+    fireEvent.keyDown(window, { key: "n", altKey: true });
+    const navigationMenu = screen.getByRole("menu", { name: "移動" });
+    const back = within(navigationMenu).getByRole("menuitem", { name: /戻る/ });
+    const up = within(navigationMenu).getByRole("menuitem", {
+      name: /上のフォルダへ/,
+    });
+    await waitFor(() => expect(back).toHaveFocus());
+    expect(back).toHaveAttribute("aria-disabled", "true");
+    expect(back).toHaveAttribute("aria-keyshortcuts", "Alt+ArrowLeft");
+    fireEvent.keyDown(back, { key: "Enter" });
+    expect(listMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(back, { key: "End" });
+    expect(up).toHaveFocus();
+    fireEvent.keyDown(up, { key: "ArrowRight" });
+    const viewMenu = await screen.findByRole("menu", { name: "表示" });
+    const firstViewItem = within(viewMenu).getByRole("menuitemradio", {
+      name: "名前で並べ替え",
+    });
+    await waitFor(() => expect(firstViewItem).toHaveFocus());
+    fireEvent.keyDown(firstViewItem, { key: "End" });
+    expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }))
+      .toHaveFocus();
+    fireEvent.keyDown(
+      within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }),
+      { key: "Home" },
+    );
+    expect(firstViewItem).toHaveFocus();
+    fireEvent.keyDown(firstViewItem, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.getByRole("menuitem", { name: "表示" })).toHaveFocus(),
+    );
+    expect(screen.queryByRole("menu", { name: "表示" })).not.toBeInTheDocument();
+  });
+
+  it("connects Navigation history and prevents diagnostics re-entry while busy", async () => {
+    diagnoseMock.mockImplementation(() => new Promise<never>(() => undefined));
+    await registerTestLibrary([]);
+
+    fireEvent.change(screen.getByLabelText("アドレス"), {
+      target: { value: "C:\\Comics\\Series" },
+    });
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
+    );
+
+    let navigationMenu = openAppMenu("移動");
+    expect(within(navigationMenu).getByRole("menuitem", { name: /戻る/ }))
+      .toHaveAttribute("aria-disabled", "false");
+    expect(within(navigationMenu).getByRole("menuitem", { name: /進む/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    expect(within(navigationMenu).getByRole("menuitem", { name: /上のフォルダへ/ }))
+      .toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(within(navigationMenu).getByRole("menuitem", { name: /戻る/ }));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
+
+    navigationMenu = openAppMenu("移動");
+    expect(within(navigationMenu).getByRole("menuitem", { name: /進む/ }))
+      .toHaveAttribute("aria-disabled", "false");
+    fireEvent.keyDown(
+      within(navigationMenu).getByRole("menuitem", { name: /進む/ }),
+      { key: "Enter" },
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
+    );
+    fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
+    fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
+    );
+    fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
+
+    let libraryMenu = openAppMenu("ライブラリ");
+    const diagnostics = within(libraryMenu).getByRole("menuitem", {
+      name: "ライブラリ診断…",
+    });
+    expect(diagnostics).toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(diagnostics);
+    expect(diagnoseMock).toHaveBeenCalledTimes(1);
+
+    libraryMenu = openAppMenu("ライブラリ");
+    const busyDiagnostics = within(libraryMenu).getByRole("menuitem", {
+      name: "ライブラリ診断…",
+    });
+    expect(busyDiagnostics).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(busyDiagnostics);
+    fireEvent.keyDown(busyDiagnostics, { key: "Enter" });
+    expect(diagnoseMock).toHaveBeenCalledTimes(1);
   });
 
   it("submits visible, near and background thumbnails with bounded-worker priorities", async () => {
@@ -1365,13 +1617,13 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(comic.relativePath));
     await registerTestLibrary([folder, comic]);
 
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    chooseAppMenuItem("ライブラリ", "お気に入り");
     let dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[0]);
     await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"));
     expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
 
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    chooseAppMenuItem("ライブラリ", "お気に入り");
     dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[1]);
     expect(await screen.findByLabelText("Series/01.cbz ビューワ")).toBeInTheDocument();
@@ -1383,11 +1635,11 @@ describe("application shell", () => {
     listFavoritesMock.mockResolvedValue(favoritesResponse([favorite]));
     await registerTestLibrary([{ relativePath: "Series" as never, kind: "folder" }]);
 
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    chooseAppMenuItem("ライブラリ", "お気に入り");
     const firstDialog = await screen.findByRole("dialog", { name: "お気に入り" });
     expect(within(firstDialog).getByText("Series")).toBeInTheDocument();
     fireEvent.click(within(firstDialog).getByRole("button", { name: "閉じる" }));
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    chooseAppMenuItem("ライブラリ", "お気に入り");
     const secondDialog = await screen.findByRole("dialog", { name: "お気に入り" });
     expect(within(secondDialog).getByText("Series")).toBeInTheDocument();
     expect(listFavoritesMock).toHaveBeenCalledTimes(2);
@@ -1421,7 +1673,7 @@ describe("application shell", () => {
     removeFavoriteMock.mockResolvedValue(favoritesResponse([missing]));
     await registerTestLibrary([testEntry("root.cbz")]);
 
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
+    chooseAppMenuItem("ライブラリ", "お気に入り");
     const dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     const movedRow = dialog.querySelector('[data-favorite-id="favorite-moved"]') as HTMLElement;
     const missingRow = dialog.querySelector('[data-favorite-id="favorite-missing"]') as HTMLElement;
