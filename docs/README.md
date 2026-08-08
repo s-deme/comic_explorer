@@ -31,6 +31,7 @@ docs/
 | ヒアリングの回答と将来候補 | [要件ヒアリングシート](requirements/product-questionnaire.md) | 入力資料。採用決定ではない |
 | 機能の採否・実装状態・検証状態 | [機能ステータス台帳](product/feature-status.md) | 機能単位の現在状態 |
 | 未実装機能の実装順 | [機能ロードマップ](product/feature-roadmap.md) | 優先順位とバッチ運用。状態の正本ではない |
+| 未実装機能を1件ずつ進める | [実装バックログ](product/implementation-backlog.md) | 原子作業の順序・着手・完了管理 |
 | 個別 Feature Lane の契約 | `requirements/*-requirements.md` | 採用済み機能の要件 |
 | 技術採用の理由 | [ADR-001](decisions/adr-001-technology-stack.md) | 採用済み技術スタックの決定 |
 | 技術比較や未確定の調査 | [技術構成評価](research/technology-evaluation.md) | ADRを補足する調査記録 |
