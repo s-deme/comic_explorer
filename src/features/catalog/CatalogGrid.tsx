@@ -284,13 +284,18 @@ export function CatalogGrid({
                           {favorite ? "★" : "☆"}
                         </button>
                       )}
-                      {entry.kind === "comicFolder" && (
+                      {(canNavigate || canRead) && (
                         <button
+                          type="button"
                           className="read-action"
-                          onClick={() => onRead(entry)}
-                          aria-label={`${name}を読む`}
+                          onClick={() =>
+                            entry.kind === "folder"
+                              ? onNavigate(entry)
+                              : onRead(entry)
+                          }
+                          aria-label={`${kind}の項目${itemIndex + 1}を${entry.kind === "folder" ? "開く" : "読む"}`}
                         >
-                          読む
+                          {entry.kind === "folder" ? "開く" : "読む"}
                         </button>
                       )}
                     </div>

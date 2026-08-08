@@ -43,11 +43,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 34px 42px 40px minmax(0, 1fr) 28px;
+  grid-template-rows: 34px 42px 40px 40px minmax(0, 1fr) 28px;
   height: 100vh;
   background: #fff;
 }
-.menu-bar, .toolbar, .address-bar, .status-bar {
+.menu-bar, .toolbar, .address-bar, .search-bar, .status-bar {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -62,7 +62,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .toolbar label { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 .address-bar label { font-size: .82rem; }
-.address-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
+.address-bar input, .search-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
+.search-bar label { font-size: .82rem; }
 
 .workspace { display: grid; min-height: 0; }
 .folder-tree {

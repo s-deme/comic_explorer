@@ -87,6 +87,55 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("shows a visible action for each supported kind and invokes its existing callback", () => {
+    const folder: CatalogEntry = {
+      relativePath: "library" as never,
+      kind: "folder",
+    };
+    const comicFolder: CatalogEntry = {
+      relativePath: "series" as never,
+      kind: "comicFolder",
+    };
+    const archive: CatalogEntry = {
+      relativePath: "volume.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    };
+    const onSelect = vi.fn();
+    const onNavigate = vi.fn();
+    const onRead = vi.fn();
+    render(
+      <CatalogGrid
+        entries={[folder, comicFolder, archive]}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={onNavigate}
+        onRead={onRead}
+      />,
+    );
+
+    expect(screen.getByText("フォルダ")).toBeInTheDocument();
+    expect(screen.getByText("漫画フォルダ")).toBeInTheDocument();
+    expect(screen.getByText("ZIP / CBZ")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "フォルダの項目1を開く" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "漫画フォルダの項目2を読む" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "ZIP / CBZの項目3を読む" }),
+    );
+
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith(folder);
+    expect(onRead).toHaveBeenCalledTimes(2);
+    expect(onRead).toHaveBeenNthCalledWith(1, comicFolder);
+    expect(onRead).toHaveBeenNthCalledWith(2, archive);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("keeps the thumbnail slot stable while loading and displays the generated image", async () => {
     const onNeeded = vi.fn();
     const { rerender } = render(
