@@ -5,7 +5,7 @@ codd:
   status: active
   confidence: 0.95
   depends_on:
-    - id: "req:library-diagnostics"
+    - id: "req:fr-b09"
       relation: "verifies"
       semantic: "library-diagnostics-contract"
     - id: "design:screen-flow"

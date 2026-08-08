@@ -1,6 +1,6 @@
 ---
 codd:
-  node_id: "research:technology-evaluation"
+  node_id: "doc:technology-evaluation"
   type: research
   status: approved
   confidence: 0.78

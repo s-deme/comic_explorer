@@ -1,10 +1,10 @@
 ---
 codd:
-  node_id: "product:feature-roadmap"
+  node_id: "doc:feature-roadmap"
   type: design
   status: active
   depends_on:
-    - id: "product:feature-status"
+    - id: "doc:feature-status"
       relation: "derives_from"
       semantic: "governance"
     - id: "req:product-questionnaire"

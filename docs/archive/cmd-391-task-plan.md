@@ -1,3 +1,10 @@
+---
+codd:
+  node_id: "doc:archive-cmd-391-task-plan"
+  type: archive
+  status: archived
+---
+
 # Archived cmd-391 C2a task completion evidence
 
 > **Archive status:** `cancelled`

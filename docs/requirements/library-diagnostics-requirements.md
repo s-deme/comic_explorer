@@ -1,3 +1,18 @@
+---
+codd:
+  node_id: "req:fr-b09"
+  type: requirement
+  status: approved
+  confidence: 0.90
+  depends_on:
+    - id: "req:mvp-requirements"
+      relation: "derives_from"
+      semantic: "scope"
+    - id: "req:product-questionnaire"
+      relation: "derives_from"
+      semantic: "priority"
+---
+
 # FR-B09 Library Diagnostics
 
 FR-B09 is a local, read-only diagnostic vertical slice. It reports changes,

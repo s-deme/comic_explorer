@@ -1,6 +1,6 @@
 ---
 codd:
-  node_id: "product:feature-status"
+  node_id: "doc:feature-status"
   type: design
   status: active
   depends_on:

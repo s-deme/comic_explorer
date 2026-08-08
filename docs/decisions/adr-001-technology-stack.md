@@ -1,11 +1,11 @@
 ---
 codd:
-  node_id: "decision:technology-stack"
+  node_id: "design:technology-stack"
   type: decision
   status: accepted
   confidence: 0.86
   depends_on:
-    - id: "research:technology-evaluation"
+    - id: "doc:technology-evaluation"
       relation: "derives_from"
       semantic: "governance"
     - id: "design:architecture"
@@ -18,7 +18,7 @@ codd:
 - 状態: Accepted
 - 日付: 2026-07-28
 - 最終決定日: 2026-07-29
-- 根拠: `req:mvp-requirements`、`research:technology-evaluation`、
+- 根拠: `req:mvp-requirements`、`doc:technology-evaluation`、
   `design:screen-flow`、`design:architecture`
 - 文書内容承認: ユーザー、2026-07-29
 - 承認範囲: 採用技術構成と実装後の品質gate。製造開始は含まない

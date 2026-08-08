@@ -1,6 +1,6 @@
 ---
 codd:
-  node_id: "evidence:performance-benchmark-results"
+  node_id: "test:performance-benchmark-results"
   type: test_result
   status: draft
   confidence: 0.70
@@ -8,7 +8,7 @@ codd:
     - id: "test:performance-benchmark-plan"
       relation: "verifies"
       semantic: "verification"
-    - id: "research:technology-evaluation"
+    - id: "doc:technology-evaluation"
       relation: "supports"
       semantic: "evidence"
 ---

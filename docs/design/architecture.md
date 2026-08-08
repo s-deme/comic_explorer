@@ -8,7 +8,7 @@ codd:
     - id: "req:mvp-requirements"
       relation: "implements"
       semantic: "governance"
-    - id: "research:technology-evaluation"
+    - id: "doc:technology-evaluation"
       relation: "derives_from"
       semantic: "governance"
     - id: "design:screen-flow"
