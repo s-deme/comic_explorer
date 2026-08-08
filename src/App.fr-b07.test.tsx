@@ -46,6 +46,15 @@ import {
 } from "./features/library/client";
 import type { CatalogEntry } from "./types/domain";
 
+function openLibraryMenuItem(name: "閲覧履歴") {
+  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+      name,
+    }),
+  );
+}
+
 vi.mock("./features/library/client", () => ({
   // Keep every App/Viewer client binding mocked; only exercised bindings get handles below.
   registerLibraryRoot: vi.fn(),
@@ -514,7 +523,7 @@ describe("FR-B07 connected App boundary", () => {
     );
     expect(screen.queryByLabelText(`${cancelled.relativePath} ビューワ`)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "閲覧履歴" }));
+    openLibraryMenuItem("閲覧履歴");
     const dialog = await screen.findByRole("dialog", { name: "閲覧履歴" });
     const rows = await within(dialog).findAllByRole("listitem");
     expect(rows).toHaveLength(1);
@@ -654,7 +663,7 @@ describe("FR-B07 connected App boundary", () => {
         ),
       );
 
-      fireEvent.click(screen.getByRole("button", { name: "閲覧履歴" }));
+      openLibraryMenuItem("閲覧履歴");
       const dialog = await screen.findByRole("dialog", { name: "閲覧履歴" });
       expect(within(dialog).getByText(comic.relativePath)).toBeInTheDocument();
       expect(historyMock).toHaveBeenCalledWith(expect.any(Number));

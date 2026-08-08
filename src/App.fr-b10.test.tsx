@@ -2,6 +2,15 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+function openTagsMenuItem() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+      name: "タグ管理",
+    }),
+  );
+}
 import {
   addFavorite,
   assignTag,
@@ -131,7 +140,7 @@ async function openTagsForSelectedItem() {
   const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
   const item = within(grid).getByRole("button", { name: /01\.cbz/ });
   fireEvent.click(item);
-  fireEvent.click(screen.getByRole("button", { name: "タグ管理" }));
+  openTagsMenuItem();
   return screen.findByRole("dialog", { name: "タグ管理" });
 }
 
@@ -324,7 +333,7 @@ describe("FR-B10 connected tag management", () => {
     getItemTagsMock.mockClear();
 
     fireEvent.click(within(tagDialog).getByRole("button", { name: "閉じる" }));
-    fireEvent.click(screen.getByRole("button", { name: "タグ管理" }));
+    openTagsMenuItem();
     await waitFor(() =>
       expect(getItemTagsMock).toHaveBeenCalledWith(
         "Series/01.cbz",

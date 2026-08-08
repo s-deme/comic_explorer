@@ -1,7 +1,16 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+function openHelpMenuItem() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "ヘルプ" }));
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "ヘルプ" })).getByRole("menuitem", {
+      name: "キー操作とショートカット…",
+    }),
+  );
+}
 import {
   DEFAULT_SHORTCUTS,
   type ShortcutBindings,
@@ -218,7 +227,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
   it("FT-B11-001 remaps, rejects conflicts, and resets the production command mapping", async () => {
     render(<App />);
     await registerTestLibrary([]);
-    fireEvent.click(screen.getByRole("button", { name: "ヘルプ" }));
+    openHelpMenuItem();
 
     const dialog = screen.getByRole("dialog", {
       name: "キー操作とショートカット",
@@ -284,7 +293,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     );
     render(<App />);
     await registerTestLibrary([]);
-    fireEvent.click(screen.getByRole("button", { name: "ヘルプ" }));
+    openHelpMenuItem();
     expect(
       await screen.findByRole("dialog", { name: "キー操作とショートカット" }),
     ).toBeInTheDocument();
@@ -299,7 +308,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     settingsMock.mockResolvedValue(settingsResponse({ nextPage: "N" }));
     render(<App />);
     await registerTestLibrary([]);
-    fireEvent.click(screen.getByRole("button", { name: "ヘルプ" }));
+    openHelpMenuItem();
     expect(
       await screen.findByRole("textbox", { name: "次ページショートカット" }),
     ).toHaveValue("N");

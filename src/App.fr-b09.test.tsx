@@ -1,7 +1,16 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+
+function openDiagnosticsMenuItem() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+      name: "ライブラリ診断…",
+    }),
+  );
+}
 import {
   cancelLibraryDiagnostics,
   diagnoseLibrary,
@@ -168,7 +177,7 @@ describe("FR-B09 connected library diagnostics", () => {
       ) as never,
     );
     await registerLibrary();
-    fireEvent.click(screen.getByRole("button", { name: "ライブラリ診断" }));
+    openDiagnosticsMenuItem();
     const results = await screen.findByRole("list", { name: "診断結果" });
     expect(results.querySelectorAll('[data-diagnostic-status="added"]')).toHaveLength(1);
     expect(results.querySelectorAll('[data-diagnostic-status="changed"]')).toHaveLength(1);
@@ -180,7 +189,7 @@ describe("FR-B09 connected library diagnostics", () => {
       response(report([finding("duplicate", "warning", "copy/book.cbz")])) as never,
     );
     await registerLibrary();
-    fireEvent.click(screen.getByRole("button", { name: "ライブラリ診断" }));
+    openDiagnosticsMenuItem();
     expect(await screen.findByText("copy/book.cbz")).toBeInTheDocument();
     expect(screen.getByText("重複")).toBeInTheDocument();
   });
@@ -190,7 +199,7 @@ describe("FR-B09 connected library diagnostics", () => {
       response(report([finding("corrupt", "error", "broken.cbz")])) as never,
     );
     await registerLibrary();
-    fireEvent.click(screen.getByRole("button", { name: "ライブラリ診断" }));
+    openDiagnosticsMenuItem();
     const corrupt = await screen.findByText("broken.cbz");
     expect(corrupt.closest("li")).toHaveAttribute("data-diagnostic-severity", "error");
     expect(screen.getByText("破損書庫")).toBeInTheDocument();
@@ -207,7 +216,7 @@ describe("FR-B09 connected library diagnostics", () => {
       ) as never,
     );
     await registerLibrary();
-    fireEvent.click(screen.getByRole("button", { name: "ライブラリ診断" }));
+    openDiagnosticsMenuItem();
     const panel = await screen.findByRole("region", { name: "ライブラリ診断" });
     expect(panel.querySelectorAll('[data-diagnostic-severity="info"]')).toHaveLength(1);
     expect(panel.querySelectorAll('[data-diagnostic-severity="warning"]')).toHaveLength(1);
@@ -217,7 +226,7 @@ describe("FR-B09 connected library diagnostics", () => {
   it("FT-B09-005 renders production cancellation and suppresses late stale retry results", async () => {
     diagnoseMock.mockResolvedValueOnce(response(report([]), "initial") as never);
     await registerLibrary();
-    fireEvent.click(screen.getByRole("button", { name: "ライブラリ診断" }));
+    openDiagnosticsMenuItem();
     await screen.findByText("問題は見つかりませんでした。");
 
     let releaseLateOld: () => void = () => undefined;
