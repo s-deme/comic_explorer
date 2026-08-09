@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -11,14 +13,28 @@ WRAPPER = ROOT / "scripts" / "run-codd-consistency.sh"
 OUTPUT = ROOT / ".codd" / "propagation_results.json"
 
 
+def consistency_command() -> list[str]:
+    if os.name == "nt":
+        return [
+            sys.executable,
+            "-X",
+            "utf8",
+            str(ROOT / "scripts/run-codd-consistency.py"),
+            "--project-root",
+            str(ROOT),
+        ]
+    return ["bash", str(ROOT / "scripts/run-codd-consistency.sh")]
+
+
 class CoddConsistencyWiringTests(unittest.TestCase):
     def test_canonical_wrapper_runs_real_nonvacuous_chain(self) -> None:
         completed = subprocess.run(
-            ["bash", str(WRAPPER)],
+            consistency_command(),
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
         self.assertIn(

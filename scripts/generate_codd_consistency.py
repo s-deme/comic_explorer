@@ -74,6 +74,10 @@ def _read_source(project_root: Path, relative_path: str) -> tuple[Path, bytes, s
 
 
 def _section_body(text: str, heading: str, source_name: str) -> str:
+    # Windows-native reads preserve CRLF line endings. Normalize them before
+    # applying line-anchored section matching so the producer has identical
+    # semantics on Windows, WSL, and Linux.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     heading_pattern = re.compile(rf"(?m)^##[ \t]+{re.escape(heading)}[ \t]*$")
     matches = list(heading_pattern.finditer(text))
     if len(matches) != 1:

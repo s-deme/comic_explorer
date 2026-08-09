@@ -1,5 +1,6 @@
 # Project-local Python environment used to run CoDD.
 .venv/
+.venv-windows/
 .codd/
 .tools/
 .codex/

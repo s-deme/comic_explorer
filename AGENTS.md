@@ -13,6 +13,15 @@ Run CoDD from the project-local environment:
 .venv/bin/codd <command>
 ```
 
+On Windows, use the native PowerShell runners instead of the Linux/WSL
+environment. They default to the project-local `.venv-windows` environment:
+
+```powershell
+.\scripts\run-codd-windows.ps1 scan
+.\scripts\run-codd-windows.ps1 check
+.\scripts\run-codd-windows.ps1 verify
+```
+
 Before implementing or changing user-visible behavior:
 
 1. Record or update the applicable requirement under `docs/requirements/`.
@@ -39,6 +48,9 @@ Use the repository's canonical verification entry points where applicable:
 - TypeScript type checking: `scripts/run-typecheck.sh` (or `npm run typecheck`).
 - Rust checks/tests: use the locked Cargo commands documented by the affected
   test or CI workflow.
+
+For Windows-native verification, use `scripts/run-tests-windows.ps1`,
+`scripts/run-typecheck-windows.ps1`, and `scripts/run-build-windows.ps1`.
 
 Do not commit generated outputs such as `codd/scan/`, `node_modules/`,
 `dist/`, `target/`, or generated fixtures. Commit requirements, design

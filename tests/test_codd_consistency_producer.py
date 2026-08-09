@@ -3,7 +3,9 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -42,6 +44,19 @@ PHASE6_TEXT = f"""# Phase 6 result fixture
 
 The rest of the document is outside the table scope.
 """
+
+
+def consistency_command() -> list[str]:
+    if os.name == "nt":
+        return [
+            sys.executable,
+            "-X",
+            "utf8",
+            str(ROOT / "scripts/run-codd-consistency.py"),
+            "--project-root",
+            str(ROOT),
+        ]
+    return ["bash", str(ROOT / "scripts/run-codd-dag-verify.sh"), str(ROOT)]
 
 EXPECTED = {
     "PASS": "3",
@@ -89,6 +104,10 @@ class CoddConsistencyProducerTests(unittest.TestCase):
             "NOT RUN": "4",
             "total": "10",
         })
+        self.assertEqual(
+            producer.extract_feature_status_counts(FEATURE_TEXT.replace("\n", "\r\n")),
+            producer.extract_feature_status_counts(FEATURE_TEXT),
+        )
 
     def test_generates_five_nonempty_records(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -216,12 +235,16 @@ class CoddConsistencyProducerTests(unittest.TestCase):
         )
         for record in payload["records"]:
             self.assertTrue(all(record.values()))
+        command = consistency_command()
+        if os.name == "nt":
+            command.append("--json")
         completed = subprocess.run(
-            ["bash", str(ROOT / "scripts/run-codd-dag-verify.sh"), str(ROOT)],
+            command,
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
         results = json.loads(completed.stdout)

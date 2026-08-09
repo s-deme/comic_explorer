@@ -120,7 +120,7 @@ propagation:
 
 typecheck:
   enabled: true
-  command: "scripts/run-typecheck.sh"
+  command: "python -X utf8 scripts/run-typecheck.py"
   max_repair_attempts: 3
 
 verify:
@@ -129,7 +129,7 @@ verify:
   # uses the Windows toolchain/project-local Node; verification still runs the
   # lock-backed tests and the separately enabled typecheck gate below.
   install_preflight: false
-  test_command: "scripts/run-tests.sh"
+  test_command: "python -X utf8 scripts/run-tests.py"
 #   verification_timeout:
 #     per_node_seconds: 60    # optional: hard cap for each verification_test node
 #     total_seconds: 300      # optional: total budget for all verification_test nodes
