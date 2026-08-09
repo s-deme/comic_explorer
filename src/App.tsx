@@ -102,6 +102,7 @@ import {
 } from "./features/reading/collections";
 import {
   catalogCsv,
+  matchesMask,
   rangeSelection,
   selectEntriesByKind,
   toggleEntrySelection,
@@ -230,6 +231,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [fileMask, setFileMask] = useState("");
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
@@ -460,6 +462,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       ),
     [entries, sortDescending, sortField],
   );
+  const visibleEntries = useMemo(
+    () => sortedEntries.filter((entry) => matchesMask(entry, fileMask)),
+    [fileMask, sortedEntries],
+  );
+
+  useEffect(() => {
+    if (selectedPath !== null && !visibleEntries.some((entry) => entry.relativePath === selectedPath)) {
+      clearSelection();
+    }
+  }, [selectedPath, visibleEntries]);
 
   useEffect(() => {
     const requestGeneration = generation.current;
@@ -531,14 +543,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   function selectAll() {
-    const next = sortedEntries.map((entry) => entry.relativePath);
+    const next = visibleEntries.map((entry) => entry.relativePath);
     setSelectedPaths(next);
     setSelectedPath(next.at(-1) ?? null);
     setSelectionNotice(null);
   }
 
   function selectByKind(kind: CatalogEntry["kind"] | "image") {
-    const next = selectEntriesByKind(sortedEntries, kind);
+    const next = selectEntriesByKind(visibleEntries, kind);
     setSelectedPaths(next);
     setSelectedPath(next.at(-1) ?? null);
     setSelectionNotice(null);
@@ -546,7 +558,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function invertSelection() {
     const selected = new Set(selectedPaths);
-    const next = sortedEntries
+    const next = visibleEntries
       .filter((entry) => !selected.has(entry.relativePath))
       .map((entry) => entry.relativePath);
     setSelectedPaths(next);
@@ -558,6 +570,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setSelectedPaths([]);
     setSelectedPath(null);
     setSelectionNotice(null);
+  }
+
+  function downloadCatalogCsv() {
+    const blob = new Blob([catalogCsv(visibleEntries)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "comic-explorer-catalog.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setSelectionNotice(`${visibleEntries.length}件をCSVへ出力しました。`);
   }
 
   function openSelectedEntry() {
@@ -1774,6 +1797,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 type="button"
                 role="menuitem"
                 tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(downloadCatalogCsv)}
+              >
+                CSVで出力
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
                 aria-disabled={selectedPaths.length !== 1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
@@ -2434,6 +2467,21 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           </button>
         )}
       </form>
+      <form
+        className="filter-bar"
+        aria-label="ファイルマスクフォーム"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <label htmlFor="file-mask">ファイルマスク</label>
+        <input
+          id="file-mask"
+          aria-label="ファイルマスク"
+          value={fileMask}
+          onChange={(event) => setFileMask(event.target.value)}
+          placeholder="*.jpg;*.cbz"
+        />
+        <button type="button" onClick={() => setFileMask("")}>全件</button>
+      </form>
       <div
         className="workspace"
         style={{ gridTemplateColumns: `${treeWidth}px 6px minmax(0, 1fr)` }}
@@ -2537,7 +2585,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             </div>
           ) : searchState.status === "idle" && loadState.status !== "error" ? (
             <CatalogGrid
-              entries={sortedEntries}
+              entries={visibleEntries}
               selectedPath={selectedPath}
               selectedPaths={selectedPaths}
               viewMode={catalogViewMode}
@@ -2559,9 +2607,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       </div>
       <footer className="status-bar" aria-live="polite">
         <span>
-          現在位置: {selectedPath === null ? "—" : `${Math.max(1, sortedEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${sortedEntries.length}`}
+          現在位置: {selectedPath === null ? "—" : `${Math.max(1, visibleEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${visibleEntries.length}`}
         </span>
-        <span>{sortedEntries.length}項目</span>
+        <span>{visibleEntries.length}項目</span>
         <span>{selectedPaths.length}件選択</span>
         <span>{selected ? `選択: ${selected.relativePath}` : "選択なし"}</span>
         <span>{loadState.status === "loading" ? "読み込み中" : "準備完了"}</span>

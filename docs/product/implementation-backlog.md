@@ -109,8 +109,8 @@ codd:
 | 40 | P3-1 / FR-B15 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Implemented / PASS | Done | page bookmark local persistence/listを実装・実測 |
 | 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Implemented / PASS | Done | next bookmarkと末尾wrapを実装・実測 |
 | 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Implemented / PASS | Done | favoriteと分離したbookshelfを実装・実測 |
-| 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Candidate / NOT TESTED | Candidate | mask構文、kind、複数条件、保存scopeを決定 |
-| 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Candidate / NOT TESTED | Candidate | 対象row、column、encoding、path秘匿を決定 |
+| 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Implemented / PASS | Done | basename glob mask、current-session scope、status同期を実装・実測 |
+| 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Implemented / PASS | Done | filtered rowのUTF-8 CSV exportとabsolute path除外を実装・実測 |
 | 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Candidate / NOT TESTED | Candidate | 採用command確定後にmenu IA、shortcut、disabled stateを設計 |
 | 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Candidate / NOT TESTED | Candidate | command集合、icon asset、accessible name、表示scopeを決定 |
 | 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Candidate / NOT TESTED | Candidate | visual fidelity、density、長名、responsive基準を決定 |

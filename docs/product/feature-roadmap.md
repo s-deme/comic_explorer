@@ -59,7 +59,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Done` |
 | P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Done` |
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Done` |
-| P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Planned`（2機能の縦切り） |
+| P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Done` |
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Planned`（先行command確定後） |
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Planned`（Windows lifecycle要件待ち） |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Planned`（設定scope確定待ち） |
@@ -626,12 +626,20 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B16 — filter・export（Batch 16 / P4）
 
-- **状態:** `Planned`。2機能で一つの原本非破壊の縦切りとする。
+- **状態:** `Done`。2機能を原本非破壊で実装し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-058` file mask、(2) `FUT-C-050` CSV出力。
 - **優先理由:** B13の複数選択・件数stateを使い、表示対象の絞り込みと一覧情報の持ち出しを
   原本非破壊で提供できる。mask適用後のcurrent/totalとexport対象を同じquery modelへ揃える。
 - **採用gate:** mask構文・対象kind・保存scope、CSV列・encoding・選択/filtered/allの範囲、
   path情報の取り扱いを要件化する。
+
+#### FR-B16 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p4-filterexport)。
+- **実装根拠:** `src/App.tsx`、`src/features/catalog/commands.ts`、
+  `src/features/catalog/commands.test.ts`。
+- **直接観測:** [FR-B16 focused test結果](../testing/fr-b16-results.md)。glob mask、empty mask、
+  CSV escaping/columnsをSKIP 0で実測した。
 
 ### FR-B17 — 参照shell UI（Batch 17 / P5）
 
