@@ -6,7 +6,35 @@ use zip::{CompressionMethod, ZipArchive};
 use crate::api::{MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES};
 use crate::domain::{AppError, ErrorCode, FileKind, RelativePath, classify_file_name, natural_cmp};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchiveAdapterKind {
+    Zip,
+    Cbz,
+    Rar,
+    Cbr,
+    SevenZip,
+}
+
+pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("cbz") => ArchiveAdapterKind::Cbz,
+        Some("rar") => ArchiveAdapterKind::Rar,
+        Some("cbr") => ArchiveAdapterKind::Cbr,
+        Some("7z") => ArchiveAdapterKind::SevenZip,
+        _ => ArchiveAdapterKind::Zip,
+    }
+}
+
 pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+    let adapter = archive_adapter_kind(path);
+    if !matches!(adapter, ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz) {
+        return Err(unsupported_adapter_error(path, adapter));
+    }
     let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
     let mut archive = ZipArchive::new(file).map_err(|source| AppError {
         code: ErrorCode::CorruptArchive,
@@ -78,6 +106,23 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
     }
     pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
     Ok(pages)
+}
+
+fn unsupported_adapter_error(path: &Path, adapter: ArchiveAdapterKind) -> AppError {
+    let name = match adapter {
+        ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => "RAR/CBR",
+        ArchiveAdapterKind::SevenZip => "7z",
+        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz => "ZIP/CBZ",
+    };
+    AppError {
+        code: ErrorCode::UnsupportedFormat,
+        message: format!(
+            "{name} archive adapter is unavailable for {}.",
+            path.display()
+        ),
+        target: None,
+        retryable: false,
+    }
 }
 
 fn archive_io_error(path: &Path, source: std::io::Error) -> AppError {
@@ -173,5 +218,30 @@ mod tests {
             ErrorCode::InvalidPath
         );
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn fr_b12_classifies_rar_cbr_and_7z_without_extracting_or_faking_support() {
+        assert_eq!(
+            archive_adapter_kind(Path::new("volume.cbr")),
+            ArchiveAdapterKind::Cbr
+        );
+        assert_eq!(
+            archive_adapter_kind(Path::new("volume.7z")),
+            ArchiveAdapterKind::SevenZip
+        );
+        for (extension, signature) in [
+            ("rar", b"Rar!\x1a\x07\x00".as_slice()),
+            ("7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
+        ] {
+            let mut path = temporary_archive(&format!("unsupported-{extension}"));
+            path.set_extension(extension);
+            let mut file = File::create(&path).unwrap();
+            file.write_all(signature).unwrap();
+            let error = enumerate_archive_pages(&path).unwrap_err();
+            assert_eq!(error.code, ErrorCode::UnsupportedFormat);
+            assert!(error.message.contains("adapter is unavailable"));
+            fs::remove_file(path).unwrap();
+        }
     }
 }

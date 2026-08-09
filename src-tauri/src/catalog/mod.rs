@@ -3,7 +3,7 @@ mod folder;
 mod image_metadata;
 mod thumbnail;
 
-pub use archive::enumerate_archive_pages;
+pub use archive::{ArchiveAdapterKind, archive_adapter_kind, enumerate_archive_pages};
 pub use folder::{ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages};
 pub use image_metadata::{ImageMetadata, inspect_image};
 #[cfg(target_os = "windows")]
@@ -157,7 +157,7 @@ mod fixture_tests {
     }
 
     #[test]
-    fn mixed_library_fixture_classifies_every_entry_without_promoting_unsupported_files() {
+    fn mixed_library_fixture_classifies_every_entry_without_promoting_unknown_files() {
         use crate::domain::ItemKind;
 
         let root = fixtures();
@@ -183,7 +183,7 @@ mod fixture_tests {
         assert_eq!(by_name["comic-folder"], ItemKind::ComicFolder);
         assert_eq!(by_name["volume.zip"], ItemKind::Archive);
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
-        assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
+        assert_eq!(by_name["future.rar"], ItemKind::Archive);
         assert_eq!(entries.len(), by_name.len());
     }
 

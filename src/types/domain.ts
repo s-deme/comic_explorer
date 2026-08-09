@@ -25,7 +25,7 @@ export interface CatalogEntry {
   kind: ItemKind;
   byteSize?: number;
   modifiedMs?: number;
-  archiveKind?: "zip" | "cbz";
+  archiveKind?: "zip" | "cbz" | "rar" | "cbr" | "sevenZip";
 }
 
 export interface Page {

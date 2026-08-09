@@ -41,8 +41,8 @@ codd:
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
 FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B04、B09、B11は既存の未解消gateを
-`Blocked`として保持する。FR-B08はWebP/GIF/AVIFまで完了した`Done`、FR-B12は未着手の
-`Planned`である。2026-08-10の優先度再検討では、Leeyes代替としての利用価値、後続機能を
+`Blocked`として保持する。FR-B08はWebP/GIF/AVIFまで完了した`Done`、FR-B12はadapterの
+依存・ライセンス・fixture確認待ちの`Partial / BLOCKED`である。2026-08-10の優先度再検討では、Leeyes代替としての利用価値、後続機能を
 解放する依存、原本非破壊、安全性、Windows製品での検証容易性を評価し、未実装候補を
 P1〜P10と分離trackへ再編した。これは優先順位案であり、台帳の`Candidate / NOT TESTED`を
 採用済みへ変更せず、`Next`または`In Progress`も自動設定しない。
@@ -64,7 +64,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Done` |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Done` |
 | P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Done` |
-| P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned`（license・fixture確認待ち） |
+| P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Partial / BLOCKED`（adapter license・fixture未承認） |
 | P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Planned`（入出力仕様確定待ち） |
 | Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
 | Hold | `FR-S06` | — | 仕様・architecture未決定 | `FUT-C-043`, `FUT-C-059`, `FUT-C-064`, `FUT-C-048`, `FUT-C-070` | `Blocked`（product・security判断待ち） |
@@ -559,8 +559,9 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B12 — 追加書庫形式（Batch 12）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。PDF/EPUB/video はこのバッチへ
-  混ぜず、`FR-S01` で別判断する。
+- **状態:** `Partial / BLOCKED`。RAR/CBR/7zの分類と既存archive adapterのunsupported境界を
+  実装・実測した。完全readerは依存crateのlicense/SBOM、Windows build、実fixtureの承認待ちであり、
+  対象行を`Done`へ上げない。PDF/EPUB/video はこのバッチへ混ぜず、`FR-S01` で別判断する。
 - **対象 feature ID:** `FUT-C-001`, `FUT-C-002`（RAR/CBR、7z）。2原子機能だが、同じ
   archive backend adapter と license gate を共有するため一つの縦切りに固定する。
 - **user outcome:** RAR/CBR と 7z の画像書庫を、既存 ZIP/CBZ と同じく展開物を残さず、
@@ -576,6 +577,16 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   parent snapshot/hash 不変、`FT-B12-005` catalog/viewer/diagnostics integration。
 - **batch末尾 gate:** license/SBOM と各形式の focused test を SKIP 0 で実測し、原本差分0、
   一時展開物0、既存 ZIP/CBZ 回帰0を確認して `BATCH-END-GATE`。その後に全体最終QCを行う。
+
+#### FR-B12 実装・直接観測証跡
+
+- **実装根拠:** `src-tauri/src/domain/file_kind.rs`、`src-tauri/src/catalog/folder.rs`、
+  `src-tauri/src/catalog/archive.rs`、`src-tauri/src/media/mod.rs`。
+- **直接観測:** RAR/CBR/7zをarchiveとして分類し、展開処理へ進めず構造化`UnsupportedFormat`を返す。
+  既存ZIP/CBZの列挙・media grant経路は変更せず、P9 focused Rust test、canonical Rust、typecheck、
+  Windows-native CoDD scan/check/verifyを通過した。
+- **未解消gate:** 完全なRAR/CBR/7z readerの依存crate、license/SBOM、Windows build、実fixtureは
+  承認・確認前のため、FT-B12-001/002の完全列挙、FT-B12-004/005をPASS扱いしない。
 
 ### FR-B13 — catalog command基盤（Batch 13 / P1）
 

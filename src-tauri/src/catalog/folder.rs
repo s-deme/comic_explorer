@@ -23,6 +23,9 @@ pub struct CatalogEntry {
 pub enum ArchiveKind {
     Zip,
     Cbz,
+    Rar,
+    Cbr,
+    SevenZip,
 }
 
 pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntry>, AppError> {
@@ -80,10 +83,16 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .and_then(|value| u64::try_from(value.as_millis()).ok()),
             archive_kind: (kind == ItemKind::Archive).then(|| {
-                if name.to_ascii_lowercase().ends_with(".cbz") {
-                    ArchiveKind::Cbz
-                } else {
-                    ArchiveKind::Zip
+                match name
+                    .rsplit_once('.')
+                    .map(|(_, extension)| extension.to_ascii_lowercase())
+                    .as_deref()
+                {
+                    Some("cbz") => ArchiveKind::Cbz,
+                    Some("rar") => ArchiveKind::Rar,
+                    Some("cbr") => ArchiveKind::Cbr,
+                    Some("7z") => ArchiveKind::SevenZip,
+                    _ => ArchiveKind::Zip,
                 }
             }),
         });

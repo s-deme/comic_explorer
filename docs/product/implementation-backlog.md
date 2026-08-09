@@ -126,8 +126,8 @@ codd:
 | 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Implemented / PASS | Done | GIF metadata/signature/alphaを既存page pipelineへ接続・実測 |
 | 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Implemented / PASS | Done | AVIF ftyp/ispe metadata、MIME、grantを接続・実測 |
 | 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Implemented / PASS | Done | WebView2へanimation GIFを渡しframeを永続化しない境界を実測 |
-| 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
-| 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
+| 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
+| 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
 | 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Candidate / NOT TESTED | Candidate | 管理対象、操作範囲、実行中状態を参照仕様から確認 |
 | 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Candidate / NOT TESTED | Candidate | 保存先、format、対象、上書き規則を決定 |
 | 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Candidate / NOT TESTED | Candidate | input source、format、対象範囲を参照仕様から確認 |
