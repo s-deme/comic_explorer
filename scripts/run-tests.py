@@ -73,10 +73,37 @@ def main() -> int:
         )
 
     python = sys.executable
-    unit_rc = run([python, "-X", "utf8", "-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"])
+    consistency_rc = run(
+        ["bash", str(ROOT / "scripts" / "run-codd-consistency.sh")]
+    )
+    if consistency_rc != 0:
+        return consistency_rc
+    unit_rc = run(
+        [
+            python,
+            "-X",
+            "utf8",
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+        ]
+    )
     if unit_rc != 0:
         return unit_rc
-    return run([npm_command(), "test", "--", "--pool=threads", "--poolOptions.threads.singleThread=true"])
+    return run(
+        [
+            npm_command(),
+            "test",
+            "--",
+            "--pool=threads",
+            "--poolOptions.threads.singleThread=true",
+        ]
+    )
 
 
 if __name__ == "__main__":

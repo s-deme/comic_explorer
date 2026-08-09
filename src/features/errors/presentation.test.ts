@@ -1,21 +1,65 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { ErrorCode } from "../../types/domain";
 import { presentError, presentUnexpectedError } from "./presentation";
 
 describe("error presentation", () => {
   it("maps every API code to a fixed user-facing classification", () => {
-    const codes: ErrorCode[] = [
-      "INVALID_REQUEST", "INVALID_PATH", "OUTSIDE_LIBRARY_ROOT", "NOT_FOUND",
-      "ACCESS_DENIED", "UNSUPPORTED_FORMAT", "CORRUPT_IMAGE", "CORRUPT_ARCHIVE",
-      "ENCRYPTED_ARCHIVE", "RESOURCE_LIMIT", "CANCELLED", "INTERNAL",
+    const cases: [ErrorCode, string][] = [
+      [
+        "INVALID_REQUEST",
+        "対応していません。対応する画像、ZIP、CBZを選んでください。",
+      ],
+      [
+        "INVALID_PATH",
+        "対応していません。対応する画像、ZIP、CBZを選んでください。",
+      ],
+      [
+        "OUTSIDE_LIBRARY_ROOT",
+        "対応していません。ライブラリルート内の対象を選んでください。",
+      ],
+      [
+        "NOT_FOUND",
+        "見つかりません。対象が移動または削除された可能性があります。",
+      ],
+      [
+        "ACCESS_DENIED",
+        "アクセスできません。権限または他のアプリによる使用状況を確認してください。",
+      ],
+      [
+        "UNSUPPORTED_FORMAT",
+        "対応していません。対応する画像、ZIP、CBZを選んでください。",
+      ],
+      [
+        "CORRUPT_IMAGE",
+        "データが破損しています。ファイルを読み込めません。",
+      ],
+      [
+        "CORRUPT_ARCHIVE",
+        "データが破損しています。ファイルを読み込めません。",
+      ],
+      [
+        "ENCRYPTED_ARCHIVE",
+        "暗号化されています。暗号化された書庫は開けません。",
+      ],
+      [
+        "RESOURCE_LIMIT",
+        "一時的に使用できません。しばらくしてから再試行してください。",
+      ],
+      [
+        "CANCELLED",
+        "一時的に使用できません。しばらくしてから再試行してください。",
+      ],
+      [
+        "INTERNAL",
+        "一時的に使用できません。しばらくしてから再試行してください。",
+      ],
     ];
 
-    for (const code of codes) {
+    for (const [code, expected] of cases) {
       const message = presentError({ code });
+      expect(message).toBe(expected);
       expect(message).not.toMatch(/Error|stack|os error|\\\\\?\\/i);
-      expect(message).toMatch(
-        /アクセスできません|見つかりません|対応していません|データが破損しています|暗号化されています|一時的に使用できません/,
-      );
     }
   });
 

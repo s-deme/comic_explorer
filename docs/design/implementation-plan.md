@@ -72,8 +72,10 @@ MVPの自動化範囲に含めず、Actions実行からの取得を配布ビル�
 ### Windows feature verification
 
 Windows product featureは`verify-feature-windows.ps1 -Feature <ID>`を単一入口とする。
-IMP-004/FUT-C-019はfocused frontend、typecheck、focused Rust、frontend/SBOM、hashで鮮度を
+IMP-004/FUT-C-019はfocused frontend、typecheck、frontend/SBOM、focused Rust、hashで鮮度を
 保証したrelease executable、ShortcutOnly product gate、CoDD scan/checkの順で開発検証する。
+Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
+staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
 CoDD verifyの設定済みtest/typecheckがfull canonical frontendとtypecheckを再実行するため、開発用
 focused laneではCoDD verifyを重複実行しない。各child processはPIDと実exit codeを追跡し、最終

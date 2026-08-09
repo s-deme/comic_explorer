@@ -40,7 +40,7 @@ import {
   type ItemMetadata,
   type ReadingHistoryEntry,
 } from "./features/library/client";
-import type { CatalogEntry, ErrorCode } from "./types/domain";
+import type { CatalogEntry } from "./types/domain";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -490,7 +490,7 @@ describe("application shell", () => {
     expect(registerMock).not.toHaveBeenCalled();
   });
 
-  it("shows a recoverable folder error without removing navigation", async () => {
+  it("renders a sanitized, recoverable folder error without removing navigation", async () => {
     registerMock.mockResolvedValue({
       status: "ok",
       requestId: "request-1" as never,
@@ -503,7 +503,8 @@ describe("application shell", () => {
       generation: 2 as never,
       error: {
         code: "ACCESS_DENIED",
-        message: "アクセスできません。",
+        message: "secret stack at C:\\internal\\source.rs:42",
+        target: "problem" as never,
         retryable: true,
       },
     });
@@ -514,57 +515,16 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "登録" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "アクセスできません。",
+      "アクセスできません。権限または他のアプリによる使用状況を確認してください。",
     );
     expect(screen.getByRole("alert")).toHaveTextContent("対象: C:\\Comics");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("secret stack");
     expect(screen.getByTitle("戻る")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "別のフォルダを選択" }),
+    ).toBeInTheDocument();
   });
-
-  it.each([
-    ["ACCESS_DENIED", "アクセスできません"],
-    ["NOT_FOUND", "見つかりません"],
-    ["UNSUPPORTED_FORMAT", "対応していません"],
-    ["CORRUPT_ARCHIVE", "データが破損しています"],
-    ["ENCRYPTED_ARCHIVE", "暗号化されています"],
-    ["RESOURCE_LIMIT", "一時的に使用できません"],
-  ] satisfies [ErrorCode, string][])(
-    "renders %s as fixed copy with target and recovery actions",
-    async (code, expected) => {
-      registerMock.mockResolvedValue({
-        status: "ok",
-        requestId: "request-1" as never,
-        generation: 1 as never,
-        data: { absolutePath: "C:\\Comics" },
-      });
-      listMock.mockResolvedValue({
-        status: "error",
-        requestId: "request-2" as never,
-        generation: 2 as never,
-        error: {
-          code,
-          message: "secret stack at C:\\internal\\source.rs:42",
-          target: "problem" as never,
-          retryable: true,
-        },
-      });
-
-      render(<App />);
-      fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-        target: { value: "C:\\Comics" },
-      });
-      fireEvent.click(screen.getByRole("button", { name: "登録" }));
-
-      const alert = await screen.findByRole("alert");
-      expect(alert).toHaveTextContent(expected);
-      expect(alert).toHaveTextContent("対象: C:\\Comics");
-      expect(alert).not.toHaveTextContent("secret stack");
-      expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "別のフォルダを選択" }),
-      ).toBeInTheDocument();
-    },
-  );
 
   it("resizes the tree by keyboard and restores help focus", async () => {
     registerMock.mockResolvedValue({

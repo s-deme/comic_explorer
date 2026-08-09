@@ -281,8 +281,14 @@ mod tests {
             result_rx.recv_timeout(Duration::from_secs(2)).unwrap(),
             "visible"
         );
-        assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
-
+        drop(result_tx);
+        match result_rx.recv_timeout(Duration::from_secs(2)) {
+            Err(mpsc::RecvTimeoutError::Disconnected) => {}
+            Ok(value) => panic!("cancelled work produced an unexpected result: {value}"),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                panic!("cancelled work did not drain within the test deadline")
+            }
+        }
         pool.shutdown();
         assert!(
             pool.submit(Priority::Visible, CancellationToken::new(), || {})

@@ -2699,7 +2699,16 @@ mod shutdown_tests {
         let (generation, bytes) = result_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(generation, Generation(100));
         assert!(bytes.unwrap().starts_with(b"\x89PNG\r\n\x1a\n"));
-        assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
+        drop(result_tx);
+        match result_rx.recv_timeout(Duration::from_secs(5)) {
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+            Ok((generation, _)) => {
+                panic!("stale viewer generation produced a result: {generation:?}")
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                panic!("cancelled viewer generations did not drain within the test deadline")
+            }
+        }
         pool.shutdown();
     }
 
@@ -3102,8 +3111,16 @@ mod shutdown_tests {
         let (generation, result) = result_rx.recv_timeout(Duration::from_secs(10)).unwrap();
         assert_eq!(generation, Generation(100));
         assert!(result.unwrap().path.is_file());
-        assert!(result_rx.recv_timeout(Duration::from_millis(100)).is_err());
-
+        drop(result_tx);
+        match result_rx.recv_timeout(Duration::from_secs(10)) {
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+            Ok((generation, _)) => {
+                panic!("stale thumbnail generation produced a result: {generation:?}")
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                panic!("cancelled thumbnail generations did not drain within the test deadline")
+            }
+        }
         pool.shutdown();
         assert!(
             pool.submit(

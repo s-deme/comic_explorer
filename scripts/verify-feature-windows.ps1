@@ -128,8 +128,8 @@ $productCleanupAudit = Join-Path $PSScriptRoot "audit-product-cleanup.ps1"
 $pipeline = @(
     [pscustomobject]@{ Name = "frontend-focused"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendFocused") },
     [pscustomobject]@{ Name = "typecheck"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Typecheck") },
-    [pscustomobject]@{ Name = "rust-$($RustMode.ToLowerInvariant())"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Rust$RustMode") },
     [pscustomobject]@{ Name = "frontend-sbom"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendSbom") },
+    [pscustomobject]@{ Name = "rust-$($RustMode.ToLowerInvariant())"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Rust$RustMode") },
     [pscustomobject]@{ Name = "release-executable"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "ReleaseExecutable") },
     [pscustomobject]@{ Name = "release-freshness"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Freshness") },
     [pscustomobject]@{ Name = "product-shortcut"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $productScript, $(if ($null -ne $featureConfig) { $featureConfig.ProductSwitch } else { "-ShortcutOnly" })) },

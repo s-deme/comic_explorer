@@ -3,9 +3,6 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import os
-import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,18 +42,6 @@ PHASE6_TEXT = f"""# Phase 6 result fixture
 The rest of the document is outside the table scope.
 """
 
-
-def consistency_command() -> list[str]:
-    if os.name == "nt":
-        return [
-            sys.executable,
-            "-X",
-            "utf8",
-            str(ROOT / "scripts/run-codd-consistency.py"),
-            "--project-root",
-            str(ROOT),
-        ]
-    return ["bash", str(ROOT / "scripts/run-codd-dag-verify.sh"), str(ROOT)]
 
 EXPECTED = {
     "PASS": "3",
@@ -220,42 +205,6 @@ class CoddConsistencyProducerTests(unittest.TestCase):
             with self.assertRaises(producer.ProducerError):
                 producer.validate_output(root, output)
             self.assertEqual(output.read_bytes(), before)
-
-    def test_real_codd_raw_json_is_nonvacuous_pass(self) -> None:
-        output = producer.generate(ROOT)
-        payload = json.loads(output.read_text(encoding="utf-8"))
-        self.assertEqual(len(payload["records"]), 5)
-        self.assertEqual(
-            [record["from_value"] for record in payload["records"]],
-            ["60", "0", "12", "0", "72"],
-        )
-        self.assertEqual(
-            [record["to_value"] for record in payload["records"]],
-            ["60", "0", "12", "0", "72"],
-        )
-        for record in payload["records"]:
-            self.assertTrue(all(record.values()))
-        command = consistency_command()
-        if os.name == "nt":
-            command.append("--json")
-        completed = subprocess.run(
-            command,
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
-        results = json.loads(completed.stdout)
-        result = next(item for item in results if item.get("check_name") == "depends_on_consistency")
-        self.assertEqual(result["status"], "pass")
-        self.assertFalse(result["skipped"])
-        self.assertEqual(result["violations"], [])
-        self.assertEqual(result["records_compared"], 5)
-        self.assertEqual(result["checked_count"], 5)
-        self.assertTrue(output.exists())
-
 
 if __name__ == "__main__":
     unittest.main()

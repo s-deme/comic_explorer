@@ -66,6 +66,34 @@ RAR／CBR、7z、PDF、EPUB、WebP、GIF、AVIF、動画、検索、タグ、メ
 
 正常系、境界値、異常系、回復、永続化、並行・キャンセル、非破壊を含む。破損画像は画面設計に従い自動スキップせず、そのページ位置の局所エラーと前後移動を期待する。書庫一覧を確定できない破損ではビューワを開始しない。
 
+### 自動化テストの実装言語と重複防止
+
+実装言語は検証対象の所有境界に合わせる。Reactの表示、アクセシブル状態、入力と
+TypeScript client呼出しはVitest／Testing Library、domain、SQLite、ファイル、書庫、
+Tauri境界はRustの`cargo test`、fixture・CoDD・release補助ツールはPythonの
+`unittest`を正本とする。UI文言は日本語を完全一致で検証し、テスト名は既存規約どおり
+feature IDと簡潔な英語の振る舞い名を使う。
+
+同じ組合せを全レイヤーで反復しない。純粋な分類・分岐の全表はUnitで一度だけ網羅し、
+UIは代表値で配線、表示、回復操作を検証する。SQLite永続化、migration、原本非破壊は
+mock済みclientのUIテストでは合格にせず、実Storeまたは製品境界で検証する。上位テストに
+残すのは、下位テストでは観測できない接続だけとする。
+
+portable toolingとfrontendの集約入口は、CoDD `depends_on_consistency`を先頭で一度だけ
+実行してからPython unitとVitestを実行する。Python unitから同じ実CoDD chainを再帰的に
+起動しない。RustはWindows toolchain、fixture、Cargo cacheを要する独立laneであり、
+CIまたは最終Windows canonical gateで一度実行する。
+
+Windows filesystem上のVitestは、2026-08-09の同一suite比較でsingle-threadが17.56秒、
+既定並列が21.41秒だったため、Windows canonical runnerはsingle-threadを維持する。
+純粋TypeScript unitは`node`環境、DOMを観測するtestだけ`jsdom`環境を使う。並列数の変更は
+同一platformで複数回測定し、速度とflakeの両方を満たす場合だけ採用する。
+
+同日の監査修正前後を同じWindows hostで各一回測定した参考値では、集約wall timeは
+31.63秒から24.29秒（23.2%短縮）、Pythonは27件・7.351秒から25件・1.069秒、Vitestは
+111件・17.56秒から104件・15.58秒となった。単発値は性能合否には使わず、重複chainと
+不要なApp renderを除去できたことの回帰基準として保持する。
+
 ## 5. テスト環境と Windows マトリクス
 
 テストごとにライブラリ、アプリ専用データ、キャッシュ、一時領域を別の一意な作業ディレクトリへ置く。時刻、ロケール、DPI、ストレージ、CPU、メモリ、アプリ版、依存版を結果に記録する。ネットワーク試験ではテストプロセスを遮断し、DNS、TCP、UDPの送信をOSレベルで記録する。

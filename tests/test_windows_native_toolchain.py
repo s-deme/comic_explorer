@@ -59,6 +59,10 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('$exception.Data["ExitCode"] = $ExitCode', task_runner)
         self.assertIn('$exitCode = [int]$_.Exception.Data["ExitCode"]', task_runner)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
+        self.assertLess(
+            source.index('Name = "frontend-sbom"'),
+            source.index('Name = "rust-$($RustMode.ToLowerInvariant())"'),
+        )
 
     def test_portable_windows_gates_delegate_to_native_runners(self) -> None:
         routes = {

@@ -76,7 +76,9 @@ focused testで直接観測する。
 | FT-B07-005 | reading positionとの分離、library/original差分0 | position API + metadata API + snapshot |
 
 focused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07` selectorは上記5契約を
-個別に検査し、frontend側は`FT-B07-001`〜`FT-B07-005`を正確に選択する。
+個別に検査する。frontend側はAppからclientへの接続を観測できる`FT-B07-001`〜
+`FT-B07-004`の4件を選択し、`FT-B07-005`は実Storeと実ファイルを使うRust testを正本とする。
+clientを全mockしたfrontend testで原本やlibrary fileの不変性を合格に数えない。
 
 ## 非採用・境界
 
@@ -125,6 +127,12 @@ openだけを一行記録し、failed、empty、cancelledは0行とする境界�
 FT-B07-005は実一時original/library fixtureのmetadata・history・rating・reading-position操作前後を
 byte/SHA snapshotし、original、library、`library.index`の差分0を観測した。これはApp回帰39とRust
 exact5/fullのaccepted compositeに含まれる。
+
+2026-08-09のsuite監査以後、上記accepted rawは履歴参照として保持し、現行frontend suiteの
+合格件数には使わない。現行の`FT-B07-005`はRustの
+`fr_b07_reading_position_separation_survives_metadata_crud`が実ファイルのbyte不変を検証する。
+SHAはbyte一致から導けるが、mtime、完全なdirectory tree、製品WebView2境界はこのRust testの
+観測範囲外であり、別のproduct gateが完了するまで過大にPASSを主張しない。
 
 CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification
 testsは `0 PASS / 0 FAIL / 0 SKIP / 0 total` である。3 SKIP（`deployment_completeness`、

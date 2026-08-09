@@ -249,6 +249,10 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B07 — 読書情報（Batch 7）
 
+2026-08-09のsuite監査で、mock済みfrontendから原本非破壊を判定していた重複を除外した。
+現行はApp/client接続をfrontend 4件、SQLite・原本byte不変をRust 5件で検証する。以下の
+focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現行件数には使わない。
+
 - **状態:** `Partial / BLOCKED`。実装境界と機能測定は受理済みだが、CoDD verifyの3 SKIP・1
   VACUOUS・verification tests 0により構造ゲートは `INCOMPLETE / NOT APPLICABLE`、Windows
   WebView2 native product gateは `BLOCKED_UNMEASURED` のままである。`FUT-D-005` の読書状態ラベルは

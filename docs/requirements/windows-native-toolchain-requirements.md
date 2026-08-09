@@ -39,6 +39,9 @@ and report both the missing capability and the locations that were searched.
 - Release and Rust compatibility wrappers use the shared bootstrap and return
   the exact child exit code; frontend, SBOM, and Rust release work cannot
   continue after an earlier failed child command.
+- The feature-verification pipeline generates the frontend bundle and SBOM
+  before any Cargo check or test that resolves Tauri bundle resources. A clean
+  workspace must not rely on a stale `dist/SBOM.json` from an earlier run.
 - One Windows-native PowerShell feature-verification command accepts a feature
   or management ID. `IMP-004`, `FUT-C-019`, and `ShortcutOnly` resolve to the
   shortcut verification lane containing focused frontend tests, typecheck,

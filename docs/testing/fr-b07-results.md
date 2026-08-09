@@ -24,6 +24,15 @@ typecheck、buildは受理済みrawを再実行していない。CoDD scan/check
 Windows WebView2 native product gateは `BLOCKED_UNMEASURED` のままであり、local evidenceで
 代替しない。したがってFR-B07の台帳状態は `Partial / BLOCKED` とする。
 
+## 現行suiteの所有境界（2026-08-09監査）
+
+本書のaccepted rawは2026-08-03時点の不変な履歴証跡であり、現在のtest件数を表さない。
+現行frontend suiteはApp/client接続を観測する`FT-B07-001`〜`FT-B07-004`の4件とし、
+全clientをmockした旧`FT-B07-005`は削除した。原本、library file、`library.index`のbyte不変は
+Rustの`fr_b07_reading_position_separation_survives_metadata_crud`を正本とする。Rust testが
+観測しないmtime、完全なdirectory tree、製品WebView2境界は引き続き未測定であり、過去rawの
+SHA記録を現在のproduct PASSへ読み替えない。
+
 ## 実測範囲と接続境界
 
 - 採用対象は `FUT-C-023`（memo）、`FUT-R-004`（閲覧履歴）、`FUT-R-005`（評価）。

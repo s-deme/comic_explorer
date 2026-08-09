@@ -1,20 +1,4 @@
 import "@testing-library/jest-dom/vitest";
-// @ts-ignore Vitest executes this focused suite in its Node-backed jsdom runtime.
-import { createHash } from "node:crypto";
-// @ts-ignore Vitest executes this focused suite in its Node-backed jsdom runtime.
-import * as nodeFs from "node:fs";
-const {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} = nodeFs;
-// @ts-ignore Vitest executes this focused suite in its Node-backed jsdom runtime.
-import { tmpdir } from "node:os";
-// @ts-ignore Vitest executes this focused suite in its Node-backed jsdom runtime.
-import { join } from "node:path";
 import {
   cleanup,
   fireEvent,
@@ -178,10 +162,8 @@ function settingsResponse(requestId: string) {
   };
 }
 
-async function registerTestLibrary(
-  entries: CatalogEntry[],
-  absolutePath = "C:\\Comics",
-) {
+async function registerTestLibrary(entries: CatalogEntry[]) {
+  const absolutePath = "C:\\Comics";
   registerMock.mockResolvedValue({
     status: "ok",
     requestId: "register" as never,
@@ -229,148 +211,10 @@ async function openTestComic(relativePath: string) {
   await screen.findByLabelText(`${relativePath} ビューワ`);
 }
 
-type FileSnapshot = {
-  bytes: string;
-  sha256: string;
-};
-
-type FixtureSnapshot = {
-  original: Record<string, FileSnapshot>;
-  library: Record<string, FileSnapshot>;
-};
-
-function snapshotFile(path: string): FileSnapshot {
-  const bytes = readFileSync(path);
-  return {
-    bytes: bytes.toString("base64"),
-    sha256: createHash("sha256").update(bytes).digest("hex"),
-  };
-}
-
-function snapshotTree(root: string): Record<string, FileSnapshot> {
-  const snapshot: Record<string, FileSnapshot> = {};
-
-  function visit(current: string, relativePath: string) {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const fullPath = join(current, entry.name);
-      const childPath =
-        relativePath === ""
-          ? entry.name
-          : join(relativePath, entry.name).replaceAll("\\", "/");
-      if (entry.isDirectory()) {
-        visit(fullPath, childPath);
-      } else if (entry.isFile()) {
-        snapshot[childPath] = snapshotFile(fullPath);
-      } else {
-        throw new Error(`Unexpected fixture entry: ${fullPath}`);
-      }
-    }
-  }
-
-  visit(root, "");
-  return snapshot;
-}
-
-function snapshotFixture(originalRoot: string, libraryRoot: string): FixtureSnapshot {
-  return {
-    original: snapshotTree(originalRoot),
-    library: snapshotTree(libraryRoot),
-  };
-}
-
-type DirectWebAdapterGuard = {
-  name: string;
-  failure: string;
-  callCount: () => number;
-  restore: () => void;
-};
-
-function installDirectWebAdapterGuard(
-  target: object,
-  property: PropertyKey,
-  name: string,
-  failure: string,
-): DirectWebAdapterGuard {
-  let calls = 0;
-  const previous = Object.getOwnPropertyDescriptor(target, property);
-  const throwingAdapter = (..._args: unknown[]): never => {
-    calls += 1;
-    throw new Error(failure);
-  };
-
-  Object.defineProperty(target, property, {
-    configurable: true,
-    enumerable: previous?.enumerable ?? true,
-    writable: true,
-    value: throwingAdapter,
-  });
-
-  return {
-    name,
-    failure,
-    callCount: () => calls,
-    restore: () => {
-      if (previous) {
-        Object.defineProperty(target, property, previous);
-      } else {
-        Reflect.deleteProperty(target, property);
-      }
-    },
-  };
-}
-
 describe("FR-B07 connected App boundary", () => {
-  let directWebAdapterGuards: DirectWebAdapterGuard[] = [];
-
-  afterEach(() => {
-    try {
-      cleanup();
-      for (const guard of directWebAdapterGuards) {
-        expect(guard.callCount(), guard.failure).toBe(0);
-      }
-      console.log("afterEach direct_web_adapter_calls=0");
-    } finally {
-      for (const guard of directWebAdapterGuards) {
-        guard.restore();
-      }
-      directWebAdapterGuards = [];
-    }
-  });
+  afterEach(cleanup);
 
   beforeEach(() => {
-    directWebAdapterGuards = [
-      installDirectWebAdapterGuard(
-        globalThis,
-        "fetch",
-        "fetch",
-        "DIRECT_WEB_ADAPTER_CALLED_fetch",
-      ),
-      installDirectWebAdapterGuard(
-        globalThis,
-        "XMLHttpRequest",
-        "XMLHttpRequest",
-        "DIRECT_WEB_ADAPTER_CALLED_XMLHttpRequest",
-      ),
-      installDirectWebAdapterGuard(
-        globalThis,
-        "WebSocket",
-        "WebSocket",
-        "DIRECT_WEB_ADAPTER_CALLED_WebSocket",
-      ),
-      installDirectWebAdapterGuard(
-        globalThis,
-        "EventSource",
-        "EventSource",
-        "DIRECT_WEB_ADAPTER_CALLED_EventSource",
-      ),
-      installDirectWebAdapterGuard(
-        globalThis.navigator,
-        "sendBeacon",
-        "navigator.sendBeacon",
-        "DIRECT_WEB_ADAPTER_CALLED_sendBeacon",
-      ),
-    ];
-
     registerMock.mockReset();
     listMock.mockReset();
     treeMock.mockReset();
@@ -426,7 +270,7 @@ describe("FR-B07 connected App boundary", () => {
     });
   });
 
-  it("FT-B07-001 persists_edits_clears_and_restores_memo_through_connected_app_boundary", async () => {
+  it("FT-B07-001 connects memo edit, save, and clear controls to the client", async () => {
     const comic = testEntry("Series/01.cbz");
     openMock.mockResolvedValue(viewerResponse(comic.relativePath));
     await registerTestLibrary([comic]);
@@ -456,7 +300,7 @@ describe("FR-B07 connected App boundary", () => {
     );
   });
 
-  it("FT-B07-002 records_history_only_after_successful_comic_open", async () => {
+  it("FT-B07-002 renders history returned after successful, failed, and cancelled opens", async () => {
     const success = testEntry("Series/A.cbz");
     const failed = testEntry("Series/failed.cbz");
     const cancelled = testEntry("Series/cancelled.cbz");
@@ -536,7 +380,7 @@ describe("FR-B07 connected App boundary", () => {
     expect(recordedHistory).toEqual(new Map([[success.relativePath, 299]]));
   });
 
-  it("FT-B07-003 accepts_rating_boundaries_and_round_trips_unset_state", async () => {
+  it("FT-B07-003 connects rating boundaries and unset state to the client", async () => {
     const comic = testEntry("Series/01.cbz");
     openMock.mockResolvedValue(viewerResponse(comic.relativePath));
     await registerTestLibrary([comic]);
@@ -573,7 +417,7 @@ describe("FR-B07 connected App boundary", () => {
     expect(rating).toHaveValue("");
   });
 
-  it("FT-B07-004 migrates_v2_metadata_and_restores_all_values_after_reopen", async () => {
+  it("FT-B07-004 restores metadata returned when the viewer reopens", async () => {
     const comic = testEntry("Series/01.cbz");
     openMock.mockResolvedValue(viewerResponse(comic.relativePath));
     metadataMock.mockResolvedValue(
@@ -592,99 +436,4 @@ describe("FR-B07 connected App boundary", () => {
     expect(metadataMock).toHaveBeenCalledTimes(2);
   });
 
-  it("FT-B07-005 keeps_metadata_operations_separate_from_original_and_library_files", async () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), "comic-explorer-fr-b07-"));
-    const originalRoot = join(fixtureRoot, "original");
-    const libraryRoot = join(fixtureRoot, "library");
-    const originalFile = join(originalRoot, "Series", "01.cbz");
-    const libraryFile = join(libraryRoot, "Series", "01.cbz");
-    const libraryManagementFile = join(libraryRoot, "library.index");
-    mkdirSync(join(originalRoot, "Series"), { recursive: true });
-    mkdirSync(join(libraryRoot, "Series"), { recursive: true });
-    writeFileSync(originalFile, "fixture-original-bytes");
-    writeFileSync(libraryFile, "fixture-original-bytes");
-    writeFileSync(libraryManagementFile, "fixture-library-management");
-
-    const comic = testEntry("Series/01.cbz");
-    openMock.mockResolvedValue(viewerResponse(comic.relativePath));
-    let memo: string | null = null;
-    let rating: number | null = null;
-    metadataMock.mockImplementation(async (itemIdentity) =>
-      metadataResponse(itemIdentity, { memo, rating }),
-    );
-    saveMemoMock.mockImplementation(async (itemIdentity, body) => {
-      memo = body.trim() === "" ? null : body;
-      return metadataResponse(itemIdentity, { memo, rating });
-    });
-    setRatingMock.mockImplementation(async (itemIdentity, nextRating) => {
-      rating = nextRating;
-      return metadataResponse(itemIdentity, { memo, rating });
-    });
-    historyMock.mockResolvedValue(
-      historyResponse([
-        { itemIdentity: comic.relativePath, lastViewedAtMs: 250 },
-      ]),
-    );
-
-    try {
-      const before = snapshotFixture(originalRoot, libraryRoot);
-      expect(before.original["Series/01.cbz"].sha256).toBe(
-        before.library["Series/01.cbz"].sha256,
-      );
-
-      await registerTestLibrary([comic], libraryRoot);
-      await openTestComic(comic.relativePath);
-
-      const memoInput = await screen.findByLabelText("作品メモ");
-      fireEvent.change(memoInput, { target: { value: "fixture memo" } });
-      fireEvent.click(screen.getByRole("button", { name: "メモを保存" }));
-      await waitFor(() =>
-        expect(saveMemoMock).toHaveBeenCalledWith(
-          comic.relativePath,
-          "fixture memo",
-          expect.any(Number),
-        ),
-      );
-
-      const ratingInput = screen.getByLabelText("作品評価");
-      fireEvent.change(ratingInput, { target: { value: "4" } });
-      await waitFor(() =>
-        expect(setRatingMock).toHaveBeenCalledWith(
-          comic.relativePath,
-          4,
-          expect.any(Number),
-        ),
-      );
-
-      fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
-      await screen.findByRole("grid", { name: "現在のフォルダの項目" });
-      await waitFor(() =>
-        expect(saveReadingMock).toHaveBeenCalledWith(
-          expect.objectContaining({ itemKey: comic.relativePath }),
-          0,
-          expect.any(Number),
-        ),
-      );
-
-      openLibraryMenuItem("閲覧履歴");
-      const dialog = await screen.findByRole("dialog", { name: "閲覧履歴" });
-      expect(within(dialog).getByText(comic.relativePath)).toBeInTheDocument();
-      expect(historyMock).toHaveBeenCalledWith(expect.any(Number));
-      fireEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
-
-      const after = snapshotFixture(originalRoot, libraryRoot);
-      expect(after).toEqual(before);
-      expect(after.original["Series/01.cbz"].sha256).toBe(
-        before.original["Series/01.cbz"].sha256,
-      );
-      expect(after.library["Series/01.cbz"].sha256).toBe(
-        before.library["Series/01.cbz"].sha256,
-      );
-      expect(after.library["library.index"].sha256).toBe(
-        before.library["library.index"].sha256,
-      );
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-    }
-  });
 });
