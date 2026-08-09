@@ -3,6 +3,7 @@ import type { FavoriteEntry } from "../library/client";
 interface QuickAccessProps {
   favorites: FavoriteEntry[];
   loading: boolean;
+  refreshRevision: number;
   notice: string | null;
   onClose: () => void;
   onRefresh: () => void;
@@ -38,6 +39,7 @@ function statusLabel(favorite: FavoriteEntry): string {
 export function QuickAccess({
   favorites,
   loading,
+  refreshRevision,
   notice,
   onClose,
   onRefresh,
@@ -50,6 +52,7 @@ export function QuickAccess({
       <section
         className="quick-access-dialog"
         data-product-id="quick-access-dialog"
+        data-favorite-refresh-revision={refreshRevision}
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-access-title"
@@ -57,10 +60,19 @@ export function QuickAccess({
         <div className="quick-access-heading">
           <h2 id="quick-access-title">お気に入り</h2>
           <div>
-            <button type="button" onClick={onRefresh} disabled={loading}>
+            <button
+              type="button"
+              data-product-id="favorite-refresh"
+              onClick={onRefresh}
+              disabled={loading}
+            >
               {loading ? "確認中…" : "再走査"}
             </button>
-            <button type="button" onClick={onClose}>
+            <button
+              type="button"
+              data-product-id="favorite-close"
+              onClick={onClose}
+            >
               閉じる
             </button>
           </div>
@@ -83,6 +95,7 @@ export function QuickAccess({
                   data-product-id="favorite-row"
                   data-favorite-id={favorite.favoriteId}
                   data-favorite-relative-path={favorite.relativePath}
+                  data-favorite-resolved-path={favorite.resolvedPath ?? ""}
                   data-favorite-status={favorite.status}
                 >
                   <div className="quick-access-main">
@@ -105,12 +118,21 @@ export function QuickAccess({
                       開く
                     </button>
                     {favorite.status === "moved" && resolvedPath !== null && (
-                      <button type="button" onClick={() => onResolve(favorite)}>
+                      <button
+                        type="button"
+                        data-product-id="favorite-resolve"
+                        onClick={() => onResolve(favorite)}
+                      >
                         再解決
                       </button>
                     )}
                     {favorite.status === "missing" && (
-                      <button type="button" onClick={onRefresh}>
+                      <button
+                        type="button"
+                        data-product-id="favorite-row-refresh"
+                        onClick={onRefresh}
+                        disabled={loading}
+                      >
                         再走査
                       </button>
                     )}

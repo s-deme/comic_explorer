@@ -1132,6 +1132,194 @@ mod tests {
     }
 
     #[test]
+    fn fr_b06_favorite_v1_migration_reopen_and_source_separation() {
+        fn snapshot_tree(root: &std::path::Path) -> Vec<String> {
+            fn collect(
+                root: &std::path::Path,
+                directory: &std::path::Path,
+                rows: &mut Vec<String>,
+            ) {
+                for entry in fs::read_dir(directory).unwrap() {
+                    let path = entry.unwrap().path();
+                    let relative = path.strip_prefix(root).unwrap().to_string_lossy();
+                    if path.is_dir() {
+                        rows.push(format!("D:{relative}"));
+                        collect(root, &path, rows);
+                    } else {
+                        rows.push(format!("F:{relative}:{:?}", fs::read(&path).unwrap()));
+                    }
+                }
+            }
+
+            let mut rows = Vec::new();
+            collect(root, root, &mut rows);
+            rows.sort();
+            rows
+        }
+
+        let paths = temporary_paths("fr-b06-v1-migration");
+        let fixture_root = std::env::temp_dir().join(format!(
+            "comic-explorer-fr-b06-library-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let library = fixture_root.join("library");
+        let source_file = library.join("Series/01.cbz");
+        let library_admin = library.join("library.index");
+        fs::create_dir_all(source_file.parent().unwrap()).unwrap();
+        fs::write(&source_file, b"favorite source bytes").unwrap();
+        fs::write(&library_admin, b"library admin bytes").unwrap();
+        let before_tree = snapshot_tree(&library);
+
+        paths.create(None).unwrap();
+        {
+            let connection = Connection::open(&paths.database).unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE settings (
+                        key TEXT PRIMARY KEY NOT NULL,
+                        value TEXT NOT NULL
+                     );
+                     CREATE TABLE reading_positions (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        page_key TEXT NOT NULL,
+                        natural_ordinal INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE source_fingerprints (
+                        item_key TEXT PRIMARY KEY NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        modified_ns TEXT NOT NULL,
+                        detail_hash TEXT
+                     );
+                     CREATE TABLE thumbnail_index (
+                        content_hash TEXT PRIMARY KEY NOT NULL,
+                        relative_path TEXT NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        width INTEGER NOT NULL,
+                        height INTEGER NOT NULL,
+                        last_access_ms INTEGER NOT NULL
+                     );
+                     CREATE TABLE schema_migrations (
+                        version INTEGER PRIMARY KEY NOT NULL,
+                        applied_at_ms INTEGER NOT NULL
+                     );
+                     INSERT INTO schema_migrations(version, applied_at_ms) VALUES(1, 1);
+                     PRAGMA user_version=1;",
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES(?1, ?2)",
+                    params!["sortField", "modified"],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO reading_positions(item_key, page_key, natural_ordinal, updated_at_ms)
+                     VALUES(?1, ?2, ?3, ?4)",
+                    params!["Series/01.cbz", "page-2.png", 1, 7],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO source_fingerprints(item_key, size_bytes, modified_ns, detail_hash)
+                     VALUES(?1, ?2, ?3, ?4)",
+                    params!["Series/01.cbz", 20, "21", "crc:22"],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO thumbnail_index(
+                        content_hash, relative_path, size_bytes, width, height, last_access_ms
+                     ) VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+                    params!["thumbnail-hash", "Series/01.cbz", 30, 40, 50, 60],
+                )
+                .unwrap();
+        }
+
+        let favorite = FavoriteRecord {
+            favorite_id: "favorite-series-01".into(),
+            item_identity: item_id_for("Series/01.cbz").to_string(),
+            relative_path: RelativePath::parse("Series/01.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            size_bytes: Some(20),
+            modified_ms: Some(21),
+        };
+        {
+            let (store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            assert_eq!(
+                store
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                SCHEMA_VERSION
+            );
+            assert_eq!(store.load_settings().unwrap().sort_field, "modified");
+            assert_eq!(
+                store
+                    .reading_position("Series/01.cbz")
+                    .unwrap()
+                    .unwrap()
+                    .page_key,
+                RelativePath::parse("page-2.png").unwrap()
+            );
+            assert_eq!(
+                store.source_fingerprint("Series/01.cbz").unwrap(),
+                Some(SourceFingerprint {
+                    size_bytes: 20,
+                    modified_ns: 21,
+                    detail_hash: Some("crc:22".into()),
+                })
+            );
+            assert_eq!(
+                store
+                    .connection()
+                    .query_row(
+                        "SELECT relative_path, size_bytes, width, height, last_access_ms
+                         FROM thumbnail_index WHERE content_hash=?1",
+                        ["thumbnail-hash"],
+                        |row| {
+                            Ok((
+                                row.get::<_, String>(0)?,
+                                row.get::<_, i64>(1)?,
+                                row.get::<_, i64>(2)?,
+                                row.get::<_, i64>(3)?,
+                                row.get::<_, i64>(4)?,
+                            ))
+                        },
+                    )
+                    .unwrap(),
+                ("Series/01.cbz".into(), 30, 40, 50, 60)
+            );
+            store.upsert_favorite(&favorite, 30).unwrap();
+            store.upsert_favorite(&favorite, 31).unwrap();
+            let disposable = FavoriteRecord {
+                favorite_id: "favorite-disposable".into(),
+                item_identity: item_id_for("Series/disposable.cbz").to_string(),
+                relative_path: RelativePath::parse("Series/disposable.cbz").unwrap(),
+                kind: ItemKind::Archive,
+                size_bytes: Some(1),
+                modified_ms: Some(2),
+            };
+            store.upsert_favorite(&disposable, 32).unwrap();
+            store.remove_favorite(&disposable.favorite_id).unwrap();
+            assert_eq!(store.favorite(&disposable.favorite_id).unwrap(), None);
+            assert_eq!(store.list_favorites().unwrap(), vec![favorite.clone()]);
+        }
+
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(store.list_favorites().unwrap(), vec![favorite]);
+        drop(store);
+        assert_eq!(snapshot_tree(&library), before_tree);
+        assert!(!library.join("Series/01.cbz.json").exists());
+        fs::remove_dir_all(paths.root).unwrap();
+        fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[test]
     fn corrupt_database_is_isolated_in_recovery() {
         let paths = temporary_paths("state-recovery");
         paths.create(None).unwrap();

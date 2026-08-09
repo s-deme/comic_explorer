@@ -7,7 +7,8 @@ param(
     [switch]$HistoryOnly,
     [switch]$RatingOnly,
     [switch]$SearchOnly,
-    [switch]$QuickAccessOnly
+    [switch]$QuickAccessOnly,
+    [switch]$FavoritePersistenceOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,7 +41,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($QuickAccessOnly) { "IMP-013" } elseif ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($FavoritePersistenceOnly) { "IMP-014" } elseif ($QuickAccessOnly) { "IMP-013" } elseif ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -733,6 +734,11 @@ $keyboardProduct = $null
 $deniedPath = Join-Path $library "folder-a\acl-denied"
 $deniedRule = $null
 $searchFreshPath = Join-Path $library "rescan-needle.cbz"
+$favoriteMovedDirectory = Join-Path $library "moved"
+$favoriteMovedArchive = Join-Path $favoriteMovedDirectory "1-valid.cbz"
+$favoriteMissingComic = Join-Path $evidenceRoot "missing-comic-folder"
+$favoriteMovedArchiveActive = $false
+$favoriteMissingComicActive = $false
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
@@ -770,7 +776,7 @@ try {
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
-    if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly) {
+    if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly) {
         Wait-Evaluate (
             "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
             "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
@@ -1037,6 +1043,218 @@ try {
             folderOpened = $true
             comicFolderOpened = $true
             archiveOpened = $true
+            removed = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
+    if ($FavoritePersistenceOnly) {
+        foreach ($favoritePath in @("1-valid.cbz", "comic-folder")) {
+            $favoritePathJson = $favoritePath | ConvertTo-Json -Compress
+            Invoke-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $favoritePathJson); " +
+                "const toggle = item?.closest('.catalog-cell')?.querySelector(" +
+                "'[data-product-id=favorite-toggle]'); if (!toggle) return false; " +
+                "toggle.click(); return true; })()"
+            ) | Out-Null
+            Wait-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $favoritePathJson); " +
+                "return item?.closest('.catalog-cell')?.querySelector(" +
+                "'[data-product-id=favorite-toggle]')?.dataset.favorite === 'true'; })()"
+            ) "favorite persistence add $favoritePath"
+        }
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "favorite persistence library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-product-id=favorite-row]')]; " +
+            "return rows.length === 2 && rows.every((row) => row.dataset.favoriteStatus === 'available'); })()"
+        ) "favorite persistence initial available rows"
+        $favoriteIds = Invoke-Evaluate (
+            "(() => { const archive = document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"]'); " +
+            "const comic = document.querySelector('[data-favorite-relative-path=`"comic-folder`"]'); " +
+            "return { archive: archive?.dataset.favoriteId || null, comic: comic?.dataset.favoriteId || null }; })()"
+        )
+        if (!$favoriteIds.archive -or !$favoriteIds.comic) {
+            throw "Favorite persistence product gate could not capture stable favorite IDs."
+        }
+        $archiveFavoriteIdJson = $favoriteIds.archive | ConvertTo-Json -Compress
+        $comicFavoriteIdJson = $favoriteIds.comic | ConvertTo-Json -Compress
+        Stop-Product $cold
+        $cold = $null
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        ) "favorite persistence restart catalog"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "favorite persistence restart library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const archive = document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"]'); " +
+            "const comic = document.querySelector('[data-favorite-relative-path=`"comic-folder`"]'); " +
+            "return archive?.dataset.favoriteId === $archiveFavoriteIdJson && " +
+            "archive?.dataset.favoriteStatus === 'available' && comic?.dataset.favoriteId === $comicFavoriteIdJson && " +
+            "comic?.dataset.favoriteStatus === 'available'; })()"
+        ) "favorite persistence restart rows"
+        Stop-Product $cold
+        $cold = $null
+        New-Item -ItemType Directory -Path $favoriteMovedDirectory -Force | Out-Null
+        $archiveBeforeMove = Get-Item -LiteralPath (Join-Path $library "1-valid.cbz")
+        $archiveBeforeMoveLength = $archiveBeforeMove.Length
+        $archiveBeforeMoveLastWriteTimeUtc = $archiveBeforeMove.LastWriteTimeUtc
+        Move-Item -LiteralPath (Join-Path $library "1-valid.cbz") -Destination $favoriteMovedArchive
+        $favoriteMovedArchiveActive = $true
+        $archiveAfterMove = Get-Item -LiteralPath $favoriteMovedArchive
+        if ($archiveAfterMove.LastWriteTimeUtc.Ticks -ne $archiveBeforeMoveLastWriteTimeUtc.Ticks) {
+            $archiveAfterMove.LastWriteTimeUtc = $archiveBeforeMoveLastWriteTimeUtc
+            $archiveAfterMove.Refresh()
+        }
+        if ($archiveAfterMove.Length -ne $archiveBeforeMoveLength -or
+            $archiveAfterMove.LastWriteTimeUtc.Ticks -ne $archiveBeforeMoveLastWriteTimeUtc.Ticks) {
+            throw "Favorite persistence external archive move did not preserve size and modified time."
+        }
+        Move-Item -LiteralPath (Join-Path $library "comic-folder") -Destination $favoriteMissingComic
+        $favoriteMissingComicActive = $true
+        $mutatedTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        $mutatedDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        $cold = Start-Product
+        Wait-Evaluate "document.querySelector('.status-bar span') !== null" "favorite persistence changed catalog"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "favorite persistence changed library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const archive = document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"]'); " +
+            "const comic = document.querySelector('[data-favorite-relative-path=`"comic-folder`"]'); " +
+            "return archive?.dataset.favoriteId === $archiveFavoriteIdJson && archive?.dataset.favoriteStatus === 'moved' && " +
+            "archive?.dataset.favoriteResolvedPath === 'moved/1-valid.cbz' && " +
+            "archive.querySelector('[data-product-id=favorite-open]')?.disabled === true && " +
+            "comic?.dataset.favoriteId === $comicFavoriteIdJson && comic?.dataset.favoriteStatus === 'missing' && " +
+            "comic.querySelector('[data-product-id=favorite-open]')?.disabled === true; })()"
+        ) "favorite persistence moved and missing"
+        $favoriteRefreshRevision = Invoke-Evaluate (
+            "Number(document.querySelector('[data-product-id=quick-access-dialog]')?.dataset.favoriteRefreshRevision)"
+        )
+        $favoriteRefreshClicked = Invoke-Evaluate (
+            "(() => { const button = document.querySelector('[data-favorite-relative-path=`"comic-folder`"] " +
+            "[data-product-id=favorite-row-refresh]'); if (!button || button.disabled) return false; " +
+            "button.click(); return true; })()"
+        )
+        if (!$favoriteRefreshClicked) {
+            throw "Favorite persistence product gate could not start the missing-row rescan."
+        }
+        Wait-Evaluate (
+            "(() => { const comic = document.querySelector('[data-favorite-relative-path=`"comic-folder`"]'); " +
+            "const dialog = document.querySelector('[data-product-id=quick-access-dialog]'); " +
+            "return Number(dialog?.dataset.favoriteRefreshRevision) > $favoriteRefreshRevision && " +
+            "comic?.dataset.favoriteId === $comicFavoriteIdJson && " +
+            "comic?.dataset.favoriteStatus === 'missing' && " +
+            "comic.querySelector('[data-product-id=favorite-open]')?.disabled === true; })()"
+        ) "favorite persistence missing rescan"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"] " +
+            "[data-product-id=favorite-resolve]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "(() => { const archive = document.querySelector('[data-favorite-relative-path=`"moved/1-valid.cbz`"]'); " +
+            "return archive?.dataset.favoriteId === $archiveFavoriteIdJson && " +
+            "archive?.dataset.favoriteStatus === 'available' && " +
+            "archive?.dataset.favoriteResolvedPath === 'moved/1-valid.cbz'; })()"
+        ) "favorite persistence re-resolve"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"] " +
+            "[data-product-id=favorite-remove]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"]') === null && " +
+            "document.querySelector('[data-favorite-relative-path=`"moved/1-valid.cbz`"]') !== null"
+        ) "favorite persistence missing remove"
+        $mutatedAfter = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        $mutatedDirectoriesAfter = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if ((Compare-Object $mutatedTree $mutatedAfter) -or
+            (Compare-Object $mutatedDirectories $mutatedDirectoriesAfter)) {
+            throw "Favorite persistence product harness changed the externally mutated source tree."
+        }
+        Stop-Product $cold
+        $cold = $null
+        $cold = Start-Product
+        Wait-Evaluate "document.querySelector('.status-bar span') !== null" "favorite persistence resolved restart catalog"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "favorite persistence resolved restart library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-product-id=favorite-row]')]; " +
+            "const archive = document.querySelector('[data-favorite-relative-path=`"moved/1-valid.cbz`"]'); " +
+            "return rows.length === 1 && archive?.dataset.favoriteId === $archiveFavoriteIdJson && " +
+            "archive?.dataset.favoriteStatus === 'available'; })()"
+        ) "favorite persistence resolved restart"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"moved/1-valid.cbz`"] " +
+            "[data-product-id=favorite-remove]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-product-id=favorite-row]').length === 0 && " +
+            "document.querySelector('[data-product-id=quick-access-dialog] .empty-state') !== null"
+        ) "favorite persistence resolved remove"
+        $mutatedAfterRemoval = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        $mutatedDirectoriesAfterRemoval = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if ((Compare-Object $mutatedTree $mutatedAfterRemoval) -or
+            (Compare-Object $mutatedDirectories $mutatedDirectoriesAfterRemoval)) {
+            throw "Favorite persistence product harness changed the externally mutated source tree after restart."
+        }
+        Stop-Product $cold
+        $cold = $null
+        Move-Item -LiteralPath $favoriteMovedArchive -Destination (Join-Path $library "1-valid.cbz")
+        $favoriteMovedArchiveActive = $false
+        Remove-Item -LiteralPath $favoriteMovedDirectory -Force
+        Move-Item -LiteralPath $favoriteMissingComic -Destination (Join-Path $library "comic-folder")
+        $favoriteMissingComicActive = $false
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Favorite persistence product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Favorite persistence product harness changed the source tree or created adjacent files."
+        }
+        $afterDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if (Compare-Object $beforeDirectories $afterDirectories) {
+            throw "Favorite persistence product harness changed the source directory tree."
+        }
+        @{
+            status = "ok"
+            test = "FT-B06-007"
+            restartPersisted = $true
+            stableFavoriteIds = $true
+            movedDetected = $true
+            missingStopped = $true
+            missingRescanned = $true
+            reResolved = $true
             removed = $true
             sourceDifferenceCount = 0
         } | ConvertTo-Json -Compress
@@ -2405,6 +2623,28 @@ try {
     }
     if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
         Move-Item $missingLibrary $library
+    }
+    if ($favoriteMovedArchiveActive -and (Test-Path -LiteralPath $favoriteMovedArchive)) {
+        try {
+            Move-Item -LiteralPath $favoriteMovedArchive -Destination (Join-Path $library "1-valid.cbz")
+            $favoriteMovedArchiveActive = $false
+        } catch {
+            $cleanupErrors.Add("Favorite moved archive fixture cleanup failed: $($_.Exception.Message)")
+        }
+    }
+    if ((Test-Path -LiteralPath $favoriteMovedDirectory) -and
+        @(Get-ChildItem -LiteralPath $favoriteMovedDirectory -Force).Count -eq 0) {
+        try { Remove-Item -LiteralPath $favoriteMovedDirectory -Force } catch {
+            $cleanupErrors.Add("Favorite moved directory fixture cleanup failed: $($_.Exception.Message)")
+        }
+    }
+    if ($favoriteMissingComicActive -and (Test-Path -LiteralPath $favoriteMissingComic)) {
+        try {
+            Move-Item -LiteralPath $favoriteMissingComic -Destination (Join-Path $library "comic-folder")
+            $favoriteMissingComicActive = $false
+        } catch {
+            $cleanupErrors.Add("Favorite missing comic fixture cleanup failed: $($_.Exception.Message)")
+        }
     }
     try { Remove-HarnessEvidence } catch { $cleanupErrors.Add($_.Exception.Message) }
     if ($cleanupErrors.Count -gt 0) {

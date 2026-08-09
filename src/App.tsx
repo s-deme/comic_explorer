@@ -250,6 +250,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoriteRefreshRevision, setFavoriteRefreshRevision] = useState(0);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [itemMetadata, setItemMetadata] = useState<ItemMetadata | null>(null);
@@ -528,6 +529,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (requestGeneration !== favoriteGeneration.current) return;
       if (response.status === "ok") {
         setFavorites(response.data);
+        setFavoriteRefreshRevision((current) => current + 1);
       } else if (response.status === "error") {
         setFavoriteNotice(presentError(response.error));
       }
@@ -2442,6 +2444,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <QuickAccess
           favorites={favorites}
           loading={favoritesLoading}
+          refreshRevision={favoriteRefreshRevision}
           notice={favoriteNotice}
           onClose={() => setFavoritesOpen(false)}
           onRefresh={() => void refreshFavorites()}

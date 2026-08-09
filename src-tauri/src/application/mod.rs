@@ -739,6 +739,13 @@ pub fn resolve_favorite(
             request_error(ErrorCode::InvalidRequest, "Favorite kind does not match."),
         ));
     }
+    let mut entries = Vec::new();
+    if let Err(error) = enumerate_all_catalog_entries(&root, &root, &mut entries) {
+        return Ok(error_response(&context, error));
+    }
+    if let Err(error) = strict_moved_favorite_resolve_target(&existing, &entries, &target) {
+        return Ok(error_response(&context, error));
+    }
     let updated = FavoriteRecord {
         relative_path: target.relative_path,
         kind: target.kind,
@@ -1924,40 +1931,52 @@ fn moved_favorite_candidate<'a>(
     record: &FavoriteRecord,
     entries: &'a [crate::catalog::CatalogEntry],
 ) -> Option<&'a crate::catalog::CatalogEntry> {
-    let name = record.relative_path.as_str().rsplit('/').next()?;
-    let candidates = entries
-        .iter()
-        .filter(|entry| {
-            entry.kind == record.kind
-                && entry.relative_path != record.relative_path
-                && entry.relative_path.as_str().rsplit('/').next() == Some(name)
-        })
-        .collect::<Vec<_>>();
-    let fingerprint_matches = candidates
-        .iter()
-        .copied()
-        .filter(|entry| {
-            entry.byte_size == record.size_bytes && entry.modified_ms == record.modified_ms
-        })
-        .collect::<Vec<_>>();
-    if fingerprint_matches.len() == 1 {
-        return fingerprint_matches.into_iter().next();
-    }
-    if fingerprint_matches.len() > 1 {
+    let (Some(size_bytes), Some(modified_ms)) = (record.size_bytes, record.modified_ms) else {
         return None;
-    }
-    let size_matches = candidates
+    };
+    let name = record.relative_path.as_str().rsplit('/').next()?;
+    let mut candidates = entries.iter().filter(|entry| {
+        entry.kind == record.kind
+            && entry.relative_path != record.relative_path
+            && entry.relative_path.as_str().rsplit('/').next() == Some(name)
+            && entry.byte_size == Some(size_bytes)
+            && entry.modified_ms == Some(modified_ms)
+    });
+    let candidate = candidates.next()?;
+    candidates.next().is_none().then_some(candidate)
+}
+
+fn strict_moved_favorite_resolve_target<'a>(
+    record: &FavoriteRecord,
+    entries: &'a [crate::catalog::CatalogEntry],
+    requested: &FavoriteTarget,
+) -> Result<&'a crate::catalog::CatalogEntry, AppError> {
+    if entries
         .iter()
-        .copied()
-        .filter(|entry| entry.byte_size == record.size_bytes)
-        .collect::<Vec<_>>();
-    if size_matches.len() == 1 {
-        return size_matches.into_iter().next();
+        .any(|entry| entry.relative_path == record.relative_path && entry.kind == record.kind)
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Favorite is still available at its stored path.",
+        ));
     }
-    if candidates.len() == 1 {
-        return candidates.into_iter().next();
+    let Some(candidate) = moved_favorite_candidate(record, entries) else {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Favorite resolution target is not the unique exact moved candidate.",
+        ));
+    };
+    if candidate.relative_path != requested.relative_path
+        || candidate.kind != requested.kind
+        || candidate.byte_size != requested.byte_size
+        || candidate.modified_ms != requested.modified_ms
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Favorite resolution target does not match the unique exact moved candidate.",
+        ));
     }
-    None
+    Ok(candidate)
 }
 
 fn enumerate_folder_port(
@@ -3016,6 +3035,110 @@ mod shutdown_tests {
         assert!(RelativePath::parse("../outside").is_err());
         assert!(RelativePath::parse(r"C:\\outside").is_err());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn fr_b06_favorite_strict_moved_missing_reresolve_and_path_safety() {
+        fn archive(path: &str, size_bytes: Option<u64>, modified_ms: Option<u64>) -> CatalogEntry {
+            CatalogEntry {
+                relative_path: RelativePath::parse(path).unwrap(),
+                kind: ItemKind::Archive,
+                byte_size: size_bytes,
+                modified_ms,
+                archive_kind: Some(crate::catalog::ArchiveKind::Cbz),
+            }
+        }
+
+        let record = FavoriteRecord {
+            favorite_id: "favorite-old".into(),
+            item_identity: "item-original".into(),
+            relative_path: RelativePath::parse("Old/01.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            size_bytes: Some(12),
+            modified_ms: Some(13),
+        };
+        let exact = archive("New/01.cbz", Some(12), Some(13));
+        let requested = FavoriteTarget {
+            relative_path: exact.relative_path.clone(),
+            kind: exact.kind,
+            byte_size: exact.byte_size,
+            modified_ms: exact.modified_ms,
+        };
+        let entries = vec![exact.clone(), archive("Other/01.cbz", Some(12), Some(99))];
+
+        let moved = favorite_view(&record, &entries);
+        assert_eq!(moved.status, FavoriteStatus::Moved);
+        assert_eq!(moved.resolved_path, Some(exact.relative_path.clone()));
+        assert_eq!(moved.favorite_id, record.favorite_id);
+        assert_eq!(moved.item_identity, record.item_identity);
+        assert_eq!(
+            strict_moved_favorite_resolve_target(&record, &entries, &requested)
+                .unwrap()
+                .relative_path,
+            exact.relative_path
+        );
+
+        let arbitrary = FavoriteTarget {
+            relative_path: RelativePath::parse("Other/01.cbz").unwrap(),
+            kind: ItemKind::Archive,
+            byte_size: Some(12),
+            modified_ms: Some(99),
+        };
+        assert_eq!(
+            strict_moved_favorite_resolve_target(&record, &entries, &arbitrary)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+
+        let entries_with_original = vec![archive("Old/01.cbz", Some(12), Some(13)), exact.clone()];
+        assert_eq!(
+            favorite_view(&record, &entries_with_original).status,
+            FavoriteStatus::Available
+        );
+        assert_eq!(
+            strict_moved_favorite_resolve_target(&record, &entries_with_original, &requested,)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+
+        let ambiguous = vec![
+            archive("New/01.cbz", Some(12), Some(13)),
+            archive("Elsewhere/01.cbz", Some(12), Some(13)),
+        ];
+        assert!(moved_favorite_candidate(&record, &ambiguous).is_none());
+        assert_eq!(
+            favorite_view(&record, &ambiguous).status,
+            FavoriteStatus::Missing
+        );
+
+        let size_only = vec![archive("New/01.cbz", Some(12), Some(99))];
+        assert!(moved_favorite_candidate(&record, &size_only).is_none());
+        assert_eq!(
+            favorite_view(&record, &size_only).status,
+            FavoriteStatus::Missing
+        );
+
+        let name_only = vec![archive("New/01.cbz", Some(99), Some(99))];
+        assert!(moved_favorite_candidate(&record, &name_only).is_none());
+        assert_eq!(
+            favorite_view(&record, &name_only).status,
+            FavoriteStatus::Missing
+        );
+
+        let no_fingerprint = FavoriteRecord {
+            size_bytes: None,
+            ..record.clone()
+        };
+        assert!(moved_favorite_candidate(&no_fingerprint, &entries).is_none());
+        assert_eq!(
+            favorite_view(&no_fingerprint, &entries).status,
+            FavoriteStatus::Missing
+        );
+        assert!(moved_favorite_candidate(&record, &[]).is_none());
+        assert!(RelativePath::parse("../outside").is_err());
+        assert!(RelativePath::parse(r"C:\\outside").is_err());
     }
 
     #[test]

@@ -63,6 +63,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-013",
             "fut-c-011",
             "quickaccessonly",
+            "imp-014",
+            "fut-c-021",
+            "favoritepersistenceonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -126,6 +129,10 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             source,
         )
         self.assertIn('ProductSwitch = "-QuickAccessOnly"', source)
+        self.assertIn('FrontendTestName = "FT-B06-00[345]"', source)
+        self.assertIn('ExpectedFrontendPasses = 3', source)
+        self.assertIn('RustFilter = "fr_b06_favorite_"', source)
+        self.assertIn('ProductSwitch = "-FavoritePersistenceOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
@@ -136,6 +143,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertEqual(catalog_search_test.count('it("FT-B05-'), 5)
         self.assertEqual(catalog_search_test.count('it("FT-B06-001 '), 1)
         self.assertEqual(catalog_search_test.count('it("FT-B06-002 '), 1)
+        self.assertEqual(catalog_search_test.count('it("FT-B06-003 '), 1)
+        self.assertEqual(catalog_search_test.count('it("FT-B06-004 '), 1)
+        self.assertEqual(catalog_search_test.count('it("FT-B06-005 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -290,7 +300,8 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$RatingOnly", source)
         self.assertIn("if ($RatingOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            source,
         )
         for stage in (
             '"rating viewer setup"',
@@ -327,7 +338,8 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$SearchOnly", source)
         self.assertIn("if ($SearchOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            source,
         )
         for stage in (
             '"search normalized mixed-kind result"',
@@ -370,7 +382,8 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$QuickAccessOnly", source)
         self.assertIn("if ($QuickAccessOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            source,
         )
         for stage in (
             '"quick access add $favoritePath"',
@@ -423,6 +436,71 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             'data-product-id="favorite-remove"',
         ):
             self.assertIn(selector, quick_access_source)
+
+    def test_favorite_persistence_product_gate_restarts_resolves_and_restores_fixtures(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$FavoritePersistenceOnly", source)
+        self.assertIn("if ($FavoritePersistenceOnly)", source)
+        self.assertIn(
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            source,
+        )
+        for stage in (
+            '"favorite persistence add $favoritePath"',
+            '"favorite persistence restart rows"',
+            '"favorite persistence moved and missing"',
+            '"favorite persistence missing rescan"',
+            '"favorite persistence re-resolve"',
+            '"favorite persistence missing remove"',
+            '"favorite persistence resolved restart"',
+            '"favorite persistence resolved remove"',
+        ):
+            self.assertIn(stage, source)
+        for selector in (
+            "favorite-resolve",
+            "dataset.favoriteResolvedPath",
+            "dataset.favoriteRefreshRevision",
+            "favorite-row-refresh",
+            "favorite-remove",
+        ):
+            self.assertIn(selector, source)
+        self.assertIn('test = "FT-B06-007"', source)
+        self.assertIn("stableFavoriteIds = $true", source)
+        self.assertIn("missingRescanned = $true", source)
+        self.assertIn("$archiveBeforeMoveLastWriteTimeUtc", source)
+        self.assertIn(
+            "$archiveAfterMove.LastWriteTimeUtc = $archiveBeforeMoveLastWriteTimeUtc",
+            source,
+        )
+        self.assertIn(
+            "Favorite persistence product gate could not start the missing-row rescan.",
+            source,
+        )
+        self.assertIn("Move-Item -LiteralPath $favoriteMovedArchive", source)
+        self.assertIn("Move-Item -LiteralPath $favoriteMissingComic", source)
+        self.assertIn(
+            'throw "Favorite persistence product harness changed the externally mutated source tree."',
+            source,
+        )
+        self.assertIn(
+            'throw "Favorite persistence product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        quick_access_source = (
+            ROOT / "src/features/catalog/QuickAccess.tsx"
+        ).read_text(encoding="utf-8")
+        for selector in (
+            'data-product-id="favorite-refresh"',
+            'data-product-id="favorite-resolve"',
+            'data-product-id="favorite-row-refresh"',
+            "data-favorite-refresh-revision={refreshRevision}",
+            'data-favorite-resolved-path={favorite.resolvedPath ?? ""}',
+        ):
+            self.assertIn(selector, quick_access_source)
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        self.assertIn("favoriteRefreshRevision", app_source)
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(

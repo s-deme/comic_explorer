@@ -93,6 +93,11 @@ IMP-013/FUT-C-011はshared FR-B06 implementationから`FT-B06-001`と`FT-B06-002
 `favorite_target_enforces_relative_path_and_eligible_kind_boundaries` Rust filterとQuickAccessOnly product
 gateへ接続する。restart/migration/missing/moved/re-resolveの`FUT-C-021`受入はIMP-014へ分離し、IMP-013の
 PASSから昇格させない。
+IMP-014/FUT-C-021はshared FR-B06 implementationから`FT-B06-003`〜`FT-B06-005`だけを選び、exact 3 PASS・
+0 FAIL・0 SKIPをmachine-readable resultで強制する。`fr_b06_favorite_` Rust filterはv1→current migration、
+SQLite reopen、app-local SQLiteとlibrary sourceの分離、strict full fingerprintによるmoved/missing/
+re-resolveとpath safetyを正本として観測し、FavoritePersistenceOnly product gateへ接続する。IMP-013の
+current-session QuickAccessOnly PASSは、このpersistence laneの結果で再判定しない。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -127,6 +132,15 @@ address/選択済みtree node/catalogへ、comic rowは既存viewer
 境界へ遷移する。再走査とremoveが競合しても最新operationの結果とloading解除へ収束する。libraryの
 file/directory集合とSHAは初期値に一致し、restart、migration、missing/moved、
 再解決は後続IMP-014の`FUT-C-021`だけで扱う。
+FavoritePersistenceOnlyではrelease UIからarchiveとcomicFolderをfavoriteへaddし、通常restart後に同じ
+favoriteIdとavailable rowが復元されることを観測する。harnessだけがarchiveをsame-nameの別locationへ
+移動すると`moved`かつopen disabledとなり、利用者の明示的なstrict re-resolveは同じfavoriteIdを保つ。
+comicFolderを消失させた場合は`missing`かつopen disabledで、成功した明示再走査のrevisionが進んだ後も
+Missingを維持してremoveできる。解決済みpathもrestart後に復元する。
+`moved`はstored sizeとmodifiedの両方があるfull fingerprintとsame kind/name候補exactly oneの一致だけであり、
+size-only/name-only/absent/ambiguousは`missing`とする。resolve commandは候補一致を再検証し、任意の
+same-kind pathを拒否する。harnessはfixtureを復元し、library file/directory集合、bytes、SHA-256を初期値へ
+一致させる。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

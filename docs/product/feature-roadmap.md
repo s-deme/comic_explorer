@@ -45,7 +45,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B06はIMP-013で`FUT-C-011`のcurrent-session quick access製品gateを完了したが、`FUT-C-021`のpersistence受入が未測定のため`Partial`で保持する。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
+FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B06はIMP-013で`FUT-C-011`、IMP-014で`FUT-C-021`の原子的Windows WebView2製品gateとcanonical aggregateを完了し、aggregateを`Done`へ更新した。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
 FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product gateを完了し、
 3 atomic featureがすべて`Implemented / PASS`となったため`Done`へ更新した。
 
@@ -64,7 +64,7 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
 | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done`（重点QC完了） |
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Done`（FT-B05-006 Windows WebView2 product gate・canonical aggregate完了） |
-| `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Partial`（FUT-C-011 product gate完了、FUT-C-021 persistence未測定） |
+| `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Done`（FT-B06-006 current-session、FT-B06-007 persistenceのWindows WebView2 product gate・canonical aggregate完了） |
 | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done`（memo/history/ratingのWindows WebView2 product gate・canonical aggregate完了） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
@@ -233,12 +233,13 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
 
 ### FR-B06 — お気に入り（Batch 6）
 
-- **状態:** `Partial`。IMP-013で`FUT-C-011`のcurrent-session quick accessを`Implemented / PASS`へ
-  更新した。shared implementationのrestart/migration/missing/moved/re-resolveは`FUT-C-021`だけのIMP-014受入であり、
-  FR-B06 aggregateはDoneへ昇格しない。
+- **状態:** `Done`。IMP-013で`FUT-C-011`のcurrent-session quick access、IMP-014で`FUT-C-021`の
+  v1 migration/restart persistence、strict missing/moved/re-resolveをそれぞれ`Implemented / PASS`へ更新した。
+  二つの原子gateが揃ったためFR-B06 aggregateをDoneへ昇格する。
 - **対象 feature ID:** `FUT-C-011`, `FUT-C-021`。
 - **user outcome:** 読者がcurrent-sessionで任意のfolder/comicをお気に入りへ登録・解除し、
-  quick accessから安全に開ける。次回起動後の復元は`FUT-C-021`の未測定受入である。
+  quick accessから安全に開ける。次回起動後も同じfavoriteIdとavailable rowを復元し、移動/消失は安全停止して
+  明示再解決または解除できる。
 - **共通基盤:** stable path identity、local metadata store、登録対象の欠損/移動表示、
   quick-access navigation、冪等な add/remove。
 - **依存:** `REQ-MVP-001`、`REQ-MVP-002` の path identity と local-only 方針。ファイル操作や
@@ -247,8 +248,9 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
   `favorite_target_enforces_relative_path_and_eligible_kind_boundaries`、release WebView2
   `FT-B06-006`でavailable rows、folder navigation、comicFolder/archive viewer、remove、source tree差分0を
   観測し、Windows-native canonical aggregateは全12 stage exit 0である。
-- **IMP-014 Next:** `FT-B06-003` restart/migration、`FT-B06-004` missing/moved/re-resolve、`FT-B06-005`
-  persistence safetyを直接測定する。FUT-C-011のPASSやcurrent-session rawをこれらへ再利用しない。
+- **IMP-014 evidence:** selected `FT-B06-003`〜`005` exact3とRust `fr_b06_favorite_`でv1 migration/reopenを、
+  release WebView2 `FT-B06-007`でrestart、strict moved/missing/re-resolve、missing再走査、source tree差分0を直接測定した。
+  FUT-C-011のcurrent-session rawを再利用せず、全12 stage exit 0のcanonical aggregateを受理した。
 
 ### FR-B07 — 読書情報（Batch 7）
 
