@@ -115,7 +115,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-001 | クラウド同期 | 外部同期 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q8-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 外部送信禁止の恒久方針。方針変更時のみ再評価 |
 | FUT-R-002 | 外部書誌情報 | 外部サービスからの情報取得 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q6-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ファイル名・フォルダ名のみを使う方針 |
 | FUT-R-003 | 外部データ送信 | 利用状況等の送信 | Rejected | NOT TESTED | 非採用 | — | [MVP対象外](../requirements/mvp-requirements.md); Q8-3 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | いかなるデータも外部送信しない方針 |
-| FUT-R-004 | 閲覧履歴 | 閲覧履歴の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-002-成功した閲覧のhistory); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-002のApp/client接続とRust history契約を分離。旧frontend exact5は履歴raw | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
+| FUT-R-004 | 閲覧履歴 | 閲覧履歴の管理 | Implemented | PASS | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-002-成功した閲覧のhistory); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs`; `src/App.fr-b07.test.tsx`; `scripts/run-product-ui-harness.ps1` | [FR-B07結果](../testing/fr-b07-results.md)（FT-B07-002、Rust history契約、Windows WebView2 `FT-B07-007`、canonical aggregate PASS） | release製品でsuccess-only・identity dedup・決定順序・restart復元を実測。library原本差分0、cleanup、Windows-native CoDD exit 0・red 0。構造advisoryは生値を開示し、機能PASSへ加算しない。ratingは別featureとしてBLOCKEDを維持。 |
 | FUT-R-005 | 評価 | 評価情報の管理 | Partial | BLOCKED | 未定 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-003-rating); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | FT-B07-003のApp/client接続とRust rating/原本byte不変契約を分離。旧frontend exact5は履歴raw | CoDD 3 SKIP/1 VACUOUS/verification 0はPASSへ加算しない。Windows product gateはBLOCKED。候補の恒久拒否ではない |
 | FUT-R-006 | タッチ操作 | タッチ入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-002 `BLOCKED_UNMEASURED`） | touch実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-003 `BLOCKED_UNMEASURED`） | gamepad実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
@@ -123,10 +123,11 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 
 ## FR-B07 受入証跡
 
-IMP-006では`FUT-C-023`だけを原子的に完了した。Windows release WebView2の`FT-B07-006`でmemoの
-save・edit・viewer再open・製品restart復元・clear・再openとlibrary source tree差分0を観測し、
-Windows-native canonical aggregateも全stage exit 0だった。`FUT-R-004`と`FUT-R-005`はproduct未測定の
-ため`Partial / BLOCKED`、FR-B07全体も`Partial / BLOCKED`を維持する。詳細なrun IDとSHAは
+IMP-006では`FUT-C-023`だけを原子的に完了した。IMP-007ではWindows release WebView2の
+`FT-B07-007`で異なる2作品のsuccess-only記録、identity dedup、決定順序、corrupt-open非記録、
+製品restart復元とlibrary source tree差分0を直接観測した。両runのWindows-native canonical aggregateは
+全stage exit 0だった。`FUT-R-005`はproduct未測定のため`Partial / BLOCKED`、FR-B07全体も
+`Partial / BLOCKED`を維持する。CoDDの構造advisoryは機能PASSへ加算しない。詳細なrun IDとSHAは
 [FR-B07結果](../testing/fr-b07-results.md)を正本とする。
 
 ### cmd_400 履歴

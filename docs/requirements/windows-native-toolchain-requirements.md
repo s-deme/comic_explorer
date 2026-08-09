@@ -46,6 +46,7 @@ and report both the missing capability and the locations that were searched.
   or management ID. `IMP-004`, `FUT-C-019`, and `ShortcutOnly` resolve to the
   shortcut lane; `IMP-005`, `FUT-C-022`, and `TagsOnly` resolve to the tag lane.
   `IMP-006`, `FUT-C-023`, and `MemoOnly` resolve to the memo lane.
+  `IMP-007`, `FUT-R-004`, and `HistoryOnly` resolve to the history lane.
   Each lane selects its own focused frontend file, optional exact test-name
   pattern, Rust filter, and product harness switch while sharing typecheck,
   frontend/SBOM generation, focused or
@@ -76,6 +77,10 @@ and report both the missing capability and the locations that were searched.
   metadata operations to finish, prove save/edit/restart restoration and clear,
   reopen the item to prove the cleared state, and leave the library source tree
   byte-identical.
+  The history product lane must open successful items through the release UI,
+  prove identity deduplication and deterministic order, prove a corrupt-open
+  failure is not recorded, restore the same rows after restart, and leave the
+  library source tree byte-identical.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and

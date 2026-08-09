@@ -1777,6 +1777,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="history-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
@@ -2175,7 +2176,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <p>{loadState.message}</p>
               <button onClick={() => void load(navigation.current)}>再試行</button>
               {entries.length > 0 && (
-                <button onClick={() => setLoadState({ status: "ready" })}>
+                <button
+                  data-product-id="catalog-error-return"
+                  onClick={() => setLoadState({ status: "ready" })}
+                >
                   一覧へ戻る
                 </button>
               )}
@@ -2410,6 +2414,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             aria-modal="true"
             aria-label="閲覧履歴"
             className="history-dialog"
+            data-product-id="history-dialog"
           >
             <h2>閲覧履歴</h2>
             {historyLoading && <p role="status">履歴を読み込み中です。</p>}
@@ -2417,17 +2422,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             {!historyLoading && historyNotice === null && (
               <ol>
                 {readingHistory.map((entry) => (
-                  <li key={entry.itemIdentity} data-history-item={entry.itemIdentity}>
+                  <li
+                    key={entry.itemIdentity}
+                    data-product-id="history-row"
+                    data-history-item={entry.itemIdentity}
+                  >
                     <span>{entry.itemIdentity}</span>
                     <span>{entry.lastViewedAtMs}</span>
                   </li>
                 ))}
               </ol>
             )}
-            <button type="button" onClick={() => void refreshHistory()}>
+            <button
+              type="button"
+              data-product-id="history-refresh"
+              onClick={() => void refreshHistory()}
+            >
               更新
             </button>
-            <button type="button" onClick={() => setHistoryOpen(false)}>
+            <button
+              type="button"
+              data-product-id="history-close"
+              onClick={() => setHistoryOpen(false)}
+            >
               閉じる
             </button>
           </div>

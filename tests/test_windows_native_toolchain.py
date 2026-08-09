@@ -51,6 +51,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-006",
             "fut-c-023",
             "memoonly",
+            "imp-007",
+            "fut-r-004",
+            "historyonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -88,10 +91,17 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('FrontendTestName = "FT-B07-001"', source)
         self.assertIn('RustFilter = "fr_b07_memo"', source)
         self.assertIn('ProductSwitch = "-MemoOnly"', source)
+        self.assertIn('FrontendTestName = "FT-B07-002"', source)
+        self.assertIn(
+            'RustFilter = "fr_b07_history_deterministic_order_and_dedup"',
+            source,
+        )
+        self.assertIn('ProductSwitch = "-HistoryOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
         self.assertEqual(frontend_test.count('it("FT-B07-001 '), 1)
+        self.assertEqual(frontend_test.count('it("FT-B07-002 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -204,6 +214,40 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         ):
             self.assertIn(selector, app_source)
         self.assertIn('data-product-id="viewer-close"', viewer_source)
+
+    def test_history_product_gate_observes_success_only_dedup_and_restart_persistence(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$HistoryOnly", source)
+        self.assertIn("if ($HistoryOnly)", source)
+        for stage in (
+            '"history successful open $itemPath"',
+            '"history successful close $itemPath"',
+            '"history failed open"',
+            '"history failed open recovery"',
+            '"history success-only dedup and deterministic order"',
+            '"history restart persistence"',
+        ):
+            self.assertIn(stage, source)
+        self.assertIn("identities === 'comic-folder|1-valid.cbz'", source)
+        self.assertIn("rows.length === 2", source)
+        self.assertIn('test = "FT-B07-007"', source)
+        self.assertIn('throw "History product harness changed source archives."', source)
+        self.assertIn(
+            'throw "History product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        for selector in (
+            'data-product-id="catalog-error-return"',
+            'data-product-id="history-menu-item"',
+            'data-product-id="history-dialog"',
+            'data-product-id="history-row"',
+            'data-product-id="history-refresh"',
+            'data-product-id="history-close"',
+        ):
+            self.assertIn(selector, app_source)
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(

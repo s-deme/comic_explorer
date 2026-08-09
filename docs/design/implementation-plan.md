@@ -81,6 +81,8 @@ IMP-006/FUT-C-023はFR-B07 frontend fileの`FT-B07-001`だけをtest-name patter
 `fr_b07_memo` Rust filterとMemoOnly product gateへ接続する。共有FR-B07 suiteをファイル分割せず、
 後続のhistory/ratingでも各原子testだけを選べるようfocused frontend runnerへ任意patternを渡す。
 runnerはVitest JSONを解析して選択対象exact 1 PASS・0 FAILを強制し、pattern非対象件数を生値で残す。
+IMP-007/FUT-R-004は同じFR-B07 fileから`FT-B07-002`だけを選び、
+`fr_b07_history_deterministic_order_and_dedup` Rust filterとHistoryOnly product gateへ接続する。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -97,6 +99,9 @@ TagsOnlyではReactの選択とmenu描画を段階ごとに待ち、非一致tag
 一件へ絞り込む。rename、再起動復元、removeの完了後にlibrary file集合とSHAを比較する。
 MemoOnlyでは製品UIからcomicを開き、memo保存中のdisabled状態が解除されるまで待ってから
 viewer再open・製品restart後の復元を確認する。clear後も再openして空状態を確認し、library file集合と
+SHAを比較する。
+HistoryOnlyでは異なる2作品の成功openと一方の再open、corrupt archiveの失敗openを順に実行し、
+history UIのrow集合・順序・重複0を確認する。製品restart後も同じrowを復元してからlibrary file集合と
 SHAを比較する。
 
 #### IMP-004 workflow timing record (2026-08-09)

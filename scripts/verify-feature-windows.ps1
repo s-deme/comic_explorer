@@ -22,6 +22,9 @@ $featureConfig = switch ($featureKey) {
     "imp-006" { [pscustomobject]@{ Id = "IMP-006"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
     "fut-c-023" { [pscustomobject]@{ Id = "FUT-C-023"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
     "memoonly" { [pscustomobject]@{ Id = "MemoOnly"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
+    "imp-007" { [pscustomobject]@{ Id = "IMP-007"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
+    "fut-r-004" { [pscustomobject]@{ Id = "FUT-R-004"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
+    "historyonly" { [pscustomobject]@{ Id = "HistoryOnly"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
     default { $null }
 }
 $resolvedFeatureId = if ($null -ne $featureConfig) { $featureConfig.Id } else { $Feature }
@@ -160,7 +163,7 @@ try {
         $failedStage = "feature-resolution"
         $overallExitCode = 2
         $errorPath = Join-Path $logRoot "feature-resolution.stderr.log"
-        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly."
+        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly, IMP-007, FUT-R-004, HistoryOnly."
         $message | Set-Content -LiteralPath $errorPath -Encoding UTF8
         $now = [DateTimeOffset]::UtcNow
         $stages.Add([pscustomobject][ordered]@{

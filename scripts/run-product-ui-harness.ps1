@@ -3,7 +3,8 @@ param(
     [switch]$FullscreenOnly,
     [switch]$ShortcutOnly,
     [switch]$TagsOnly,
-    [switch]$MemoOnly
+    [switch]$MemoOnly,
+    [switch]$HistoryOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,7 +37,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -887,6 +888,90 @@ try {
             reopened = $true
             restartPersisted = $true
             cleared = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
+    if ($HistoryOnly) {
+        foreach ($itemPath in @("comic-folder", "1-valid.cbz", "comic-folder")) {
+            $itemPathJson = $itemPath | ConvertTo-Json -Compress
+            Invoke-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $itemPathJson); " +
+                "if (!item) return false; item.click(); " +
+                "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+            ) | Out-Null
+            Wait-Evaluate "document.querySelector('.viewer') !== null" "history successful open $itemPath"
+            Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" |
+                Out-Null
+            Wait-Evaluate "document.querySelector('.viewer') === null" "history successful close $itemPath"
+        }
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === '2-corrupt.zip'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.error-panel[role=alert]') !== null && " +
+            "document.querySelector('.viewer') === null"
+        ) "history failed open"
+        Invoke-Evaluate "document.querySelector('[data-product-id=catalog-error-return]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.error-panel[role=alert]') === null && " +
+            "document.querySelectorAll('.catalog-item').length > 0"
+        ) "history failed open recovery"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "history library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=history-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-product-id=history-row]')]; " +
+            "const identities = rows.map((row) => row.dataset.historyItem).join('|'); " +
+            "const times = rows.map((row) => Number(row.querySelectorAll('span')[1]?.textContent)); " +
+            "return document.querySelector('[data-product-id=history-dialog]') !== null && " +
+            "identities === 'comic-folder|1-valid.cbz' && times.every((time, index) => " +
+            "index === 0 || times[index - 1] >= time); })()"
+        ) "history success-only dedup and deterministic order"
+        Stop-Product $cold
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+            "document.querySelectorAll('.catalog-item').length > 0"
+        ) "history restart catalog"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "history restart library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=history-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-product-id=history-row]')]; " +
+            "return rows.length === 2 && rows[0]?.dataset.historyItem === 'comic-folder' && " +
+            "rows[1]?.dataset.historyItem === '1-valid.cbz'; })()"
+        ) "history restart persistence"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "History product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "History product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B07-007"
+            successOnly = $true
+            deduplicated = $true
+            deterministicOrder = $true
+            failedNotRecorded = $true
+            restartPersisted = $true
             sourceDifferenceCount = 0
         } | ConvertTo-Json -Compress
         return

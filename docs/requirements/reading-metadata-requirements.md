@@ -75,6 +75,7 @@ focused testで直接観測する。
 | FT-B07-004 | v2→v3 migrationと再起動後の全値 | StateStore migration/reopen → metadata API |
 | FT-B07-005 | reading positionとの分離、library/original差分0 | position API + metadata API + snapshot |
 | FT-B07-006 | Windows製品でのmemo保存、編集、再起動復元、clear | release WebView2 → App → client → SQLite + library source tree差分0 |
+| FT-B07-007 | Windows製品で成功openだけをhistoryへ記録し、重複排除・順序・restart復元 | release WebView2 → open境界 → SQLite → history UI + library source tree差分0 |
 
 選択対象のfocused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07` selectorは上記5契約を
 個別に検査する。frontend側はAppからclientへの接続を観測できる`FT-B07-001`〜
@@ -113,6 +114,20 @@ release freshness、`FT-B07-006`、製品process cleanup、CoDD scan/check/verif
 復元されることを確認してからclearする。保存完了はinput値だけでなく操作中状態の解除後に判定し、
 再表示でも空であることを確認する。前後のlibrary file集合、bytes、SHA-256は一致しなければならない。
 このgateのPASSは`FUT-C-023`だけを完了させ、`FUT-R-004`と`FUT-R-005`を自動的にPASSへ昇格しない。
+
+### IMP-007 history完了ゲート
+
+`scripts/run-feature-verification-wsl.sh IMP-007 -RustMode Canonical`をWindows-native toolchainへ橋渡しする
+正本コマンドとする。現行frontendから`FT-B07-002`だけを選択し、typecheck、SBOM/build、canonical Rust、
+release freshness、`FT-B07-007`、製品process cleanup、CoDD scan/check/verifyを同じsourceへ束縛する。
+
+`FT-B07-007`はrelease製品UIから異なる2作品を正常openし、一方を再openしてもidentityごとのrowが
+1件であることと、最終成功時刻の降順で表示されることを確認する。corrupt archiveのopen失敗はrowを
+追加せず、製品restart後も同じ集合・順序を復元しなければならない。cancel、empty、stale generationは
+製品UIで決定的に発生させず、Rustの`fr_b07_history_deterministic_order_and_dedup`を正本とする。
+前後のlibrary file集合、bytes、SHA-256は一致しなければならない。このgateのPASSは`FUT-R-004`だけを
+完了させ、`FUT-R-005`を自動的にPASSへ昇格しない。履歴行から作品を開く操作は承認済み要件に含まれず、
+本IMPへ追加しない。
 
 ## cmd_400 履歴実測状態
 
@@ -156,5 +171,5 @@ testsは `0 PASS / 0 FAIL / 0 SKIP / 0 total` である。3 SKIP（`deployment_c
 `user_journey_coherence`、`environment_coverage`）と1 VACUOUS（`task_completion`）はPASSへ加算せず、
 cmd_400のCoDD gateおよびFR-B07 aggregateは `INCOMPLETE / NOT APPLICABLE` だった。当時のWindows
 WebView2 native product UIとOS syscall完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで
-代替しなかった。IMP-006はmemoのWebView2境界だけを後続実測し、history/ratingへ波及させない。
+代替しなかった。IMP-006はmemo、IMP-007はhistoryのWebView2境界を後続実測し、ratingへ波及させない。
 最終結果と不採用CoDD草稿の履歴は [FR-B07結果](../testing/fr-b07-results.md) に集約する。
