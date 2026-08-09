@@ -41,7 +41,7 @@ import {
   type ItemMetadata,
   type ReadingHistoryEntry,
 } from "./features/library/client";
-import type { CatalogEntry } from "./types/domain";
+import type { CatalogEntry, ImageFormat } from "./types/domain";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -1557,6 +1557,77 @@ describe("application shell", () => {
     expect(screen.queryByText("Old/Volume.cbz")).not.toBeInTheDocument();
     expect(searchMock).toHaveBeenCalledTimes(2);
     expect(searchMock.mock.calls[1][1]).toBeGreaterThan(searchMock.mock.calls[0][1]);
+  });
+
+  it("FT-B08-001 connects static WebP folder/archive viewer media and recovers past a corrupt page", async () => {
+    const webpFormat: ImageFormat = "webp";
+    const folder: CatalogEntry = { relativePath: "webp-folder" as never, kind: "comicFolder" };
+    const archive = testEntry("webp-book.cbz");
+    const session = (itemKey: string, pages: string[]) => ({
+      status: "ok" as const,
+      requestId: `open-${itemKey}` as never,
+      generation: 1 as never,
+      data: {
+        itemKey,
+        displayName: itemKey,
+        pages: pages.map((relativePath, index) => ({
+          id: `${itemKey}-${index}` as never,
+          relativePath: relativePath as never,
+          mediaUri: "",
+          format: webpFormat,
+        })),
+        startIndex: 0,
+      },
+    });
+    openMock
+      .mockResolvedValueOnce(session("webp-folder", [
+        "webp-folder/1-lossy.webp",
+        "webp-folder/2-corrupt.webp",
+        "webp-folder/3-alpha.webp",
+      ]))
+      .mockResolvedValueOnce(session("webp-book.cbz", ["1-lossless.webp"]));
+    loadPageMock.mockImplementation(async (viewer, index, generation) => {
+      const page = viewer.pages[index];
+      if (page.relativePath === "webp-folder/2-corrupt.webp") {
+        return {
+          status: "error" as const,
+          requestId: "webp-corrupt" as never,
+          generation: generation as never,
+          error: { code: "CORRUPT_IMAGE", message: "corrupt WebP", retryable: false },
+        };
+      }
+      return {
+        status: "ok" as const,
+        requestId: `webp-${page.relativePath}` as never,
+        generation: generation as never,
+        data: { pageId: page.id, mediaUri: `comic://localhost/${page.id}` },
+      };
+    });
+
+    await registerTestLibrary([folder, archive]);
+    const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const folderButton = within(grid)
+      .getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === "webp-folder");
+    expect(folderButton).toBeDefined();
+    fireEvent.keyDown(folderButton!, { key: "Enter", ctrlKey: true });
+    await screen.findByLabelText("webp-folder ビューワ");
+    expect(await screen.findByAltText("webp-folder 1ページ"))
+      .toHaveAttribute("src", "comic://localhost/webp-folder-0");
+
+    fireEvent.keyDown(window, { key: "PageDown" });
+    const corrupt = await screen.findByRole("alert");
+    expect(corrupt).toHaveTextContent("webp-folder/2-corrupt.webp");
+    fireEvent.click(within(corrupt).getByRole("button", { name: "次ページ" }));
+    expect(await screen.findByAltText("webp-folder 3ページ"))
+      .toHaveAttribute("src", "comic://localhost/webp-folder-2");
+
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+    await openTestComic("webp-book.cbz");
+    expect(await screen.findByAltText("webp-book.cbz 1ページ"))
+      .toHaveAttribute("src", "comic://localhost/webp-book.cbz-0");
+    expect(openMock).toHaveBeenNthCalledWith(1, "webp-folder", expect.any(Number));
+    expect(openMock).toHaveBeenNthCalledWith(2, "webp-book.cbz", expect.any(Number));
   });
 
   it("FT-B06-001 adds and removes one favorite idempotently without duplicate UI rows", async () => {

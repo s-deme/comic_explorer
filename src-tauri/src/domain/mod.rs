@@ -29,6 +29,7 @@ pub enum ItemKind {
 pub enum ImageFormat {
     Jpeg,
     Png,
+    Webp,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

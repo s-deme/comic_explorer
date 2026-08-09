@@ -131,6 +131,9 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
     let signature_valid = match grant.mime_type {
         "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
         "image/jpeg" => bytes.starts_with(&[0xff, 0xd8]),
+        "image/webp" => {
+            bytes.starts_with(b"RIFF") && bytes.get(8..12).is_some_and(|format| format == b"WEBP")
+        }
         _ => false,
     };
     if !signature_valid {
@@ -314,6 +317,26 @@ mod tests {
         assert!(!body.contains('\\'));
         assert!(!body.contains("secret"));
         assert!(!body.contains(".zip"));
+    }
+
+    #[test]
+    fn fr_b08_webp_media_grants_require_the_riff_webp_signature() {
+        let grant = MediaGrant {
+            page_id: PageId::parse("webp-page").unwrap(),
+            mime_type: "image/webp",
+            max_bytes: 1024,
+            source: PageSource::Memory(b"RIFF\0\0\0\0WEBPpayload".to_vec()),
+        };
+        assert!(read_grant_bytes(&grant).is_ok());
+
+        let invalid = MediaGrant {
+            source: PageSource::Memory(b"RIFF\0\0\0\0WAVEpayload".to_vec()),
+            ..grant
+        };
+        assert_eq!(
+            read_grant_bytes(&invalid).unwrap_err().code,
+            ErrorCode::CorruptImage
+        );
     }
 
     #[test]

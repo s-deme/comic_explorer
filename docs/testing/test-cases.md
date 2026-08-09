@@ -10,6 +10,9 @@ codd:
     - id: "req:mvp-requirements"
       relation: "verifies"
       semantic: "behavioral"
+    - id: "req:fr-b08-webp"
+      relation: "verifies"
+      semantic: "static-webp-extension-and-recovery"
 ---
 
 # Comic Explorer MVP テストケース
@@ -32,7 +35,7 @@ codd:
 | テストID | 対応要件 | レベル | 優先度 | 前提条件 | テストデータ | 操作 | 期待結果 | 非期待結果 | 後処理 | 自動化状態 | 備考 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | TC-UT-001 | REQ-MVP-007-AC1,008-AC2 | Unit | P0 | 比較器のみ | FIX-ORDER-001 | `10,2,1`を昇順比較 | `1,2,10`、反復100回同一 | 辞書順、入力順依存 | なし | Specified | 共通oracle |
-| TC-UT-002 | REQ-MVP-008-AC1/3,009-AC1/3 | Unit | P0 | 拡張子判定のみ | FIX-ORDER-003 | 全対象名を判定 | jpg/jpeg/png/zip/cbzは大小文字非区別、txt/webpはfalse | 対象外混入 | なし | Specified |  |
+| TC-UT-002 | REQ-MVP-008-AC1/3,009-AC1/3,REQ-FR-B08-001 | Unit | P0 | 拡張子判定のみ | FIX-ORDER-003/FIX-WEBP-001 | 全対象名を判定 | jpg/jpeg/png/webp/zip/cbzは大小文字非区別、txtと偽拡張子はfalse | 対象外混入 | なし | Specified | WebPはfeature-specific採用 |
 | TC-UT-003 | REQ-MVP-008-AC2,009-AC2 | Unit | P0 | Windows相対path契約 | FIX-NESTED-001 | `/`,`\`,`.`を含む入力を正規化 | 区切り統一、`..`脱出拒否、絶対化なし | root外path | なし | Specified |  |
 | TC-UT-004 | REQ-MVP-005,008〜010 | Unit | P0 | 項目分類契約 | FIX-LIBRARY-001 | 各項目を分類 | folder/comic/archive/page/unsupportedが一意。画像と子フォルダ併存でもEnterは移動、読むは明示操作 | metadata推測、暗黙閲覧 | なし | Specified | GAP-TEST-004解決済み |
 | TC-UT-005 | REQ-MVP-006-AC1 | Unit | P0 | page一覧あり | FIX-ORDER-001/003 | 表紙を選択 | 隠し・対象外を除く自然順先頭 | 列挙順採用 | なし | Specified |  |

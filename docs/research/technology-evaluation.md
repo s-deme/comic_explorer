@@ -80,6 +80,7 @@ lockする。preview/betaは候補点へ含めない。
 | TanStack Virtual | 3系 | MIT。[公式リポジトリ](https://github.com/TanStack/virtual) |
 | Tokio/tokio-util | 1系/0.7系 | MIT。[公式リポジトリ](https://github.com/tokio-rs/tokio) |
 | zip | 8系 | MIT。repository同梱test corpusの別licenseは製品へ含めない |
+| image-webp | 0.2.4 exact pin | pure Rust。rawはMIT OR Apache-2.0。推移依存`byteorder-lite`（Unlicense OR MIT）と`quick-error`（MIT/Apache-2.0）を含め、各依存のMIT互換grantを選択してCargo.lock/SBOM/noticeへ固定し、WIC Store codecの代替にしない |
 | encoding_rs | 0.8系 | Apache-2.0/MIT。[公式リポジトリ](https://github.com/hsivonen/encoding_rs) |
 | rusqlite/SQLite | 0.39系/3系 | rusqlite MIT、SQLite public domain |
 | windows crate/WIC | windows 0.6x系/OS component | crate MIT/Apache-2.0、WICはWindows component |
@@ -208,6 +209,14 @@ sRGB、背景を不透明化しJPEG quality 82で保存する。PNG透明が一�
 `sha256(schema|canonical-path|size|mtime|archive-entry-crc|thumb-spec)`。
 二段階ディレクトリ、tempへの書込み＋atomic rename、既定2GiB/20,000件LRUを採る。
 上限は性能スパイクで調整する。
+
+静止WebPを採用する場合、page bytesは既存のopaque media tokenから`image/webp`としてWebView2へ渡す。
+thumbnail decodeはpinしたpure-Rust `image-webp` 0.2.4で行い、raw pixelを既存WIC resize/JPEG cacheへ渡す。
+Windows Store WebP extensionまたはWICのruntime codec availabilityへ依存しない。採用前にCargo.lock/Cargo
+metadataで各依存のraw license expressionとMITまたはApache-2.0の選択可能な互換grantを固定し、SBOMと
+THIRD-PARTY-NOTICESのunknown/prohibited license 0を確認する。VP8X animation、ANIM、ANMFは静止WebPの
+decoder契約から除外し、別のframe policy採否まで
+`UnsupportedFormat`とする。
 
 decode済みページcacheは最大3表示単位（現在、前、次）かつ512MiBの小さい方、
 圧縮entry cacheは128MiBを初期値とする。現在ページをpinし、次、前、遠方の順に

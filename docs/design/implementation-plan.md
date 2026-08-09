@@ -98,6 +98,15 @@ IMP-014/FUT-C-021はshared FR-B06 implementationから`FT-B06-003`〜`FT-B06-005
 SQLite reopen、app-local SQLiteとlibrary sourceの分離、strict full fingerprintによるmoved/missing/
 re-resolveとpath safetyを正本として観測し、FavoritePersistenceOnly product gateへ接続する。IMP-013の
 current-session QuickAccessOnly PASSは、このpersistence laneの結果で再判定しない。
+IMP-015/FUT-C-005は静止WebPだけを採用し、`FT-B08-001`をexact 1 PASS・0 FAIL・0 SKIPで選ぶ。
+`fr_b08_webp_` Rust filterはRIFF/WEBP container、VP8/VP8L/non-animation VP8X、metadata/limits、folder/ZIP/CBZ、
+`image/webp` media token、corrupt/animation recovery、source非破壊を観測する。thumbnail decodeはpinした
+pure-Rust `image-webp` 0.2.4から既存WIC raw pixel/JPEG cacheへ接続し、WIC WebP Store extensionへ依存しない。
+decode bufferとBGR bufferのchecked合計は既存`MAX_IMAGE_BYTES`をworking-buffer上限としてallocation前に強制する。
+Cargo.lock/Cargo metadataで各codec依存がMITまたはApache-2.0の互換grantを選択可能であることを確認し、raw
+license expressionを結果台帳へ残す。SBOM/THIRD-PARTY unknown/prohibited 0をgate化してからWebpOnly product
+gateへ渡す。animated WebPは`UnsupportedFormat`として別atomic candidateへ残し、FR-B08 aggregateの
+Done条件へ混入させない。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -141,6 +150,11 @@ Missingを維持してremoveできる。解決済みpathもrestart後に復元�
 size-only/name-only/absent/ambiguousは`missing`とする。resolve commandは候補一致を再検証し、任意の
 same-kind pathを拒否する。harnessはfixtureを復元し、library file/directory集合、bytes、SHA-256を初期値へ
 一致させる。
+WebpOnlyではisolated fixtureのcomicFolder、ZIP、CBZにstatic lossy/lossless/alpha WebPを置き、自然順enumeration、
+表紙thumbnail、`image/webp` viewer表示をrelease UIで確認する。harnessはcorrupt WebPとanimation flag/ANIM/
+ANMFを局所errorとして確認し、後続page/comicへ継続する。fixtureのfile/directory集合、bytes、SHA-256を
+初期値へ戻し、alpha thumbnailはunpremultiplied sRGBを白背景へ合成した結果を確認し、WebP decoderの
+network/install/Store codecへ依存しない。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

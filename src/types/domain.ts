@@ -11,7 +11,7 @@ export type ItemKind =
   | "page"
   | "unsupported";
 
-export type ImageFormat = "jpeg" | "png";
+export type ImageFormat = "jpeg" | "png" | "webp";
 
 export interface LibraryItem {
   id: ItemId;

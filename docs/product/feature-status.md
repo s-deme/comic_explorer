@@ -70,7 +70,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-002 | 7z書庫閲覧 | 7z対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | library/license確認が必要 |
 | FUT-C-003 | PDF閲覧 | PDF対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | MVP後に再検討 |
 | FUT-C-004 | EPUB閲覧 | EPUB対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | MVP後に再検討 |
-| FUT-C-005 | WebPページ表示 | WebP対応 | Candidate | NOT TESTED | 希望 | 将来 | Q3-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | — |
+| FUT-C-005 | WebPページ表示 | static WebPをfolder/ZIP/CBZのpage・viewer・thumbnailへ接続 | Implemented | PASS | 希望 | FR-B08 | [FR-B08 static WebP要件](../requirements/webp-requirements.md#fr-b08-静止-webp-要件); Q3-2 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/catalog/thumbnail.rs`; `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/catalog/`; `src-tauri/src/media/`; `src/App.tsx`; `src/features/viewer/Viewer.tsx`; `scripts/run-product-ui-harness.ps1`; `scripts/verify-feature-windows.ps1` | [FR-B08結果](../testing/fr-b08-results.md)（FT-B08-001 exact1、Rust `fr_b08_webp_`、Windows WebView2 `FT-B08-006`、canonical aggregate PASS） | static lossy/lossless/alpha、WebView2 viewer、pure-Rust thumbnail decode/cache、corrupt/animated local recovery、source tree差分0を直接観測。image-webp 0.2.4 lock/SBOM/noticeのunknown/prohibited licenseは0。CoDD advisoryは生値のみでPASSへ加算しない。 |
 | FUT-C-006 | 静止GIF表示 | 静止GIF対応 | Candidate | NOT TESTED | 希望 | 将来 | Q3-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | MVP本文はアニメGIFのみ対象外とするため、静止GIFは推論由来候補 |
 | FUT-C-007 | アニメーションGIF表示 | アニメGIF対応 | Candidate | NOT TESTED | 希望 | 将来 | Q3-2 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-008 | AVIFページ表示 | AVIF対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-2 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
@@ -216,6 +216,14 @@ IMP-006のmemo、IMP-007のhistory、IMP-008のratingをそれぞれWindows rele
 直接観測した。3機能のWindows-native canonical aggregateは全stage exit 0であり、FR-B07は
 `Done`である。CoDDの構造advisoryは生値として開示し、機能PASSへ加算しない。詳細なrun IDとSHAは
 [FR-B07結果](../testing/fr-b07-results.md)を正本とする。
+
+## FR-B08 受入証跡
+
+IMP-015で`FUT-C-005`を`Implemented / PASS`へ更新した。Windows release WebView2
+`FT-B08-006`はfolder、ZIP、CBZのstatic lossy/lossless/alpha WebPをenumerateし、thumbnail cacheと
+viewer decode、corrupt/animatedの局所errorから次page・他comicへの復帰、library source tree差分0を直接観測した。
+`FUT-C-006`〜`FUT-C-008`は未実装Candidateのため、FR-B08 aggregateは`Partial`を維持する。詳細なrun ID、
+release/SBOM binding、CoDD advisory、生の不採用runは[FR-B08結果](../testing/fr-b08-results.md)を正本とする。
 
 ### cmd_400 履歴
 

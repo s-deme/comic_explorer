@@ -29,9 +29,9 @@ codd:
 
 | 区分 | 件数 | 扱い |
 |---|---:|---|
-| 実装・受入完了 | 11 | 実装、直接観測、正本同期、CoDD gateを完了済み |
+| 実装・受入完了 | 12 | 実装、直接観測、正本同期、CoDD gateを完了済み |
 | 実装が一部完了・受入待ち | 3 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
-| 未実装候補 | 51 | 採用判断、要件化、実装、直接観測を順に行う |
+| 未実装候補 | 50 | 採用判断、要件化、実装、直接観測を順に行う |
 | 保留・未決定 | 5 | 優先度と仕様を決めるまで実装しない |
 | 実機・外部環境待ち | 2 | 実装着手ではなく、測定環境を確保して判定する |
 | **実装バックログ合計** | **72** | `FUT-R-001`〜`003`、`FUT-R-008` の恒久Rejectedは含めない |
@@ -78,7 +78,8 @@ codd:
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
 [機能ロードマップ](./feature-roadmap.md)の順で採用判断する。ただし今回のユーザー指示により
-`IMP-009`〜`IMP-011`は状態を変えずにスキップし、現在の `Next` は `IMP-015` とする。
+`IMP-009`〜`IMP-011`は状態を変えずにスキップした。ユーザー指定の「IMP-015終わったら停止」により
+`IMP-015`完了後の `Next` は置かず、`IMP-016`以下はCandidateのまま保全する。
 `IMP-037`〜`IMP-072`は2026-08-09のLeeyes参照画面差分から登録した未採用候補である。
 追記順は優先順位を表さず、採用判断時にroadmapのbatchと安全境界を決める。
 
@@ -98,7 +99,7 @@ codd:
 | 12 | `IMP-012` | `FUT-C-010` | 名前検索 | Implemented / PASS | **Done** | `FT-B05-006`でnormalized mixed-kind、navigation、empty/clear、explicit rescan、原本差分0を完了 |
 | 13 | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Implemented / PASS | **Done** | `FT-B06-006`でcurrent-session add/remove、available rows、folder/comic navigation、原本差分0を完了 |
 | 14 | `IMP-014` | `FUT-C-021` | お気に入り保存 | Implemented / PASS | **Done** | Rustでv1 migration、`FT-B06-007`でrestart、strict moved/missing/re-resolve、source tree差分0を完了 |
-| 15 | `IMP-015` | `FUT-C-005` | WebPページ表示 | Candidate / NOT TESTED | **Next** | decoder、ライセンス、対応範囲を確認 |
+| 15 | `IMP-015` | `FUT-C-005` | WebPページ表示 | Implemented / PASS | **Done** | `FT-B08-006`でfolder/ZIP/CBZ static WebP、local error recovery、原本差分0、canonical aggregateを完了 |
 | 16 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
 | 17 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |
 | 18 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |

@@ -28,6 +28,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / brotli | 8.0.4 | BSD-3-Clause AND MIT |
 | cargo / bumpalo | 3.20.3 | MIT OR Apache-2.0 |
 | cargo / bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
+| cargo / byteorder-lite | 0.1.0 | Unlicense OR MIT |
 | cargo / byteorder | 1.5.0 | Unlicense OR MIT |
 | cargo / bytes | 1.12.1 | MIT |
 | cargo / cairo-rs | 0.18.5 | MIT |
@@ -154,6 +155,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / ident_case | 1.0.1 | MIT OR Apache-2.0 |
 | cargo / idna | 1.1.0 | MIT OR Apache-2.0 |
 | cargo / idna_adapter | 1.2.1 | Apache-2.0 OR MIT |
+| cargo / image-webp | 0.2.4 | MIT OR Apache-2.0 |
 | cargo / indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | cargo / indexmap | 2.14.0 | Apache-2.0 OR MIT |
 | cargo / infer | 0.19.0 | MIT |
@@ -236,6 +238,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / proc-macro-error | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
+| cargo / quick-error | 2.0.1 | MIT OR Apache-2.0 |
 | cargo / quick-xml | 0.38.4 | MIT |
 | cargo / quote | 1.0.47 | MIT OR Apache-2.0 |
 | cargo / r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |

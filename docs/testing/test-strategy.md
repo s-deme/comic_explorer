@@ -39,7 +39,7 @@ Python環境を使って製品依存を追加しない。
 
 ## 2. MVP対象外
 
-RAR／CBR、7z、PDF、EPUB、WebP、GIF、AVIF、動画、検索、タグ、メモ、ファイル変更、自動監視、表示形式切替、ズーム、フルスクリーン、ショートカット編集は試験対象外である。`NFR-MVP-002-AC4` の検索性能は要件自身の指定どおり `DEFERRED` とする。漫画項目の移動・改名後の読書位置継承も将来試験とする。
+RAR／CBR、7z、PDF、EPUB、GIF、AVIF、動画、検索、タグ、メモ、ファイル変更、自動監視、表示形式切替、ズーム、フルスクリーン、ショートカット編集は試験対象外である。静止WebPはMVP本文の対象外のまま、採用後は`docs/requirements/webp-requirements.md`のfeature-specific gateで別途測定する。animated WebPはそのgateにも含めず将来試験とする。`NFR-MVP-002-AC4` の検索性能は要件自身の指定どおり `DEFERRED` とする。漫画項目の移動・改名後の読書位置継承も将来試験とする。
 
 ## 3. 品質リスク
 
@@ -158,7 +158,7 @@ force、非force既存outputの上書き、または実行済み分岐のmanifes
 | --- | --- |
 | `1.jpg, 10.jpg, 2.jpg` | `1.jpg, 2.jpg, 10.jpg` |
 | `chapter/10.png, chapter/2.png, 1.png` | `1.png, chapter/2.png, chapter/10.png` |
-| `.JPG, .JPEG, .PNG, .txt, .webp` | 先の3形式だけを大小文字非区別でページ認識 |
+| `.JPG, .JPEG, .PNG, .WEBP, .txt` | 先の4形式だけを大小文字非区別でページ認識 |
 | 同一相対パスを持つFolderとZIP | 同一ページ順・同一表紙 |
 | ZIP格納順を逆転 | 格納順に関係なく同一結果 |
 

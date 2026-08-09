@@ -2419,11 +2419,7 @@ pub async fn load_page(
         PageSource::File(root.join(page.as_str()))
     };
     let page_id = page_id_for(item.as_str(), page.as_str());
-    let mime_type = if page.as_str().to_ascii_lowercase().ends_with(".png") {
-        "image/png"
-    } else {
-        "image/jpeg"
-    };
+    let mime_type = page_mime_type(&page);
     let cancellation = state
         .viewer
         .lock()
@@ -2489,6 +2485,19 @@ pub async fn load_page(
             media_uri: media_uri(&token),
         },
     })
+}
+
+fn page_mime_type(page: &RelativePath) -> &'static str {
+    match page
+        .as_str()
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        _ => "image/jpeg",
+    }
 }
 
 #[tauri::command]
@@ -2560,6 +2569,14 @@ fn unix_millis() -> i64 {
 mod shutdown_tests {
     use super::*;
     use std::sync::Condvar;
+
+    #[test]
+    fn fr_b08_webp_uses_the_exact_viewer_media_type() {
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/01.WEBP").unwrap()),
+            "image/webp"
+        );
+    }
 
     #[test]
     fn shortcut_validation_accepts_default_and_modified_plus_bindings() {

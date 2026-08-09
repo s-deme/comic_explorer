@@ -66,6 +66,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-014",
             "fut-c-021",
             "favoritepersistenceonly",
+            "imp-015",
+            "fut-c-005",
+            "webponly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -133,6 +136,10 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('ExpectedFrontendPasses = 3', source)
         self.assertIn('RustFilter = "fr_b06_favorite_"', source)
         self.assertIn('ProductSwitch = "-FavoritePersistenceOnly"', source)
+        self.assertIn('FrontendTestName = "FT-B08-001"', source)
+        self.assertIn('ExpectedFrontendPasses = 1', source)
+        self.assertIn('RustFilter = "fr_b08_webp_"', source)
+        self.assertIn('ProductSwitch = "-WebpOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
@@ -146,6 +153,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertEqual(catalog_search_test.count('it("FT-B06-003 '), 1)
         self.assertEqual(catalog_search_test.count('it("FT-B06-004 '), 1)
         self.assertEqual(catalog_search_test.count('it("FT-B06-005 '), 1)
+        self.assertEqual(catalog_search_test.count('it("FT-B08-001 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -300,7 +308,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$RatingOnly", source)
         self.assertIn("if ($RatingOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly)",
             source,
         )
         for stage in (
@@ -338,7 +346,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$SearchOnly", source)
         self.assertIn("if ($SearchOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly)",
             source,
         )
         for stage in (
@@ -382,7 +390,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$QuickAccessOnly", source)
         self.assertIn("if ($QuickAccessOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly)",
             source,
         )
         for stage in (
@@ -444,7 +452,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn("[switch]$FavoritePersistenceOnly", source)
         self.assertIn("if ($FavoritePersistenceOnly)", source)
         self.assertIn(
-            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly)",
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly)",
             source,
         )
         for stage in (
@@ -501,6 +509,65 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             self.assertIn(selector, quick_access_source)
         app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
         self.assertIn("favoriteRefreshRevision", app_source)
+
+    def test_webp_product_gate_uses_fixed_isolated_fixtures_and_observes_recovery(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$WebpOnly", source)
+        self.assertIn("if ($WebpOnly)", source)
+        self.assertIn("Add-Type -AssemblyName System.IO.Compression\n", source)
+        self.assertIn("Add-Type -AssemblyName System.IO.Compression.FileSystem", source)
+        self.assertIn(
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly)",
+            source,
+        )
+        for fixture in (
+            "0-webp-folder",
+            "0-webp-static.zip",
+            "0-webp-static.cbz",
+            "1-lossy.webp",
+            "2-lossless.webp",
+            "3-alpha.webp",
+            "4-corrupt.webp",
+            "5-animated.webp",
+            "6-recovery.webp",
+        ):
+            self.assertIn(fixture, source)
+        for stage in (
+            '"webp folder ZIP and CBZ enumeration"',
+            '"webp thumbnail decode and cache generation"',
+            '"webp corrupt local error"',
+            '"webp animated local error"',
+            '"webp local error next recovery"',
+            '"webp thumbnail cache hit"',
+        ):
+            self.assertIn(stage, source)
+        for observable in (
+            "naturalWidth > 0",
+            "naturalHeight > 0",
+            "data-cache-hit=true",
+            "page-error[role=alert]",
+            "data-product-id=viewer-error-next",
+            "sourceDifferenceCount = 0",
+            'test = "FT-B08-006"',
+            "networkOrCodecInstall = $false",
+            "viewerStaticLossyLosslessAlphaDecoded = $true",
+            "comicCoverThumbnailCacheVerified = $true",
+        ):
+            self.assertIn(observable, source)
+        webp_start = source.index("    if ($WebpOnly) {")
+        webp_end = source.index("    if ($SearchOnly) {", webp_start)
+        self.assertNotIn(
+            ".page-error button:nth-of-type(2)", source[webp_start:webp_end]
+        )
+        self.assertIn(
+            'throw "WebP product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        self.assertIn(
+            'throw "WebP product harness changed the source directory tree."', source
+        )
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(

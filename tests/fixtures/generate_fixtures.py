@@ -8,6 +8,7 @@ System.Drawing encoder included with supported Windows installations.
 from __future__ import annotations
 
 import argparse
+import base64
 import binascii
 import hashlib
 import json
@@ -23,10 +24,26 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 SEED = 20260728
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 FIXED_EPOCH = 1_700_000_000
 ZIP_TIME = (2023, 11, 14, 22, 13, 20)
-SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png"}
+SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png", ".webp"}
+
+# Fixed 1x1 WebP conformance payloads keep fixture generation deterministic and
+# standard-library-only. The animation is a negative input for the static lane.
+WEBP_LOSSY = base64.b64decode(
+    "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
+)
+WEBP_LOSSLESS = base64.b64decode(
+    "UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=="
+)
+WEBP_ALPHA = base64.b64decode(
+    "UklGRkoAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAABQBAJ0BKgEAAQAAAP4AAA3AAP7mtQAAAA=="
+)
+WEBP_ANIMATED = base64.b64decode(
+    "UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA"
+)
+WEBP_CORRUPT = WEBP_LOSSY[:20]
 
 # The fixture labels only need this deliberately small, platform-independent font.
 FONT = {
@@ -246,7 +263,7 @@ def build_core(builder: Builder) -> None:
     for index, name in enumerate(order3, 1):
         builder.image(p / name, 320, 480, "FIX-ORDER-003", index)
     (p / "notes.txt").write_text("unsupported synthetic file\n", encoding="utf-8")
-    (p / "page.webp").write_bytes(b"not-webp")
+    (p / "page.webpx").write_bytes(b"not-webp")
 
     p = builder.fixture(
         "FIX-ORDER-004",
@@ -367,6 +384,38 @@ def build_core(builder: Builder) -> None:
     for name in ("same-a.cbz", "same-b.cbz"):
         shutil.copyfile(builder.root / "FIX-ZIP-001/standard.cbz", p / name)
 
+    p = builder.fixture(
+        "FIX-WEBP-001",
+        "static lossy/lossless/alpha WebP for folders and ZIP/CBZ",
+        ["1-lossy.webp", "2-lossless.webp", "3-alpha.webp"],
+        "1-lossy.webp",
+        "static-webp-with-negative-cases",
+        3,
+    )
+    folder = p / "folder"
+    folder.mkdir()
+    static_webp = [
+        ("1-lossy.webp", WEBP_LOSSY),
+        ("2-lossless.webp", WEBP_LOSSLESS),
+        ("3-alpha.webp", WEBP_ALPHA),
+    ]
+    for name, payload in static_webp:
+        (folder / name).write_bytes(payload)
+    errors = p / "errors"
+    errors.mkdir()
+    (errors / "4-corrupt.webp").write_bytes(WEBP_CORRUPT)
+    (errors / "5-animated.webp").write_bytes(WEBP_ANIMATED)
+    archive_entries = [
+        (name, payload, compression)
+        for (name, payload), compression in zip(
+            static_webp,
+            (ZIP_DEFLATED, ZIP_STORED, ZIP_DEFLATED),
+            strict=True,
+        )
+    ]
+    builder.archive(p / "static-webp.zip", archive_entries)
+    builder.archive(p / "static-webp.cbz", list(reversed(archive_entries)))
+
 
 def build_performance(builder: Builder) -> None:
     p = builder.fixture("FIX-PERFORMANCE-001", "1k/10k items and 300 pages", [], None, "performance-data")
@@ -393,6 +442,29 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def webp_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+        raise ValueError("not a WebP RIFF container")
+    if struct.unpack("<I", data[4:8])[0] != len(data) - 8:
+        raise ValueError("WebP RIFF length does not match payload")
+    chunks: list[tuple[bytes, bytes]] = []
+    position = 12
+    while position < len(data):
+        if position + 8 > len(data):
+            raise ValueError("WebP chunk header is truncated")
+        fourcc = data[position : position + 4]
+        length = struct.unpack("<I", data[position + 4 : position + 8])[0]
+        start = position + 8
+        end = start + length
+        if end > len(data):
+            raise ValueError("WebP chunk payload is truncated")
+        chunks.append((fourcc, data[start:end]))
+        position = end + (length & 1)
+    if position != len(data):
+        raise ValueError("WebP chunk padding is invalid")
+    return chunks
+
+
 def image_info(path: Path) -> dict[str, object] | None:
     data = path.read_bytes()
     if data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) >= 24:
@@ -414,6 +486,43 @@ def image_info(path: Path) -> dict[str, object] | None:
                 if position + 4 > len(data):
                     break
                 position += 2 + struct.unpack(">H", data[position + 2 : position + 4])[0]
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        try:
+            chunks = webp_chunks(data)
+        except ValueError:
+            return None
+        for fourcc, payload in chunks:
+            if fourcc == b"VP8 " and len(payload) >= 10 and payload[3:6] == b"\x9d\x01\x2a":
+                width, height = struct.unpack("<HH", payload[6:10])
+                return {
+                    "format": "WEBP",
+                    "width": width & 0x3FFF,
+                    "height": height & 0x3FFF,
+                    "variant": "lossy",
+                    "hasAlpha": any(name == b"ALPH" for name, _ in chunks),
+                    "animated": any(name == b"ANIM" for name, _ in chunks),
+                }
+            if fourcc == b"VP8L" and len(payload) >= 5 and payload[0] == 0x2F:
+                bits = int.from_bytes(payload[1:5], "little")
+                return {
+                    "format": "WEBP",
+                    "width": (bits & 0x3FFF) + 1,
+                    "height": ((bits >> 14) & 0x3FFF) + 1,
+                    "variant": "lossless",
+                    "hasAlpha": bool((bits >> 28) & 1),
+                    "animated": any(name == b"ANIM" for name, _ in chunks),
+                }
+        for fourcc, payload in chunks:
+            if fourcc == b"VP8X" and len(payload) == 10:
+                flags = payload[0]
+                return {
+                    "format": "WEBP",
+                    "width": int.from_bytes(payload[4:7], "little") + 1,
+                    "height": int.from_bytes(payload[7:10], "little") + 1,
+                    "variant": "extended",
+                    "hasAlpha": bool(flags & 0x10),
+                    "animated": bool(flags & 0x02),
+                }
     return None
 
 

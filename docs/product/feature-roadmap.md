@@ -45,7 +45,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B06はIMP-013で`FUT-C-011`、IMP-014で`FUT-C-021`の原子的Windows WebView2製品gateとcanonical aggregateを完了し、aggregateを`Done`へ更新した。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
+FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B06はIMP-013で`FUT-C-011`、IMP-014で`FUT-C-021`の原子的Windows WebView2製品gateとcanonical aggregateを完了し、aggregateを`Done`へ更新した。FR-B08はIMP-015で`FUT-C-005`のstatic WebP gateを完了したが、`FUT-C-006`〜`FUT-C-008`はCandidateのため`Partial`を維持する。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
 FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product gateを完了し、
 3 atomic featureがすべて`Implemented / PASS`となったため`Done`へ更新した。
 
@@ -66,7 +66,7 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Done`（FT-B05-006 Windows WebView2 product gate・canonical aggregate完了） |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Done`（FT-B06-006 current-session、FT-B06-007 persistenceのWindows WebView2 product gate・canonical aggregate完了） |
 | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done`（memo/history/ratingのWindows WebView2 product gate・canonical aggregate完了） |
-| `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
+| `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Partial`（IMP-015 static WebP product gate・canonical aggregate完了、GIF/AVIFはCandidate） |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Done`（Windows WebView2製品gate・canonical aggregate完了） |
 | `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（shortcutはproduct PASS、touch/gamepad `BLOCKED_UNMEASURED`） |
@@ -359,18 +359,23 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B08 — 追加画像形式（Batch 8）
 
-- **状態:** `Planned`。対象行は `Candidate / NOT TESTED`。静止GIFの行は台帳の注記どおり
-  推論由来候補であり、採用済みとしない。
+- **状態:** `Partial`。IMP-015で`FUT-C-005`（static WebP）を`Implemented / PASS`へ更新した。
+  `FUT-C-006`〜`FUT-C-008`は `Candidate / NOT TESTED`のままであり、静止GIFは台帳の注記どおり
+  推論由来候補であって採用済みとしない。
 - **対象 feature ID:** `FUT-C-005`, `FUT-C-006`, `FUT-C-007`, `FUT-C-008`（WebP、静止GIF、
   animation GIF、AVIF）。
 - **user outcome:** 既存の画像 folder/書庫閲覧と同じ原本非破壊契約で、追加画像形式を表示し、
   非対応・破損時には対象を隠さず説明して継続できる。
+- **IMP-015受入:** `FT-B08-001` exact1、Rust `fr_b08_webp_`、release WebView2 `FT-B08-006`で
+  folder/ZIP/CBZのstatic lossy/lossless/alpha、thumbnail cache、viewer、corrupt/animated local
+  recovery、library source tree差分0を観測した。pure-Rust `image-webp` 0.2.4のlock/SBOM/noticeは
+  unknown/prohibited 0であり、詳細は[FR-B08結果](../testing/fr-b08-results.md)を正本とする。
 - **共通基盤:** format detection、decoder adapter、静止/animation の frame policy、
   thumbnail/cache、error classification、license/SBOM 記録。
 - **依存:** `REQ-MVP-008`、`REQ-MVP-009` の image pipeline と `REQ-MVP-017` の原本非破壊。
   decoder のライセンスと platform availability が未確認なら `Blocked` とし、推測で PASS にしない。
-- **実装順:** (1) format/decoder interface と license gate、(2) WebP、(3) static/animation GIF、
-  (4) AVIF、(5) thumbnail/cache/error と viewer integration。
+- **残る実装順:** (1) static/animation GIF、(2) AVIF、(3) featureごとのthumbnail/cache/error と
+  viewer integration。ユーザー指定の停止によりIMP-016を`Next`へ繰り上げない。
 - **focused test 範囲:** `FT-B08-001` WebP、`FT-B08-002` static GIF、`FT-B08-003` animation
   GIF の frame policy、`FT-B08-004` AVIF、`FT-B08-005` corrupt/unsupported fallback と
   cache/原本 snapshot。

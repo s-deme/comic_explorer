@@ -19,8 +19,11 @@ mod fixture_tests {
     use crate::domain::{ErrorCode, PageId};
     use crate::media::{MediaGrant, MediaTokenRegistry, PageSource};
     use std::fs;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use zip::write::SimpleFileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     fn fixtures() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -56,6 +59,64 @@ mod fixture_tests {
         let mut output = Vec::new();
         visit(root, root, &mut output);
         output
+    }
+
+    fn temporary_root(test_name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "comic-explorer-{test_name}-{}-{nonce}",
+            std::process::id()
+        ))
+    }
+
+    fn source_snapshot(root: &Path) -> Vec<(PathBuf, bool, Vec<u8>)> {
+        fn visit(root: &Path, path: &Path, output: &mut Vec<(PathBuf, bool, Vec<u8>)>) {
+            let mut entries = fs::read_dir(path)
+                .unwrap()
+                .map(Result::unwrap)
+                .collect::<Vec<_>>();
+            entries.sort_by_key(|entry| entry.file_name());
+            for entry in entries {
+                let path = entry.path();
+                let is_directory = entry.file_type().unwrap().is_dir();
+                output.push((
+                    path.strip_prefix(root).unwrap().to_path_buf(),
+                    is_directory,
+                    (!is_directory)
+                        .then(|| fs::read(&path).unwrap())
+                        .unwrap_or_default(),
+                ));
+                if is_directory {
+                    visit(root, &path, output);
+                }
+            }
+        }
+
+        let mut output = Vec::new();
+        visit(root, root, &mut output);
+        output
+    }
+
+    fn write_webp_archive(path: &Path) {
+        let file = fs::File::create(path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        for (name, bytes, compression) in [
+            ("chapter/10.webp", &b"ten"[..], CompressionMethod::Deflated),
+            ("chapter/2.WEBP", &b"two"[..], CompressionMethod::Stored),
+            ("notes.txt", &b"ignored"[..], CompressionMethod::Stored),
+        ] {
+            writer
+                .start_file(
+                    name,
+                    SimpleFileOptions::default().compression_method(compression),
+                )
+                .unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap();
     }
 
     #[test]
@@ -124,6 +185,66 @@ mod fixture_tests {
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
         assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
         assert_eq!(entries.len(), by_name.len());
+    }
+
+    #[test]
+    fn fr_b08_webp_enumerates_folder_zip_and_cbz_without_mutating_sources() {
+        let root = temporary_root("webp-enumeration");
+        let comic = root.join("webp-comic");
+        fs::create_dir_all(&comic).unwrap();
+        fs::write(comic.join("10.webp"), b"ten").unwrap();
+        fs::write(comic.join("2.WEBP"), b"two").unwrap();
+        let zip = root.join("webp-volume.zip");
+        let cbz = root.join("webp-volume.cbz");
+        write_webp_archive(&zip);
+        write_webp_archive(&cbz);
+        let before = source_snapshot(&root);
+        let metadata_before = snapshot(&root);
+
+        let catalog = enumerate_folder(&root, &root).unwrap();
+        assert_eq!(
+            catalog
+                .iter()
+                .map(|entry| (entry.relative_path.to_string(), entry.kind))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "webp-comic".to_owned(),
+                    crate::domain::ItemKind::ComicFolder
+                ),
+                (
+                    "webp-volume.cbz".to_owned(),
+                    crate::domain::ItemKind::Archive
+                ),
+                (
+                    "webp-volume.zip".to_owned(),
+                    crate::domain::ItemKind::Archive
+                ),
+            ]
+        );
+        assert_eq!(
+            enumerate_folder_pages(&root, &comic)
+                .unwrap()
+                .into_iter()
+                .map(|page| page.to_string())
+                .collect::<Vec<_>>(),
+            ["webp-comic/2.WEBP", "webp-comic/10.webp"]
+        );
+        for archive in [&zip, &cbz] {
+            assert_eq!(
+                enumerate_archive_pages(archive)
+                    .unwrap()
+                    .into_iter()
+                    .map(|page| page.to_string())
+                    .collect::<Vec<_>>(),
+                ["chapter/2.WEBP", "chapter/10.webp"]
+            );
+        }
+
+        assert_eq!(source_snapshot(&root), before);
+        assert_eq!(snapshot(&root), metadata_before);
+        assert!(!root.join("chapter").exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -52,6 +52,7 @@ and report both the missing capability and the locations that were searched.
   `IMP-013`, `FUT-C-011`, and `QuickAccessOnly` resolve to the quick-access lane.
   `IMP-014`, `FUT-C-021`, and `FavoritePersistenceOnly` resolve to the favorite-
   persistence lane.
+  `IMP-015`, `FUT-C-005`, and `WebpOnly` resolve to the static-WebP lane.
   Each lane selects its own focused frontend file, optional exact test-name
   pattern, Rust filter, and product harness switch while sharing typecheck,
   frontend/SBOM generation, focused or
@@ -64,7 +65,9 @@ and report both the missing capability and the locations that were searched.
   `ExpectedFrontendPasses` count passes with zero failures. Atomic lanes configure
   one selected test; SearchOnly configures the five `FT-B05-*` tests, QuickAccessOnly
   configures `FT-B06-001`/`FT-B06-002` (two tests), and FavoritePersistenceOnly configures
-  `FT-B06-003`/`FT-B06-004`/`FT-B06-005` (three tests). Tests excluded
+  `FT-B06-003`/`FT-B06-004`/`FT-B06-005` (three tests). WebpOnly configures
+  `FT-B08-001` (one test) with the `fr_b08_webp_` Rust filter and `FT-B08-006`
+  release product switch. Tests excluded
   by the feature pattern are reported separately from selected functional skips.
 - Every verification run emits a final JSON result on success and failure. It
   records each stage's UTC start/end, elapsed seconds, and exit code, plus the
@@ -115,6 +118,11 @@ and report both the missing capability and the locations that were searched.
   across another restart, and restore the isolated library file/directory tree
   byte-identically. Schema-v1 migration and ambiguous/invalid candidates remain
   deterministic Rust contracts rather than product-UI injection.
+  The static-WebP product lane must use an isolated fixture to prove folder,
+  ZIP, and CBZ static WebP enumeration, `image/webp` viewer display, WIC-independent
+  thumbnail generation, corrupt/animated local recovery, and byte-identical
+  library file/directory restoration. It must not treat an installed Windows
+  Store WebP codec or a network download as a decoder dependency.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and

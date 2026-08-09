@@ -8,7 +8,8 @@ param(
     [switch]$RatingOnly,
     [switch]$SearchOnly,
     [switch]$QuickAccessOnly,
-    [switch]$FavoritePersistenceOnly
+    [switch]$FavoritePersistenceOnly,
+    [switch]$WebpOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,7 +42,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($FavoritePersistenceOnly) { "IMP-014" } elseif ($QuickAccessOnly) { "IMP-013" } elseif ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($WebpOnly) { "IMP-015" } elseif ($FavoritePersistenceOnly) { "IMP-014" } elseif ($QuickAccessOnly) { "IMP-013" } elseif ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -704,6 +705,56 @@ New-Item (Join-Path $library $longName) -ItemType Directory -Force | Out-Null
     New-Item (Join-Path $library ("scroll-folder-{0:D3}" -f $_)) `
         -ItemType Directory -Force | Out-Null
 }
+$webpFolder = Join-Path $library "0-webp-folder"
+$webpZip = Join-Path $library "0-webp-static.zip"
+$webpCbz = Join-Path $library "0-webp-static.cbz"
+if ($WebpOnly) {
+    $webpPayloads = [ordered]@{
+        "1-lossy.webp" = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
+        "2-lossless.webp" = "UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=="
+        "3-alpha.webp" = "UklGRkoAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAABQBAJ0BKgEAAQAAAP4AAA3AAP7mtQAAAA=="
+    }
+    New-Item $webpFolder -ItemType Directory -Force | Out-Null
+    foreach ($webpName in $webpPayloads.Keys) {
+        [IO.File]::WriteAllBytes(
+            (Join-Path $webpFolder $webpName),
+            [Convert]::FromBase64String($webpPayloads[$webpName])
+        )
+    }
+    $lossyBytes = [Convert]::FromBase64String($webpPayloads["1-lossy.webp"])
+    [byte[]]$corruptWebpBytes = $lossyBytes[0..19]
+    [IO.File]::WriteAllBytes((Join-Path $webpFolder "4-corrupt.webp"), $corruptWebpBytes)
+    [IO.File]::WriteAllBytes(
+        (Join-Path $webpFolder "5-animated.webp"),
+        [Convert]::FromBase64String("UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA")
+    )
+    [IO.File]::WriteAllBytes((Join-Path $webpFolder "6-recovery.webp"), $lossyBytes)
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    foreach ($archivePath in @($webpZip, $webpCbz)) {
+        $archive = [IO.Compression.ZipFile]::Open(
+            $archivePath,
+            [IO.Compression.ZipArchiveMode]::Create
+        )
+        try {
+            foreach ($webpName in $webpPayloads.Keys) {
+                $entry = $archive.CreateEntry($webpName, [IO.Compression.CompressionLevel]::Optimal)
+                $entryStream = $entry.Open()
+                try {
+                    $entryStream.Write(
+                        [Convert]::FromBase64String($webpPayloads[$webpName]),
+                        0,
+                        [Convert]::FromBase64String($webpPayloads[$webpName]).Length
+                    )
+                } finally {
+                    $entryStream.Dispose()
+                }
+            }
+        } finally {
+            $archive.Dispose()
+        }
+    }
+}
 $sourceFiles = @(
     (Join-Path $library "1-valid.cbz"),
     (Join-Path $library "2-corrupt.zip"),
@@ -717,6 +768,18 @@ $sourceFiles = @(
     (Join-Path $library "z-next-comic\2.png"),
     (Join-Path $library "z-next-comic\3.png")
 )
+if ($WebpOnly) {
+    $sourceFiles += @(
+        (Join-Path $webpFolder "1-lossy.webp"),
+        (Join-Path $webpFolder "2-lossless.webp"),
+        (Join-Path $webpFolder "3-alpha.webp"),
+        (Join-Path $webpFolder "4-corrupt.webp"),
+        (Join-Path $webpFolder "5-animated.webp"),
+        (Join-Path $webpFolder "6-recovery.webp"),
+        $webpZip,
+        $webpCbz
+    )
+}
 $before = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
 $beforeTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
     ForEach-Object {
@@ -739,6 +802,7 @@ $favoriteMovedArchive = Join-Path $favoriteMovedDirectory "1-valid.cbz"
 $favoriteMissingComic = Join-Path $evidenceRoot "missing-comic-folder"
 $favoriteMovedArchiveActive = $false
 $favoriteMissingComicActive = $false
+$expectedRootEntryCount = if ($WebpOnly) { 130 } else { 127 }
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
@@ -771,12 +835,12 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+        "document.querySelector('.status-bar span')?.textContent.startsWith('$expectedRootEntryCount') && " +
         "document.querySelector('#address').value.endsWith('\\library') && " +
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
-    if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly) {
+    if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly) {
         Wait-Evaluate (
             "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
             "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
@@ -785,6 +849,124 @@ try {
             "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
             ".every((image) => image.complete && image.naturalWidth > 0)"
         ) "cold thumbnail image decode"
+    }
+    if ($WebpOnly) {
+        $webpItems = @(
+            [pscustomobject]@{ Path = "0-webp-folder"; DisplayName = "0-webp-folder"; PageCount = 6 },
+            [pscustomobject]@{ Path = "0-webp-static.zip"; DisplayName = "0-webp-static.zip"; PageCount = 3 },
+            [pscustomobject]@{ Path = "0-webp-static.cbz"; DisplayName = "0-webp-static.cbz"; PageCount = 3 }
+        )
+        $webpPathsJson = @($webpItems.Path) | ConvertTo-Json -Compress
+        Wait-Evaluate (
+            "(() => { const paths = $webpPathsJson; return paths.every((path) => " +
+            "document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]') !== null); })()"
+        ) "webp folder ZIP and CBZ enumeration"
+        Wait-Evaluate (
+            "(() => { const paths = $webpPathsJson; return paths.every((path) => { " +
+            "const item = document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]'); " +
+            "const image = item?.closest('.catalog-cell')?.querySelector('.thumbnail img'); " +
+            "return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0; }); })()"
+        ) "webp thumbnail decode and cache generation"
+        foreach ($webpItem in $webpItems) {
+            $webpPathJson = $webpItem.Path | ConvertTo-Json -Compress
+            $webpDisplayNameJson = $webpItem.DisplayName | ConvertTo-Json -Compress
+            Invoke-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $webpPathJson); " +
+                "if (!item) return false; item.click(); " +
+                "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+            ) | Out-Null
+            Wait-Evaluate (
+                "document.querySelector('.viewer .viewer-toolbar strong')?.textContent === " +
+                "$webpDisplayNameJson"
+            ) "webp viewer open $($webpItem.Path)"
+            for ($page = 1; $page -le 3; $page++) {
+                Wait-Evaluate (
+                    "document.querySelector('.viewer-toolbar span:last-of-type')?.textContent.startsWith('$page / $($webpItem.PageCount)') && " +
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
+                ) "webp viewer $($webpItem.Path) static page $page dimensions"
+                if ($page -lt 3) {
+                    Invoke-Evaluate "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true" |
+                        Out-Null
+                }
+            }
+            if ($webpItem.Path -eq "0-webp-folder") {
+                Invoke-Evaluate "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true" |
+                    Out-Null
+                Wait-Evaluate (
+                    "document.querySelector('.page-error[role=alert]')?.textContent.includes('4-corrupt.webp')"
+                ) "webp corrupt local error"
+                $advancedPastCorrupt = Invoke-Evaluate (
+                    "(() => { const button = document.querySelector(" +
+                    "'[data-product-id=viewer-error-next]'); if (!button || button.disabled) return false; " +
+                    "button.click(); return true; })()"
+                )
+                if (!$advancedPastCorrupt) {
+                    throw "WebP product gate could not advance past the corrupt page."
+                }
+                Wait-Evaluate (
+                    "document.querySelector('.page-error[role=alert]')?.textContent.includes('5-animated.webp')"
+                ) "webp animated local error"
+                $advancedPastAnimated = Invoke-Evaluate (
+                    "(() => { const button = document.querySelector(" +
+                    "'[data-product-id=viewer-error-next]'); if (!button || button.disabled) return false; " +
+                    "button.click(); return true; })()"
+                )
+                if (!$advancedPastAnimated) {
+                    throw "WebP product gate could not advance past the animated page."
+                }
+                Wait-Evaluate (
+                    "document.querySelector('.viewer-toolbar span:last-of-type')?.textContent.startsWith('6 / 6') && " +
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
+                ) "webp local error next recovery"
+            }
+            Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+            Wait-Evaluate "document.querySelector('.viewer') === null" "webp viewer close $($webpItem.Path)"
+        }
+        Stop-Product $cold
+        $cold = $null
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('$expectedRootEntryCount')"
+        ) "webp thumbnail cache restart catalog"
+        Wait-Evaluate (
+            "(() => { const paths = $webpPathsJson; return paths.every((path) => " +
+            "document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]')?.closest('.catalog-cell')" +
+            ".querySelector('.thumbnail[data-cache-hit=true] img')?.naturalWidth > 0); })()"
+        ) "webp thumbnail cache hit"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "WebP product harness changed source files."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "WebP product harness changed the source tree or created adjacent files."
+        }
+        $afterDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if (Compare-Object $beforeDirectories $afterDirectories) {
+            throw "WebP product harness changed the source directory tree."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B08-006"
+            folderZipCbzEnumerated = $true
+            viewerStaticLossyLosslessAlphaDecoded = $true
+            comicCoverThumbnailCacheVerified = $true
+            corruptLocalErrorRecovered = $true
+            animatedLocalErrorRecovered = $true
+            otherComicRecovered = $true
+            networkOrCodecInstall = $false
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
     }
     if ($SearchOnly) {
         Invoke-Evaluate @"

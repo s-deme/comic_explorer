@@ -25,7 +25,7 @@ WindowsのPowerShellから、プロジェクトルートで実行する。
 .\.venv-windows\Scripts\python.exe tests/fixtures/validate_fixtures.py tests/fixtures/generated
 ```
 
-Pythonの外部パッケージは使わない。PNGはPython標準ライブラリだけで生成する。JPEGはサポート対象Windowsに同梱される PowerShell と `System.Drawing` で、同じラベル付きPNGから変換する。対応Windows以外でPowerShellを利用できない場合はJPEG生成を明示的に失敗させ、不完全なフィクスチャを成功扱いしない。
+Pythonの外部パッケージは使わない。PNGはPython標準ライブラリだけで生成する。JPEGはサポート対象Windowsに同梱される PowerShell と `System.Drawing` で、同じラベル付きPNGから変換する。WebPは固定の合成base64 payloadをPython標準ライブラリだけで復元し、encoder・download・外部画像を使わない。対応Windows以外でPowerShellを利用できない場合はJPEG生成を明示的に失敗させ、不完全なフィクスチャを成功扱いしない。
 
 `--force` は指定した出力ディレクトリだけを置換する。既定はこのREADMEと同じ場所の `generated/` である。性能版は10,000個超のファイルを作るため通常実行から分離した。
 
@@ -48,7 +48,7 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 | --- | --- | --- | --- |
 | FIX-ORDER-001 | 基本自然順 | `1.jpg, 2.jpg, 10.jpg`／`1.jpg` | なし |
 | FIX-ORDER-002 | 先頭ゼロと数値同値 | `001.png, 01.png, 1.png, 2.png`／`001.png` | 数値同値は正規化前UTF-16序数 |
-| FIX-ORDER-003 | 大小文字と混在形式 | `2.PNG, PAGE3.JPEG, PAGE10.JPG`／`2.PNG` | `.txt`, `.webp`はページ外 |
+| FIX-ORDER-003 | 大小文字と混在形式 | `2.PNG, PAGE3.JPEG, PAGE10.JPG`／`2.PNG` | `.txt`, `.webpx`はページ外 |
 | FIX-ORDER-004 | 日本語、ASCII、全角数字、NFC/NFD | `ASCII2.png, é.png, é.png, 全角２.png, 日本語10.png`／`ASCII2.png` | Unicode正規化なし。Windowsで共存不能な組はUnit文字列入力としても利用 |
 | FIX-NESTED-001 | 再帰相対パス | `1.png, chapter/2.png, chapter/10.png, chapter/deep/11.png`／`1.png` | `.hidden*`は除外 |
 | FIX-IMAGE-001 | 縦JPEG/PNG、横JPEG/PNG、正方形、高解像度、1×1 | マニフェスト記載／`portrait.jpg` | 幅>高さだけ横長。EXIF Orientationは要件外で未収録 |
@@ -57,6 +57,7 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 | FIX-ZIP-ERROR-001 | 空、画像なし、破損、暗号化フラグ、Zip Slip | なし | `empty`, `no-images`, `corrupt`, `encrypted`, `unsafe-entry`に分類 |
 | FIX-LIBRARY-001 | 通常／漫画folder、ZIP/CBZ、未対応書庫、空、深い階層、長名、同値metadata | 項目sort規則による | 漫画folderはEnterで移動、明示的な`読む`で閲覧 |
 | FIX-READING-001 | 12ページのfolder/ZIP/CBZ、保存・追加・削除 | `page1.png`〜`page12.png`／`page1.png` | 保存はpage7。同距離近傍は後方候補を優先 |
+| FIX-WEBP-001 | static WebP folder/ZIP/CBZ | `1-lossy.webp, 2-lossless.webp, 3-alpha.webp`／`1-lossy.webp` | fixed 1×1 lossy/lossless/alpha。正常系は`folder/`のみ、negativeは別の`errors/4-corrupt.webp`・`errors/5-animated.webp` |
 | FIX-PERFORMANCE-001 | 1,000／10,000項目、300ページfolder/CBZ | 数字3桁の自然順 | `--include-performance`時だけ生成 |
 
 ## 原本改変検出

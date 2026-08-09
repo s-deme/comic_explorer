@@ -336,7 +336,7 @@ export function Viewer({
         <h2>画像を読み込めません</h2>
         <p>{page.relativePath}</p>
         <button onClick={() => dispatch({ type: "previous" })}>前ページ</button>
-        <button onClick={next}>次ページ</button>
+        <button data-product-id="viewer-error-next" onClick={next}>次ページ</button>
         <button onClick={close}>一覧へ戻る</button>
       </div>
     ) : mediaUris[index] ? (
