@@ -54,6 +54,8 @@ interface ViewerProps {
   fullscreenAdapter?: FullscreenAdapter;
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
+  detached?: boolean;
+  onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
   onNextBookmark?: (index: number) => number | null;
 }
@@ -86,6 +88,8 @@ export function Viewer({
   fullscreenAdapter = tauriFullscreenAdapter,
   bookmarks = [],
   onPageChange,
+  detached = false,
+  onToggleDetached,
   onSaveBookmark,
   onNextBookmark,
 }: ViewerProps) {
@@ -304,6 +308,7 @@ export function Viewer({
       switch (command) {
         case "closeViewer":
           if (fullscreen) void requestFullscreen(false);
+          else if (detached) onToggleDetached?.();
           else void close();
           break;
         case "nextPage":
@@ -487,6 +492,14 @@ export function Viewer({
           onClick={jumpToNextBookmark}
         >
           次のしおり
+        </button>
+        <button
+          type="button"
+          aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
+          aria-pressed={detached}
+          onClick={onToggleDetached}
+        >
+          {detached ? "表示を統合" : "表示を分離"}
         </button>
         <button
           ref={fullscreenButtonRef}

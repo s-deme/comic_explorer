@@ -92,6 +92,12 @@ import {
 } from "./features/catalog/view-mode";
 import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
+  restoreWorkspaceDisplay,
+  shellGridRows,
+  trayRuntimeAvailable,
+  workspaceGridColumns,
+} from "./features/workspace/display";
+import {
   addBookshelfItem,
   listBookmarks,
   listBookshelf,
@@ -247,6 +253,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [endOfVolumePolicy, setEndOfVolumePolicy] =
     useState<EndOfVolumePolicy>("auto_next");
   const endOfVolumePolicyRef = useRef<EndOfVolumePolicy>("auto_next");
+  const endOfVolumePolicyRevision = useRef(0);
+  const endOfVolumePolicyUserChanged = useRef(false);
   const [endOfVolumeNotice, setEndOfVolumeNotice] = useState<string | null>(null);
   const [pendingEndOfVolume, setPendingEndOfVolume] =
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
@@ -269,6 +277,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(240);
+  const [treeVisible, setTreeVisible] = useState(true);
+  const [menuBarVisible, setMenuBarVisible] = useState(true);
+  const [toolbarVisible, setToolbarVisible] = useState(true);
+  const [viewerDetached, setViewerDetached] = useState(false);
+  const [trayStored, setTrayStored] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState(false);
@@ -305,6 +318,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
+  const trayApiAvailable =
+    trayRuntimeAvailable(typeof window === "undefined" ? undefined : window);
 
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
     const next = action === "toggle"
@@ -395,6 +410,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   useEffect(() => {
     settingsGeneration.current += 1;
     const settingsRequestGeneration = settingsGeneration.current;
+    const policyRevisionAtRequest = endOfVolumePolicyRevision.current;
     void getCatalogSettings(settingsRequestGeneration)
       .then((response) => {
         if (settingsRequestGeneration !== settingsGeneration.current) return;
@@ -404,11 +420,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           setCatalogViewMode(
             normalizeCatalogViewMode(response.data.catalogViewMode),
           );
-          const restoredEndOfVolumePolicy = normalizeEndOfVolumePolicy(
-            response.data.endOfVolumePolicy,
-          );
-          endOfVolumePolicyRef.current = restoredEndOfVolumePolicy;
-          setEndOfVolumePolicy(restoredEndOfVolumePolicy);
+          if (
+            !endOfVolumePolicyUserChanged.current &&
+            policyRevisionAtRequest === endOfVolumePolicyRevision.current
+          ) {
+            const restoredEndOfVolumePolicy = normalizeEndOfVolumePolicy(
+              response.data.endOfVolumePolicy,
+            );
+            endOfVolumePolicyRef.current = restoredEndOfVolumePolicy;
+            setEndOfVolumePolicy(restoredEndOfVolumePolicy);
+          }
           setViewMode(response.data.viewMode);
           setLayoutMode(normalizeViewerLayoutMode(response.data.layoutMode));
           setReadingDirection(response.data.readingDirection);
@@ -1312,7 +1333,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       ? []
       : Array.from(
           menu.querySelectorAll<HTMLButtonElement>(
-            '[role="menuitem"], [role="menuitemradio"]',
+          '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]',
           ),
         );
   }
@@ -1332,7 +1353,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (menu === null) return;
     menu
       .querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"], [role="menuitemradio"]',
+        '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]',
       )
       .forEach((candidate) => {
         candidate.tabIndex = candidate === item ? 0 : -1;
@@ -1443,6 +1464,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   function changeEndOfVolumePolicy(policy: EndOfVolumePolicy) {
+    endOfVolumePolicyUserChanged.current = true;
+    endOfVolumePolicyRevision.current += 1;
     endOfVolumePolicyRef.current = policy;
     setEndOfVolumePolicy(policy);
     settingsGeneration.current += 1;
@@ -1497,6 +1520,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setMetadataNotice(null);
     setBookmarks([]);
     setBookmarkNotice(null);
+    setViewerDetached(false);
   }
 
   function openComicEntry(entry: CatalogEntry) {
@@ -1547,7 +1571,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   if (viewerSession !== null) {
     return (
-      <div className="viewer-shell">
+      <div
+        className={viewerDetached ? "viewer-shell viewer-shell--detached" : "viewer-shell"}
+        data-viewer-detached={viewerDetached}
+      >
         <Viewer
           key={viewerSession.itemKey}
           session={viewerSession}
@@ -1583,6 +1610,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onNextItem={handleEndOfVolume}
           bookmarks={bookmarks}
           onPageChange={() => undefined}
+          detached={viewerDetached}
+          onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}
           onNextBookmark={(index) => nextBookmark(bookmarks, index)?.pageIndex ?? null}
         />
@@ -1685,14 +1714,34 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     );
   }
 
+  if (trayStored) {
+    return (
+      <main className="tray-shell" aria-label="タスクトレイ収納">
+        <h1>Comic Explorer</h1>
+        <p>アプリケーションをタスクトレイへ収納しました。</p>
+        <button type="button" onClick={() => setTrayStored(false)}>
+          アプリを復帰
+        </button>
+      </main>
+    );
+  }
+
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      style={{
+        gridTemplateRows: shellGridRows({ menuBarVisible, toolbarVisible }),
+      }}
+      data-menu-visible={menuBarVisible}
+      data-toolbar-visible={toolbarVisible}
+      data-tree-visible={treeVisible}
+    >
       {recoveryNotice && (
         <p className="recovery-notice" role="status">
           アプリデータを再初期化しました。漫画ファイルは変更していません。
         </p>
       )}
-      <nav
+      {menuBarVisible && <nav
         ref={menuBarRef}
         className="menu-bar"
         aria-label="メニューバー"
@@ -2042,6 +2091,38 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 降順
               </button>
               <div className="menu-separator" role="separator" />
+              <span className="menu-heading">ワークスペース</span>
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={treeVisible}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => setTreeVisible((current) => !current))}
+              >
+                フォルダツリー {treeVisible ? "を隠す" : "を表示"}
+              </button>
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={toolbarVisible}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => setToolbarVisible((current) => !current))}
+              >
+                ツールバー {toolbarVisible ? "を隠す" : "を表示"}
+              </button>
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={menuBarVisible}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => setMenuBarVisible((current) => !current))}
+              >
+                メニューバー {menuBarVisible ? "を隠す" : "を表示"}
+              </button>
+              <div className="menu-separator" role="separator" />
               <span className="menu-heading">一覧形式</span>
               {CATALOG_VIEW_MODES.filter((mode) => mode !== "reference_tile").map((mode) => (
                 <button
@@ -2231,8 +2312,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             </div>
           )}
         </div>
-      </nav>
-      <div className="toolbar" aria-label="ナビゲーション">
+      </nav>}
+      {toolbarVisible && <div className="toolbar" aria-label="ナビゲーション">
         <button
           disabled={navigation.back.length === 0}
           onClick={() => {
@@ -2358,7 +2439,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           {sortDescending ? "降順 ▼" : "昇順 ▲"}
         </button>
-      </div>
+      </div>}
       {(diagnosticsOpen || diagnosticsLoading || diagnosticNotice !== null) && (
         <section
           className="diagnostic-panel"
@@ -2465,6 +2546,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
         />
         <button type="submit">移動</button>
+        <button
+          type="button"
+          data-product-id="workspace-restore-controls"
+          onClick={() => {
+            const restored = restoreWorkspaceDisplay();
+            setTreeVisible(restored.treeVisible);
+            setToolbarVisible(restored.toolbarVisible);
+            setMenuBarVisible(restored.menuBarVisible);
+          }}
+        >
+          UIを表示
+        </button>
+        <button
+          type="button"
+          data-product-id="task-tray-toggle"
+          disabled={!trayApiAvailable}
+          title={trayApiAvailable ? "タスクトレイへ収納" : "この実行環境ではタスクトレイAPIを利用できません"}
+          onClick={() => {
+            if (trayApiAvailable) setTrayStored(true);
+          }}
+        >
+          タスクトレイへ収納
+        </button>
       </form>
       <form className="search-bar" aria-label="名前検索フォーム" onSubmit={submitSearch}>
         <label htmlFor="catalog-search">名前検索</label>
@@ -2499,36 +2603,42 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       </form>
       <div
         className="workspace"
-        style={{ gridTemplateColumns: `${treeWidth}px 6px minmax(0, 1fr)` }}
+        style={{
+          gridTemplateColumns: workspaceGridColumns(treeVisible, treeWidth),
+        }}
       >
-        <FolderTree
-          libraryRoot={libraryRoot}
-          currentPath={navigation.current}
-          onNavigate={(path) => navigate(path)}
-        />
-        <div
-          className="tree-splitter"
-          role="separator"
-          aria-label="フォルダツリーの幅"
-          aria-orientation="vertical"
-          aria-valuemin={180}
-          aria-valuenow={treeWidth}
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-              event.preventDefault();
-              setTreeWidth((width) =>
-                Math.max(180, width + (event.key === "ArrowLeft" ? -10 : 10)),
-              );
-            }
-          }}
-          onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
-          onPointerMove={(event) => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              setTreeWidth(Math.max(180, event.clientX));
-            }
-          }}
-        />
+        {treeVisible && (
+          <>
+            <FolderTree
+              libraryRoot={libraryRoot}
+              currentPath={navigation.current}
+              onNavigate={(path) => navigate(path)}
+            />
+            <div
+              className="tree-splitter"
+              role="separator"
+              aria-label="フォルダツリーの幅"
+              aria-orientation="vertical"
+              aria-valuemin={180}
+              aria-valuenow={treeWidth}
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                  event.preventDefault();
+                  setTreeWidth((width) =>
+                    Math.max(180, width + (event.key === "ArrowLeft" ? -10 : 10)),
+                  );
+                }
+              }}
+              onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
+              onPointerMove={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  setTreeWidth(Math.max(180, event.clientX));
+                }
+              }}
+            />
+          </>
+        )}
         <section className="catalog-pane" aria-busy={loadState.status === "loading"}>
           {searchState.status === "loading" && (
             <p className="loading-state" role="status">

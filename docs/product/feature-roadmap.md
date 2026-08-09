@@ -61,7 +61,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Done` |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Done` |
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Done` |
-| P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Planned`（Windows lifecycle要件待ち） |
+| P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Done` |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Planned`（設定scope確定待ち） |
 | P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial`（WebP完了、残件はCandidate） |
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned`（license・fixture確認待ち） |
@@ -661,7 +661,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B18 — workspace・window（Batch 18 / P6）
 
-- **状態:** `Planned`。Windows lifecycleの製品要件と検証環境を確定してから採用する。
+- **状態:** `Done`。表示surfaceの可逆切替、viewer分離、task tray APIの安全な利用可否表示を実装し、
+  focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-062` pane表示切替、(2) `FUT-C-063` bar・menu表示切替、
   (3) `FUT-C-060`画像表示領域の分離、(4) `FUT-C-061`task tray収納。
 - **優先理由:** 同一window内の可逆な表示切替を先に作り、別window・trayのfocus、復帰、fullscreen、
@@ -669,6 +670,14 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **採用gate:** 常に戻せる導線、複数windowのowner、B14の終了menuとの相互作用を要件化し、
   release WebView2で直接観測する。B18単独では表示状態をcurrent sessionに限定し、永続化・profile
   schemaはB19で一度だけ設計する。
+
+#### FR-B18 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow)。
+- **実装根拠:** `src/App.tsx`、`src/features/workspace/display.ts`、
+  `src/features/workspace/display.test.ts`、`src/features/viewer/Viewer.tsx`、`src/styles.css`。
+- **直接観測:** [FR-B18 focused test結果](../testing/fr-b18-results.md)。pane/bar/menuのcurrent-session切替、
+  viewer分離とEsc復帰、tray APIなし時のdisabled境界を確認した。
 
 ### FR-B19 — 設定・help（Batch 19 / P7）
 

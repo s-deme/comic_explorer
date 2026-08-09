@@ -114,10 +114,10 @@ codd:
 | 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Implemented / PASS | Done | menuとtoolbarの共通command IAを実装・実測 |
 | 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Implemented / PASS | Done | accessible icon command toolbarを実装・実測 |
 | 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Implemented / PASS | Done | reference_tile view modeを実装・実測 |
-| 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Candidate / NOT TESTED | Candidate | 対象pane、current-session表示状態、keyboard導線を決定 |
-| 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Candidate / NOT TESTED | Candidate | 対象bar、current-session復帰導線を決定。永続化はB19へ送る |
-| 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Candidate / NOT TESTED | Candidate | 分離方式、lifecycle、focus、fullscreen、復帰を要件化 |
-| 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Candidate / NOT TESTED | Candidate | tray lifecycle、自動常駐、終了との区別を決定 |
+| 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Implemented / PASS | Done | folder treeのcurrent-session表示切替と復帰導線を実装・実測 |
+| 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Implemented / PASS | Done | menu/toolbarの表示切替と復帰導線を実装・実測。永続化はB19へ送る |
+| 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Implemented / PASS | Done | viewerのcurrent-session分離表示、Esc復帰を実装・実測 |
+| 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Implemented / PASS | Done | tray API可否の安全なdisabled境界と収納状態UIを実装・実測 |
 | 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Candidate / NOT TESTED | Candidate | 統合対象、分類、適用・取消、永続化を要件化 |
 | 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Candidate / NOT TESTED | Candidate | format、save/load/switch、migration、安全な除外項目を決定 |
 | 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Candidate / NOT TESTED | Candidate | 対象操作、device、context、conflict解決を決定 |

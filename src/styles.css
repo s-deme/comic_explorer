@@ -47,6 +47,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 100vh;
   background: #fff;
 }
+.app-shell[data-menu-visible="false"],
+.app-shell[data-toolbar-visible="false"] {
+  overflow: hidden;
+}
+.tray-shell {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 12px;
+  padding: 32px;
+  background: #f5f6f8;
+  text-align: center;
+}
+.tray-shell h1 { margin: 0; }
 .menu-bar, .toolbar, .address-bar, .search-bar, .status-bar {
   display: flex;
   align-items: center;
@@ -148,6 +162,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .search-bar label { font-size: .82rem; }
 
 .workspace { display: grid; min-height: 0; }
+.viewer-shell--detached {
+  position: fixed;
+  z-index: 20;
+  inset: 12px;
+  overflow: auto;
+  border: 2px solid #4f83bd;
+  background: #f4f8fc;
+  box-shadow: 0 16px 48px #16283c55;
+}
+.viewer-shell--detached .viewer { min-height: calc(100vh - 28px); }
 .folder-tree {
   position: relative;
   overflow: auto;
