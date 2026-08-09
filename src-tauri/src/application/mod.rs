@@ -2496,6 +2496,8 @@ fn page_mime_type(page: &RelativePath) -> &'static str {
     {
         Some("png") => "image/png",
         Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("avif") => "image/avif",
         _ => "image/jpeg",
     }
 }
@@ -2575,6 +2577,14 @@ mod shutdown_tests {
         assert_eq!(
             page_mime_type(&RelativePath::parse("chapter/01.WEBP").unwrap()),
             "image/webp"
+        );
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/02.GIF").unwrap()),
+            "image/gif"
+        );
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/03.AVIF").unwrap()),
+            "image/avif"
         );
     }
 

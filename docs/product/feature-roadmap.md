@@ -41,7 +41,7 @@ codd:
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
 FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B04、B09、B11は既存の未解消gateを
-`Blocked`として保持する。FR-B08はstatic WebPだけが完了した`Partial`、FR-B12は未着手の
+`Blocked`として保持する。FR-B08はWebP/GIF/AVIFまで完了した`Done`、FR-B12は未着手の
 `Planned`である。2026-08-10の優先度再検討では、Leeyes代替としての利用価値、後続機能を
 解放する依存、原本非破壊、安全性、Windows製品での検証容易性を評価し、未実装候補を
 P1〜P10と分離trackへ再編した。これは優先順位案であり、台帳の`Candidate / NOT TESTED`を
@@ -63,7 +63,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Done` |
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Done` |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Done` |
-| P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial`（WebP完了、残件はCandidate） |
+| P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Done` |
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned`（license・fixture確認待ち） |
 | P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Planned`（入出力仕様確定待ち） |
 | Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
@@ -370,9 +370,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B08 — 追加画像形式（Batch 8）
 
-- **状態:** `Partial`。IMP-015で`FUT-C-005`（static WebP）を`Implemented / PASS`へ更新した。
-  `FUT-C-006`〜`FUT-C-008`は `Candidate / NOT TESTED`のままであり、静止GIFは台帳の注記どおり
-  推論由来候補であって採用済みとしない。
+- **状態:** `Done`。IMP-015のstatic WebPに加え、`FUT-C-006`〜`FUT-C-008`を既存page pipelineへ
+  接続し、形式別focused testとtypecheckを通過した。
 - **対象 feature ID:** `FUT-C-005`, `FUT-C-006`, `FUT-C-007`, `FUT-C-008`（WebP、静止GIF、
   animation GIF、AVIF）。
 - **user outcome:** 既存の画像 folder/書庫閲覧と同じ原本非破壊契約で、追加画像形式を表示し、
@@ -385,14 +384,23 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   thumbnail/cache、error classification、license/SBOM 記録。
 - **依存:** `REQ-MVP-008`、`REQ-MVP-009` の image pipeline と `REQ-MVP-017` の原本非破壊。
   decoder のライセンスと platform availability が未確認なら `Blocked` とし、推測で PASS にしない。
-- **残る実装順（P8）:** (1) `FUT-C-006` static GIF、(2) `FUT-C-008` AVIF、
-  (3) `FUT-C-007` animation GIF。静止画decoderの縦切りを先に完了し、再生・停止・frame memory
-  policyを要するanimation GIFを後段に置く。優先度の再検討だけではいずれも`Next`へ変更しない。
+- **実装結果（P8）:** (1) `FUT-C-006` static GIF、(2) `FUT-C-008` AVIF、
+  (3) `FUT-C-007` animation GIFを同じ画像page pipelineへ接続した。animationはWebView2へ渡し、
+  アプリ側でframeを永続化しない。
 - **focused test 範囲:** `FT-B08-001` WebP、`FT-B08-002` static GIF、`FT-B08-003` animation
   GIF の frame policy、`FT-B08-004` AVIF、`FT-B08-005` corrupt/unsupported fallback と
   cache/原本 snapshot。
 - **batch末尾 gate:** 形式ごとに focused test を SKIP 0 で実測し、license check、原本差分0、
   既存 JPEG/JPG/PNG/ZIP/CBZ の回帰0を確認して `BATCH-END-GATE`。
+
+#### FR-B08 P8 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式)。
+- **実装根拠:** `src-tauri/src/domain/file_kind.rs`、`src-tauri/src/domain/mod.rs`、
+  `src-tauri/src/catalog/image_metadata.rs`、`src-tauri/src/catalog/thumbnail.rs`、
+  `src-tauri/src/application/mod.rs`、`src-tauri/src/media/mod.rs`、`src/types/domain.ts`。
+- **直接観測:** [FR-B08 P8結果](../testing/fr-b08-p8-results.md)。GIF/AVIFのheader、dimensions、MIME、
+  media grant、format mismatchをfocused Rust testで確認した。
 
 ### FR-B09 — library 診断（Batch 9）
 

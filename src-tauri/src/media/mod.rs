@@ -134,6 +134,13 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
         "image/webp" => {
             bytes.starts_with(b"RIFF") && bytes.get(8..12).is_some_and(|format| format == b"WEBP")
         }
+        "image/gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "image/avif" => {
+            bytes.get(4..8).is_some_and(|kind| kind == b"ftyp")
+                && bytes
+                    .get(8..12)
+                    .is_some_and(|brand| brand == b"avif" || brand == b"avis")
+        }
         _ => false,
     };
     if !signature_valid {

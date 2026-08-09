@@ -123,9 +123,9 @@ codd:
 | 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Implemented / PASS | Done | swipe/double-clickとcommand conflict拒否を実装・実測 |
 | 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Implemented / PASS | Done | offlineの操作説明を既存helpへ統合・実測 |
 | 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Implemented / PASS | Done | version/runtime/license noticeを表示・実測 |
-| 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
-| 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |
-| 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |
+| 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Implemented / PASS | Done | GIF metadata/signature/alphaを既存page pipelineへ接続・実測 |
+| 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Implemented / PASS | Done | AVIF ftyp/ispe metadata、MIME、grantを接続・実測 |
+| 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Implemented / PASS | Done | WebView2へanimation GIFを渡しframeを永続化しない境界を実測 |
 | 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
 | 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
 | 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Candidate / NOT TESTED | Candidate | 管理対象、操作範囲、実行中状態を参照仕様から確認 |

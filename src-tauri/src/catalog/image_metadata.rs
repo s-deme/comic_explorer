@@ -41,6 +41,12 @@ pub fn inspect_image<R: Read + Seek>(
         inspect_jpeg(reader)?
     } else if signature.starts_with(b"RIFF") && &signature[8..12] == b"WEBP" {
         inspect_webp(reader, compressed_size)?
+    } else if signature.starts_with(b"GIF87a") || signature.starts_with(b"GIF89a") {
+        inspect_gif(reader, compressed_size)?
+    } else if &signature[4..8] == b"ftyp"
+        && (signature[8..12] == *b"avif" || signature[8..12] == *b"avis")
+    {
+        inspect_avif(reader, compressed_size)?
     } else {
         return Err(error(
             ErrorCode::CorruptImage,
@@ -49,6 +55,77 @@ pub fn inspect_image<R: Read + Seek>(
     };
     validate_dimensions(metadata)?;
     Ok(metadata)
+}
+
+fn inspect_gif<R: Read + Seek>(
+    reader: &mut R,
+    compressed_size: u64,
+) -> Result<ImageMetadata, AppError> {
+    if compressed_size < 13 {
+        return Err(error(ErrorCode::CorruptImage, "GIF header is truncated."));
+    }
+    reader
+        .seek(SeekFrom::Start(0))
+        .map_err(|_| error(ErrorCode::CorruptImage, "GIF stream is not seekable."))?;
+    let mut bytes = Vec::new();
+    reader
+        .take(compressed_size)
+        .read_to_end(&mut bytes)
+        .map_err(|_| error(ErrorCode::CorruptImage, "GIF stream is truncated."))?;
+    if bytes.len() < 13 || !(bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")) {
+        return Err(error(ErrorCode::CorruptImage, "GIF signature is invalid."));
+    }
+    Ok(ImageMetadata {
+        format: ImageFormat::Gif,
+        width: u16::from_le_bytes([bytes[6], bytes[7]]) as u32,
+        height: u16::from_le_bytes([bytes[8], bytes[9]]) as u32,
+        has_alpha: bytes.windows(2).any(|window| window == [0x21, 0xf9]),
+    })
+}
+
+fn inspect_avif<R: Read + Seek>(
+    reader: &mut R,
+    compressed_size: u64,
+) -> Result<ImageMetadata, AppError> {
+    if compressed_size < 16 {
+        return Err(error(
+            ErrorCode::CorruptImage,
+            "AVIF ftyp box is truncated.",
+        ));
+    }
+    reader
+        .seek(SeekFrom::Start(0))
+        .map_err(|_| error(ErrorCode::CorruptImage, "AVIF stream is not seekable."))?;
+    let mut bytes = Vec::new();
+    reader
+        .take(compressed_size)
+        .read_to_end(&mut bytes)
+        .map_err(|_| error(ErrorCode::CorruptImage, "AVIF stream is truncated."))?;
+    let valid_brand = bytes
+        .get(8..12)
+        .is_some_and(|brand| brand == b"avif" || brand == b"avis");
+    if bytes.get(4..8) != Some(b"ftyp") || !valid_brand {
+        return Err(error(
+            ErrorCode::CorruptImage,
+            "AVIF ftyp signature is invalid.",
+        ));
+    }
+    let ispe = bytes
+        .windows(4)
+        .position(|window| window == b"ispe")
+        .ok_or_else(|| error(ErrorCode::CorruptImage, "AVIF ispe dimensions are missing."))?;
+    if ispe.checked_add(16).is_none_or(|end| end > bytes.len()) {
+        return Err(error(
+            ErrorCode::CorruptImage,
+            "AVIF ispe dimensions are truncated.",
+        ));
+    }
+    Ok(ImageMetadata {
+        format: ImageFormat::Avif,
+        width: u32::from_be_bytes(bytes[ispe + 8..ispe + 12].try_into().unwrap()),
+        height: u32::from_be_bytes(bytes[ispe + 12..ispe + 16].try_into().unwrap()),
+        has_alpha: false,
+    })
 }
 
 fn png_has_alpha<R: Read + Seek>(reader: &mut R) -> Result<bool, AppError> {
@@ -509,6 +586,32 @@ mod tests {
         bytes
     }
 
+    fn gif(transparency: bool) -> Vec<u8> {
+        let mut bytes = b"GIF89a".to_vec();
+        bytes.extend_from_slice(&2_u16.to_le_bytes());
+        bytes.extend_from_slice(&3_u16.to_le_bytes());
+        bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+        if transparency {
+            bytes.extend_from_slice(&[0x21, 0xf9, 0x04, 0x01, 0, 0, 0, 0]);
+        }
+        bytes.push(0x3b);
+        bytes.resize(32, 0);
+        bytes
+    }
+
+    fn avif() -> Vec<u8> {
+        let mut bytes = vec![0, 0, 0, 24];
+        bytes.extend_from_slice(b"ftypavif");
+        bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]);
+        bytes.extend_from_slice(&[0, 0, 0, 20]);
+        bytes.extend_from_slice(b"ispe");
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        bytes.extend_from_slice(&320_u32.to_be_bytes());
+        bytes.extend_from_slice(&480_u32.to_be_bytes());
+        bytes.resize(40, 0);
+        bytes
+    }
+
     #[test]
     fn reads_png_dimensions_without_decoding_pixels() {
         let png = png(2, &[]);
@@ -516,6 +619,37 @@ mod tests {
             inspect_image(&mut Cursor::new(&png), png.len() as u64).unwrap(),
             ImageMetadata {
                 format: ImageFormat::Png,
+                width: 320,
+                height: 480,
+                has_alpha: false,
+            }
+        );
+    }
+
+    #[test]
+    fn fr_b08_gif_accepts_static_and_transparent_animation_headers() {
+        assert_eq!(
+            inspect_image(&mut Cursor::new(gif(false)), 32).unwrap(),
+            ImageMetadata {
+                format: ImageFormat::Gif,
+                width: 2,
+                height: 3,
+                has_alpha: false,
+            }
+        );
+        assert!(
+            inspect_image(&mut Cursor::new(gif(true)), 32)
+                .unwrap()
+                .has_alpha
+        );
+    }
+
+    #[test]
+    fn fr_b08_avif_reads_ispe_dimensions() {
+        assert_eq!(
+            inspect_image(&mut Cursor::new(avif()), 40).unwrap(),
+            ImageMetadata {
+                format: ImageFormat::Avif,
                 width: 320,
                 height: 480,
                 has_alpha: false,

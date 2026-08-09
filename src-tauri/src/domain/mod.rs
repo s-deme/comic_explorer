@@ -30,6 +30,8 @@ pub enum ImageFormat {
     Jpeg,
     Png,
     Webp,
+    Gif,
+    Avif,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

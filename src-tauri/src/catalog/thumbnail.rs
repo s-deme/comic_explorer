@@ -88,6 +88,8 @@ fn validate_cover_format(cover: &RelativePath, bytes: &[u8]) -> Result<(), AppEr
         Some("jpg" | "jpeg") => ImageFormat::Jpeg,
         Some("png") => ImageFormat::Png,
         Some("webp") => ImageFormat::Webp,
+        Some("gif") => ImageFormat::Gif,
+        Some("avif") => ImageFormat::Avif,
         _ => {
             return Err(thumbnail_error(
                 ErrorCode::CorruptImage,
