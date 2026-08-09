@@ -125,9 +125,8 @@ typecheck:
 
 verify:
   # Frozen dependency installation is enforced by product-quality.yml.
-  # CoDD's built-in preflight hard-codes `npm ci`, while local WSL intentionally
-  # uses the Windows toolchain/project-local Node; verification still runs the
-  # lock-backed tests and the separately enabled typecheck gate below.
+  # CoDD's built-in preflight hard-codes `npm ci`; verification instead runs the
+  # lock-backed project runner and the separately enabled typecheck gate below.
   install_preflight: false
   test_command: "python -X utf8 scripts/run-tests.py"
 #   verification_timeout:

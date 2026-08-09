@@ -13,8 +13,8 @@ Run CoDD from the project-local environment:
 .venv/bin/codd <command>
 ```
 
-On Windows, use the native PowerShell runners instead of the Linux/WSL
-environment. They default to the project-local `.venv-windows` environment:
+On Windows, use the native PowerShell runners instead of the Linux environment.
+They default to the project-local `.venv-windows` environment:
 
 ```powershell
 .\scripts\run-codd-windows.ps1 scan

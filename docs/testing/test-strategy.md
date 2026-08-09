@@ -88,13 +88,12 @@ Windows 10の具体的エディション・ビルド、基準PC、HDDをリリ�
 Integration（malformed ZIP／image／security corpus）で検証する。test modalityは
 Contractで内部seed・同一generator version・同一command（fixture optionsを含む）を
 「同一入力」として決定性を検証し、Integrationで生成物と非破壊境界を検証する。
-実行環境はWindows、WSL、通常のLinux CIを各1ケースとして記録し、各ケースで同一入力
+実行環境はWindowsと通常のLinux CIを各1ケースとして記録し、各ケースで同一入力
 からmanifest、SHA-256、サイズ、固定mtime、ディレクトリエントリが一致することを
 expected evidenceとする。同一入力は内部seed、同一generator version、同一command
 （fixture optionsを含む）の組合せであり、CLIに存在しない`--seed`を捏造しない。platform
-固有のpath変換は、利用可能なpath変換interfaceを検出できた場合だけ実行する。WSLでは
-`wslpath`を検出できた場合だけpath変換を行い、検出できない場合は変換せず、その分岐も
-証跡へ記録する。これはPowerShell/System.DrawingによるPNG→JPEG生成とは別責務である。
+固有のpath変換は行わず、各環境の通常の絶対pathをそのまま使用する。これは
+PowerShell/System.DrawingによるPNG→JPEG生成とは別責務である。
 通常生成（非force）で既存outputがある場合はnonzeroで拒否し、生成前後のoutput hashと
 mtimeを比較して不変であることを要求する。Pythonの`--force`は既定の
 `tests/fixtures/generated` directory、またはbasenameが`comic-explorer-fixtures*`の
@@ -254,7 +253,7 @@ L2/L3のUI・E2EをWebdriverIO Tauriへ割り当てる。Windows性能ハーネ�
 | AC-006 | TC-UI-007 |
 | AC-007 | TC-E2E-003 |
 
-`NFR-MVP-006` のAC6は上記のfixture Contract／Integrationで追跡する。Windows、WSL、
+`NFR-MVP-006` のAC6は上記のfixture Contract／Integrationで追跡する。Windowsと
 通常のLinux CIの実機・CI結果が揃わない間は`Blocked`であり、未実行、skip、環境不足を
 成功扱いにしない。技術候補比較・採否はアーキテクチャ作業のため本書では判定しない。
 

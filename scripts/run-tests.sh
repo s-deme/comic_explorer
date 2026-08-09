@@ -6,8 +6,7 @@ bash scripts/run-codd-consistency.sh
 python3 -B -m unittest discover -s tests -p 'test_*.py'
 
 if command -v npm >/dev/null 2>&1; then
-  # Windows Node running through WSL can share mocked module state between
-  # parallel Vitest workers. Keep the canonical aggregate deterministic.
+  # Keep the canonical aggregate deterministic across supported Node runtimes.
   exec env TMPDIR=/tmp TEMP=/tmp TMP=/tmp npm test -- \
     --pool=threads --poolOptions.threads.singleThread=true
 fi

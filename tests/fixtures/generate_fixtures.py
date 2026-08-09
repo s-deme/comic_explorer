@@ -108,16 +108,7 @@ def png_bytes(width: int, height: int, label: str, seed: int) -> bytes:
     )
 
 
-def is_wsl() -> bool:
-    proc_version = Path("/proc/version")
-    return proc_version.is_file() and "microsoft" in proc_version.read_text(
-        errors="ignore"
-    ).lower()
-
-
 def windows_path(path: Path) -> str:
-    if is_wsl():
-        return subprocess.check_output(["wslpath", "-w", str(path.resolve())], text=True).strip()
     return str(path.resolve())
 
 
@@ -125,7 +116,7 @@ def png_to_jpeg(source: Path, target: Path) -> None:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
     if not powershell:
         raise RuntimeError(
-            "JPEG fixtures require Windows PowerShell/System.Drawing; run on supported Windows or WSL."
+            "JPEG fixtures require Windows PowerShell/System.Drawing; run on supported Windows."
         )
     helper = Path(__file__).with_name("convert_png_to_jpeg.ps1")
     completed = subprocess.run(

@@ -79,6 +79,12 @@ class CoddConsistencyWiringTests(unittest.TestCase):
         unittest_at = source.index("python3 -B -m unittest", wrapper_at)
         self.assertLess(wrapper_at, unittest_at)
 
+    def test_dag_verify_wrapper_uses_the_project_path_directly(self) -> None:
+        source = (ROOT / "scripts/run-codd-dag-verify.sh").read_text(encoding="utf-8")
+        for obsolete_marker in ("9p", "v9fs", "mirror_root", "runtime_root", "PYTHONPATH"):
+            self.assertNotIn(obsolete_marker, source)
+        self.assertIn('--path "${project_root}"', source)
+
 
 if __name__ == "__main__":
     unittest.main()

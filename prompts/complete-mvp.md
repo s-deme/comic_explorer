@@ -213,7 +213,7 @@ amberは内容を確認し、解消可能なら解消してください。skip�
 - CoDD scan/check/verify
 - `git status --short`
 
-sandboxまたはWSL制約でWindows commandが失敗した場合は、必要な承認を要求して
+Windows-native commandが失敗した場合は、必要な承認を要求して
 同じ検証を再実行してください。
 
 ## 厳守事項

@@ -11,25 +11,21 @@
 
 ## 生成と検証
 
-WindowsまたはWindowsホスト上のWSLで、プロジェクトルートから実行する。
+WindowsのPowerShellから、プロジェクトルートで実行する。
 
-```bash
-.venv/bin/python tests/fixtures/generate_fixtures.py --force
-.venv/bin/python tests/fixtures/validate_fixtures.py tests/fixtures/generated
+```powershell
+.\.venv-windows\Scripts\python.exe tests/fixtures/generate_fixtures.py --force
+.\.venv-windows\Scripts\python.exe tests/fixtures/validate_fixtures.py tests/fixtures/generated
 ```
 
 性能版を含める場合:
 
-```bash
-.venv/bin/python tests/fixtures/generate_fixtures.py --force --include-performance
-.venv/bin/python tests/fixtures/validate_fixtures.py tests/fixtures/generated
+```powershell
+.\.venv-windows\Scripts\python.exe tests/fixtures/generate_fixtures.py --force --include-performance
+.\.venv-windows\Scripts\python.exe tests/fixtures/validate_fixtures.py tests/fixtures/generated
 ```
 
-WSLからWindowsマウントへ11,000件のmtimeとハッシュを記録するとメタデータI/Oが
-遅いため、生成経路だけを確認する場合は
-`--output /tmp/comic-explorer-fixtures-full` を指定できる。製品性能値としては扱わない。
-
-Pythonの外部パッケージは使わない。PNGはPython標準ライブラリだけで生成する。JPEGはサポート対象Windowsに同梱される PowerShell と `System.Drawing` で、同じラベル付きPNGから変換する。Windows/WSL以外でPowerShellを利用できない場合はJPEG生成を明示的に失敗させ、不完全なフィクスチャを成功扱いしない。
+Pythonの外部パッケージは使わない。PNGはPython標準ライブラリだけで生成する。JPEGはサポート対象Windowsに同梱される PowerShell と `System.Drawing` で、同じラベル付きPNGから変換する。対応Windows以外でPowerShellを利用できない場合はJPEG生成を明示的に失敗させ、不完全なフィクスチャを成功扱いしない。
 
 `--force` は指定した出力ディレクトリだけを置換する。既定はこのREADMEと同じ場所の `generated/` である。性能版は10,000個超のファイルを作るため通常実行から分離した。
 

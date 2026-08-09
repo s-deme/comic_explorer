@@ -66,12 +66,12 @@ Windowsのdataset生成は `benchmarks/architecture-spike/windows/Generate-Datas
 `20260728` はgenerator内部の固定値として使用し、生成したmanifestにも記録する（`--seed`
 入力は存在しない）。Pythonで既存の許可対象出力を明示置換する場合だけ `--force` を使う。
 
-malformed ZIP/image/security corpusを含む同一fixtureをWindows、WSLおよび通常のLinux CIで
+malformed ZIP/image/security corpusを含む同一fixtureをWindowsと通常のLinux CIで
 再現できることを確認する。ただし現行Python generatorのPNG→JPEG変換はPowerShell/
 System.Drawingに依存するため、通常Linuxでそのinterfaceが利用できず成功実測できない間は
 fixture再現を `not_measured`/`BLOCKED` とし、性能測定へ進まない。
-生成前に出力先のpathを、実行環境でpath変換interfaceが利用可能な場合だけそのinterface
-で変換する。interfaceがない場合は入力pathをそのまま使用し、変換を推測・代替実行しない。
+生成前に出力先は実行環境の通常の絶対pathをそのまま使用し、別環境向けのpath変換を
+推測・代替実行しない。
 既存出力はmanifest、dataset、logを含めて明示的な置換指定がない限り上書きせず、既存出力が
 ある場合は停止して再生成しない。明示的な置換指定を受けた場合だけ、対象を記録してから
 置換する。
@@ -156,8 +156,8 @@ contractとする。最低でもP01、P02、P06、P08、P09、distribution size�
    `20260728` とmanifest記録を確認する。Windows用datasetは
    `Generate-Dataset.ps1` を実行する。各generatorの既存出力を明示置換する場合だけ、
    Pythonは `--force`、PowerShellは `-Force` を使う（対象directory制限を守る）。
-   Windows、WSL、通常のLinux CIで同じmanifest/hashを用い、各環境で再現できることを記録する。
-   出力先のpath変換は利用可能なinterfaceを検出した場合だけ行い、interfaceがなければ変換しない。
+   Windowsと通常のLinux CIで同じmanifest/hashを用い、各環境で再現できることを記録する。
+   出力先は各環境の通常の絶対pathを使用する。
    既存出力を検出したら、明示的な置換指定がない限り生成を停止する。
 2. dataset生成、hash保存、PC再起動、環境情報採取。
 3. candidateをrelease buildしSHA-256、依存lock、WebView2 versionを記録。

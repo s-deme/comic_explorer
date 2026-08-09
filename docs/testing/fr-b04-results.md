@@ -26,7 +26,7 @@ BLOCKEDを維持する。
 - default: `paged`。既存`viewMode`（single/spread）とB01 scale/fit・loupe・reading positionは独立保持
 - C1 integration owner: ashigaru6。model → Viewer → App → API/SQLite → window adapterを一名で直列統合
 - path ownership: [FR-B04要件](../requirements/viewer-layout-requirements.md#c0c1-ownership-checkpoint)
-- focused実測環境: WSL2、Linux Node.js v24.18.0、npm 11.16.0、Vitest 3.2.7、Windows cargo 1.97.1
+- focused実測環境: Windows native filesystem、Windows Python `.venv-windows`、Node.js/npm、Vitest 3.2.7
 - 原本snapshot差分: 0（library root配下への書込みなし）
 - library管理file: 0（設定は既存app-local SQLiteのみ）
 - 外部通信: 0。install/CI/network取得なし
@@ -60,14 +60,12 @@ IMP-002の追加観測では、横layoutをright-to-leftで開いた場合にペ
 
 ## batch末尾 gate
 
-### aggregate redo RCA / resolution
+### aggregate resolution
 
-`src/features/viewer/`と接続済み`App`のfocused testは失敗しない一方、
-`tests/test_codd_consistency_producer.py`の実CoDD呼出しと
-`scripts/run-codd-consistency.sh`の`codd dag verify --path /mnt/e/...`は
-`p9_client_rpc`で停止していた。`scripts/run-codd-dag-verify.sh`を追加し、WSL時だけ
-`.codd`入力をext4一時ミラーへ置き、CoDD本体を`/tmp`キャッシュから起動するようにした。
-その結果、`depends_on_consistency`は`pass / skipped=false / violations=0 /
+`scripts/run-codd-dag-verify.sh`は入力されたプロジェクトパスを直接
+`.venv/bin/codd dag verify`へ渡す。WindowsではPowerShell runnerが
+`.venv-windows`のPythonから同じ検証を実行し、9p、WSL、ext4ミラーへ依存しない。
+`depends_on_consistency`は`pass / skipped=false / violations=0 /
 records_compared=5 / checked_count=5`となった。
 
 | Gate | 結果 | 備考 |
@@ -77,9 +75,9 @@ records_compared=5 / checked_count=5`となった。
 | TypeScript typecheck | PASS | `npm run typecheck` exit 0 |
 | production build | PASS | Vite 7.3.6、52 modules transformed、exit 0 |
 | Rust fmt/check/test | PASS | canonical `scripts/run-rust-check.cmd`、56 lib + 1 shutdown integration、ignored 0、SKIP 0、exit 0 |
-| CoDD scan/check | BLOCKED (v9fs root) | `codd scan`は完了。`codd check`はred gate判定前に9p上のdag verifyで長時間停止したため中断。canonical consistencyは別経路でPASS |
-| CoDD verify / canonical aggregate | PASS | WSL ext4ミラー経路で実CoDDを実行。`scripts/run-tests.sh`全体もexit 0 |
-| Windows WebView2 product fullscreen | BLOCKED disclosed | WSL/Linux sessionでは実行しない。未実行をPASS化しない |
+| CoDD scan/check | PASS | Windows-native PowerShell runner、red gate 0、advisory 4件 |
+| CoDD verify / canonical aggregate | PASS | Windows-native runnerでDAG 3 PASS / 0 FAIL、consistency 5/5 PASS |
+| Windows WebView2 product fullscreen | BLOCKED disclosed | Windows WebView2製品実機gateは別途未測定。未実行をPASS化しない |
 
 ## 実装・保存境界
 
