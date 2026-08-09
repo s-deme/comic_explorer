@@ -20,7 +20,7 @@ codd:
 - 対象: `FUT-C-018`, `FUT-C-033`, `FUT-C-034`, `FUT-C-035`, `FUT-C-036`, `FUT-C-037`
 - 接続対象: `src/features/viewer/Viewer.tsx` と `src/features/viewer/model.ts`
 - 実測日: 2026-08-01 JST
-- テスト実行環境: Linux WSL2、Node.js v24.18.0、npm 11.16.0
+- テスト実行環境: Windows native Node.js/npm
 - 原本snapshot差分: 0（fixture/library rootへの書込みなし）
 - 外部通信: 0（npm依存は既存ローカルcacheのoffline補修のみ）
 
@@ -49,7 +49,7 @@ npm test -- --run src/features/viewer/model.test.ts src/features/viewer/Viewer.t
 | focused test | PASS | SKIP 0、失敗0 |
 | TypeScript typecheck | PASS | `npm run typecheck` |
 | diff check | PASS | `git diff --check` |
-| Rust check | PASS | Windows cargo 1.97.1をWSLから実行、`cargo check --locked`成功 |
+| Rust check | PASS | Windows native cargoで`cargo check --locked`成功 |
 | Rust unit/integration regression | PASS | `cargo test --locked`: 54 lib tests + 1 shutdown integration test、失敗0、skip0 |
 | Rust persistence focused test | PASS | `settings_and_reading_position_survive_reopen`: 1 passed、0 failed |
 | Windows product UI harness | BLOCKED | Windows WebView2実機が無く未実行。component観測結果とは分離 |

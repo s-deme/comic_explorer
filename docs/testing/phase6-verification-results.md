@@ -21,7 +21,7 @@ codd:
 ## 実行情報
 
 - 実行日: 2026-07-30
-- 実行環境: Windows 11 host + WSL2
+- 実行環境: Windows 11 host + Windows-native toolchains
 - 対象version: 0.1.0
 - fixture: 固定seed 20260728、通常68ファイル/11 fixture、性能版11,365ファイル/12 fixture
 
@@ -48,16 +48,8 @@ codd:
 
 ## 基礎性能測定
 
-この値はWSL2上のportable foundation harnessであり、Windows製品UIの合否値ではない。
-7回測定のp95は次のとおり。
-
-| 操作 | p95 |
-| --- | ---: |
-| 1,000項目列挙・metadata sort | 21.588 ms |
-| 10,000項目列挙・metadata sort | 238.665 ms |
-| Deflate ZIPから30ページrandom read | 21.153 ms |
-| Stored ZIPから30ページrandom read | 20.798 ms |
-| SQLite 10,000件insert + 100件read | 116.516 ms |
+保存されていた非Windows環境の基礎性能測定結果は削除した。Windows製品UIの性能値は
+未測定であり、Windows native performance gateで別途測定する。
 
 ## 配布物
 

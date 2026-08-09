@@ -171,10 +171,10 @@ contractとする。最低でもP01、P02、P06、P08、P09、distribution size�
 
 ## 8. 妥当性と停止条件
 
-- generator内部の固定seed `20260728` とmanifest記録、三環境での再現、またはpath変換
+- generator内部の固定seed `20260728` とmanifest記録、Windowsと通常のLinux CIでの再現
   interfaceの有無を確認できない場合はfixtureの妥当性を判定せず停止する。通常Linuxで
   PowerShell/System.Drawingが利用できずPNG→JPEG成功実測がない場合は
-  `not_measured`/`BLOCKED` とし、interfaceがないのにpath変換が必要な場合も停止する。
+  `not_measured`/`BLOCKED` とし、PowerShell/System.Drawing依存が解消されない場合も停止する。
 - 明示的な置換指定なしに既存出力のhashまたはmtimeが変化した場合、fixture生成を失敗とし、
   既存出力を復元して原因を記録する。明示的な置換指定がある場合も対象と指定を記録する。
 - background update、thermal throttling、antivirus scanが発生したrunは理由を残し、
@@ -189,13 +189,11 @@ contractとする。最低でもP01、P02、P06、P08、P09、distribution size�
 
 ## 9. 成果物
 
-期待結果は、三環境でgenerator内部の固定seed `20260728` から同一manifest/hashのfixtureを
-生成でき、seedがmanifestへ記録され、利用可能な場合だけpath変換が行われ、interfaceがない
-場合は入力pathが保持されることである。通常LinuxのPowerShell/System.Drawing依存が未実測
+期待結果は、Windowsと通常のLinux CIでgenerator内部の固定seed `20260728` から同一manifest/hashのfixtureを
+生成でき、seedがmanifestへ記録されることである。通常LinuxのPowerShell/System.Drawing依存が未実測
 なら成功扱いにせず `not_measured`/`BLOCKED` とする。置換指定なし
 では既存出力のhash/mtimeが不変で、置換指定時だけ対象出力が更新されることをfixture生成の
 failure oracleとする。いずれかを満たさない場合は性能測定へ進まず停止する。
 
-raw JSON/ETLは大容量ならrelease artifact、要約とmanifest/hashは
-`docs/testing/performance-benchmark-results.md` と
-`benchmarks/architecture-spike/results/`へ置く。個人pathや漫画原本名を含めない。
+raw JSON/ETLは大容量ならrelease artifact、要約とmanifest/hashはWindows native測定結果へ
+記録する。個人pathや漫画原本名を含めない。

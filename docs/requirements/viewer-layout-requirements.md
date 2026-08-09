@@ -103,7 +103,7 @@ C1で次のpath ownershipとconnected evidence matrixを凍結する。
 
 pure unit testだけで完了扱いにせず、少なくとも`App`から`Viewer`へ接続したDOM、API保存、
 adapter呼出しを直接観測する。FT-B04が1件でもSKIPまたは未接続ならFR-B04をPASSへ更新しない。
-Windows WebView2 fullscreen product gateは別に記録し、Linux/WSLで未実測のままPASSにしない。
+Windows WebView2 fullscreen product gateは別に記録し、非Windows環境で未実測のままPASSにしない。
 
 ## Non-destructive and batch boundary
 

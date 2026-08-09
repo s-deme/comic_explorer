@@ -134,7 +134,7 @@ is disclosed separately, and functional-test SKIP has no exception. CoDD was not
 task and its non-PASS state is not added to the feature PASS count.
 
 Windows WebView2 native product UI, UIA/screen-reader/DPI, OS syscall, touch hardware, and gamepad hardware
-remain `UNMEASURED / BLOCKED`. WSL/local/component evidence does not substitute for those product gates.
+remain `UNMEASURED / BLOCKED`. Local/component evidence does not substitute for those product gates.
 
 ## Final path boundary
 

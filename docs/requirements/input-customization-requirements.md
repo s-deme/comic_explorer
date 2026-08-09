@@ -26,7 +26,7 @@ restart/accessibilityの三契約である。touchとgamepadは実機観測が�
 設定は既存のapp-local metadata/settings境界へ保存する。漫画folder、画像、ZIP/CBZ、sidecar、
 library管理fileへ書き込まず、外部通信、外部同期、外部サービス、原本自動変更を行わない。
 Windows WebView2 native product UI、UIA/screen-reader/DPI、OS syscall、およびtouch/gamepad
-hardwareの未観測結果をcomponentまたはWSLのevidenceで代替しない。
+hardwareの未観測結果をcomponentまたはlocal evidenceで代替しない。
 
 ## REQ-FR-B11-001: command mapping, remap, conflict, and reset
 

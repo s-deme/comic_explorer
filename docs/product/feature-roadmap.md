@@ -205,7 +205,7 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 - **保存・非永続境界:** `layoutMode`だけを既存app-local SQLiteへ保存し、fullscreenはOS
   window stateへ委譲して保存しない。旧値・未知値は`paged`へ戻し、B01のview/scale/fit/
   loupe/reading positionを独立に保全する。原本・書庫・library root配下への書込みと外部通信は0。
-- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定はWSL/Linux環境外であり
+- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定は非Windows環境外であり
   `BLOCKED`。さらにcanonical aggregate FAILのため、未実行・未完了をPASSへ昇格しない。
 
 ### FR-B05 — 名前検索（Batch 5）
@@ -302,7 +302,7 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
   `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
   `INCOMPLETE / NOT APPLICABLE`としてPASS数へ加算しない。accepted functional raw、CoDD rawの
   再実行、retry、commit、pushは行わない。Windows WebView2 native product UIとOS syscallの完全観測は
-  `UNMEASURED / BLOCKED`のまま維持し、WSL/local evidenceをPASSへ代替しない。
+  `UNMEASURED / BLOCKED`のまま維持し、local evidenceをPASSへ代替しない。
 
 - **最終diff境界:** 最終11-path product diff、draft contamination 0、staged path 0、
   `git diff --check PASS`を確認し、四文書以外の7機能pathはbyte不変として保全する。Gunshiの

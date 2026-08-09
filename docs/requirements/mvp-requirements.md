@@ -538,9 +538,8 @@ codd:
 - NFR-MVP-006-AC4: 最初に操作可能になるまでの時間、入力遅延、p95、UIスレッドの長時間停止を総処理時間と分けて評価する。
 - NFR-MVP-006-AC5: 採用構成ごとに理由、UX・性能上の利点、欠点、ライセンス、却下候補および再評価条件を記録する。
 - NFR-MVP-006-AC6: malformed ZIP/image/security corpusは固定seedのfixture
-  generatorからWindows、WSLおよび通常のLinux CIで再現でき、既存出力は明示的な
-  置換指定なしに上書きしない。platform固有のpath変換は、そのplatformで利用可能な
-  interfaceを検出した場合だけ実行する。
+  generatorからWindowsと通常のLinux CIで再現でき、既存出力は明示的な置換指定なしに
+  上書きしない。各環境の通常の絶対pathを使用する。
 - NFR-MVP-006-AC7: release前に実装済みの全library read経路をbefore/after
   snapshotで囲み、相対path、種別、size、mtime、内容hash、ZIP entry一覧が一致し、
   library配下にDB、cache、temp、logまたはsidecarが新規作成されないことを自動検証する。

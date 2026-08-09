@@ -27,9 +27,9 @@ SQLite、サムネイル本体はアプリ専用領域のJPEGファイル、ZIP/
 `zip`、サムネイル生成は Windows Imaging Component (WIC)、漫画ページは
 カスタムURI経由で圧縮済みJPEG/PNGをWebView2へ渡して描画する。
 
-この結論は一次情報と WSL 上の基礎I/O実測には基づくが、候補アプリを同一
-Windows実機で比較した値はまだない。したがって、点数のうちUX、起動、メモリ、
-描画、配布サイズは推定である。これらは採用決定後も未測定として保持し、
+この結論は一次情報とアーキテクチャ整合性に基づく。候補アプリを同一Windows実機で
+比較した性能値はまだない。したがって、点数のうちUX、起動、メモリ、描画、配布サイズは
+推定である。これらは採用決定後も未測定として保持し、
 Windows release buildの品質gateで検証する。gate未達だけで基盤を自動変更せず、
 代替比較と新しいADRの承認を必要とする。
 
@@ -215,26 +215,8 @@ decode済みページcacheは最大3表示単位（現在、前、次）かつ51
 
 ## 8. 実測結果
 
-実行環境は WSL2/Linux、Python 3.12.3、`/tmp`、7回。合成PNGは単色に近く、
-Windows/実漫画の絶対性能を代表しない。値は基礎I/Oパイプラインが再現可能で
-あることと桁の確認にだけ使う。
-
-| 操作 | median | p95 | Python peak allocation | 区分 |
-| --- | ---: | ---: | ---: | --- |
-| 1,000項目列挙＋stat＋sort | 22.968ms | 31.578ms | 129,321 B | 実測/WSL |
-| 10,000項目列挙＋stat＋sort | 253.150ms | 284.960ms | 1,733,666 B | 実測/WSL |
-| Deflate ZIPからランダム30件 | 23.311ms | 33.769ms | 249,108 B | 実測/WSL |
-| Stored ZIPからランダム30件 | 21.151ms | 29.965ms | 181,366 B | 実測/WSL |
-| SQLite WAL 10,000 insert＋100 read | 126.245ms | 150.789ms | 13,264 B | 実測/WSL |
-
-10,000件を一括列挙しても基礎処理は1秒未満だったが、これをUI応答目標達成の証拠
-にはしない。段階的に最初のchunkを返す設計は維持する。生データは
-`benchmarks/architecture-spike/results/foundation-wsl.json` にある。
-
-fixtureの再現環境は、固定seedのmalformed ZIP/image/security corpus generatorを
-Windows、WSLおよび通常のLinux CIで実行する構成とする。platform固有のpath変換は
-利用可能なinterfaceを検出した場合だけ実行し、既存出力は明示的な置換指定なしに
-上書きしない。この運用を `NFR-MVP-006-AC6` の正本と同期する。
+保存されていた非Windows環境の基礎I/O測定値とraw dataは削除した。Windows製品相当の
+性能値は未測定であり、実装後のWindows native performance gateで測定する。
 
 ### 未測定
 
@@ -255,7 +237,7 @@ CPU/GPU、installer size、CP932/ZIP64/encrypted corpusは未測定である。W
 | メモリ効率 (10) | 8 E | 5 E | 9 E |
 | 起動時間 (10) | 8 E | 5 E | 9 E |
 | 読込み中・エラー時UX (10) | 9 P | 9 P | 8 P |
-| ZIP・画像処理との統合 (5) | 5 M/P | 4 P | 4 P |
+| ZIP・画像処理との統合 (5) | 5 P | 4 P | 4 P |
 | Windowsらしい操作性 (5) | 4 E | 3 E | 5 P |
 | 安定性とテスト容易性 (5) | 4 P | 4 P | 4 P |
 | ライセンスと配布 (5) | 5 P | 4 P | 5 P |

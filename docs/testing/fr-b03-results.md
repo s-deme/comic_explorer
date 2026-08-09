@@ -22,7 +22,7 @@ codd:
 - default: `cover_list`（既存の表紙付き一覧を維持）
 - C1 integration owner: ashigaru6。mode model → CatalogGrid → App → API/SQLite → gateを一名で直列統合
 - path ownership: [FR-B03要件](../requirements/catalog-view-requirements.md#c0c1-ownership-checkpoint)
-- 実測環境: WSL2、Linux Node.js v24.18.0、npm 11.16.0、Vitest 3.2.7、Windows cargo 1.97.1
+- 実測環境: Windows native Node.js/npm、Vitest 3.2.7、Windows cargo 1.97.1
 - 原本snapshot差分: 0（library root配下への書込みなし）
 - library管理file: 0（設定はapp-local SQLiteのみ）
 - 外部通信: 0。依存treeは既存cacheを使用し、install/ci/network取得なし
@@ -57,7 +57,7 @@ npm test -- --run src/features/catalog/view-mode.test.ts src/features/catalog/Ca
 | production build | PASS | Vite 7.3.6、47 modules transformed、exit 0 |
 | Rust fmt/check/test | PASS | canonical `scripts/run-rust-check.cmd`、55 lib + 1 shutdown integration、ignored 0、SKIP 0、exit 0 |
 | CoDD scan/check/verify | PASS | scan/check/verify exit 0、red gate 0、depends_on/product-test SKIP 0 |
-| Windows WebView2 product harness | BLOCKED disclosed | WSL/Linux sessionでは実行しない。未実行をPASS化しない |
+| Windows WebView2 product harness | BLOCKED disclosed | product実機環境では未実行。未実行をPASS化しない |
 
 ## 実装・保存境界
 

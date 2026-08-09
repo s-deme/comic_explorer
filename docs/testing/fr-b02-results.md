@@ -22,7 +22,7 @@ codd:
 - default: `auto_next`（REQ-MVP-016の確認なし自動遷移を維持）
 - C1 integration owner: ashigaru6。resolver → UI/dialog → SQLite/API → gateを一名で直列統合
 - path ownership: [FR-B02要件](../requirements/end-of-volume-requirements.md#c0c1-ownership-checkpoint)
-- 実測環境: WSL2、Linux Node.js v24.18.0、npm 11.16.0、Vitest 3.2.7、Windows cargo 1.97.1
+- 実測環境: Windows native Node.js/npm、Vitest 3.2.7、Windows cargo 1.97.1
 - 原本snapshot差分: 0（library root配下への書込みなし）
 - library管理file: 0（SQLiteはapp-local settingsのみ）
 - 外部通信: 0。frontendは既存native package treeを使用し、install/ci/network取得なし
@@ -63,7 +63,7 @@ UI/persistence focused補助:
 | frontend regression | PASS | 10 files / 51 tests、SKIP 0、失敗0、exit 0。single-thread実行 |
 | production build | PASS | Vite 7.3.6、46 modules transformed、exit 0 |
 | CoDD scan/check/verify | PASS | scan/check/verify exit 0、check red gate 0 / advisory 4。verifyはDAG 3 PASS / 0 FAIL / 1 advisory、`deployment_completeness`・`user_journey_coherence`・`environment_coverage`の構造的SKIP 3件（cmd_400で対象外承認）、`task_completion` 1 vacuous。depends_onと製品テストのSKIPは0 |
-| Windows WebView2 product harness | BLOCKED | Linux/WSL環境では実行しない。未実行をPASS化しない |
+| Windows WebView2 product harness | BLOCKED | product実機環境では未実行。未実行をPASS化しない |
 
 ## 非破壊・通信境界
 

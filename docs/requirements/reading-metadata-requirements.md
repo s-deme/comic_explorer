@@ -84,7 +84,7 @@ focused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07
 - 読書位置のpage key、natural ordinal、保存タイミング、既存APIをmetadataの代替にしない。
 - library root内のファイル操作、rename、move、copy、delete、sidecar書込みを行わない。
 - network、install、外部同期、外部サービス、秘密情報を機能の前提にしない。
-- Windows WebView2のproduct実機gateはfocused WSL測定で代替せず、未実測ならBLOCKEDとして残す。
+- Windows WebView2のproduct実機gateは非native環境の測定で代替せず、未実測ならBLOCKEDとして残す。
 
 ## 受入ゲート
 
@@ -130,5 +130,5 @@ CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS
 testsは `0 PASS / 0 FAIL / 0 SKIP / 0 total` である。3 SKIP（`deployment_completeness`、
 `user_journey_coherence`、`environment_coverage`）と1 VACUOUS（`task_completion`）はPASSへ加算せず、
 CoDD gateおよびFR-B07 aggregateは `INCOMPLETE / NOT APPLICABLE` のままとする。Windows WebView2
-native product UIとOS syscallの完全観測は `UNMEASURED / BLOCKED` であり、WSL/local evidenceで代替しない。
+native product UIとOS syscallの完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで代替しない。
 最終結果と不採用CoDD草稿の履歴は [FR-B07結果](../testing/fr-b07-results.md) に集約する。

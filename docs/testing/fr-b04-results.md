@@ -64,7 +64,7 @@ IMP-002の追加観測では、横layoutをright-to-leftで開いた場合にペ
 
 `scripts/run-codd-dag-verify.sh`は入力されたプロジェクトパスを直接
 `.venv/bin/codd dag verify`へ渡す。WindowsではPowerShell runnerが
-`.venv-windows`のPythonから同じ検証を実行し、9p、WSL、ext4ミラーへ依存しない。
+`.venv-windows`のPythonから同じ検証を実行し、mounted pathやext4ミラーへ依存しない。
 `depends_on_consistency`は`pass / skipped=false / violations=0 /
 records_compared=5 / checked_count=5`となった。
 

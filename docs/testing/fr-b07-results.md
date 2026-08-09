@@ -21,7 +21,7 @@ codd:
 typecheck、buildは受理済みrawを再実行していない。CoDD scan/check/verifyは復元後の既存rawを各一回
 だけ参照し、exit 0・red 0を記録するが、verifyの構造値に3 SKIP・1 VACUOUS・verification tests 0
 があるため、CoDDとcmd_400 aggregateは `INCOMPLETE / NOT APPLICABLE` であり、PASSへ加算しない。
-Windows WebView2 native product gateは `BLOCKED_UNMEASURED` のままであり、WSL/local evidenceで
+Windows WebView2 native product gateは `BLOCKED_UNMEASURED` のままであり、local evidenceで
 代替しない。したがってFR-B07の台帳状態は `Partial / BLOCKED` とする。
 
 ## 実測範囲と接続境界

@@ -18,7 +18,7 @@ codd:
 ## 実行条件
 
 - 実行日時: 2026-07-30 JST
-- 環境: Windows 11 hostのMSVC Rust toolchain、WSL2上のNode/Python
+- 環境: Windows 11 hostのMSVC Rust toolchain、Windows-native Node/Python
 - Rust: `cmd.exe /c 'E:\script\comic_explorer\scripts\run-rust-check.cmd'`
   （54 unit + 1 product-process integration PASS。実binary shutdown、位置復元、
   cancel/token失効/queue拒否、app-data renameによるhandle closeを含む）

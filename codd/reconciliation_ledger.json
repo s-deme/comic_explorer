@@ -60,18 +60,6 @@
       "reason": "Approved implementation baseline committed on 2026-07-29.",
       "upstream_commit": "6c1f6e05833c7dd05545d68da6cf4258f3ce6da5"
     },
-    "docs/testing/performance-benchmark-results.md -> docs/research/technology-evaluation.md": {
-      "acked_at": "2026-07-28T18:04:40.036017+00:00",
-      "method": "baseline_ack",
-      "reason": "Approved implementation baseline committed on 2026-07-29.",
-      "upstream_commit": "3bfcc9b04d1a7ae8d40033413c1d3e117a036f83"
-    },
-    "docs/testing/performance-benchmark-results.md -> docs/testing/performance-benchmark-plan.md": {
-      "acked_at": "2026-07-28T18:04:40.296989+00:00",
-      "method": "baseline_ack",
-      "reason": "Approved implementation baseline committed on 2026-07-29.",
-      "upstream_commit": "9476163a2747bf807504e48e5a238867491c05cb"
-    },
     "docs/testing/test-cases.md -> docs/requirements/mvp-requirements.md": {
       "acked_at": "2026-07-28T18:04:40.434854+00:00",
       "method": "baseline_ack",

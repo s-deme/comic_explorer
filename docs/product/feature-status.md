@@ -156,7 +156,7 @@ byte/SHA snapshotし、original、library、`library.index`の差分0を受理�
 CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0で
 あり、3 SKIP（`deployment_completeness`、`user_journey_coherence`、`environment_coverage`）と1
 VACUOUS（`task_completion`）はPASSへ加算しない。Windows WebView2 native product UIとOS syscallの
-完全観測は `UNMEASURED / BLOCKED` であり、WSL/local evidenceで代替しない。
+完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで代替しない。
 
 最終worktreeは11-path product diff、draft contamination 0、staged path 0、`git diff --check PASS`で
 あり、四文書以外の7機能pathはbyte不変として保全した。Gunshiのcomplete diff QC前のcommit/pushは行わない。

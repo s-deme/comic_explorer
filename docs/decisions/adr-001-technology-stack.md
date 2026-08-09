@@ -77,18 +77,10 @@ ElectronはChromium/Nodeを同梱する予測メモリ、起動、配布サイ�
 
 ## 性能検証
 
-WSL2で7回測った基礎処理は次のとおり。
-
-| 操作 | median | p95 |
-| --- | ---: | ---: |
-| 1,000項目列挙/stat/sort | 22.968ms | 31.578ms |
-| 10,000項目列挙/stat/sort | 253.150ms | 284.960ms |
-| Deflate ZIPランダム30entry | 23.311ms | 33.769ms |
-| SQLite WAL 10,000 insert + read | 126.245ms | 150.789ms |
-
-これはWindowsアプリ、画像decode、実漫画の性能値ではない。コールド/ウォーム
-起動、TTI、memory、300 thumbnail、page、scroll、input、long task、CPU/GPU、
-installer sizeは未測定である。
+保存されていた非Windows環境の基礎I/O測定値は削除した。Windowsアプリ、画像decode、
+実漫画の性能値は未測定であり、コールド/ウォーム起動、TTI、memory、300 thumbnail、
+page、scroll、input、long task、CPU/GPU、installer sizeと合わせて、実装後のWindows
+native performance gateで測定する。
 
 ## UXへの効果
 
