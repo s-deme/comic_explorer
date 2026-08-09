@@ -107,6 +107,42 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-039 | 巻末動作設定・一覧復帰 | 巻末でライブラリ画面へ戻る設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/state/repository.rs` | [FT-B02-003](../testing/fr-b02-results.md#ft-b02-003) | C0採用、return_libraryで確定位置後に復帰 |
 | FUT-C-040 | 巻末動作設定・停止 | 巻末で何もしない設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-002-no-next-safety); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts` | [FT-B02-004](../testing/fr-b02-results.md#ft-b02-004) | C0採用、stopとno-nextは現在巻末に安全停止 |
 | FUT-C-041 | 巻末動作設定・ループ | 末尾から先頭へループする設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-002-no-next-safety); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src/features/catalog/sort.ts` | [FT-B02-005](../testing/fr-b02-results.md#ft-b02-005) | C0採用、次項目なし時だけsort済み先頭へloop |
+| FUT-C-042 | ファイル・フォルダを開く | `Ctrl+O`のopen commandから対象を直接開く | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行は登録ライブラリの変更と一覧内項目のopenのみ。選択UIと登録外pathを許可する範囲は未決定 |
+| FUT-C-043 | 指定動作で開く | open前に閲覧方法または処理を明示選択する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | サブメニュー未提示のため動作候補は推論せず、仕様未決定として保持 |
+| FUT-C-044 | 最近開いたファイルメニュー | 最近開いた対象をメニューから直接再openする | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-R-004の閲覧履歴は実装済みだが、ファイルメニューのsubmenu、対象範囲、再open導線が異なる |
+| FUT-C-045 | ページしおり保存・一覧 | ページしおりを保存し、一覧から開く | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | REQ-MVP-015は最終読書位置の自動保存であり、明示的なしおり操作とは別機能。保存数等は未決定 |
+| FUT-C-046 | 次のしおりへ移動 | 現在位置より後の保存済みしおりへ順次移動する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | しおりがない状態では無効となるcontext-sensitive commandを画面で観測 |
+| FUT-C-047 | 本棚表示・追加 | 専用の本棚contextを表示し、選択項目を登録する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-C-011/FUT-C-021のお気に入りは近似するが、独立した本棚viewと「本棚に追加」menuはない |
+| FUT-C-048 | メディア表示 | フォルダ・本棚とは別のメディアcontextを表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 対象媒体、登録方法、永続化の有無は参照画面だけでは確定できず未決定 |
+| FUT-C-049 | 項目プロパティ | 選択ファイル・フォルダのproperty dialogを表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 詳細リストと作品metadata panelはあるが、汎用property actionはない。表示項目は要件化時に決定 |
+| FUT-C-050 | CSV形式で出力 | 現在の一覧または選択項目の情報をCSVへ保存する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 出力対象、列、文字コード、個人情報となる絶対pathの扱いは未決定 |
+| FUT-C-051 | 終了メニュー | ファイルメニューからアプリを明示終了する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | OSのwindow closeとは別の発見可能な終了command |
+| FUT-C-052 | 編集操作の元に戻す | 直前のundo可能な操作を`Ctrl+Z`で取り消す | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 参照画面では無効項目として観測。undo対象、履歴、安全境界は未決定 |
+| FUT-C-053 | クリップボードのファイル操作 | 切り取り・コピー・貼り付けをclipboard経由で行う | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-C-025/FUT-C-026の直接操作とはUI・clipboard境界が異なる。原本非破壊方針の再評価が必要 |
+| FUT-C-054 | パスのコピー | 選択項目のpathまたは親フォルダpathをclipboardへコピーする | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 絶対pathと登録root相対pathのどちらを公開するかは未決定 |
+| FUT-C-055 | 複数・種別選択 | 全選択、ファイルのみ、画像のみ、反転、解除を含む複数選択を行う | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行CatalogGridは単一`selectedPath`。選択対象kindと後続一括操作の安全境界を要件化する |
+| FUT-C-056 | 履歴ドロップダウン移動 | 戻る・進むの履歴を開き、任意の過去位置へ直接移動する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | REQ-MVP-004の一段戻る・進むは実装済みだが、toolbarの履歴dropdownはない |
+| FUT-C-057 | 現在場所の手動更新 | `F5`で現在の一覧を手動再読込する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-C-030の自動変更検出、検索の明示再走査、error再試行とは別の常設command |
+| FUT-C-058 | ファイルマスク | mask条件で一覧表示対象をfilterする | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-C-010の名前検索とは別機能。mask構文、対象、保存scopeは未決定 |
+| FUT-C-059 | ファイル表示の切り替え | file表示領域または表示対象をcommandで切り替える | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 参照画面では無効項目として観測。切替対象は画面だけでは確定できず推論由来・仕様未決定 |
+| FUT-C-060 | 画像表示領域の分離 | viewerをcatalog shellから分離して独立表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行viewerは同一window内遷移。別window、pane、表示modeのどれにするかを含め分離方式は未決定 |
+| FUT-C-061 | タスクトレイ収納 | windowを閉じずにnotification areaへ収納・復帰する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 終了との区別、常駐条件、通知有無を要件化する |
+| FUT-C-062 | ペイン表示切替 | 対象paneを表示・非表示にする | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行folder treeは幅変更のみでclose不可。submenu未提示のため対象paneは未確定 |
+| FUT-C-063 | バー・メニュー表示切替 | 対象barとmenu barを表示・非表示にする | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 参照画面の「バー」「メニュー」に対応。対象barと非表示時の復帰導線は未決定 |
+| FUT-C-064 | OS全体フォルダツリー | desktop、PC、driveを含むOS namespaceから場所を選ぶ | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行は登録library root配下に限定。権限、ネットワーク場所、原本非破壊境界を先に決定する |
+| FUT-C-065 | 参照メニュー構成 | `ファイル/編集/表示/オプション/ヘルプ`へcommand、shortcut、separator、有効状態を整理する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行は`ファイル/移動/表示/ライブラリ/ヘルプ`。機能採用後に配置するUI parity候補 |
+| FUT-C-066 | アイコンコマンドツールバー | open、更新、context切替、検索、表示形式等をicon buttonから実行する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行にも記号buttonとtitleはあるが、command範囲、icon表現、address barとの配置が異なる |
+| FUT-C-067 | 参照型サムネイルタイル | folder iconと表紙を混在させた罫線付きtile、長名省略、密度を再現する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | REQ-MVP-005/FUT-C-012〜014は機能的に近似。視覚的fidelityとresponsive条件は未決定 |
+| FUT-C-068 | 現在位置付きステータス | 選択情報に加えて現在位置と総file数を`n / total`形式で表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行は項目数、選択path、load状態を表示。sort/filter時のindex定義は未決定 |
+| FUT-C-069 | 統合設定画面 | application設定を一か所で確認・変更する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行はcatalog表示、viewer、巻末動作、shortcut等の個別controlと自動保存。統合対象は未決定 |
+| FUT-C-070 | プラグイン設定 | pluginに関する設定dialogを提供する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | plugin方式自体が未採用。設定対象、互換性、安全・配布境界は未決定 |
+| FUT-C-071 | 設定プロファイル | 設定一式を保存・読み込み・複数profileから切り替える | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行の自動永続化とは別機能。format、merge、秘密情報除外、migrationを要件化する |
+| FUT-C-072 | マウスジェスチャ設定 | mouse操作またはgestureへcommandを割り当てる | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | REQ-MVP-014は固定mouse操作。対象操作、device、conflict解決は未決定 |
+| FUT-C-073 | サムネイル管理 | user向けのthumbnail管理dialogを提供する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | REQ-MVP-006の内部cacheは実装済みだが管理UIはない。管理操作の範囲は未決定 |
+| FUT-C-074 | 表示中サムネイルの保存 | 現在表示中のthumbnailを明示保存する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 保存先、format、既存cacheとの関係は参照画面だけでは未決定 |
+| FUT-C-075 | サムネイルの一括読込 | 複数対象のthumbnailを一括で読み込む | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 入力source、format、対象範囲は画面だけでは確定できず仕様未決定 |
+| FUT-C-076 | 一般ヘルプ | 操作体系と主要機能を説明するhelp contentsを表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行helpはキー操作とshortcut設定のみ |
+| FUT-C-077 | バージョン情報 | About情報を表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 表示項目は参照画面だけでは確定できず未決定 |
 | FUT-D-001 | 名前検索性能 | 10,000項目を1秒以内に検索 | Deferred | NOT TESTED | Should | 将来 | [NFR](../requirements/mvp-requirements.md#nfr-mvp-002-性能目標); Q4-1/Q4-4 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 検索UIがMVP対象外のため保留。機能候補FUT-C-010と分離 |
 | FUT-D-002 | 最大ファイルサイズ | 1冊あたりの上限条件 | Deferred | NOT TESTED | 未定 | TBD | Q8-1/TBD [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 未定記入のため未決定性を保持 |
 | FUT-D-003 | 性能計測条件の適用 | 基準条件での性能測定を確定・実行 | Deferred | NOT TESTED | 未定 | TBD | Q8-2/TBD-006 [questionnaire](../requirements/product-questionnaire.md); [性能計画](../testing/performance-benchmark-plan.md) | — | 未実装・未実測 | TBD-006で計画は承認済み。Windows実測が未完了で、初期回答の未決定性も注記 |
@@ -120,6 +156,58 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-006 | タッチ操作 | タッチ入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-002 `BLOCKED_UNMEASURED`） | touch実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-003 `BLOCKED_UNMEASURED`） | gamepad実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-008 | 閲覧時の原本自動変更 | 原本への自動書込み | Rejected | NOT TESTED | 非採用 | — | Q7-2/Q8-4 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 読取専用・原本非破壊の恒久方針。方針変更時のみ再評価 |
+
+## Leeyes参照画面差分（2026-08-09）
+
+本節は、ユーザー提供のLeeyes参照スクリーンショット6枚を一次入力として、画面から直接
+読み取れる項目と現行Comic Explorerの差を登録した監査記録である。1枚目はmain window、
+2〜6枚目は順にfile、edit、view、option、help menuを示す。開かれていないsubmenuの内容や、
+無効項目の発動条件は推測で確定せず、該当候補の備考に未決定性を残す。
+
+現行アプリは登録library root配下を非破壊で閲覧する構成であり、OS全体を対象にしたfile
+managerではない。menuは`ファイル/移動/表示/ライブラリ/ヘルプ`、catalog選択は単一、
+folder treeはlibrary内限定である（`src/App.tsx`、`src/features/catalog/CatalogGrid.tsx`、
+`src/features/navigation/FolderTree.tsx`）。したがって、原本を変更する候補は採用済み要件
+REQ-MVP-017を自動的に上書きせず、採用時に安全境界を明示して再評価する。
+
+### 基準UIと現行UIの差
+
+| 参照画面での直接観測 | 現行機能 | 未実装または差異 | 追跡ID |
+|---|---|---|---|
+| `ファイル/編集/表示/オプション/ヘルプ`のmenu bar | `ファイル/移動/表示/ライブラリ/ヘルプ` | edit/optionsがなく、navigation/libraryの配置とcommand groupingが異なる | FUT-C-065 |
+| icon中心のtoolbar、戻る・進むのdropdown、folder/bookcase/media/search切替 | 戻る・進む・上へ、sort、view mode等の文字・記号control | 履歴の直接選択、context切替commandのicon、全体の配置がない | FUT-C-056, FUT-C-066 |
+| label、path入力、右端の実行buttonを持つaddress bar | path入力、`移動`実行button、履歴移動を実装済み | 基本機能はREQ-MVP-004で実装済み。buttonのicon、配置、toolbarとの統合が異なる | REQ-MVP-004, FUT-C-066 |
+| desktop、PC、driveを含むfolder treeとpane close button | 登録library内tree、splitterで幅変更 | OS namespaceとpane close/visibilityがない | REQ-MVP-003, FUT-C-062, FUT-C-064 |
+| folder iconと表紙を混在表示する罫線付きthumbnail grid | cover、小thumbnail、detailの3 mode | catalog/thumbnail機能は近似するがtile外観、密度、長名表示が異なる | REQ-MVP-005, REQ-MVP-006, FUT-C-012〜014, FUT-C-067 |
+| 選択情報と`現在位置 / 総file数`を示すstatus bar | 項目数、選択path、load状態 | sort/filter後の現在index表示がない | FUT-C-068 |
+
+### メニュー機能の対応差
+
+| 参照menu | 参照画面での直接観測 | 現行との差 | 追跡ID |
+|---|---|---|---|
+| ファイル | 開く、指定動作で開く、最近開いたfile | 一覧内openと閲覧履歴はあるが、picker、指定動作submenu、recent submenuはない | FUT-C-042〜044, FUT-R-004 |
+| ファイル | しおりを開く、次のしおり、しおりを保存 | 最終読書位置の自動保存のみで、明示的な複数page bookmarkはない | REQ-MVP-015, FUT-C-045, FUT-C-046 |
+| ファイル | 本棚に追加 | お気に入りはあるが、専用本棚contextと追加menuはない | FUT-C-011, FUT-C-021, FUT-C-047 |
+| ファイル | 削除、名前変更、folder作成 | 未実装候補として既に登録済み。削除がごみ箱か完全削除かは画面だけでは未確定 | FUT-C-024, FUT-C-027〜029 |
+| ファイル | property、CSV出力、終了 | 対応するaction/menuがない | FUT-C-049〜051 |
+| 編集 | undo、cut、copy、paste | move/copy候補はあるが、undoとOS clipboard操作はない | FUT-C-025, FUT-C-026, FUT-C-052, FUT-C-053 |
+| 編集 | folderへcopy、folderへmove | 既存の未実装候補に対応 | FUT-C-025, FUT-C-026 |
+| 編集 | pathをcopy、親folder pathをcopy | clipboardへのpath出力がない | FUT-C-054 |
+| 編集 | 全選択、fileのみ、imageのみ、選択反転、解除 | 現行catalogは単一選択のみ | FUT-C-055 |
+| 表示 | folder、本棚、media、検索context | folderと名前検索は実装済み。本棚はお気に入りのみ、media contextはない | REQ-MVP-002, FUT-C-010, FUT-C-047, FUT-C-048 |
+| 表示 | 移動、最新情報へ更新 | 一段の戻る・進む・上へはあるが履歴dropdownと常設F5 refreshはない | REQ-MVP-004, FUT-C-056, FUT-C-057 |
+| 表示 | file表示形式、並び順 | 3表示形式と4 fieldの昇降順を実装済み。menu階層とlabelは異なる | REQ-MVP-007, FUT-C-012〜014, FUT-C-065 |
+| 表示 | file mask、file表示切替 | 名前検索はあるがmaskはなく、無効表示された切替commandの意味は未確定 | FUT-C-010, FUT-C-058, FUT-C-059 |
+| 表示 | image表示分離、task tray収納 | catalog shellから独立した画像表示とtray常駐はない。分離方式は画面だけでは未確定 | FUT-C-060, FUT-C-061 |
+| 表示 | pane、bar、menuの表示切替 | tree幅変更以外のworkspace表示切替はない | FUT-C-062, FUT-C-063 |
+| オプション | 設定、plugin設定 | 個別設定の自動保存はあるが統合設定画面とplugin設定はない | FUT-C-069, FUT-C-070 |
+| オプション | 設定の保存、読込、切替 | user操作可能な設定profileはない | FUT-C-071 |
+| オプション | key customize、mouse gesture | viewer操作8種のkey割当は実装済みだがmenu配置が異なり、mouse割当はない。参照側のkey対象範囲は未確認 | FUT-C-019, FUT-C-065, FUT-C-072 |
+| オプション | thumbnail管理、表示中thumbnail保存、一括読込 | thumbnail生成/cacheは内部実装済みだがuser向け管理操作はない | REQ-MVP-006, FUT-C-073〜075 |
+| ヘルプ | 一般help、version情報 | shortcut help/editorのみで、一般helpとAbout dialogはない | FUT-C-076, FUT-C-077 |
+
+上表の既存IDは重複登録せず、差分だけを`FUT-C-042`〜`FUT-C-077`へ原子化した。
+これらは代替アプリとしての候補範囲を記録するもので、優先順位、採用、詳細仕様を確定するものではない。
 
 ## FR-B07 受入証跡
 
