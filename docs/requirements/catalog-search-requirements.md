@@ -50,7 +50,9 @@ file、folder、comicFolder、archive、page、unsupportedを混在して表示�
 
 一致0件は「検索結果はありません。」として通知し、一覧を破壊せずに再検索できる。
 backendの分類付きerrorは対象queryを含む再試行可能なerror panelへ表示し、検索結果の
-`クリア`操作で通常の現在folder一覧へ復帰できる。内部例外やstack traceを表示しない。
+`クリア`操作で通常の現在folder一覧へ復帰できる。`クリア`はin-flightの検索generationを
+無効化するため、clear後に到着した古い成功・empty・error結果は画面へ反映しない。内部例外や
+stack traceを表示しない。
 
 ## REQ-FR-B05-004: rescan freshness
 
@@ -89,13 +91,35 @@ connected evidence matrixを凍結する。
 | C1 navigation | resultの元階層、種別、現在位置、selection | `FT-B05-003` connected App result navigation |
 | C1 recovery | empty/error/clear/retry可能な状態 | `FT-B05-004` connected App states |
 | C1 freshness | 再走査後の追加・更新結果、再起動相当の新request | `FT-B05-005` connected App/backend rescan |
+| release product | 実UI query、result navigation、empty/clear、明示rescan、原本不変 | `FT-B05-006` SearchOnly release WebView2 gate |
 
 pure unitだけでは完了扱いにせず、AppからAPI client、catalog/backendへ接続した結果を
-直接観測する。FT-B05-001〜005のいずれかがFAILまたはSKIPなら、FUT-C-010をPASSへ更新しない。
+直接観測する。frontend focusedは`FT-B05-` prefixのexact 5（`FT-B05-001`〜005）を選択し、
+選択対象を5 PASS・0 FAILで強制する。同じfileの非対象testはpattern除外であり、選択対象の
+SKIPへ算入しない。Rustは`search_port_` filterでnormalizationと明示rescanを正本として検証する。
+FT-B05-001〜006のいずれかがFAILまたは選択対象内でSKIPなら、FUT-C-010をPASSへ更新しない。
+
+### IMP-012 SearchOnly 完了ゲート
+
+`scripts/run-feature-verification-wsl.sh IMP-012 -RustMode Canonical`をWindows-native toolchainへ
+橋渡しする正本コマンドとする。`FT-B05-` prefixのfrontend exact 5、`search_port_` Rust filter、
+typecheck、SBOM/build、canonical Rust、release freshness、`FT-B05-006`、製品process cleanup、
+CoDD scan/check/verifyを同じsourceへ束縛する。
+
+`FT-B05-006`はisolated fixtureを使うrelease WebView2製品UIから、全角・大小文字を含むqueryで
+folder/archiveの期待rowとkindを確認し、resultから親addressとselectionへ復帰する。0件noticeと
+clearによる通常catalog復帰を確認する。harnessだけが一時probeを追加した後、watcherや永続indexを
+使わない次の明示検索で新しい結果へ置換されなければならない。harnessはprobeを除去してfixtureを
+復元する。空白trimとclear後の旧generation抑止は`FT-B05-001`/`FT-B05-004`、再走査の置換と
+generationは`FT-B05-005`/Rust filterを正本とする。検索はlibrary source treeへwrite、rename、
+delete、cache、sidecar、temporary fileを作らず、前後のpath、bytes、SHA-256は一致しなければならない。
+`FT-B05-006`のPASSは`FUT-C-010`だけを完了させる。10,000項目・1秒の`FUT-D-001`は`FR-S03`の
+性能gateであり、本featureのPASSへ加算せず、また本gateを妨げない。
 
 ## Batch and evidence boundary
 
-focused機能テストはSKIP 0で実測する。canonical aggregateはfocused成功後に一回だけ実行し、
+選択対象のfocused機能テストはSKIP 0で実測する。canonical aggregateはfocused成功後に一回だけ実行し、
 CoDDの構造検査が同条件で非PASSとなる場合は、生値・check名・影響をledgerとreportへ残す。
 その場合も機能証跡PASSとCoDD structural certificationを分離し、「全gate PASS」と称しない。
-性能、Windows WebView2製品実機、FR-S03の10,000項目測定は本batchのPASS根拠ではない。
+Windows WebView2製品実機は`FT-B05-006`を現在のPASS根拠とする。FR-S03の10,000項目性能測定は
+本batchのPASS根拠ではなく、未実測でもFR-B05の機能PASSを妨げない。

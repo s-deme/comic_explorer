@@ -5,7 +5,8 @@ param(
     [switch]$TagsOnly,
     [switch]$MemoOnly,
     [switch]$HistoryOnly,
-    [switch]$RatingOnly
+    [switch]$RatingOnly,
+    [switch]$SearchOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +39,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -657,6 +658,11 @@ New-Item (Join-Path $library "folder-a\acl-denied") -ItemType Directory -Force |
     Out-Null
 New-Item (Join-Path $library "folder-a\still-readable") -ItemType Directory -Force |
     Out-Null
+if ($SearchOnly) {
+    New-Item (Join-Path $library "folder-a\search-pair") -ItemType Directory -Force |
+        Out-Null
+    Copy-Item (Join-Path $library "1-valid.cbz") (Join-Path $library "folder-a\search-pair.cbz")
+}
 New-Item (Join-Path $library "comic-folder") -ItemType Directory -Force |
     Out-Null
 Copy-Item (
@@ -714,6 +720,8 @@ $beforeTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
     ForEach-Object {
         "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
     }
+$beforeDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+    ForEach-Object { $_.FullName.Substring($library.Length) }
 
 $cold = $null
 $warm = $null
@@ -723,6 +731,7 @@ $appDataRecovery = $null
 $keyboardProduct = $null
 $deniedPath = Join-Path $library "folder-a\acl-denied"
 $deniedRule = $null
+$searchFreshPath = Join-Path $library "rescan-needle.cbz"
 try {
     $cold = Start-Product
     Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
@@ -760,7 +769,7 @@ try {
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
-    if (!$RatingOnly) {
+    if (!$RatingOnly -and !$SearchOnly) {
         Wait-Evaluate (
             "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
             "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
@@ -769,6 +778,121 @@ try {
             "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
             ".every((image) => image.complete && image.naturalWidth > 0)"
         ) "cold thumbnail image decode"
+    }
+    if ($SearchOnly) {
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#catalog-search');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '\uFF33\uFF25\uFF21\uFF32\uFF23\uFF28\uFF0D\uFF30\uFF21\uFF29\uFF32');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-search-result-path]')]" +
+            ".map((node) => node.dataset.searchResultPath + ':' + node.dataset.searchResultKind).sort(); " +
+            "const expected = ['folder-a/search-pair:folder', " +
+            "'folder-a/search-pair.cbz:archive'].sort(); " +
+            "return document.querySelector('.search-results')?.dataset.searchResultCount === '2' && " +
+            "JSON.stringify(rows) === JSON.stringify(expected); })()"
+        ) "search normalized mixed-kind result"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#catalog-search');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '\uFF3A\uFF0D\uFF4E\uFF45\uFF58\uFF54');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results')?.dataset.searchResultCount === '1' && " +
+            "document.querySelector('[data-search-result-path=`"z-next-comic`"]')?.dataset.searchResultKind === 'comicFolder'"
+        ) "search navigation result"
+        Invoke-Evaluate "document.querySelector('[data-search-result-path=`"z-next-comic`"]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results') === null && " +
+            "document.querySelector('#address')?.value.endsWith('\\library') && " +
+            "document.querySelector('[data-relative-path=`"z-next-comic`"]')?.dataset.selected === 'true' && " +
+            "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
+            "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
+        ) "search result navigation and selection"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#catalog-search');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'missing-search-needle');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results')?.dataset.searchResultCount === '0'"
+        ) "search empty result"
+        Invoke-Evaluate (
+            "document.querySelector('.search-bar button[type=button]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results') === null && " +
+            "document.querySelector('#catalog-search')?.value === '' && " +
+            "document.querySelector('[role=grid]') !== null"
+        ) "search clear result"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#catalog-search');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'rescan-needle');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results')?.dataset.searchResultCount === '0'"
+        ) "search rescan baseline"
+        Copy-Item (Join-Path $library "1-valid.cbz") $searchFreshPath
+        Invoke-Evaluate (
+            "document.querySelector('.search-bar button[type=submit]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.search-results')?.dataset.searchResultCount === '1' && " +
+            "document.querySelector('[data-search-result-path=`"rescan-needle.cbz`"]')?.dataset.searchResultKind === 'archive'"
+        ) "search fresh rescan"
+        Remove-Item -LiteralPath $searchFreshPath -Force
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Search product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$(($_.FullName.Substring($library.Length))):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Search product harness changed the source tree or created adjacent files."
+        }
+        $afterDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if (Compare-Object $beforeDirectories $afterDirectories) {
+            throw "Search product harness changed the source directory tree."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B05-006"
+            normalizedQuery = $true
+            mixedKind = $true
+            navigated = $true
+            emptyAndClear = $true
+            freshRescan = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
     }
     if ($MemoOnly) {
         Invoke-Evaluate (
@@ -2114,6 +2238,13 @@ try {
     } | ConvertTo-Json -Compress
 } finally {
     $cleanupErrors = [Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath $searchFreshPath) {
+        try {
+            Remove-Item -LiteralPath $searchFreshPath -Force -ErrorAction Stop
+        } catch {
+            $cleanupErrors.Add("Search fixture cleanup failed: $($_.Exception.Message)")
+        }
+    }
     if ($deniedRule -and (Test-Path $deniedPath)) {
         $deniedAcl = Get-Acl $deniedPath
         $deniedAcl.RemoveAccessRuleSpecific($deniedRule)

@@ -45,7 +45,7 @@ connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新�
 connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B05、FR-B06、FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
+FR-B06、FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
 FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product gateを完了し、
 3 atomic featureがすべて`Implemented / PASS`となったため`Done`へ更新した。
 
@@ -63,7 +63,7 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
 | `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done`（pilot実装・重点QC完了） |
 | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done`（重点QC完了） |
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
-| `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
+| `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Done`（FT-B05-006 Windows WebView2 product gate・canonical aggregate完了） |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
 | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done`（memo/history/ratingのWindows WebView2 product gate・canonical aggregate完了） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
@@ -212,8 +212,8 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
 
 ### FR-B05 — 名前検索（Batch 5）
 
-- **状態:** `Planned`。`FUT-C-010` は Candidate かつ備考に推論由来・未決定性があるため、
-  本行は採用承認を待つ優先順位案である。
+- **状態:** `Done`。IMP-012で`FUT-C-010`のrelease WebView2 `FT-B05-006`、focused exact5、
+  Rust `search_port_`、Windows-native canonical aggregateを同じsourceへ束縛した。
 - **対象 feature ID:** `FUT-C-010`（file name/folder name の検索 UI と機能契約）。
 - **user outcome:** library 内の file/folder name をローカルだけで検索し、結果から元の
   階層・種別・現在位置へ移動できる。
@@ -225,9 +225,11 @@ FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product
   navigation、(4) empty/error/clear、(5) 再スキャン時の index 更新。
 - **focused test 範囲:** `FT-B05-001` exact/partial と大小文字・Unicode、`FT-B05-002`
   file/folder 混在、`FT-B05-003` result からの階層復帰、`FT-B05-004` empty/error/clear、
-  `FT-B05-005` 再起動・再スキャン。性能閾値は含めない。
-- **batch末尾 gate:** 機能 focused test を SKIP 0 で実測し、外部通信0・原本差分0を確認して
-  `BATCH-END-GATE`。性能の PASS は `FR-S03` の実測証跡が揃うまで付与しない。
+  `FT-B05-005` fresh request・再スキャン、`FT-B05-006` release製品でのnormalized mixed-kind、navigation、
+  empty/clear、explicit rescan、source tree差分0。性能閾値は含めない。
+- **batch末尾 gate:** selected focused exact5をSKIP 0で実測し、Windows WebView2 `FT-B05-006`、
+  外部通信0・原本差分0、canonical aggregateを確認して`Done`。10,000項目/1秒の性能PASSは
+  `FR-S03`の実測証跡まで`FUT-D-001`へ分離したまま、FR-B05を阻害しない。
 
 ### FR-B06 — お気に入り（Batch 6）
 

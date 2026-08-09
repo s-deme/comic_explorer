@@ -13,21 +13,24 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "windows-toolchain.ps1")
 $featureKey = $Feature.ToLowerInvariant()
 $featureConfig = switch ($featureKey) {
-    "imp-004" { [pscustomobject]@{ Id = "IMP-004"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
-    "fut-c-019" { [pscustomobject]@{ Id = "FUT-C-019"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
-    "shortcutonly" { [pscustomobject]@{ Id = "ShortcutOnly"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
-    "imp-005" { [pscustomobject]@{ Id = "IMP-005"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
-    "fut-c-022" { [pscustomobject]@{ Id = "FUT-C-022"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
-    "tagsonly" { [pscustomobject]@{ Id = "TagsOnly"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
-    "imp-006" { [pscustomobject]@{ Id = "IMP-006"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
-    "fut-c-023" { [pscustomobject]@{ Id = "FUT-C-023"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
-    "memoonly" { [pscustomobject]@{ Id = "MemoOnly"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
-    "imp-007" { [pscustomobject]@{ Id = "IMP-007"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
-    "fut-r-004" { [pscustomobject]@{ Id = "FUT-R-004"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
-    "historyonly" { [pscustomobject]@{ Id = "HistoryOnly"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
-    "imp-008" { [pscustomobject]@{ Id = "IMP-008"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
-    "fut-r-005" { [pscustomobject]@{ Id = "FUT-R-005"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
-    "ratingonly" { [pscustomobject]@{ Id = "RatingOnly"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
+    "imp-004" { [pscustomobject]@{ Id = "IMP-004"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "shortcut" } }
+    "fut-c-019" { [pscustomobject]@{ Id = "FUT-C-019"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "shortcut" } }
+    "shortcutonly" { [pscustomobject]@{ Id = "ShortcutOnly"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "shortcut" } }
+    "imp-005" { [pscustomobject]@{ Id = "IMP-005"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "fr_b10" } }
+    "fut-c-022" { [pscustomobject]@{ Id = "FUT-C-022"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "fr_b10" } }
+    "tagsonly" { [pscustomobject]@{ Id = "TagsOnly"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; ExpectedFrontendPasses = 1; RustFilter = "fr_b10" } }
+    "imp-006" { [pscustomobject]@{ Id = "IMP-006"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_memo" } }
+    "fut-c-023" { [pscustomobject]@{ Id = "FUT-C-023"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_memo" } }
+    "memoonly" { [pscustomobject]@{ Id = "MemoOnly"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_memo" } }
+    "imp-007" { [pscustomobject]@{ Id = "IMP-007"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
+    "fut-r-004" { [pscustomobject]@{ Id = "FUT-R-004"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
+    "historyonly" { [pscustomobject]@{ Id = "HistoryOnly"; ProductSwitch = "-HistoryOnly"; ProductStage = "history"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-002"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_history_deterministic_order_and_dedup" } }
+    "imp-008" { [pscustomobject]@{ Id = "IMP-008"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
+    "fut-r-005" { [pscustomobject]@{ Id = "FUT-R-005"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
+    "ratingonly" { [pscustomobject]@{ Id = "RatingOnly"; ProductSwitch = "-RatingOnly"; ProductStage = "rating"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-003"; ExpectedFrontendPasses = 1; RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection" } }
+    "imp-012" { [pscustomobject]@{ Id = "IMP-012"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
+    "fut-c-010" { [pscustomobject]@{ Id = "FUT-C-010"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
+    "searchonly" { [pscustomobject]@{ Id = "SearchOnly"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
     default { $null }
 }
 $resolvedFeatureId = if ($null -ne $featureConfig) { $featureConfig.Id } else { $Feature }
@@ -139,10 +142,11 @@ $productScript = Join-Path $PSScriptRoot "run-product-ui-harness.ps1"
 $productCleanupAudit = Join-Path $PSScriptRoot "audit-product-cleanup.ps1"
 $frontendTest = if ($null -ne $featureConfig) { $featureConfig.FrontendTest } else { "src\App.fr-b11.test.tsx" }
 $frontendTestName = if ($null -ne $featureConfig) { $featureConfig.FrontendTestName } else { "" }
+$expectedFrontendPasses = if ($null -ne $featureConfig) { $featureConfig.ExpectedFrontendPasses } else { 1 }
 $rustFilter = if ($null -ne $featureConfig) { $featureConfig.RustFilter } else { "shortcut" }
 $productStage = if ($null -ne $featureConfig) { $featureConfig.ProductStage } else { "shortcut" }
 $pipeline = @(
-    [pscustomobject]@{ Name = "frontend-focused"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendFocused", "-FrontendTest", $frontendTest, "-FrontendTestName", $frontendTestName) },
+    [pscustomobject]@{ Name = "frontend-focused"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendFocused", "-FrontendTest", $frontendTest, "-FrontendTestName", $frontendTestName, "-ExpectedFrontendPasses", $expectedFrontendPasses) },
     [pscustomobject]@{ Name = "typecheck"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Typecheck") },
     [pscustomobject]@{ Name = "frontend-sbom"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendSbom") },
     [pscustomobject]@{ Name = "rust-$($RustMode.ToLowerInvariant())"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Rust$RustMode", "-RustFilter", $rustFilter) },
@@ -166,7 +170,7 @@ try {
         $failedStage = "feature-resolution"
         $overallExitCode = 2
         $errorPath = Join-Path $logRoot "feature-resolution.stderr.log"
-        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly, IMP-007, FUT-R-004, HistoryOnly, IMP-008, FUT-R-005, RatingOnly."
+        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly, IMP-007, FUT-R-004, HistoryOnly, IMP-008, FUT-R-005, RatingOnly, IMP-012, FUT-C-010, SearchOnly."
         $message | Set-Content -LiteralPath $errorPath -Encoding UTF8
         $now = [DateTimeOffset]::UtcNow
         $stages.Add([pscustomobject][ordered]@{

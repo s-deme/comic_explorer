@@ -85,6 +85,9 @@ IMP-007/FUT-R-004は同じFR-B07 fileから`FT-B07-002`だけを選び、
 `fr_b07_history_deterministic_order_and_dedup` Rust filterとHistoryOnly product gateへ接続する。
 IMP-008/FUT-R-005は同じFR-B07 fileから`FT-B07-003`だけを選び、
 `fr_b07_rating_boundaries_and_invalid_rejection` Rust filterとRatingOnly product gateへ接続する。
+IMP-012/FUT-C-010は現行App suiteの`FT-B05-` prefixを選び、exact 5 PASS・0 FAIL・0 SKIPを
+machine-readable resultで強制する。`search_port_` Rust filterとSearchOnly product gateへ接続し、
+performanceの`FUT-D-001`はFR-S03へ分離したままこのlaneへ含めない。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -108,6 +111,11 @@ SHAを比較する。
 RatingOnlyでは製品UIからcomicを開いてrating 1を保存し、5へ更新する。製品restart後の5復元、未設定への
 clear、viewer再open後の未設定を確認してからlibrary file集合とSHAを比較する。不正0/6はRust filterが
 正本であり、製品UIから注入しない。
+SearchOnlyではrelease UIからisolated fixtureを名前検索し、全角・大小文字のnormalizationを含む
+folder/archiveのrowとkindを観測する。resultを選ぶと親addressとselectionへ復帰し、0件noticeと
+clear後の通常catalogを確認する。harnessだけが一時probeを追加した後の明示検索は新結果へ置換し、
+probe除去後のlibrary file集合とSHAが初期値へ一致する。clear後に到着した旧generationの抑止は
+deferred frontend testを正本とする。これはwatcherではなくread-only rescanである。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

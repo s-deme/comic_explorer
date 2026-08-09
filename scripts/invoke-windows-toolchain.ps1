@@ -5,6 +5,8 @@ param(
     [string]$Task,
     [string]$FrontendTest = "src\App.fr-b11.test.tsx",
     [string]$FrontendTestName = "",
+    [ValidateRange(1, 2147483647)]
+    [int]$ExpectedFrontendPasses = 1,
     [string]$RustFilter = "shortcut",
     [switch]$ForceRelease
 )
@@ -107,8 +109,8 @@ try {
                 } catch {
                     throw "Focused frontend JSON result could not be parsed."
                 }
-                if ($summary.numPassedTests -ne 1 -or $summary.numFailedTests -ne 0) {
-                    throw ("Focused frontend selection must execute exactly one passing test: " +
+                if ($summary.numPassedTests -ne $ExpectedFrontendPasses -or $summary.numFailedTests -ne 0) {
+                    throw ("Focused frontend selection must execute exactly $ExpectedFrontendPasses passing test(s): " +
                         "passed=$($summary.numPassedTests) failed=$($summary.numFailedTests) " +
                         "excluded=$($summary.numPendingTests).")
                 }

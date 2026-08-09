@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -1477,6 +1478,9 @@ describe("application shell", () => {
   });
 
   it("FT-B05-004 exposes empty and error states and clears back to the catalog", async () => {
+    let resolveStaleSearch:
+      | ((value: Awaited<ReturnType<typeof searchLibrary>>) => void)
+      | undefined;
     searchMock
       .mockResolvedValueOnce(searchResponse([]))
       .mockResolvedValueOnce({
@@ -1488,7 +1492,13 @@ describe("application shell", () => {
           message: "internal detail must stay hidden",
           retryable: true,
         },
-      });
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<Awaited<ReturnType<typeof searchLibrary>>>((resolve) => {
+            resolveStaleSearch = resolve;
+          }),
+      );
     await registerTestLibrary([testEntry("root.cbz")]);
 
     const input = await screen.findByLabelText("名前検索");
@@ -1505,6 +1515,19 @@ describe("application shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "名前検索結果" })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "stale" } });
+    fireEvent.click(screen.getByRole("button", { name: "検索" }));
+    await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(3));
+    fireEvent.click(screen.getByRole("button", { name: "クリア" }));
+    expect(input).toHaveValue("");
+    expect(screen.getByRole("grid", { name: "現在のフォルダの項目" })).toBeInTheDocument();
+    expect(resolveStaleSearch).toBeDefined();
+    await act(async () => {
+      resolveStaleSearch!(searchResponse([testEntry("stale-result.cbz")]));
+    });
+    expect(screen.queryByText("stale-result.cbz")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "名前検索結果" })).not.toBeInTheDocument();
   });
 

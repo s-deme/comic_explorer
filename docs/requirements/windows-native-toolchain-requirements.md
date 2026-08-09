@@ -48,6 +48,7 @@ and report both the missing capability and the locations that were searched.
   `IMP-006`, `FUT-C-023`, and `MemoOnly` resolve to the memo lane.
   `IMP-007`, `FUT-R-004`, and `HistoryOnly` resolve to the history lane.
   `IMP-008`, `FUT-R-005`, and `RatingOnly` resolve to the rating lane.
+  `IMP-012`, `FUT-C-010`, and `SearchOnly` resolve to the name-search lane.
   Each lane selects its own focused frontend file, optional exact test-name
   pattern, Rust filter, and product harness switch while sharing typecheck,
   frontend/SBOM generation, focused or
@@ -56,9 +57,10 @@ and report both the missing capability and the locations that were searched.
   canonical lane also runs `verify`, whose configured test command already
   executes the full canonical frontend suite and typecheck.
   When a test-name pattern is supplied, the focused runner parses its
-  machine-readable result and fails unless exactly one selected test passes
-  with zero failures. Tests excluded by the atomic feature pattern are reported
-  separately from selected functional skips.
+  machine-readable result and fails unless the lane's configured
+  `ExpectedFrontendPasses` count passes with zero failures. Atomic lanes configure
+  one selected test; SearchOnly configures the five `FT-B05-*` tests. Tests excluded
+  by the feature pattern are reported separately from selected functional skips.
 - Every verification run emits a final JSON result on success and failure. It
   records each stage's UTC start/end, elapsed seconds, and exit code, plus the
   failed stage and total elapsed seconds.
@@ -86,6 +88,13 @@ and report both the missing capability and the locations that were searched.
   restart, clear it to unset, reopen the viewer to prove the unset value, and
   leave the library source tree byte-identical. Invalid 0/6 requests remain a
   Rust contract and are not injected through the product UI.
+  The name-search product lane must run an explicit search against an isolated
+  fixture, prove normalized mixed-kind results, result navigation, empty and
+  clear behavior, and a subsequent explicit rescan after a harness-only probe
+  is added. It must remove the probe, restore the fixture, and leave the source
+  tree byte-identical. Cleared in-flight generation suppression remains a
+  deterministic deferred frontend contract. This is not a filesystem watcher
+  lane.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and

@@ -514,6 +514,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   function clearSearch() {
+    generation.current += 1;
     setSearchQuery("");
     setSearchState({ status: "idle" });
   }

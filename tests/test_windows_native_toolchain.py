@@ -57,6 +57,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-008",
             "fut-r-005",
             "ratingonly",
+            "imp-012",
+            "fut-c-010",
+            "searchonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -76,16 +79,18 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('$exitCode = [int]$_.Exception.Data["ExitCode"]', task_runner)
         self.assertIn('[string]$FrontendTest = "src\\App.fr-b11.test.tsx"', task_runner)
         self.assertIn('[string]$FrontendTestName = ""', task_runner)
+        self.assertIn('[int]$ExpectedFrontendPasses = 1', task_runner)
         self.assertIn('[string]$RustFilter = "shortcut"', task_runner)
         self.assertIn('if (![string]::IsNullOrWhiteSpace($FrontendTestName))', task_runner)
         self.assertIn(
             '$vitestArguments += @(\"-t\", $FrontendTestName, \"--reporter=json\")',
             task_runner,
         )
-        self.assertIn("$summary.numPassedTests -ne 1", task_runner)
+        self.assertIn("$summary.numPassedTests -ne $ExpectedFrontendPasses", task_runner)
         self.assertIn("$summary.numFailedTests -ne 0", task_runner)
         self.assertIn('"-FrontendTest", $frontendTest', source)
         self.assertIn('"-FrontendTestName", $frontendTestName', source)
+        self.assertIn('"-ExpectedFrontendPasses", $expectedFrontendPasses', source)
         self.assertIn('"-RustFilter", $rustFilter', source)
         self.assertIn('"src\\App.fr-b10.test.tsx"', source)
         self.assertIn('RustFilter = "fr_b10"', source)
@@ -106,12 +111,19 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             source,
         )
         self.assertIn('ProductSwitch = "-RatingOnly"', source)
+        self.assertIn('"src\\App.test.tsx"', source)
+        self.assertIn('FrontendTestName = "FT-B05-"', source)
+        self.assertIn('ExpectedFrontendPasses = 5', source)
+        self.assertIn('RustFilter = "search_port_"', source)
+        self.assertIn('ProductSwitch = "-SearchOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
         self.assertEqual(frontend_test.count('it("FT-B07-001 '), 1)
         self.assertEqual(frontend_test.count('it("FT-B07-002 '), 1)
         self.assertEqual(frontend_test.count('it("FT-B07-003 '), 1)
+        catalog_search_test = (ROOT / "src/App.test.tsx").read_text(encoding="utf-8")
+        self.assertEqual(catalog_search_test.count('it("FT-B05-'), 5)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -265,7 +277,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         )
         self.assertIn("[switch]$RatingOnly", source)
         self.assertIn("if ($RatingOnly)", source)
-        self.assertIn("if (!$RatingOnly)", source)
+        self.assertIn("if (!$RatingOnly -and !$SearchOnly)", source)
         for stage in (
             '"rating viewer setup"',
             '"rating $rating saved"',
@@ -293,6 +305,47 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "disabled={metadataLoading}",
         ):
             self.assertIn(selector, app_source)
+
+    def test_search_product_gate_observes_normalization_navigation_and_fresh_rescan(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$SearchOnly", source)
+        self.assertIn("if ($SearchOnly)", source)
+        self.assertIn("if (!$RatingOnly -and !$SearchOnly)", source)
+        for stage in (
+            '"search normalized mixed-kind result"',
+            '"search result navigation and selection"',
+            '"search empty result"',
+            '"search clear result"',
+            '"search rescan baseline"',
+            '"search fresh rescan"',
+        ):
+            self.assertIn(stage, source)
+        for selector in (
+            "#catalog-search",
+            ".search-results",
+            "data-search-result-path",
+            "dataset.searchResultKind",
+            "data-relative-path",
+            "dataset.selected",
+        ):
+            self.assertIn(selector, source)
+        self.assertIn("folder-a\\search-pair.cbz", source)
+        self.assertIn("folder-a/search-pair:folder", source)
+        self.assertIn("folder-a/search-pair.cbz:archive", source)
+        self.assertIn("rescan-needle.cbz", source)
+        self.assertIn("Remove-Item -LiteralPath $searchFreshPath", source)
+        self.assertIn('test = "FT-B05-006"', source)
+        self.assertIn('throw "Search product harness changed source archives."', source)
+        self.assertIn(
+            'throw "Search product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        self.assertIn(
+            'throw "Search product harness changed the source directory tree."',
+            source,
+        )
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(
