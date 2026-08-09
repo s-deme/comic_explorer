@@ -98,6 +98,16 @@ import {
   workspaceGridColumns,
 } from "./features/workspace/display";
 import {
+  APP_VERSION,
+  MOUSE_GESTURE_ACTIONS,
+  MOUSE_GESTURE_NAMES,
+  loadMouseGestures,
+  normalizeSettingsProfile,
+  saveMouseGestures,
+  type MouseGestureBindings,
+  type SettingsProfile,
+} from "./features/settings/profile";
+import {
   addBookshelfItem,
   listBookmarks,
   listBookshelf,
@@ -274,6 +284,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   >("idle");
   const shortcutSaveRequest = useRef(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDraft, setSettingsDraft] = useState<SettingsProfile | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [mouseGestures, setMouseGestures] = useState<MouseGestureBindings>(() =>
+    loadMouseGestures(typeof window === "undefined" ? undefined : window.localStorage),
+  );
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(240);
@@ -1174,6 +1190,92 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
   }
 
+  function currentSettingsProfile(): SettingsProfile {
+    return {
+      profileVersion: 1,
+      sortField,
+      sortDescending,
+      endOfVolumePolicy,
+      catalogViewMode,
+      viewMode,
+      layoutMode,
+      readingDirection,
+      scaleMode: viewerScaleMode,
+      scale: viewerScale,
+      loupeEnabled,
+      shortcuts: { ...shortcuts },
+      mouseGestures: { ...mouseGestures },
+    };
+  }
+
+  function openSettingsDialog() {
+    setProfileNotice(null);
+    setSettingsDraft(currentSettingsProfile());
+    setSettingsOpen(true);
+  }
+
+  function applySettingsProfile(profile: SettingsProfile) {
+    changeSort(profile.sortField, profile.sortDescending);
+    changeEndOfVolumePolicy(profile.endOfVolumePolicy);
+    changeCatalogViewMode(profile.catalogViewMode);
+    setViewMode(profile.viewMode);
+    setLayoutMode(profile.layoutMode);
+    setReadingDirection(profile.readingDirection);
+    setViewerScaleMode(profile.scaleMode);
+    setViewerScale(profile.scale);
+    setLoupeEnabled(profile.loupeEnabled);
+    void saveViewerSettings(
+      {
+        viewMode: profile.viewMode,
+        layoutMode: profile.layoutMode,
+        readingDirection: profile.readingDirection,
+        scaleMode: profile.scaleMode,
+        scale: profile.scale,
+        loupeEnabled: profile.loupeEnabled,
+      },
+      ++settingsGeneration.current,
+    ).catch(() => undefined);
+    persistShortcutBindings(profile.shortcuts);
+    setMouseGestures(profile.mouseGestures);
+    saveMouseGestures(
+      typeof window === "undefined" ? undefined : window.localStorage,
+      profile.mouseGestures,
+    );
+    setSettingsOpen(false);
+    setProfileNotice("設定profileを適用しました。");
+  }
+
+  function exportSettingsProfile() {
+    const blob = new Blob([JSON.stringify(currentSettingsProfile(), null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "comic-explorer-settings.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setProfileNotice("設定profileを書き出しました。");
+  }
+
+  function importSettingsProfile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file === undefined) return;
+    void file
+      .text()
+      .then((text) => {
+        const profile = normalizeSettingsProfile(JSON.parse(text));
+        if (profile === null) {
+          setProfileNotice("設定profileの形式が不正です。");
+          return;
+        }
+        setSettingsDraft(profile);
+        setProfileNotice("設定profileを読み込みました。適用を押すと反映します。");
+      })
+      .catch(() => setProfileNotice("設定profileを読み込めませんでした。"));
+  }
+
   function persistShortcutBindings(next: ShortcutBindings) {
     setShortcuts(next);
     setShortcutNotice(null);
@@ -1610,6 +1712,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onNextItem={handleEndOfVolume}
           bookmarks={bookmarks}
           onPageChange={() => undefined}
+          mouseGestures={mouseGestures}
           detached={viewerDetached}
           onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}
@@ -2301,6 +2404,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="settings-menu-item"
+                tabIndex={0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
+                onClick={() => runMenuAction(openSettingsDialog)}
+              >
+                統合設定…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 data-product-id="shortcut-help-menu-item"
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
@@ -2740,6 +2854,136 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <span>{loadState.status === "loading" ? "読み込み中" : "準備完了"}</span>
         {selectionNotice !== null && <span role="status">{selectionNotice}</span>}
       </footer>
+      {settingsOpen && settingsDraft !== null && (
+        <div className="dialog-backdrop">
+          <section
+            className="settings-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="統合設定"
+          >
+            <h2>統合設定</h2>
+            <p>表示・操作設定だけを扱います。library path、秘密情報、machine固有値はprofileに含めません。</p>
+            <div className="settings-grid">
+              <label>
+                一覧形式
+                <select
+                  aria-label="profile一覧形式"
+                  value={settingsDraft.catalogViewMode}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    catalogViewMode: normalizeCatalogViewMode(event.target.value),
+                  })}
+                >
+                  {CATALOG_VIEW_MODES.map((mode) => <option key={mode} value={mode}>{CATALOG_VIEW_MODE_LABELS[mode]}</option>)}
+                </select>
+              </label>
+              <label>
+                閲覧モード
+                <select
+                  aria-label="profile閲覧モード"
+                  value={settingsDraft.viewMode}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    viewMode: event.target.value as SettingsProfile["viewMode"],
+                  })}
+                >
+                  <option value="single">単ページ</option>
+                  <option value="spread">見開き</option>
+                </select>
+              </label>
+              <label>
+                閲覧レイアウト
+                <select
+                  aria-label="profile閲覧レイアウト"
+                  value={settingsDraft.layoutMode}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    layoutMode: normalizeViewerLayoutMode(event.target.value),
+                  })}
+                >
+                  {VIEWER_LAYOUT_MODES.map((mode) => <option key={mode} value={mode}>{VIEWER_LAYOUT_MODE_LABELS[mode]}</option>)}
+                </select>
+              </label>
+              <label>
+                巻末動作
+                <select
+                  aria-label="profile巻末動作"
+                  value={settingsDraft.endOfVolumePolicy}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    endOfVolumePolicy: normalizeEndOfVolumePolicy(event.target.value),
+                  })}
+                >
+                  {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => <option key={policy} value={policy}>{label}</option>)}
+                </select>
+              </label>
+              <label>
+                読み方向
+                <select
+                  aria-label="profile読み方向"
+                  value={settingsDraft.readingDirection}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    readingDirection: event.target.value as SettingsProfile["readingDirection"],
+                  })}
+                >
+                  <option value="rightToLeft">右開き</option>
+                  <option value="leftToRight">左開き</option>
+                </select>
+              </label>
+              <label>
+                ルーペ
+                <input
+                  type="checkbox"
+                  aria-label="profileルーペ"
+                  checked={settingsDraft.loupeEnabled}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    loupeEnabled: event.target.checked,
+                  })}
+                />
+              </label>
+            </div>
+            <section aria-label="マウスジェスチャー設定">
+              <h3>マウスジェスチャー</h3>
+              {MOUSE_GESTURE_NAMES.map((name) => (
+                <label key={name}>
+                  {name}
+                  <select
+                    aria-label={`${name}ジェスチャー`}
+                    value={settingsDraft.mouseGestures[name]}
+                    onChange={(event) => {
+                      const action = event.target.value as MouseGestureBindings[typeof name];
+                      const current = settingsDraft.mouseGestures;
+                      const next = { ...current, [name]: action };
+                      const duplicate = action !== "none" && MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
+                      if (duplicate) {
+                        setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
+                        return;
+                      }
+                      setProfileNotice(null);
+                      setSettingsDraft({ ...settingsDraft, mouseGestures: next });
+                    }}
+                  >
+                    {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{action}</option>)}
+                  </select>
+                </label>
+              ))}
+            </section>
+            {profileNotice !== null && <p role="status">{profileNotice}</p>}
+            <div className="settings-actions">
+              <button type="button" onClick={exportSettingsProfile}>profileを書き出す</button>
+              <label className="file-button">
+                profileを読み込む
+                <input type="file" accept="application/json,.json" onChange={importSettingsProfile} />
+              </label>
+              <button type="button" onClick={() => applySettingsProfile(settingsDraft)}>適用</button>
+              <button type="button" onClick={() => setSettingsOpen(false)}>キャンセル</button>
+            </div>
+          </section>
+        </div>
+      )}
       {helpOpen && (
         <div className="dialog-backdrop">
           <div
@@ -2753,6 +2997,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             }}
           >
             <h2 id="help-title">キー操作とショートカット</h2>
+            <section aria-label="一般ヘルプ">
+              <h3>一般ヘルプ</h3>
+              <p>フォルダを登録し、項目をEnterで開きます。漫画はCtrl+Enterまたはダブルクリックで読み始めます。</p>
+              <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: Tauri WebView2またはブラウザ / license: THIRD-PARTY-NOTICES.md</p>
+            </section>
             <p>Enter: フォルダを開く / Ctrl+Enter: 漫画として読む</p>
             <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
             <section aria-label="ショートカット設定">

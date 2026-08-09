@@ -35,6 +35,7 @@ import {
   type ShortcutBindings,
 } from "../input/shortcuts";
 import type { PageBookmark } from "../reading/collections";
+import type { MouseGestureBindings } from "../settings/profile";
 
 interface ViewerProps {
   session: ViewerSession;
@@ -54,6 +55,7 @@ interface ViewerProps {
   fullscreenAdapter?: FullscreenAdapter;
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
+  mouseGestures?: MouseGestureBindings;
   detached?: boolean;
   onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
@@ -88,6 +90,7 @@ export function Viewer({
   fullscreenAdapter = tauriFullscreenAdapter,
   bookmarks = [],
   onPageChange,
+  mouseGestures,
   detached = false,
   onToggleDetached,
   onSaveBookmark,
@@ -119,6 +122,7 @@ export function Viewer({
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
+  const pointerDownX = useRef<number | null>(null);
   const layoutInitialized = useRef(false);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
@@ -296,6 +300,12 @@ export function Viewer({
   function jumpToNextBookmark() {
     const next = onNextBookmark?.(state.index);
     if (next !== null && next !== undefined) dispatch({ type: "go", index: next });
+  }
+
+  function applyMouseGesture(action: MouseGestureBindings[keyof MouseGestureBindings] | undefined) {
+    if (action === "nextPage") next();
+    else if (action === "previousPage") dispatch({ type: "previous" });
+    else if (action === "closeViewer") void close();
   }
 
   useEffect(() => {
@@ -521,6 +531,19 @@ export function Viewer({
         className="viewer-stage"
         onPointerMove={updateLoupe}
         onPointerLeave={() => setLoupe(null)}
+        onPointerDown={(event) => {
+          pointerDownX.current = event.clientX;
+        }}
+        onPointerUp={(event) => {
+          const start = pointerDownX.current;
+          pointerDownX.current = null;
+          if (start === null || Math.abs(event.clientX - start) < 48) return;
+          const action = event.clientX < start
+            ? mouseGestures?.swipeLeft
+            : mouseGestures?.swipeRight;
+          applyMouseGesture(action);
+        }}
+        onDoubleClick={() => applyMouseGesture(mouseGestures?.doubleClick)}
         onWheel={(event) => {
           if (event.ctrlKey) {
             event.preventDefault();

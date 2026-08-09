@@ -62,7 +62,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Done` |
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Done` |
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Done` |
-| P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Planned`（設定scope確定待ち） |
+| P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Done` |
 | P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial`（WebP完了、残件はCandidate） |
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned`（license・fixture確認待ち） |
 | P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Planned`（入出力仕様確定待ち） |
@@ -681,13 +681,22 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B19 — 設定・help（Batch 19 / P7）
 
-- **状態:** `Planned`。設定対象となる先行機能のscope確定後に着手する。
+- **状態:** `Done`。先行priorityの表示・viewer・操作設定を統合dialogへ束ね、profile、mouse gesture、
+  offline help、version情報を実装し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-069`統合設定画面、(2) `FUT-C-071`設定profile、
   (3) `FUT-C-072`mouse gesture設定、(4) `FUT-C-076`一般help、(5) `FUT-C-077`version情報。
 - **優先理由:** 個別設定を先に増殖させず、apply/cancel、migration、safe defaultを共有する。
   既存`FUT-C-019`のkeyboard shortcut設定は再実装せず統合導線から利用する。
 - **採用gate:** profileへ含める値と秘密・machine固有値の除外、gesture conflict、offline help配布、
   version/license表示項目を決める。
+
+#### FR-B19 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p7-help)。
+- **実装根拠:** `src/App.tsx`、`src/features/settings/profile.ts`、
+  `src/features/settings/profile.test.ts`、`src/features/viewer/Viewer.tsx`。
+- **直接観測:** [FR-B19 focused test結果](../testing/fr-b19-results.md)。profileの非機密境界、gesture conflict、
+  apply/cancel導線、一般help/version表示を確認した。
 
 ### FR-B20 — thumbnail保守（Batch 20 / P10）
 

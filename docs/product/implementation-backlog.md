@@ -118,11 +118,11 @@ codd:
 | 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Implemented / PASS | Done | menu/toolbarの表示切替と復帰導線を実装・実測。永続化はB19へ送る |
 | 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Implemented / PASS | Done | viewerのcurrent-session分離表示、Esc復帰を実装・実測 |
 | 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Implemented / PASS | Done | tray API可否の安全なdisabled境界と収納状態UIを実装・実測 |
-| 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Candidate / NOT TESTED | Candidate | 統合対象、分類、適用・取消、永続化を要件化 |
-| 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Candidate / NOT TESTED | Candidate | format、save/load/switch、migration、安全な除外項目を決定 |
-| 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Candidate / NOT TESTED | Candidate | 対象操作、device、context、conflict解決を決定 |
-| 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Candidate / NOT TESTED | Candidate | help構成、offline配布、検索・context導線を決定 |
-| 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Candidate / NOT TESTED | Candidate | 表示項目とdialog操作を決定 |
+| 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Implemented / PASS | Done | catalog/viewer/巻末/gesture/shortcutをapply/cancel付きdialogへ統合 |
+| 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Implemented / PASS | Done | versioned JSON export/importと安全な除外項目を実装・実測 |
+| 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Implemented / PASS | Done | swipe/double-clickとcommand conflict拒否を実装・実測 |
+| 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Implemented / PASS | Done | offlineの操作説明を既存helpへ統合・実測 |
+| 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Implemented / PASS | Done | version/runtime/license noticeを表示・実測 |
 | 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
 | 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |
 | 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |
