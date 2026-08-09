@@ -111,9 +111,9 @@ codd:
 | 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Implemented / PASS | Done | favoriteと分離したbookshelfを実装・実測 |
 | 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Implemented / PASS | Done | basename glob mask、current-session scope、status同期を実装・実測 |
 | 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Implemented / PASS | Done | filtered rowのUTF-8 CSV exportとabsolute path除外を実装・実測 |
-| 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Candidate / NOT TESTED | Candidate | 採用command確定後にmenu IA、shortcut、disabled stateを設計 |
-| 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Candidate / NOT TESTED | Candidate | command集合、icon asset、accessible name、表示scopeを決定 |
-| 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Candidate / NOT TESTED | Candidate | visual fidelity、density、長名、responsive基準を決定 |
+| 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Implemented / PASS | Done | menuとtoolbarの共通command IAを実装・実測 |
+| 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Implemented / PASS | Done | accessible icon command toolbarを実装・実測 |
+| 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Implemented / PASS | Done | reference_tile view modeを実装・実測 |
 | 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Candidate / NOT TESTED | Candidate | 対象pane、current-session表示状態、keyboard導線を決定 |
 | 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Candidate / NOT TESTED | Candidate | 対象bar、current-session復帰導線を決定。永続化はB19へ送る |
 | 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Candidate / NOT TESTED | Candidate | 分離方式、lifecycle、focus、fullscreen、復帰を要件化 |

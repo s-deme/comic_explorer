@@ -60,7 +60,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Done` |
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Done` |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Done` |
-| P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Planned`（先行command確定後） |
+| P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Done` |
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Planned`（Windows lifecycle要件待ち） |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Planned`（設定scope確定待ち） |
 | P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial`（WebP完了、残件はCandidate） |
@@ -643,13 +643,21 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B17 — 参照shell UI（Batch 17 / P5）
 
-- **状態:** `Planned`。B13〜B16で採用commandとstateを確定してから着手する。
+- **状態:** `Done`。B13〜B16のcommand/stateを再利用して実装し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-065`参照menu構成、(2) `FUT-C-066`icon command toolbar、
   (3) `FUT-C-067`参照型thumbnail tile。
 - **優先理由:** Leeyesとの差を縮めるが、先に外観だけを作るとdisabled commandやshortcutを
   作り直すため、実機能の後段に置く。既存のview mode・sort・thumbnail取得を再利用する。
 - **採用gate:** menu/toolbarは既存commandを呼ぶpresentation層とし、機能を二重実装しない。
   accessible name、keyboard menu操作、long name、density、DPIの受入基準を決める。
+
+#### FR-B17 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui)。
+- **実装根拠:** `src/App.tsx`、`src/features/catalog/view-mode.ts`、
+  `src/features/catalog/CatalogGrid.tsx`、`src/styles.css`、`src/features/catalog/view-mode.test.ts`。
+- **直接観測:** [FR-B17 focused test結果](../testing/fr-b17-results.md)。enum/default、grid mount、
+  toolbar accessible labelsをSKIP 0で実測した。
 
 ### FR-B18 — workspace・window（Batch 18 / P6）
 

@@ -2043,7 +2043,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               </button>
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">一覧形式</span>
-              {CATALOG_VIEW_MODES.map((mode) => (
+              {CATALOG_VIEW_MODES.filter((mode) => mode !== "reference_tile").map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -2282,6 +2282,21 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           ↑
         </button>
+        <div className="icon-command-toolbar" aria-label="コマンドツールバー">
+          <button type="button" aria-label="現在場所を更新" data-product-id="toolbar-refresh" onClick={refreshCatalog}>⟳</button>
+          <button type="button" aria-label="選択パスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}>⧉</button>
+          <button type="button" aria-label="選択項目のプロパティ" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}>ⓘ</button>
+          <button type="button" aria-label="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}>▤</button>
+          <button
+            type="button"
+            aria-label="参照型タイル"
+            aria-pressed={catalogViewMode === "reference_tile"}
+            data-product-id="toolbar-reference-tile"
+            onClick={() => changeCatalogViewMode(catalogViewMode === "reference_tile" ? "cover_list" : "reference_tile")}
+          >
+            ▦
+          </button>
+        </div>
         <label>
           並べ替え
           <select
@@ -2328,7 +2343,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               )
             }
           >
-            {CATALOG_VIEW_MODES.map((mode) => (
+              {CATALOG_VIEW_MODES.map((mode) => (
               <option key={mode} value={mode}>
                 {CATALOG_VIEW_MODE_LABELS[mode]}
               </option>

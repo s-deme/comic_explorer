@@ -12,6 +12,7 @@ describe("catalog view mode", () => {
       "small_thumbnail",
       "detail_list",
       "cover_list",
+      "reference_tile",
     ]);
     expect(DEFAULT_CATALOG_VIEW_MODE).toBe("cover_list");
   });

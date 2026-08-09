@@ -29,6 +29,7 @@ const VIEW_MODE_CONFIG: Record<
   small_thumbnail: { columnCount: 8, rowHeight: 116 },
   detail_list: { columnCount: 1, rowHeight: 62 },
   cover_list: { columnCount: 5, rowHeight: 258 },
+  reference_tile: { columnCount: 6, rowHeight: 218 },
 };
 
 function displayName(entry: CatalogEntry): string {

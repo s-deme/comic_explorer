@@ -214,6 +214,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   grid-template-columns: minmax(0, 1fr);
   height: 62px;
 }
+.catalog-row--reference_tile {
+  grid-template-columns: repeat(6, minmax(132px, 1fr));
+  height: 218px;
+}
 .catalog-scroll--detail_list .virtual-canvas { min-width: 760px; }
 .catalog-list-header {
   display: grid;
@@ -251,6 +255,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 5px;
   text-align: left;
 }
+.catalog-item--reference_tile {
+  height: 208px;
+  grid-template-rows: 142px auto auto;
+  justify-items: stretch;
+  padding: 6px;
+  border-color: #d7dde5;
+  background: #fbfcfe;
+  box-shadow: 0 1px 3px #1f293714;
+}
+.catalog-item--reference_tile:hover,
+.catalog-item--reference_tile[data-selected="true"] {
+  border-color: #6b9ed5;
+  background: #eef6ff;
+}
+.catalog-item--reference_tile .thumbnail { min-height: 132px; }
 .catalog-item--small_thumbnail .thumbnail {
   grid-row: 1 / 3;
   width: 64px;
