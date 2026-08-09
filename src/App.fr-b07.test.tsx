@@ -140,6 +140,14 @@ function historyResponse(data: ReadingHistoryEntry[]) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
 const defaultSettings: CatalogSettings = {
   sortField: "name",
   sortDescending: false,
@@ -288,9 +296,20 @@ describe("FR-B07 connected App boundary", () => {
     );
     await waitFor(() => expect(memo).toHaveValue("first memo"));
 
+    const pendingSave = deferred<ReturnType<typeof metadataResponse>>();
+    saveMemoMock.mockReturnValueOnce(pendingSave.promise);
     fireEvent.change(memo, { target: { value: "edited memo" } });
     fireEvent.click(screen.getByRole("button", { name: "メモを保存" }));
-    await waitFor(() => expect(memo).toHaveValue("edited memo"));
+    await waitFor(() => expect(memo).toBeDisabled());
+    expect(screen.getByRole("button", { name: "メモを保存" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "メモを消去" })).toBeDisabled();
+    pendingSave.resolve(
+      metadataResponse(comic.relativePath, { memo: "edited memo" }),
+    );
+    await waitFor(() => {
+      expect(memo).toBeEnabled();
+      expect(memo).toHaveValue("edited memo");
+    });
     fireEvent.click(screen.getByRole("button", { name: "メモを消去" }));
     await waitFor(() => expect(memo).toHaveValue(""));
     expect(saveMemoMock).toHaveBeenLastCalledWith(

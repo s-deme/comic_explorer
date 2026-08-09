@@ -77,6 +77,10 @@ IMP-004/FUT-C-019はfocused frontend、typecheck、frontend/SBOM、focused Rust�
 IMP-005/FUT-C-022も同じpipelineを共有し、設定tableからFR-B10 frontend file、`fr_b10` Rust filter、
 TagsOnly product gateを選ぶ。featureごとの差はこの三点へ限定し、release freshness、cleanup、
 CoDD工程を複製しない。
+IMP-006/FUT-C-023はFR-B07 frontend fileの`FT-B07-001`だけをtest-name patternで選び、
+`fr_b07_memo` Rust filterとMemoOnly product gateへ接続する。共有FR-B07 suiteをファイル分割せず、
+後続のhistory/ratingでも各原子testだけを選べるようfocused frontend runnerへ任意patternを渡す。
+runnerはVitest JSONを解析して選択対象exact 1 PASS・0 FAILを強制し、pattern非対象件数を生値で残す。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -91,6 +95,9 @@ frontend `*.test.ts(x)`はrelease入力から除外する。product harnessはac
 保存状態と相対reading positionを観測し、socket/UI/process/port/cleanupを有限時間で終了する。
 TagsOnlyではReactの選択とmenu描画を段階ごとに待ち、非一致tagを含む検索前集合から正規化queryで
 一件へ絞り込む。rename、再起動復元、removeの完了後にlibrary file集合とSHAを比較する。
+MemoOnlyでは製品UIからcomicを開き、memo保存中のdisabled状態が解除されるまで待ってから
+viewer再open・製品restart後の復元を確認する。clear後も再openして空状態を確認し、library file集合と
+SHAを比較する。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

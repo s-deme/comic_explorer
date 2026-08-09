@@ -4,6 +4,7 @@ param(
     [ValidateSet("Bootstrap", "FrontendFocused", "Typecheck", "Release", "FrontendSbom", "ReleaseExecutable", "RustFocused", "RustCanonical", "Freshness")]
     [string]$Task,
     [string]$FrontendTest = "src\App.fr-b11.test.tsx",
+    [string]$FrontendTestName = "",
     [string]$RustFilter = "shortcut",
     [switch]$ForceRelease
 )
@@ -86,12 +87,35 @@ try {
             if (!(Test-Path -LiteralPath $frontendTestPath -PathType Leaf)) {
                 throw "Focused frontend test was not found: $FrontendTest"
             }
-            Invoke-Checked "Focused frontend test ($FrontendTest)" $toolchain.Node `
-                @(
-                    (Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
-                    $frontendTestPath,
-                    "--pool=threads", "--poolOptions.threads.singleThread=true"
-                ) $projectRoot
+            $vitestArguments = @(
+                (Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
+                $frontendTestPath,
+                "--pool=threads", "--poolOptions.threads.singleThread=true"
+            )
+            if (![string]::IsNullOrWhiteSpace($FrontendTestName)) {
+                $vitestArguments += @("-t", $FrontendTestName, "--reporter=json")
+                $result = Invoke-TrackedNative -FilePath $toolchain.Node `
+                    -Arguments $vitestArguments -WorkingDirectory $projectRoot
+                if ($result.StandardOutput) { [Console]::Out.Write($result.StandardOutput) }
+                if ($result.StandardError) { [Console]::Error.Write($result.StandardError) }
+                if ($result.ExitCode -ne 0) {
+                    Throw-NativeFailure -Name "Focused frontend test ($FrontendTest)" `
+                        -ExitCode $result.ExitCode
+                }
+                try {
+                    $summary = $result.StandardOutput | ConvertFrom-Json
+                } catch {
+                    throw "Focused frontend JSON result could not be parsed."
+                }
+                if ($summary.numPassedTests -ne 1 -or $summary.numFailedTests -ne 0) {
+                    throw ("Focused frontend selection must execute exactly one passing test: " +
+                        "passed=$($summary.numPassedTests) failed=$($summary.numFailedTests) " +
+                        "excluded=$($summary.numPendingTests).")
+                }
+            } else {
+                Invoke-Checked "Focused frontend test ($FrontendTest)" $toolchain.Node `
+                    $vitestArguments $projectRoot
+            }
         }
         "Typecheck" {
             Invoke-Checked "TypeScript typecheck" $toolchain.Node `

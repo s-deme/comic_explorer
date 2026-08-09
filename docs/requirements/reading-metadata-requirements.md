@@ -74,11 +74,16 @@ focused testで直接観測する。
 | FT-B07-003 | rating 1/5、未設定、invalid拒否 | App入力 → rating command → SQLite reopen |
 | FT-B07-004 | v2→v3 migrationと再起動後の全値 | StateStore migration/reopen → metadata API |
 | FT-B07-005 | reading positionとの分離、library/original差分0 | position API + metadata API + snapshot |
+| FT-B07-006 | Windows製品でのmemo保存、編集、再起動復元、clear | release WebView2 → App → client → SQLite + library source tree差分0 |
 
-focused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07` selectorは上記5契約を
+選択対象のfocused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07` selectorは上記5契約を
 個別に検査する。frontend側はAppからclientへの接続を観測できる`FT-B07-001`〜
 `FT-B07-004`の4件を選択し、`FT-B07-005`は実Storeと実ファイルを使うRust testを正本とする。
 clientを全mockしたfrontend testで原本やlibrary fileの不変性を合格に数えない。
+`FT-B07-006`はmockを使わないWindows release製品で`FUT-C-023`だけを原子的に判定し、historyと
+ratingの未測定product gateをmemoのPASSへ含めない。原子feature runnerのtest-name patternで非対象に
+なったtestは`excluded-by-pattern`として生値を開示し、選択対象の機能SKIPへ数えない。runnerは選択対象が
+exact 1 PASS・0 FAILでなければexit 0でも失敗させる。
 
 ## 非採用・境界
 
@@ -90,14 +95,26 @@ clientを全mockしたfrontend testで原本やlibrary fileの不変性を合格
 
 ## 受入ゲート
 
-実装後、frontend focused、Rust focused、canonical Rust、typecheck、buildを各一回、SKIP 0で測定し、
+実装後、frontend focused、Rust focused、canonical Rust、typecheck、buildを各一回、選択対象SKIP 0で測定し、
 stdout/stderrをraw保存してSHA-256で束縛する。CoDD scan/check/verifyも各一回測定してrawを束縛するが、
 承認済みの構造的3 SKIP以外の実test SKIPは許容せず、CoDDのexit 0だけではSKIPをPASSへ昇格できない。
 verification tests 0やVacuousも完了扱いにしない。独立command-manifest oracleとv3 scope oracleが
 exit 0で、Gunshiの軽量review ACCEPTを得るまで測定結果をPASSへ昇格せず、commitも行わない。全gate後に
 roadmap、feature-status、test resultsを実測状態へ同期する。
 
-## cmd_400 最終実測状態
+### IMP-006 memo完了ゲート
+
+`scripts/run-feature-verification-wsl.sh IMP-006 -RustMode Canonical`をWindows-native toolchainへ橋渡しする
+正本コマンドとする。現行frontendから`FT-B07-001`だけを選択し、typecheck、SBOM/build、canonical Rust、
+release freshness、`FT-B07-006`、製品process cleanup、CoDD scan/check/verifyを同じsourceへ束縛する。
+
+`FT-B07-006`では`comic-folder`を製品UIから開き、保存中はmemo入力を含む操作を無効化して、memoを
+保存・編集し、製品再起動後に同じ作品へ
+復元されることを確認してからclearする。保存完了はinput値だけでなく操作中状態の解除後に判定し、
+再表示でも空であることを確認する。前後のlibrary file集合、bytes、SHA-256は一致しなければならない。
+このgateのPASSは`FUT-C-023`だけを完了させ、`FUT-R-004`と`FUT-R-005`を自動的にPASSへ昇格しない。
+
+## cmd_400 履歴実測状態
 
 2026-08-03 JSTのcmd_400では、Gunshiが受理した機能rawを再実行せずSHA参照した。frontend focusedは
 source SHA `f7031d69365005301961896db87da20ace8b9c5086531c6ad7501e9b68aa9c83`に束縛した
@@ -132,11 +149,12 @@ exact5/fullのaccepted compositeに含まれる。
 合格件数には使わない。現行の`FT-B07-005`はRustの
 `fr_b07_reading_position_separation_survives_metadata_crud`が実ファイルのbyte不変を検証する。
 SHAはbyte一致から導けるが、mtime、完全なdirectory tree、製品WebView2境界はこのRust testの
-観測範囲外であり、別のproduct gateが完了するまで過大にPASSを主張しない。
+観測範囲外である。cmd_400では別product gateが未完了だったため、過大にPASSを主張しなかった。
 
 CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification
 testsは `0 PASS / 0 FAIL / 0 SKIP / 0 total` である。3 SKIP（`deployment_completeness`、
 `user_journey_coherence`、`environment_coverage`）と1 VACUOUS（`task_completion`）はPASSへ加算せず、
-CoDD gateおよびFR-B07 aggregateは `INCOMPLETE / NOT APPLICABLE` のままとする。Windows WebView2
-native product UIとOS syscallの完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで代替しない。
+cmd_400のCoDD gateおよびFR-B07 aggregateは `INCOMPLETE / NOT APPLICABLE` だった。当時のWindows
+WebView2 native product UIとOS syscall完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで
+代替しなかった。IMP-006はmemoのWebView2境界だけを後続実測し、history/ratingへ波及させない。
 最終結果と不採用CoDD草稿の履歴は [FR-B07結果](../testing/fr-b07-results.md) に集約する。

@@ -2,7 +2,8 @@
 param(
     [switch]$FullscreenOnly,
     [switch]$ShortcutOnly,
-    [switch]$TagsOnly
+    [switch]$TagsOnly,
+    [switch]$MemoOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,7 +36,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -765,6 +766,131 @@ try {
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    if ($MemoOnly) {
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer') !== null && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle' && " +
+            "document.querySelector('[data-product-id=item-memo-input]') !== null"
+        ) "memo viewer setup"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('[data-product-id=item-memo-input]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+  setter.call(input, 'memo-one');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-one' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle'"
+        ) "memo first edit"
+        Invoke-Evaluate "document.querySelector('[data-product-id=item-memo-save]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'saved' && " +
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-one' && " +
+            "document.querySelector('[data-product-id=item-memo-save]')?.disabled === false && " +
+            "document.querySelector('[data-product-id=item-memo-clear]')?.disabled === false"
+        ) "memo first save"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "memo first viewer close"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-one' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle'"
+        ) "memo reopen persistence"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('[data-product-id=item-memo-input]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+  setter.call(input, 'memo-two');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-two' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle'"
+        ) "memo second edit"
+        Invoke-Evaluate "document.querySelector('[data-product-id=item-memo-save]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'saved' && " +
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-two' && " +
+            "document.querySelector('[data-product-id=item-memo-save]')?.disabled === false && " +
+            "document.querySelector('[data-product-id=item-memo-clear]')?.disabled === false"
+        ) "memo second save"
+        Stop-Product $cold
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        ) "memo restart catalog"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === 'memo-two' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle'"
+        ) "memo restart persistence"
+        Invoke-Evaluate "document.querySelector('[data-product-id=item-memo-clear]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'saved' && " +
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === '' && " +
+            "document.querySelector('[data-product-id=item-memo-save]')?.disabled === false && " +
+            "document.querySelector('[data-product-id=item-memo-clear]')?.disabled === false"
+        ) "memo clear"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "memo clear viewer close"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-memo-input]')?.value === '' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.memoSaveState === 'idle'"
+        ) "memo clear reopen persistence"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Memo product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Memo product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B07-006"
+            saved = $true
+            reopened = $true
+            restartPersisted = $true
+            cleared = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
     if ($TagsOnly) {
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +

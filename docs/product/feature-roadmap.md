@@ -46,8 +46,8 @@ connected evidenceとfocused QCまでは通過したが、canonical aggregate（
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
 FR-B05、FR-B06、FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
-FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWindows product gateが残るため
-`Partial / BLOCKED`で保持する。
+FR-B07はIMP-006でmemoのWindows product gateを完了したが、history/ratingのproduct gateが残るため
+全体は`Partial / BLOCKED`で保持する。
 
 ## 推奨実装順
 
@@ -65,7 +65,7 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
-| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Partial / BLOCKED`（機能raw受理、CoDD INCOMPLETE、Windows product gate BLOCKED） |
+| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Partial / BLOCKED`（memo product PASS、history/rating product BLOCKED） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Done`（Windows WebView2製品gate・canonical aggregate完了） |
@@ -253,9 +253,9 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 現行はApp/client接続をfrontend 4件、SQLite・原本byte不変をRust 5件で検証する。以下の
 focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現行件数には使わない。
 
-- **状態:** `Partial / BLOCKED`。実装境界と機能測定は受理済みだが、CoDD verifyの3 SKIP・1
-  VACUOUS・verification tests 0により構造ゲートは `INCOMPLETE / NOT APPLICABLE`、Windows
-  WebView2 native product gateは `BLOCKED_UNMEASURED` のままである。`FUT-D-005` の読書状態ラベルは
+- **状態:** `Partial / BLOCKED`。IMP-006で`FUT-C-023`のWindows WebView2製品gateと現行canonical
+  aggregateを完了し、memoは`Implemented / PASS`である。`FUT-R-004`と`FUT-R-005`の製品gateは
+  `BLOCKED_UNMEASURED`のため、FR-B07全体は完了へ昇格しない。`FUT-D-005` の読書状態ラベルは
   未決定のため本バッチへ先行投入しない。
 - **対象 feature ID:** `FUT-C-023`, `FUT-R-004`, `FUT-R-005`（memo、閲覧履歴、評価）。
 - **user outcome:** 読者が作品にメモ、閲覧履歴、評価をローカル保存し、後から同じ作品の
@@ -268,7 +268,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   (4) rating の入力/表示、(5) 欠損対象と再起動復元。
 - **focused test 範囲:** `FT-B07-001` memo CRUD、`FT-B07-002` history の順序と重複、
   `FT-B07-003` rating の境界/未設定、`FT-B07-004` migration・restart、`FT-B07-005`
-  reading position との分離と原本差分0。
+  reading position との分離と原本差分0、`FT-B07-006` Windows release製品のmemo
+  save/reopen/restart/clearとsource tree差分0。
 - **実装path:** `src-tauri/src/state/repository.rs`、`src-tauri/src/application/mod.rs`、
   `src-tauri/src/lib.rs`、`src/features/library/client.ts`、`src/App.tsx`、`src/App.test.tsx`、
   `src/App.fr-b07.test.tsx`。
@@ -285,7 +286,17 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   3 SKIP・1 VACUOUS・verification tests 0であり、SKIP=FAIL規則により `BATCH-END-GATE` は
   未達のまま保持する。`FUT-D-005` の採否判断は別トラックで行う。
 
-#### FR-B07 最終同期の受入証跡
+#### IMP-006 memo受入証跡
+
+- `./scripts/run-feature-verification-wsl.sh IMP-006 -RustMode Canonical`は全12 stage、exit 0、
+  133.969秒で完了した。frontendは`FT-B07-001`をexact 1 PASS、非対象3件をpattern除外として記録し、
+  Windows canonical Rustは79 unit + 1 process PASSだった。
+- release WebView2 `FT-B07-006`はsave、viewer再open、edit、製品restart復元、clear、再open、
+  library source tree差分0を観測した。cleanupは製品/WebView2 process、port、SQLite lock残留0。
+- CoDD scan/check/verifyは各exit 0・red 0。任意profileのSKIP/VACUOUSは生値を開示し、memoの
+  機能PASSへ加算しない。run ID、stage時間、各SHAは[FR-B07結果](../testing/fr-b07-results.md)を正本とする。
+
+#### cmd_400 最終同期の受入証跡（履歴）
 
 - **機能raw:** [FR-B07結果](../testing/fr-b07-results.md) と、次のaccepted rawを参照する。
   focused exact5・typecheck・buildは
@@ -307,12 +318,12 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   `93f6aeef90bfacde5a7f1f76eddbbdb1510dc83adb7f97fd3739069acb7685a6`。verifyは
   `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
   `INCOMPLETE / NOT APPLICABLE`としてPASS数へ加算しない。accepted functional raw、CoDD rawの
-  再実行、retry、commit、pushは行わない。Windows WebView2 native product UIとOS syscallの完全観測は
-  `UNMEASURED / BLOCKED`のまま維持し、local evidenceをPASSへ代替しない。
+  cmd_400では再実行、retry、commit、pushを行わなかった。当時のWindows WebView2 native product UIと
+  OS syscallの完全観測は`UNMEASURED / BLOCKED`であり、local evidenceをPASSへ代替しなかった。
 
-- **最終diff境界:** 最終11-path product diff、draft contamination 0、staged path 0、
-  `git diff --check PASS`を確認し、四文書以外の7機能pathはbyte不変として保全する。Gunshiの
-  complete diff QC前のcommitは行わない。
+- **最終diff境界:** cmd_400当時は11-path product diff、draft contamination 0、staged path 0、
+  `git diff --check PASS`を確認し、四文書以外の7機能pathをbyte不変として保全した。当時の
+  complete diff QC前にはcommitを行っていない。
 
 ### FR-B08 — 追加画像形式（Batch 8）
 

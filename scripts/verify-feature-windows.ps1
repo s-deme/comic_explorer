@@ -13,12 +13,15 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "windows-toolchain.ps1")
 $featureKey = $Feature.ToLowerInvariant()
 $featureConfig = switch ($featureKey) {
-    "imp-004" { [pscustomobject]@{ Id = "IMP-004"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; RustFilter = "shortcut" } }
-    "fut-c-019" { [pscustomobject]@{ Id = "FUT-C-019"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; RustFilter = "shortcut" } }
-    "shortcutonly" { [pscustomobject]@{ Id = "ShortcutOnly"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; RustFilter = "shortcut" } }
-    "imp-005" { [pscustomobject]@{ Id = "IMP-005"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; RustFilter = "fr_b10" } }
-    "fut-c-022" { [pscustomobject]@{ Id = "FUT-C-022"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; RustFilter = "fr_b10" } }
-    "tagsonly" { [pscustomobject]@{ Id = "TagsOnly"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; RustFilter = "fr_b10" } }
+    "imp-004" { [pscustomobject]@{ Id = "IMP-004"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
+    "fut-c-019" { [pscustomobject]@{ Id = "FUT-C-019"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
+    "shortcutonly" { [pscustomobject]@{ Id = "ShortcutOnly"; ProductSwitch = "-ShortcutOnly"; ProductStage = "shortcut"; FrontendTest = "src\App.fr-b11.test.tsx"; FrontendTestName = ""; RustFilter = "shortcut" } }
+    "imp-005" { [pscustomobject]@{ Id = "IMP-005"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
+    "fut-c-022" { [pscustomobject]@{ Id = "FUT-C-022"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
+    "tagsonly" { [pscustomobject]@{ Id = "TagsOnly"; ProductSwitch = "-TagsOnly"; ProductStage = "tags"; FrontendTest = "src\App.fr-b10.test.tsx"; FrontendTestName = ""; RustFilter = "fr_b10" } }
+    "imp-006" { [pscustomobject]@{ Id = "IMP-006"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
+    "fut-c-023" { [pscustomobject]@{ Id = "FUT-C-023"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
+    "memoonly" { [pscustomobject]@{ Id = "MemoOnly"; ProductSwitch = "-MemoOnly"; ProductStage = "memo"; FrontendTest = "src\App.fr-b07.test.tsx"; FrontendTestName = "FT-B07-001"; RustFilter = "fr_b07_memo" } }
     default { $null }
 }
 $resolvedFeatureId = if ($null -ne $featureConfig) { $featureConfig.Id } else { $Feature }
@@ -129,10 +132,11 @@ $coddScript = Join-Path $PSScriptRoot "run-codd-windows.ps1"
 $productScript = Join-Path $PSScriptRoot "run-product-ui-harness.ps1"
 $productCleanupAudit = Join-Path $PSScriptRoot "audit-product-cleanup.ps1"
 $frontendTest = if ($null -ne $featureConfig) { $featureConfig.FrontendTest } else { "src\App.fr-b11.test.tsx" }
+$frontendTestName = if ($null -ne $featureConfig) { $featureConfig.FrontendTestName } else { "" }
 $rustFilter = if ($null -ne $featureConfig) { $featureConfig.RustFilter } else { "shortcut" }
 $productStage = if ($null -ne $featureConfig) { $featureConfig.ProductStage } else { "shortcut" }
 $pipeline = @(
-    [pscustomobject]@{ Name = "frontend-focused"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendFocused", "-FrontendTest", $frontendTest) },
+    [pscustomobject]@{ Name = "frontend-focused"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendFocused", "-FrontendTest", $frontendTest, "-FrontendTestName", $frontendTestName) },
     [pscustomobject]@{ Name = "typecheck"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Typecheck") },
     [pscustomobject]@{ Name = "frontend-sbom"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "FrontendSbom") },
     [pscustomobject]@{ Name = "rust-$($RustMode.ToLowerInvariant())"; File = $powerShell; Args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $toolchainScript, "-Task", "Rust$RustMode", "-RustFilter", $rustFilter) },
@@ -156,7 +160,7 @@ try {
         $failedStage = "feature-resolution"
         $overallExitCode = 2
         $errorPath = Join-Path $logRoot "feature-resolution.stderr.log"
-        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly."
+        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly."
         $message | Set-Content -LiteralPath $errorPath -Encoding UTF8
         $now = [DateTimeOffset]::UtcNow
         $stages.Add([pscustomobject][ordered]@{

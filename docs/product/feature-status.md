@@ -88,7 +88,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-020 | 巻末動作設定・自動遷移 | 自動的に次の巻を開く設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/application/mod.rs` | [FT-B02-001](../testing/fr-b02-results.md#ft-b02-001) | C0採用、既定値auto_nextでREQ-MVP-016互換 |
 | FUT-C-021 | お気に入り保存 | お気に入り永続化 | Candidate | NOT TESTED | 希望 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-022 | タグ付与・検索 | タグ管理 | Implemented | PASS | 将来 | FR-B10 | [FR-B10要件](../requirements/tag-management-requirements.md#fr-b10タグ管理要件); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/state/repository.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/lib.rs`; `src/features/library/client.ts`; `src/App.tsx`; `src/App.fr-b10.test.tsx`; `scripts/run-product-ui-harness.ps1` | [FR-B10結果](../testing/fr-b10-results.md)（focused exact4、Rust exact4、Windows WebView2 `FT-B10-005`、canonical aggregate PASS） | release製品で付与・正規化検索・rename・再起動復元・除去を直接観測。library原本差分0、Windows-native CoDD scan/check/verify exit 0・red 0。構造advisoryは生値を開示し、機能PASSへ加算しない。 |
-| FUT-C-023 | メモ保存 | メモ管理 | Partial | BLOCKED | 将来 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-001-作品identityとmemo); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | 2026-08-03のfrontend exact5は履歴raw。現行はfrontend接続4件とRust契約5件へ分離 | CoDDは3 SKIP/1 VACUOUS/verification 0のためINCOMPLETE/NOT APPLICABLE。Windows product gateはBLOCKED。 |
+| FUT-C-023 | メモ保存 | メモ管理 | Implemented | PASS | 将来 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-001-作品identityとmemo); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs`; `src/App.fr-b07.test.tsx`; `scripts/run-product-ui-harness.ps1` | [FR-B07結果](../testing/fr-b07-results.md)（FT-B07-001、Rust memo契約、Windows WebView2 `FT-B07-006`、canonical aggregate PASS） | release製品でsave・edit・viewer再open・restart復元・clear・再openを実測。library原本差分0、cleanup、Windows-native CoDD exit 0・red 0。history/ratingは別featureとしてBLOCKEDを維持。 |
 | FUT-C-024 | 名前変更 | ファイル名変更 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-025 | 移動 | ファイル移動 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-026 | コピー | ファイルコピー | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
@@ -121,13 +121,21 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-003 `BLOCKED_UNMEASURED`） | gamepad実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-008 | 閲覧時の原本自動変更 | 原本への自動書込み | Rejected | NOT TESTED | 非採用 | — | Q7-2/Q8-4 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 読取専用・原本非破壊の恒久方針。方針変更時のみ再評価 |
 
-## FR-B07 最終受入証跡（cmd_400）
+## FR-B07 受入証跡
+
+IMP-006では`FUT-C-023`だけを原子的に完了した。Windows release WebView2の`FT-B07-006`でmemoの
+save・edit・viewer再open・製品restart復元・clear・再openとlibrary source tree差分0を観測し、
+Windows-native canonical aggregateも全stage exit 0だった。`FUT-R-004`と`FUT-R-005`はproduct未測定の
+ため`Partial / BLOCKED`、FR-B07全体も`Partial / BLOCKED`を維持する。詳細なrun IDとSHAは
+[FR-B07結果](../testing/fr-b07-results.md)を正本とする。
+
+### cmd_400 履歴
 
 2026-08-09のsuite監査後はfrontendを接続4件、Rustを契約5件の正本とする。以下の
 frontend exact5と各SHAは2026-08-03時点のaccepted rawであり、現行test件数へ読み替えない。
 
-実装根拠と機能rawは受理済みであるが、CoDDの構造的未完了とWindows WebView2 product gateの未実測が
-残るため、FR-B07および対象3行は `Partial / BLOCKED` とする。accepted rawは不変SHA参照であり、
+当時は実装根拠と機能rawを受理したが、CoDDの構造的未完了とWindows WebView2 product gateの未実測が
+残ったため、FR-B07および対象3行を `Partial / BLOCKED` とした。accepted rawは不変SHA参照であり、
 frontend、App回帰、Rust、typecheck、build、CoDDの再実行は行っていない。
 
 accepted evidence rootは、frontend exact5・typecheck・buildが
@@ -158,11 +166,13 @@ byte/SHA snapshotし、original、library、`library.index`の差分0を受理�
 
 CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0で
 あり、3 SKIP（`deployment_completeness`、`user_journey_coherence`、`environment_coverage`）と1
-VACUOUS（`task_completion`）はPASSへ加算しない。Windows WebView2 native product UIとOS syscallの
-完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで代替しない。
+VACUOUS（`task_completion`）はPASSへ加算しない。cmd_400当時のWindows WebView2 native product UIと
+OS syscallの完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで代替しなかった。memoの
+WebView2境界はIMP-006で解消済みだが、history/ratingとOS syscall完全観測へ波及させない。
 
-最終worktreeは11-path product diff、draft contamination 0、staged path 0、`git diff --check PASS`で
-あり、四文書以外の7機能pathはbyte不変として保全した。Gunshiのcomplete diff QC前のcommit/pushは行わない。
+cmd_400当時の最終worktreeは11-path product diff、draft contamination 0、staged path 0、
+`git diff --check PASS`であり、四文書以外の7機能pathはbyte不変として保全した。当時の
+commit/pushは行っておらず、この履歴をIMP-006の差分・publish状態へ読み替えない。
 
 受理済み機能rawと復旧後CoDD rawの出典は [FR-B07結果](../testing/fr-b07-results.md) に集約する。
 

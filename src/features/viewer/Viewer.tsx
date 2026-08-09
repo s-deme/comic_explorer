@@ -463,7 +463,7 @@ export function Viewer({
         >
           {fullscreen ? "全画面終了" : "全画面"}
         </button>
-        <button onClick={close}>一覧へ戻る</button>
+        <button data-product-id="viewer-close" onClick={close}>一覧へ戻る</button>
         {fullscreenError !== null && (
           <span className="fullscreen-error" role="status">
             {fullscreenError}

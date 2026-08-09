@@ -17,23 +17,62 @@ codd:
 
 ## 判定
 
-機能証跡は `ACCEPTED` としてSHA参照する。frontend focused、App回帰、Windows offline Rust、
-typecheck、buildは受理済みrawを再実行していない。CoDD scan/check/verifyは復元後の既存rawを各一回
-だけ参照し、exit 0・red 0を記録するが、verifyの構造値に3 SKIP・1 VACUOUS・verification tests 0
-があるため、CoDDとcmd_400 aggregateは `INCOMPLETE / NOT APPLICABLE` であり、PASSへ加算しない。
-Windows WebView2 native product gateは `BLOCKED_UNMEASURED` のままであり、local evidenceで
-代替しない。したがってFR-B07の台帳状態は `Partial / BLOCKED` とする。
+`FUT-C-023`（memo）は `Implemented / PASS` とする。IMP-006でWindows release WebView2製品から
+実SQLiteへ接続し、save、viewer再open、edit、製品restart復元、clear、再open、library source tree
+差分0を直接観測した。保存中はmemo入力と操作buttonを無効化し、遅延応答後の復帰もfocused testで確認した。
+
+`FUT-R-004`（history）と`FUT-R-005`（rating）のWindows product gateは未測定なので、両機能と
+FR-B07全体は `Partial / BLOCKED` を維持する。IMP-006のPASSを残る2機能へ波及させない。旧cmd_400の
+機能rawとCoDD rawは履歴として保持し、現行runで上書きしない。
+
+## IMP-006 Windows製品・canonical結果
+
+正本コマンドは`./scripts/run-feature-verification-wsl.sh IMP-006 -RustMode Canonical`である。
+accepted runは`imp-006-20260809T102924682Z`、UTC 2026-08-09 10:29:24から10:31:38、全12 stage、
+合計133.969秒、accepted run自体のretry 0である。log rootは
+`src-tauri/target/verification/imp-006-20260809T102924682Z/`、最終JSONは
+`src-tauri/target/verification/wsl-20260809T102924Z-2.json`、JSON SHA-256は
+`ef4b9d81b47b012516d87c312ee6ec35fe740e4b2234251518ecb8dca51d1239`である。
+
+release input hashは`7696e6a49e524af5f7a11c809f74c645b3f5b681b3478b7d07ab7b0e8debc4ce`、
+exe SHA-256は`b25db3b2c4fd3b1b060e4c9339ea2bd6bba8fa113be46bad6cbb4a26651fcfb7`である。
+source bindingは`src/App.tsx`=`97928d8ece225d967db2789d571e36721cab0ab5268a3aa6523d71e3221df9a6`、
+`src/App.fr-b07.test.tsx`=`01a82244932c510a48b305d94f6007eb5d49b39a1d29e224be144c8998cfda77`、
+`src/features/viewer/Viewer.tsx`=`6a194dd09f31521255b742c46e9f83e876f064f9dbe134576d7ba678e3da1cf7`、
+product harness=`61196d35982b1e4657359a9059b60533b7807bcc016c3820d1e5ebebbec37bb6`、
+feature runner=`b8a076cd236b755cabb54be7e1016e286420496d67ff2fe8405ad7397492ba16`へ束縛する。
+
+| Gate | 結果 | 秒 | stdout SHA-256 | 直接観測 |
+|---|---|---:|---|---|
+| frontend focused | selected 1 PASS / 0 FAIL、3 excluded-by-pattern | 5.315 | `0ded73ed01c2779a32fec1b1a83b9d8ef92b97e8a243d9049a2be50f308da529` | FT-B07-001、遅延save中disabledと応答後復帰。Vitest rawの`numPendingTests=3`は非対象history/rating/migration |
+| typecheck | PASS | 4.570 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | TypeScript error 0 |
+| frontend SBOM/build | PASS | 4.291 | `f2e6cdcd743b2a0974afd2e67cc5104d40e3adea937885b89c0791e4a933bd31` | 665 components、unknown/prohibited license 0 |
+| Windows Rust canonical | 79 unit + 1 process PASS | 41.824 | `848c6789de856112cdf5ad83530ea31a8e5b6b6bd1e21bcac85f58874ce53c24` | fmt、check、locked full test、failed/ignored 0 |
+| release executable / freshness | PASS | 1.173 / 1.205 | `d17a4b4be45d2920486052566f6e2482b6020f419beb62c9b9e8328e00bd435e` | 現行input hashに束縛したexeを再利用 |
+| FT-B07-006 product | PASS | 13.244 | `914ac67eecaba066de3664d2d9cc57c0ab16689e9ce4dc435aa82ee698c7f62e` | save、reopen、edit、restart、clear、再open、source difference 0 |
+| product cleanup audit | PASS | 0.947 | `b81f2b3b0194b087912b75a46012f276e1d5fa3249db6cd5d0d0a5b11413c467` | 製品/WebView2 process、port、SQLite lock残留0 |
+| CoDD scan | PASS | 1.622 | `ded830e4052a681dfd443bf3c2036714a8c7ee3811fa31054e2a61ec44190fcc` | 72 nodes / 148 edges |
+| CoDD check | exit 0 / red 0 | 25.697 | `be71b0b84e0b9eff95d499bca8dc2c69976296af83dd72b26d887163ad6dcae5` | `depends_on_consistency` PASS |
+| CoDD verify | exit 0 / red 0 | 29.493 | `cc6001b1cbae6b4211138591baa96925963d5a525e70658bf5f9d01c6037d590` | canonical tests・typecheck・source integrity 13 files |
+
+CoDD verifyの任意profile advisoryは`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、
+verification tests 0の生値を維持し、memoの機能PASSへ加算しない。IMP-006の直接判定は
+FT-B07-001、Rust memo/reopen契約、FT-B07-006、source-tree非破壊を正本とする。
+
+IMP-006のtracked差分は、memo/UI source 2件、focused frontend/Python test 2件、共有Windows検証script
+3件、要件・設計・台帳・結果文書7件のexact 14 pathである。生成された`dist/`、`target/`、CoDD scan
+出力はcommit対象にしない。
 
 ## 現行suiteの所有境界（2026-08-09監査）
 
 本書のaccepted rawは2026-08-03時点の不変な履歴証跡であり、現在のtest件数を表さない。
 現行frontend suiteはApp/client接続を観測する`FT-B07-001`〜`FT-B07-004`の4件とし、
 全clientをmockした旧`FT-B07-005`は削除した。原本、library file、`library.index`のbyte不変は
-Rustの`fr_b07_reading_position_separation_survives_metadata_crud`を正本とする。Rust testが
-観測しないmtime、完全なdirectory tree、製品WebView2境界は引き続き未測定であり、過去rawの
-SHA記録を現在のproduct PASSへ読み替えない。
+Rustの`fr_b07_reading_position_separation_survives_metadata_crud`を正本とする。IMP-006はmemoについて
+mtimeを含む完全なdirectory treeと製品WebView2境界を追加観測した。history/ratingは引き続き未測定であり、
+過去rawのSHA記録を現在のproduct PASSへ読み替えない。
 
-## 実測範囲と接続境界
+## cmd_400 実測範囲と接続境界（履歴）
 
 - 採用対象は `FUT-C-023`（memo）、`FUT-R-004`（閲覧履歴）、`FUT-R-005`（評価）。
 - `FUT-D-005`（未読・読書中・読了）は未決定の別トラックであり、本結果に含めない。
@@ -48,7 +87,7 @@ SHA記録を現在のproduct PASSへ読み替えない。
 - restored CoDD evidence root:
   `queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate`。
 
-## Connected evidence matrix
+## cmd_400 connected evidence matrix（履歴）
 
 | Test ID | 契約 | 実測状態 |
 |---|---|---|
@@ -67,7 +106,7 @@ open-history seamで、成功したcurrent-generation・非空openだけを一�
 history、rating、reading-position操作の前後でbyte/SHA snapshotを比較し、original、library、
 `library.index`の差分0を観測した。
 
-## Accepted raw ledger
+## cmd_400 accepted raw ledger（履歴）
 
 受理済みrawのSHAは測定時点の不変参照である。各行の `run_count` は1、retryは0であり、accepted
 frontend rawは再実行していない。
@@ -93,7 +132,7 @@ canonical Rust wrapperは `CARGO_NET_OFFLINE=true` で実行され、cargo fmt c
 cargo test lockedをPASSとした。これはWindows Rust toolchainの証跡であり、Windows WebView2 native
 product UIの実機gateを満たすものではない。
 
-## CoDD raw ledger
+## cmd_400 CoDD raw ledger（履歴）
 
 CoDD 3.37.0の復元後rawを参照した。scan/check/verifyは各 `attempt=1`、`run_count=1`、retryなし、
 overwriteなしである。exit 0とred 0はプロセス・red gateの事実であり、構造的SKIP/VACUOUSをPASSへ
@@ -123,7 +162,7 @@ CoDD rawは `codd/codd.yaml` 復元後の既存測定であり、最終文書同
 - removed draft paths: 6; never-present `tests/e2e` candidates: 2; post-restore draft paths: 0
 - accepted functional path setにはdraft、plugin、contract、deploy、smoke、e2e成果物を含めない。
 
-## Scope and safety ledger
+## cmd_400 scope and safety ledger（履歴）
 
 最終worktreeの機能pathは11件であり、draft contaminationは0、staged pathは0である。
 
@@ -143,7 +182,7 @@ CoDD rawは `codd/codd.yaml` 復元後の既存測定であり、最終文書同
 保全する。原本/library snapshot差分、library管理file、network、commit、pushは0である。
 OS syscall monitorは別gateとして `NOT_RUN_SEPARATE_GATE` と開示し、local-only境界の証跡を過大主張しない。
 
-## 最終diff QC handoff
+## cmd_400 最終diff QC handoff（履歴）
 
 同期後の11path exact diff/hash/statusは
 `/home/yaman/tools/multi-agent-shogun/queue/reports/evidence/cmd_400/fr_b07_final_docs_sync_diff_qc`

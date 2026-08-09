@@ -252,6 +252,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [itemMetadata, setItemMetadata] = useState<ItemMetadata | null>(null);
   const [memoDraft, setMemoDraft] = useState("");
+  const [memoSaveState, setMemoSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryEntry[]>([]);
@@ -607,6 +610,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const requestGeneration = ++metadataGeneration.current;
     setItemMetadata(null);
     setMemoDraft("");
+    setMemoSaveState("idle");
     setMetadataLoading(true);
     setMetadataNotice(null);
     try {
@@ -634,6 +638,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const requestGeneration = metadataGeneration.current;
     setMetadataLoading(true);
     setMetadataNotice(null);
+    setMemoSaveState("saving");
     try {
       const response = await saveItemMemo(
         itemMetadata.itemIdentity,
@@ -644,12 +649,15 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (response.status === "ok") {
         setItemMetadata(response.data);
         setMemoDraft(response.data.memo ?? "");
+        setMemoSaveState("saved");
       } else if (response.status === "error") {
         setMetadataNotice(presentError(response.error));
+        setMemoSaveState("error");
       }
     } catch {
       if (requestGeneration === metadataGeneration.current) {
         setMetadataNotice(presentUnexpectedError());
+        setMemoSaveState("error");
       }
     } finally {
       if (requestGeneration === metadataGeneration.current) {
@@ -1289,6 +1297,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     metadataGeneration.current += 1;
     setItemMetadata(null);
     setMemoDraft("");
+    setMemoSaveState("idle");
     setMetadataNotice(null);
   }
 
@@ -1373,7 +1382,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onClose={closeViewer}
           onNextItem={handleEndOfVolume}
         />
-        <section aria-label="作品メタデータ">
+        <section
+          aria-label="作品メタデータ"
+          data-product-id="item-metadata-panel"
+          data-memo-save-state={memoSaveState}
+        >
           <h2>作品メタデータ</h2>
           {metadataLoading && <p role="status">メタデータを読み込み中です。</p>}
           {itemMetadata !== null && (
@@ -1383,14 +1396,20 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 作品メモ
                 <textarea
                   aria-label="作品メモ"
+                  data-product-id="item-memo-input"
                   value={memoDraft}
-                  onChange={(event) => setMemoDraft(event.target.value)}
+                  disabled={metadataLoading}
+                  onChange={(event) => {
+                    setMemoDraft(event.target.value);
+                    setMemoSaveState("idle");
+                  }}
                   rows={4}
                 />
               </label>
               <div>
                 <button
                   type="button"
+                  data-product-id="item-memo-save"
                   disabled={metadataLoading}
                   onClick={() => void persistMemo(memoDraft)}
                 >
@@ -1398,6 +1417,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 </button>
                 <button
                   type="button"
+                  data-product-id="item-memo-clear"
                   disabled={metadataLoading}
                   onClick={() => void persistMemo("")}
                 >

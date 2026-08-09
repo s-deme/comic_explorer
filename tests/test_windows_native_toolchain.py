@@ -48,6 +48,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-005",
             "fut-c-022",
             "tagsonly",
+            "imp-006",
+            "fut-c-023",
+            "memoonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -66,12 +69,29 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('$exception.Data["ExitCode"] = $ExitCode', task_runner)
         self.assertIn('$exitCode = [int]$_.Exception.Data["ExitCode"]', task_runner)
         self.assertIn('[string]$FrontendTest = "src\\App.fr-b11.test.tsx"', task_runner)
+        self.assertIn('[string]$FrontendTestName = ""', task_runner)
         self.assertIn('[string]$RustFilter = "shortcut"', task_runner)
+        self.assertIn('if (![string]::IsNullOrWhiteSpace($FrontendTestName))', task_runner)
+        self.assertIn(
+            '$vitestArguments += @(\"-t\", $FrontendTestName, \"--reporter=json\")',
+            task_runner,
+        )
+        self.assertIn("$summary.numPassedTests -ne 1", task_runner)
+        self.assertIn("$summary.numFailedTests -ne 0", task_runner)
         self.assertIn('"-FrontendTest", $frontendTest', source)
+        self.assertIn('"-FrontendTestName", $frontendTestName', source)
         self.assertIn('"-RustFilter", $rustFilter', source)
         self.assertIn('"src\\App.fr-b10.test.tsx"', source)
         self.assertIn('RustFilter = "fr_b10"', source)
         self.assertIn('ProductSwitch = "-TagsOnly"', source)
+        self.assertIn('"src\\App.fr-b07.test.tsx"', source)
+        self.assertIn('FrontendTestName = "FT-B07-001"', source)
+        self.assertIn('RustFilter = "fr_b07_memo"', source)
+        self.assertIn('ProductSwitch = "-MemoOnly"', source)
+        frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(frontend_test.count('it("FT-B07-001 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -144,6 +164,46 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             'throw "Tag product harness changed the source tree or created adjacent files."',
             source,
         )
+
+    def test_memo_product_gate_waits_for_persistence_and_keeps_sources_unchanged(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$MemoOnly", source)
+        self.assertIn("if ($MemoOnly)", source)
+        for stage in (
+            '"memo viewer setup"',
+            '"memo first save"',
+            '"memo reopen persistence"',
+            '"memo second save"',
+            '"memo restart persistence"',
+            '"memo clear"',
+            '"memo clear reopen persistence"',
+        ):
+            self.assertIn(stage, source)
+        self.assertIn("dataset.memoSaveState === 'saved'", source)
+        self.assertIn("dataset.memoSaveState === 'idle'", source)
+        self.assertGreaterEqual(source.count("?.disabled === false"), 6)
+        self.assertIn('test = "FT-B07-006"', source)
+        self.assertIn('throw "Memo product harness changed source archives."', source)
+        self.assertIn(
+            'throw "Memo product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        viewer_source = (ROOT / "src/features/viewer/Viewer.tsx").read_text(
+            encoding="utf-8"
+        )
+        for selector in (
+            'data-product-id="item-metadata-panel"',
+            'data-product-id="item-memo-input"',
+            'data-product-id="item-memo-save"',
+            'data-product-id="item-memo-clear"',
+            'data-memo-save-state={memoSaveState}',
+            'disabled={metadataLoading}',
+        ):
+            self.assertIn(selector, app_source)
+        self.assertIn('data-product-id="viewer-close"', viewer_source)
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(
