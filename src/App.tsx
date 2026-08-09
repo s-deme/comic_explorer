@@ -206,6 +206,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     forward: [],
   });
   const [addressInput, setAddressInput] = useState("");
+  const addressInputDirty = useRef(false);
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -393,7 +394,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     return `${libraryRoot.replace(/[\\/]+$/, "")}\\${navigation.current.replaceAll("/", "\\")}`;
   }, [libraryRoot, navigation.current]);
 
-  useEffect(() => setAddressInput(absoluteAddress), [absoluteAddress]);
+  useEffect(() => {
+    if (!addressInputDirty.current) setAddressInput(absoluteAddress);
+  }, [absoluteAddress]);
 
   const sortedEntries = useMemo(
     () =>
@@ -456,6 +459,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     generation.current += 1;
     const response = await registerLibraryRoot(rootInput, generation.current);
     if (response.status === "ok") {
+      addressInputDirty.current = false;
       setLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: "" });
       await load("");
@@ -471,6 +475,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     generation.current += 1;
     const response = await pickLibraryRoot(generation.current);
     if (response.status === "ok" && response.data) {
+      addressInputDirty.current = false;
       setRootInput(response.data.absolutePath);
       setLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: "" });
@@ -489,6 +494,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     history: "push" | "back" | "forward" = "push",
     selectionPath: string | null = null,
   ) {
+    addressInputDirty.current = false;
     setSearchState({ status: "idle" });
     if (history === "push") dispatch({ type: "navigate", path });
     else dispatch({ type: history });
@@ -2004,6 +2010,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             .slice(root.length)
             .replace(/^[\\/]+/, "")
             .replaceAll("\\", "/");
+          addressInputDirty.current = false;
           navigate(relative);
         }}
       >
@@ -2011,7 +2018,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <input
           id="address"
           value={addressInput}
-          onChange={(event) => setAddressInput(event.target.value)}
+          onChange={(event) => {
+            addressInputDirty.current = true;
+            setAddressInput(event.target.value);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Escape") setAddressInput(absoluteAddress);
           }}
