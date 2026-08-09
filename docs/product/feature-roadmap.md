@@ -65,7 +65,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Done` |
 | P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Done` |
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Partial / BLOCKED`（adapter license・fixture未承認） |
-| P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Planned`（入出力仕様確定待ち） |
+| P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Done` |
 | Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
 | Hold | `FR-S06` | — | 仕様・architecture未決定 | `FUT-C-043`, `FUT-C-059`, `FUT-C-064`, `FUT-C-048`, `FUT-C-070` | `Blocked`（product・security判断待ち） |
 | Hold | `FR-S01` | — | 独立reader・media | `FUT-C-003`, `FUT-C-004`, `FUT-C-009` | `Blocked`（別設計・license確認待ち） |
@@ -719,14 +719,25 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B20 — thumbnail保守（Batch 20 / P10）
 
-- **状態:** `Planned`。既存thumbnail cacheは破棄可能なapp-local dataであり、入出力仕様が
-  決まるまで利用者データ契約へ変更しない。
+- **状態:** `Done`。既存の自動生成thumbnail cacheとは分離した、利用者が読み込んだJPEGの
+  app-local管理層を追加した。件数・bytes表示、削除、表示中thumbnailのJPEG保存、一括読込を
+  原本非破壊で実装・実測した。
 - **対象と実装順:** (1) `FUT-C-073` thumbnail管理、(2) `FUT-C-074`表示中thumbnailの保存、
   (3) `FUT-C-075` thumbnail一括読込。
 - **優先理由:** 日常閲覧の必須導線より専門性が高く、cache形式・容量・overwrite・互換性を
   公開契約にする設計コストが大きいため通常候補の最後に置く。
-- **採用gate:** 管理対象、保存format、input source、容量上限、取消・失敗回復、既存cache migration、
-  原本非破壊を要件化する。
+- **採用gate:** 管理対象は利用者読込JPEG、保存formatはJPEG、input sourceは現在一覧の
+  archive/comicFolderへ一意に対応するファイル、app-local容量上限は3 MiBとした。不正形式・
+  容量超過・対応先不明を個別に拒否し、既存の自動生成cache migrationは行わず、原本へ書き戻さない。
+
+#### FR-B20 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守)。
+- **実装根拠:** `src/features/catalog/thumbnail-maintenance.ts`、`src/features/catalog/thumbnail-maintenance.test.ts`、
+  `src/App.tsx`、`src/styles.css`。
+- **直接観測:** [FR-B20 focused test結果](../testing/fr-b20-results.md)。管理件数/bytes/削除、表示中JPEG保存、
+  JPEG一括読込と重複・容量・形式エラー境界を確認した。frontend全体120 tests、typecheck、Windows-native
+  CoDD scan/check/verifyもPASS。
 
 ## 重複・umbrella 境界台帳
 

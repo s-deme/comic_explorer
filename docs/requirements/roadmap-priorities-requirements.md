@@ -91,7 +91,9 @@ catalogでunsupportedとして扱い、壊れた書庫を成功と判定しな�
 `FUT-C-073`はapp-local thumbnail cacheの件数・bytes・削除を表示する。`FUT-C-074`は
 表示中thumbnailを利用者が選んだローカル保存先へJPEGとして保存する。`FUT-C-075`は同じ
 thumbnail形式のファイルを選択してcacheへ読み込み、既存原本と衝突させない。容量上限、
-失敗、取消、cache migrationはUIに説明し、元画像へ書き戻さない。
+失敗、取消、cache migrationはUIに説明し、元画像へ書き戻さない。利用者が明示的に読み込む
+管理層は既存の自動生成cacheと分離したapp-local JPEG storeとし、容量上限を3 MiB、対象を
+現在一覧のarchive/comicFolderへ一意に対応するJPEG、形式不正・重複・容量超過を個別拒否とする。
 
 ## 受入テスト
 

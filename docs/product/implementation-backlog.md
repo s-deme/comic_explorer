@@ -128,9 +128,9 @@ codd:
 | 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Implemented / PASS | Done | WebView2へanimation GIFを渡しframeを永続化しない境界を実測 |
 | 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
 | 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
-| 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Candidate / NOT TESTED | Candidate | 管理対象、操作範囲、実行中状態を参照仕様から確認 |
-| 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Candidate / NOT TESTED | Candidate | 保存先、format、対象、上書き規則を決定 |
-| 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Candidate / NOT TESTED | Candidate | input source、format、対象範囲を参照仕様から確認 |
+| 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Implemented / PASS | Done | app-local JPEG管理dialogで件数、bytes、削除、原本非破壊を実装・実測 |
+| 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Implemented / PASS | Done | generated/imported thumbnailを明示的なJPEG downloadとして保存 |
+| 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Implemented / PASS | Done | JPEGを一覧対象へ一意に対応付け、容量・形式・重複を検証してapp-localへ読込 |
 | 27 | Hold / FR-S02 | `IMP-027` | `FUT-C-027` | 新規フォルダ | Candidate / NOT TESTED | Candidate | file mutationの安全設計と明示承認後に権限・失敗回復を要件化 |
 | 26 | Hold / FR-S02 | `IMP-026` | `FUT-C-026` | コピー | Candidate / NOT TESTED | Candidate | root/path、上書き確認、途中失敗・rollbackを要件化 |
 | 24 | Hold / FR-S02 | `IMP-024` | `FUT-C-024` | 名前変更 | Candidate / NOT TESTED | Candidate | identity、cache・読書情報移行、undo境界を要件化 |

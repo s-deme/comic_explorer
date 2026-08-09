@@ -436,6 +436,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .quick-access-resolved { color: #6b4b00; font-size: .8rem; }
 .quick-access-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .quick-access-actions button { white-space: nowrap; }
+.thumbnail-manager-dialog {
+  width: min(620px, calc(100vw - 48px));
+  max-height: min(560px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 22px;
+  border-radius: 6px;
+  color: #1f2328;
+  background: white;
+  box-shadow: 0 12px 40px #0005;
+}
+.thumbnail-manager-stats { display: flex; gap: 24px; margin: 16px 0; }
+.thumbnail-manager-stats div { display: grid; gap: 3px; }
+.thumbnail-manager-stats dt { color: #59636f; font-size: .8rem; }
+.thumbnail-manager-stats dd { margin: 0; font-weight: 600; }
+.thumbnail-manager-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 @media (prefers-contrast: more) {
   .catalog-item[data-selected="true"] { border-width: 3px; }

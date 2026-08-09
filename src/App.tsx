@@ -90,6 +90,19 @@ import {
   normalizeCatalogViewMode,
   type CatalogViewMode,
 } from "./features/catalog/view-mode";
+import {
+  formatThumbnailBytes,
+  loadManagedThumbnails,
+  mergeImportedThumbnails,
+  readJpegFile,
+  resolveImportTargets,
+  saveManagedThumbnails,
+  saveThumbnailDataUrl,
+  thumbnailDownloadName,
+  thumbnailStats,
+  type ImportedThumbnail,
+  type ManagedThumbnailMap,
+} from "./features/catalog/thumbnail-maintenance";
 import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
   restoreWorkspaceDisplay,
@@ -244,6 +257,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const addressInputDirty = useRef(false);
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
+  const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(() =>
+    loadManagedThumbnails(typeof window === "undefined" ? undefined : window.localStorage),
+  );
+  const [thumbnailManagerOpen, setThumbnailManagerOpen] = useState(false);
+  const [thumbnailManagerNotice, setThumbnailManagerNotice] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
@@ -336,6 +354,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
   const trayApiAvailable =
     trayRuntimeAvailable(typeof window === "undefined" ? undefined : window);
+
+  useEffect(() => {
+    try {
+      saveManagedThumbnails(
+        typeof window === "undefined" ? undefined : window.localStorage,
+        managedThumbnails,
+      );
+    } catch {
+      setThumbnailManagerNotice("app-local thumbnailを保存できませんでした。容量を減らして再試行してください。");
+    }
+  }, [managedThumbnails]);
 
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
     const next = action === "toggle"
@@ -514,12 +543,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const requestGeneration = generation.current;
     sortedEntries.forEach((entry, index) => {
       if (entry.kind !== "archive" && entry.kind !== "comicFolder") return;
+      if (managedThumbnails[entry.relativePath] !== undefined) return;
       if (thumbnails[entry.relativePath] !== undefined) return;
       const priority =
         index < 15 ? "visible" : index < 40 ? "near" : "background";
       queueThumbnail(entry, requestGeneration, priority);
     });
-  }, [sortedEntries, thumbnails]);
+  }, [managedThumbnails, sortedEntries, thumbnails]);
 
   async function load(relativePath: string, selectionPath: string | null = null) {
     generation.current += 1;
@@ -618,6 +648,57 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     link.click();
     URL.revokeObjectURL(url);
     setSelectionNotice(`${visibleEntries.length}件をCSVへ出力しました。`);
+  }
+
+  async function saveDisplayedThumbnail() {
+    if (selectedPath === null) {
+      setThumbnailManagerNotice("一覧でthumbnail対象を選択してください。");
+      return;
+    }
+    const managed = managedThumbnails[selectedPath];
+    const generated = thumbnails[selectedPath];
+    const dataUrl = managed?.dataUrl ?? (generated?.status === "ready" ? generated.mediaUri : undefined);
+    if (dataUrl === undefined) {
+      setThumbnailManagerNotice("表示中thumbnailがまだ準備できていません。");
+      return;
+    }
+    try {
+      await saveThumbnailDataUrl(dataUrl, thumbnailDownloadName(selectedPath));
+      setThumbnailManagerNotice("表示中thumbnailをJPEGとして保存しました。");
+    } catch (error) {
+      setThumbnailManagerNotice(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "thumbnailの保存をキャンセルしました。"
+          : "表示中thumbnailを保存できませんでした。",
+      );
+    }
+  }
+
+  async function importManagedThumbnails(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    const targets = resolveImportTargets(files, entries);
+    const imports: ImportedThumbnail[] = [];
+    const rejected = [...targets.rejected];
+    for (const target of targets.accepted) {
+      try {
+        const loaded = await readJpegFile(target.file);
+        imports.push({ ...loaded, itemRelativePath: target.itemRelativePath });
+      } catch (error) {
+        rejected.push(`${target.file.name}: ${error instanceof Error ? error.message : "読込失敗"}`);
+      }
+    }
+    const merged = mergeImportedThumbnails(managedThumbnails, imports);
+    setManagedThumbnails(merged.thumbnails);
+    setThumbnailManagerNotice(
+      `${merged.accepted}件を読み込みました。${rejected.length + merged.rejected.length > 0 ? ` ${rejected.concat(merged.rejected).join(" / ")}` : ""}`,
+    );
+  }
+
+  function clearManagedThumbnails() {
+    setManagedThumbnails({});
+    setThumbnailManagerNotice("利用者が読み込んだthumbnailを削除しました。原本は変更していません。");
   }
 
   function openSelectedEntry() {
@@ -1428,6 +1509,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     (entry) => entry.relativePath === selectedPath,
   );
   const up = parentPath(navigation.current);
+  const selectedThumbnailDataUrl = selectedPath === null
+    ? undefined
+    : managedThumbnails[selectedPath]?.dataUrl
+      ?? (thumbnails[selectedPath]?.status === "ready" ? thumbnails[selectedPath].mediaUri : undefined);
+  const managedThumbnailStats = thumbnailStats(managedThumbnails);
 
   function getMenuItems(menuId: MenuId): HTMLButtonElement[] {
     const menu = menuPopupRefs.current[menuId];
@@ -2321,6 +2407,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="thumbnail-manager-menu-item"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() =>
+                  runMenuAction(() => {
+                    setThumbnailManagerNotice(null);
+                    setThumbnailManagerOpen(true);
+                  })
+                }
+              >
+                サムネイル管理…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 data-product-id="history-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
@@ -2832,11 +2934,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
               thumbnailFor={(entry) =>
-                thumbnails[entry.relativePath] ?? { status: "loading" }
+                managedThumbnails[entry.relativePath] !== undefined
+                  ? { status: "ready", mediaUri: managedThumbnails[entry.relativePath].dataUrl, cacheHit: false }
+                  : thumbnails[entry.relativePath] ?? { status: "loading" }
               }
               isFavorite={(entry) => favoriteForPath(entry.relativePath) !== undefined}
               onToggleFavorite={toggleFavorite}
               onThumbnailNeeded={(entry) => {
+                if (managedThumbnails[entry.relativePath] !== undefined) return;
                 if (thumbnails[entry.relativePath]?.status === "ready") return;
                 queueThumbnail(entry, generation.current, "visible");
               }}
@@ -2981,6 +3086,56 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button type="button" onClick={() => applySettingsProfile(settingsDraft)}>適用</button>
               <button type="button" onClick={() => setSettingsOpen(false)}>キャンセル</button>
             </div>
+          </section>
+        </div>
+      )}
+      {thumbnailManagerOpen && (
+        <div className="dialog-backdrop">
+          <section
+            className="thumbnail-manager-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="サムネイル管理"
+          >
+            <div className="quick-access-heading">
+              <h2>サムネイル管理</h2>
+              <button type="button" onClick={() => setThumbnailManagerOpen(false)}>閉じる</button>
+            </div>
+            <p>
+              利用者が読み込んだJPEGだけをapp-localに管理します。内部生成cacheは自動管理され、
+              library原本や書庫には書き戻しません。
+            </p>
+            <dl className="thumbnail-manager-stats">
+              <div><dt>管理件数</dt><dd>{managedThumbnailStats.count}件</dd></div>
+              <div><dt>管理容量</dt><dd>{formatThumbnailBytes(managedThumbnailStats.bytes)}</dd></div>
+            </dl>
+            <p>表示中: {selectedPath ?? "—"}</p>
+            <div className="thumbnail-manager-actions">
+              <button
+                type="button"
+                disabled={selectedThumbnailDataUrl === undefined}
+                onClick={() => void saveDisplayedThumbnail()}
+              >
+                表示中thumbnailをJPEG保存
+              </button>
+              <label className="file-button">
+                JPEGを一括読込
+                <input
+                  type="file"
+                  accept="image/jpeg,.jpg,.jpeg"
+                  multiple
+                  onChange={(event) => void importManagedThumbnails(event)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={managedThumbnailStats.count === 0}
+                onClick={clearManagedThumbnails}
+              >
+                読み込んだthumbnailを削除
+              </button>
+            </div>
+            {thumbnailManagerNotice !== null && <p role="status">{thumbnailManagerNotice}</p>}
           </section>
         </div>
       )}
