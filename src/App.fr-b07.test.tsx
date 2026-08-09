@@ -402,10 +402,20 @@ describe("FR-B07 connected App boundary", () => {
   it("FT-B07-003 connects rating boundaries and unset state to the client", async () => {
     const comic = testEntry("Series/01.cbz");
     openMock.mockResolvedValue(viewerResponse(comic.relativePath));
+    let resolveFirstSave:
+      | ((value: Awaited<ReturnType<typeof setItemRating>>) => void)
+      | undefined;
+    setRatingMock.mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof setItemRating>>>((resolve) => {
+          resolveFirstSave = resolve;
+        }),
+    );
     await registerTestLibrary([comic]);
     await openTestComic(comic.relativePath);
 
     const rating = await screen.findByLabelText("作品評価");
+    const panel = screen.getByLabelText("作品メタデータ");
     fireEvent.change(rating, { target: { value: "1" } });
     await waitFor(() =>
       expect(setRatingMock).toHaveBeenNthCalledWith(
@@ -415,6 +425,20 @@ describe("FR-B07 connected App boundary", () => {
         expect.any(Number),
       ),
     );
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-rating-save-state", "saving");
+      expect(rating).toBeDisabled();
+    });
+    fireEvent.change(rating, { target: { value: "5" } });
+    expect(setRatingMock).toHaveBeenCalledTimes(1);
+    expect(resolveFirstSave).toBeDefined();
+    resolveFirstSave!(metadataResponse(comic.relativePath, { rating: 1 }));
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-rating-save-state", "saved");
+      expect(panel).toHaveAttribute("data-rating-persisted-value", "1");
+      expect(rating).toBeEnabled();
+      expect(rating).toHaveValue("1");
+    });
     fireEvent.change(rating, { target: { value: "5" } });
     await waitFor(() =>
       expect(setRatingMock).toHaveBeenNthCalledWith(
@@ -424,6 +448,10 @@ describe("FR-B07 connected App boundary", () => {
         expect.any(Number),
       ),
     );
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-rating-persisted-value", "5");
+      expect(rating).toHaveValue("5");
+    });
     fireEvent.change(rating, { target: { value: "" } });
     await waitFor(() =>
       expect(setRatingMock).toHaveBeenNthCalledWith(
@@ -433,7 +461,10 @@ describe("FR-B07 connected App boundary", () => {
         expect.any(Number),
       ),
     );
-    expect(rating).toHaveValue("");
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-rating-persisted-value", "unset");
+      expect(rating).toHaveValue("");
+    });
   });
 
   it("FT-B07-004 restores metadata returned when the viewer reopens", async () => {

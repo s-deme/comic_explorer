@@ -54,6 +54,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-007",
             "fut-r-004",
             "historyonly",
+            "imp-008",
+            "fut-r-005",
+            "ratingonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -97,11 +100,18 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             source,
         )
         self.assertIn('ProductSwitch = "-HistoryOnly"', source)
+        self.assertIn('FrontendTestName = "FT-B07-003"', source)
+        self.assertIn(
+            'RustFilter = "fr_b07_rating_boundaries_and_invalid_rejection"',
+            source,
+        )
+        self.assertIn('ProductSwitch = "-RatingOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
         self.assertEqual(frontend_test.count('it("FT-B07-001 '), 1)
         self.assertEqual(frontend_test.count('it("FT-B07-002 '), 1)
+        self.assertEqual(frontend_test.count('it("FT-B07-003 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -246,6 +256,41 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             'data-product-id="history-row"',
             'data-product-id="history-refresh"',
             'data-product-id="history-close"',
+        ):
+            self.assertIn(selector, app_source)
+
+    def test_rating_product_gate_waits_for_save_and_keeps_sources_unchanged(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$RatingOnly", source)
+        self.assertIn("if ($RatingOnly)", source)
+        self.assertIn("if (!$RatingOnly)", source)
+        for stage in (
+            '"rating viewer setup"',
+            '"rating $rating saved"',
+            '"rating restart persistence"',
+            '"rating clear saved"',
+            '"rating clear reopen persistence"',
+        ):
+            self.assertIn(stage, source)
+        self.assertIn("dataset.ratingSaveState === 'saved'", source)
+        self.assertIn("dataset.ratingPersistedValue === $ratingJson", source)
+        self.assertIn('test = "FT-B07-008"', source)
+        self.assertIn('throw "Rating product harness changed source archives."', source)
+        self.assertIn(
+            'throw "Rating product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        for selector in (
+            'data-rating-save-state={ratingSaveState}',
+            'data-rating-persisted-value={',
+            'data-product-id="item-rating-select"',
+            "const ratingSaveGeneration = useRef(0);",
+            "const ratingSaveInFlight = useRef(false);",
+            'setRatingSaveState("saving")',
+            "disabled={metadataLoading}",
         ):
             self.assertIn(selector, app_source)
 

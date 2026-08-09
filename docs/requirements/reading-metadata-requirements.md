@@ -76,6 +76,7 @@ focused testで直接観測する。
 | FT-B07-005 | reading positionとの分離、library/original差分0 | position API + metadata API + snapshot |
 | FT-B07-006 | Windows製品でのmemo保存、編集、再起動復元、clear | release WebView2 → App → client → SQLite + library source tree差分0 |
 | FT-B07-007 | Windows製品で成功openだけをhistoryへ記録し、重複排除・順序・restart復元 | release WebView2 → open境界 → SQLite → history UI + library source tree差分0 |
+| FT-B07-008 | Windows製品でrating 1/5、再起動復元、未設定clear | release WebView2 → App → rating command → SQLite + library source tree差分0 |
 
 選択対象のfocused testはSKIP 0でなければ完了扱いにしない。Rust側の`fr_b07` selectorは上記5契約を
 個別に検査する。frontend側はAppからclientへの接続を観測できる`FT-B07-001`〜
@@ -129,6 +130,20 @@ release freshness、`FT-B07-007`、製品process cleanup、CoDD scan/check/verif
 完了させ、`FUT-R-005`を自動的にPASSへ昇格しない。履歴行から作品を開く操作は承認済み要件に含まれず、
 本IMPへ追加しない。
 
+### IMP-008 rating完了ゲート
+
+`scripts/run-feature-verification-wsl.sh IMP-008 -RustMode Canonical`をWindows-native toolchainへ橋渡しする
+正本コマンドとする。現行frontendから`FT-B07-003`だけを選択し、typecheck、SBOM/build、canonical Rust、
+release freshness、`FT-B07-008`、製品process cleanup、CoDD scan/check/verifyを同じsourceへ束縛する。
+
+`FT-B07-008`はrelease製品UIから実comicを開き、rating 1を保存してから5へ更新し、製品restart後も5が
+復元されることを確認する。その後未設定へclearし、viewer再openで未設定のままであることを確認する。
+保存完了は選択値だけでなく非同期operationの完了後に判定する。0/6などの不正値拒否は製品UIで注入せず、
+Rustの`fr_b07_rating_boundaries_and_invalid_rejection`を正本とする。前後のlibrary file集合、bytes、
+SHA-256は一致しなければならない。このgateのPASSは`FUT-R-005`だけを完了させる。`FUT-C-023`、
+`FUT-R-004`、`FUT-R-005`の3 atomic product gateがすべてPASSした後にのみ、FR-B07 aggregateを
+`Done`へ遷移する。
+
 ## cmd_400 履歴実測状態
 
 2026-08-03 JSTのcmd_400では、Gunshiが受理した機能rawを再実行せずSHA参照した。frontend focusedは
@@ -171,5 +186,6 @@ testsは `0 PASS / 0 FAIL / 0 SKIP / 0 total` である。3 SKIP（`deployment_c
 `user_journey_coherence`、`environment_coverage`）と1 VACUOUS（`task_completion`）はPASSへ加算せず、
 cmd_400のCoDD gateおよびFR-B07 aggregateは `INCOMPLETE / NOT APPLICABLE` だった。当時のWindows
 WebView2 native product UIとOS syscall完全観測は `UNMEASURED / BLOCKED` であり、local evidenceで
-代替しなかった。IMP-006はmemo、IMP-007はhistoryのWebView2境界を後続実測し、ratingへ波及させない。
-最終結果と不採用CoDD草稿の履歴は [FR-B07結果](../testing/fr-b07-results.md) に集約する。
+代替しなかった。後続のIMP-006はmemo、IMP-007はhistory、IMP-008はratingのWebView2境界をそれぞれ
+実測し、3 atomic product gateの完了後にFR-B07 aggregateを`Done`へ遷移した。cmd_400の生値は履歴のまま
+保持する。最終結果と不採用CoDD草稿の履歴は [FR-B07結果](../testing/fr-b07-results.md) に集約する。

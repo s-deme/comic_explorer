@@ -29,8 +29,8 @@ codd:
 
 | 区分 | 件数 | 扱い |
 |---|---:|---|
-| 実装・受入完了 | 7 | 実装、直接観測、正本同期、CoDD gateを完了済み |
-| 実装が一部完了・受入待ち | 4 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
+| 実装・受入完了 | 8 | 実装、直接観測、正本同期、CoDD gateを完了済み |
+| 実装が一部完了・受入待ち | 3 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
 | 未実装候補 | 18 | 採用判断、要件化、実装、直接観測を順に行う |
 | 保留・未決定 | 5 | 優先度と仕様を決めるまで実装しない |
 | 実機・外部環境待ち | 2 | 実装着手ではなく、測定環境を確保して判定する |
@@ -77,7 +77,7 @@ codd:
 ## 実装バックログ
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
-[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-008` である。
+[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-009` である。
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
@@ -88,8 +88,8 @@ codd:
 | 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Implemented / PASS | **Done** | `FT-B10-005`で付与・検索・rename・restart・remove・原本差分0、canonical aggregateを完了 |
 | 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Implemented / PASS | **Done** | `FT-B07-006`でsave・再open・restart復元・clear・原本差分0、canonical aggregateを完了 |
 | 7 | `IMP-007` | `FUT-R-004` | 閲覧履歴 | Implemented / PASS | **Done** | `FT-B07-007`でsuccess-only・dedup・順序・restart復元・原本差分0、canonical aggregateを完了 |
-| 8 | `IMP-008` | `FUT-R-005` | 評価 | Partial / BLOCKED | **Next** | FR-B07のWindows rating product gateを解消 |
-| 9 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
+| 8 | `IMP-008` | `FUT-R-005` | 評価 | Implemented / PASS | **Done** | `FT-B07-008`で1→5・restart復元・unset・再open・原本差分0、canonical aggregateを完了 |
+| 9 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | **Next** | FR-B09のWindows file-change product gateを解消 |
 | 10 | `IMP-010` | `FUT-C-031` | 重複作品検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
 | 11 | `IMP-011` | `FUT-C-032` | 壊れた書庫検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
 | 12 | `IMP-012` | `FUT-C-010` | 名前検索 | Candidate / NOT TESTED | Candidate | 採用範囲を決定しFR-B05要件を作成 |

@@ -4,7 +4,8 @@ param(
     [switch]$ShortcutOnly,
     [switch]$TagsOnly,
     [switch]$MemoOnly,
-    [switch]$HistoryOnly
+    [switch]$HistoryOnly,
+    [switch]$RatingOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,7 +38,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -759,14 +760,16 @@ try {
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
-    Wait-Evaluate (
-        "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
-        "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
-    ) "cold thumbnail success and error"
-    Wait-Evaluate (
-        "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
-        ".every((image) => image.complete && image.naturalWidth > 0)"
-    ) "cold thumbnail image decode"
+    if (!$RatingOnly) {
+        Wait-Evaluate (
+            "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
+            "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
+        ) "cold thumbnail success and error"
+        Wait-Evaluate (
+            "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
+            ".every((image) => image.complete && image.naturalWidth > 0)"
+        ) "cold thumbnail image decode"
+    }
     if ($MemoOnly) {
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -972,6 +975,102 @@ try {
             deterministicOrder = $true
             failedNotRecorded = $true
             restartPersisted = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
+    if ($RatingOnly) {
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer') !== null && " +
+            "document.querySelector('[data-product-id=item-rating-select]') !== null && " +
+            "document.querySelector('[data-product-id=item-rating-select]')?.disabled === false && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingSaveState === 'idle'"
+        ) "rating viewer setup"
+        foreach ($rating in @("1", "5")) {
+            $ratingJson = $rating | ConvertTo-Json -Compress
+            Invoke-Evaluate (
+                "(() => { const select = document.querySelector('[data-product-id=item-rating-select]'); " +
+                "const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; " +
+                "setter.call(select, $ratingJson); select.dispatchEvent(new Event('change', { bubbles: true })); return true; })()"
+            ) | Out-Null
+            Wait-Evaluate (
+                "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingSaveState === 'saved' && " +
+                "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingPersistedValue === $ratingJson && " +
+                "document.querySelector('[data-product-id=item-rating-select]')?.disabled === false && " +
+                "document.querySelector('[data-product-id=item-rating-select]')?.value === $ratingJson"
+            ) "rating $rating saved"
+        }
+        Stop-Product $cold
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+            "document.querySelectorAll('.catalog-item').length > 0"
+        ) "rating restart catalog"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-rating-select]')?.value === '5' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingPersistedValue === '5' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingSaveState === 'idle'"
+        ) "rating restart persistence"
+        Invoke-Evaluate @"
+(() => {
+  const select = document.querySelector('[data-product-id=item-rating-select]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+  setter.call(select, '');
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingSaveState === 'saved' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingPersistedValue === 'unset' && " +
+            "document.querySelector('[data-product-id=item-rating-select]')?.disabled === false && " +
+            "document.querySelector('[data-product-id=item-rating-select]')?.value === ''"
+        ) "rating clear saved"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "rating clear viewer close"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); " +
+            "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=item-rating-select]')?.value === '' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingPersistedValue === 'unset' && " +
+            "document.querySelector('[data-product-id=item-metadata-panel]')?.dataset.ratingSaveState === 'idle'"
+        ) "rating clear reopen persistence"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Rating product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Rating product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B07-008"
+            savedOne = $true
+            savedFive = $true
+            restartPersisted = $true
+            cleared = $true
             sourceDifferenceCount = 0
         } | ConvertTo-Json -Compress
         return

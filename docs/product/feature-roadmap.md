@@ -46,8 +46,8 @@ connected evidenceとfocused QCまでは通過したが、canonical aggregate（
 `scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
 FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
 FR-B05、FR-B06、FR-B08、FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
-FR-B07はIMP-006でmemo、IMP-007でhistoryのWindows product gateを完了したが、ratingのproduct gateが
-残るため全体は`Partial / BLOCKED`で保持する。
+FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product gateを完了し、
+3 atomic featureがすべて`Implemented / PASS`となったため`Done`へ更新した。
 
 ## 推奨実装順
 
@@ -65,7 +65,7 @@ FR-B07はIMP-006でmemo、IMP-007でhistoryのWindows product gateを完了し�
 | `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
 | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Planned` |
 | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Planned` |
-| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Partial / BLOCKED`（memo/history product PASS、rating product BLOCKED） |
+| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done`（memo/history/ratingのWindows WebView2 product gate・canonical aggregate完了） |
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Done`（Windows WebView2製品gate・canonical aggregate完了） |
@@ -253,10 +253,10 @@ FR-B07はIMP-006でmemo、IMP-007でhistoryのWindows product gateを完了し�
 現行はApp/client接続をfrontend 4件、SQLite・原本byte不変をRust 5件で検証する。以下の
 focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現行件数には使わない。
 
-- **状態:** `Partial / BLOCKED`。IMP-006で`FUT-C-023`、IMP-007で`FUT-R-004`のWindows WebView2製品gateと
-  現行canonical aggregateを完了し、memo/historyは`Implemented / PASS`である。`FUT-R-005`の製品gateは
-  `BLOCKED_UNMEASURED`のため、FR-B07全体は完了へ昇格しない。`FUT-D-005` の読書状態ラベルは
-  未決定のため本バッチへ先行投入しない。
+- **状態:** `Done`。IMP-006で`FUT-C-023`、IMP-007で`FUT-R-004`、IMP-008で`FUT-R-005`の
+  Windows WebView2製品gateと現行canonical aggregateを完了し、3原子機能はすべて
+  `Implemented / PASS`である。`FUT-D-005` の読書状態ラベルは未決定の別トラックとして本バッチへ
+  混入させない。
 - **対象 feature ID:** `FUT-C-023`, `FUT-R-004`, `FUT-R-005`（memo、閲覧履歴、評価）。
 - **user outcome:** 読者が作品にメモ、閲覧履歴、評価をローカル保存し、後から同じ作品の
   読書文脈を確認できる。
@@ -270,7 +270,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   `FT-B07-003` rating の境界/未設定、`FT-B07-004` migration・restart、`FT-B07-005`
   reading position との分離と原本差分0、`FT-B07-006` Windows release製品のmemo
   save/reopen/restart/clearとsource tree差分0、`FT-B07-007` Windows release製品のhistory
-  success-only/dedup/order/restartとsource tree差分0。
+  success-only/dedup/order/restartとsource tree差分0、`FT-B07-008` Windows release製品のrating
+  1/5/restart/unset/reopenとsource tree差分0。
 - **実装path:** `src-tauri/src/state/repository.rs`、`src-tauri/src/application/mod.rs`、
   `src-tauri/src/lib.rs`、`src/features/library/client.ts`、`src/App.tsx`、`src/App.test.tsx`、
   `src/App.fr-b07.test.tsx`。
@@ -284,8 +285,9 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   は記録せず、履歴表示の順序と重複0を観測した。FT-B07-005は実一時original/library fixtureを
   metadata・history・rating・reading-position操作の前後でbyte/SHA snapshotし、差分0と
   `library.index`不変を観測した。CoDD scan/check/verifyも各exit 0だが、verifyの生値は
-  3 SKIP・1 VACUOUS・verification tests 0であり、SKIP=FAIL規則により `BATCH-END-GATE` は
-  未達のまま保持する。`FUT-D-005` の採否判断は別トラックで行う。
+  3 SKIP・1 VACUOUS・verification tests 0であり、SKIP=FAIL規則によりcmd_400時点の
+  `BATCH-END-GATE` は未達だった。この履歴を後続の3 atomic WebView2 gateの受入へ読み替えない。
+  `FUT-D-005` の採否判断は別トラックで行う。
 
 #### IMP-006 memo受入証跡
 
@@ -307,6 +309,19 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   製品/WebView2 process、port、SQLite lock残留0。
 - CoDD scan/check/verifyは各exit 0・red 0。任意profileのSKIP/VACUOUSは生値を開示し、historyの
   機能PASSへ加算しない。run ID、stage時間、各SHAは[FR-B07結果](../testing/fr-b07-results.md)を正本とする。
+
+#### IMP-008 rating受入証跡
+
+- `./scripts/run-feature-verification-wsl.sh IMP-008 -RustMode Canonical`はaccepted runで全12 stage、exit 0、
+  130.870秒で完了した。frontendは`FT-B07-003`をexact 1 PASS、非対象3件をpattern除外として記録し、
+  Windows canonical Rustは79 unit + 1 process PASSだった。
+- release WebView2 `FT-B07-008`はrating 1保存・5更新・製品restart後の5復元・unset・viewer再openと
+  library source tree差分0を観測した。cleanupは製品/WebView2 process、port、SQLite lock残留0。
+- formal run 1は既存`confirm_next`の一過性full-suite failureでCoDD verifyが停止し、後続accepted runの
+  full canonicalでPASSを再確認した。run 2はRating要件外のshared cold-thumbnail wait timeoutであり、laneから
+  除外した。いずれもaccepted evidenceへ再利用しない。CoDD scan/check/verifyはaccepted runで各exit 0・
+  red 0、任意profileのSKIP/VACUOUSは生値を開示し機能PASSへ加算しない。詳細は
+  [FR-B07結果](../testing/fr-b07-results.md)を正本とする。
 
 #### cmd_400 最終同期の受入証跡（履歴）
 

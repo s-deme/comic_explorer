@@ -83,6 +83,8 @@ IMP-006/FUT-C-023はFR-B07 frontend fileの`FT-B07-001`だけをtest-name patter
 runnerはVitest JSONを解析して選択対象exact 1 PASS・0 FAILを強制し、pattern非対象件数を生値で残す。
 IMP-007/FUT-R-004は同じFR-B07 fileから`FT-B07-002`だけを選び、
 `fr_b07_history_deterministic_order_and_dedup` Rust filterとHistoryOnly product gateへ接続する。
+IMP-008/FUT-R-005は同じFR-B07 fileから`FT-B07-003`だけを選び、
+`fr_b07_rating_boundaries_and_invalid_rejection` Rust filterとRatingOnly product gateへ接続する。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -103,6 +105,9 @@ SHAを比較する。
 HistoryOnlyでは異なる2作品の成功openと一方の再open、corrupt archiveの失敗openを順に実行し、
 history UIのrow集合・順序・重複0を確認する。製品restart後も同じrowを復元してからlibrary file集合と
 SHAを比較する。
+RatingOnlyでは製品UIからcomicを開いてrating 1を保存し、5へ更新する。製品restart後の5復元、未設定への
+clear、viewer再open後の未設定を確認してからlibrary file集合とSHAを比較する。不正0/6はRust filterが
+正本であり、製品UIから注入しない。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

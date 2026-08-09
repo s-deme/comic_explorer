@@ -176,6 +176,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const settingsGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
   const metadataGeneration = useRef(0);
+  const ratingSaveGeneration = useRef(0);
+  const ratingSaveInFlight = useRef(false);
   const historyGeneration = useRef(0);
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
@@ -253,6 +255,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [itemMetadata, setItemMetadata] = useState<ItemMetadata | null>(null);
   const [memoDraft, setMemoDraft] = useState("");
   const [memoSaveState, setMemoSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [ratingSaveState, setRatingSaveState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [metadataLoading, setMetadataLoading] = useState(false);
@@ -608,9 +613,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   async function loadItemMetadata(itemIdentity: string) {
     const requestGeneration = ++metadataGeneration.current;
+    ratingSaveGeneration.current += 1;
+    ratingSaveInFlight.current = false;
     setItemMetadata(null);
     setMemoDraft("");
     setMemoSaveState("idle");
+    setRatingSaveState("idle");
     setMetadataLoading(true);
     setMetadataNotice(null);
     try {
@@ -667,28 +675,48 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   async function persistRating(rating: number | null) {
-    if (itemMetadata === null) return;
-    const requestGeneration = metadataGeneration.current;
+    if (itemMetadata === null || ratingSaveInFlight.current) return;
+    const metadataRequestGeneration = metadataGeneration.current;
+    const requestGeneration = ++ratingSaveGeneration.current;
+    ratingSaveInFlight.current = true;
     setMetadataLoading(true);
     setMetadataNotice(null);
+    setRatingSaveState("saving");
     try {
       const response = await setItemRating(
         itemMetadata.itemIdentity,
         rating,
-        requestGeneration,
+        metadataRequestGeneration,
       );
-      if (requestGeneration !== metadataGeneration.current) return;
+      if (
+        metadataRequestGeneration !== metadataGeneration.current ||
+        requestGeneration !== ratingSaveGeneration.current
+      ) {
+        return;
+      }
       if (response.status === "ok") {
         setItemMetadata(response.data);
+        setRatingSaveState("saved");
       } else if (response.status === "error") {
         setMetadataNotice(presentError(response.error));
+        setRatingSaveState("error");
+      } else {
+        setRatingSaveState("idle");
       }
     } catch {
-      if (requestGeneration === metadataGeneration.current) {
+      if (
+        metadataRequestGeneration === metadataGeneration.current &&
+        requestGeneration === ratingSaveGeneration.current
+      ) {
         setMetadataNotice(presentUnexpectedError());
+        setRatingSaveState("error");
       }
     } finally {
-      if (requestGeneration === metadataGeneration.current) {
+      if (
+        metadataRequestGeneration === metadataGeneration.current &&
+        requestGeneration === ratingSaveGeneration.current
+      ) {
+        ratingSaveInFlight.current = false;
         setMetadataLoading(false);
       }
     }
@@ -1295,9 +1323,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setEndOfVolumeNotice(null);
     setViewerSession(null);
     metadataGeneration.current += 1;
+    ratingSaveGeneration.current += 1;
+    ratingSaveInFlight.current = false;
     setItemMetadata(null);
     setMemoDraft("");
     setMemoSaveState("idle");
+    setRatingSaveState("idle");
     setMetadataNotice(null);
   }
 
@@ -1386,6 +1417,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           aria-label="作品メタデータ"
           data-product-id="item-metadata-panel"
           data-memo-save-state={memoSaveState}
+          data-rating-save-state={ratingSaveState}
+          data-rating-persisted-value={
+            itemMetadata?.rating?.toString() ?? "unset"
+          }
         >
           <h2>作品メタデータ</h2>
           {metadataLoading && <p role="status">メタデータを読み込み中です。</p>}
@@ -1428,6 +1463,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 作品評価
                 <select
                   aria-label="作品評価"
+                  data-product-id="item-rating-select"
                   value={itemMetadata.rating?.toString() ?? ""}
                   disabled={metadataLoading}
                   onChange={(event) => {

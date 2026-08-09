@@ -21,10 +21,9 @@ codd:
 実SQLiteへ接続し、save、viewer再open、edit、製品restart復元、clear、再open、library source tree
 差分0を直接観測した。保存中はmemo入力と操作buttonを無効化し、遅延応答後の復帰もfocused testで確認した。
 
-`FUT-R-004`（history）は `Implemented / PASS` とする。IMP-007でWindows release WebView2製品から
-異なる2作品のsuccess-only記録、一方のreopenに対するidentity dedup、決定順序、corrupt-open非記録、
-製品restart復元、library source tree差分0を直接観測した。`FUT-R-005`（rating）のWindows product gateは
-未測定なので、ratingとFR-B07全体は `Partial / BLOCKED` を維持する。IMP-007のPASSをratingへ波及させない。
+`FUT-R-004`（history）と`FUT-R-005`（rating）は `Implemented / PASS` とする。IMP-008でWindows release
+WebView2製品からrating 1保存、5更新、製品restart後の5復元、unset、viewer再openとlibrary source tree
+差分0を直接観測した。memo/history/ratingの3 atomic product gateが揃ったためFR-B07全体は `Done`である。
 旧cmd_400の機能rawとCoDD rawは履歴として保持し、現行runで上書きしない。
 
 ## IMP-006 Windows製品・canonical結果
@@ -103,6 +102,52 @@ IMP-007の最終tracked差分は、history product/UI source 1件、Python test 
 2件、要件・設計文書3件、台帳・roadmap・結果文書4件のexact 11 pathである。生成された`dist/`、
 `target/`、CoDD scan出力はcommit対象にしない。
 
+## IMP-008 Windows製品・canonical結果
+
+正本コマンドは`./scripts/run-feature-verification-wsl.sh IMP-008 -RustMode Canonical`である。
+accepted runは`imp-008-20260809T112129896Z`、UTC 2026-08-09 11:21:29から11:23:40、全12 stage、
+合計130.870秒である。log rootは`src-tauri/target/verification/imp-008-20260809T112129896Z/`、最終JSONは
+`src-tauri/target/verification/wsl-20260809T112129Z-2.json`、JSON SHA-256は
+`b09fa8b04a42799c644acdb14eef2c87faa8d3da3c952b7f812b4687ae9b1175`である。
+
+release input hashは`7b720af8ba7199ea7dcd08c945682857524b9caa3445f338da60cd1f93254cae`、
+exe SHA-256は`eabcbe09e82eba0705a39f741f1deee4058360e9072665017efceaf4d6dc60ef`である。
+source bindingは`src/App.tsx`=`07c4948b4ea368bec69a12026e7dc5b18abc5b0ec4bf26a13a69e965876fd998`、
+`src/App.fr-b07.test.tsx`=`9380a1ed158d89cc854671d596a29407da2d625791b284421b9b76e779efbac4`、
+product harness=`03e5cd33d7d03698f360147c6b73084af7a156d19b9c3bd98ac4f9e9afdb7a4e`、
+feature runner=`bb5214bd0869d973f6f7a1509c979b5ba482ce3e4e34acc9bf3f852132684899`へ束縛する。
+
+| Gate | 結果 | 秒 | stdout SHA-256 | stderr SHA-256 | 直接観測 |
+|---|---|---:|---|---|---|
+| toolchain bootstrap | PASS | 4.002 | `c3e14a481e2da7cf8718e9ec533ae8471c939280295e41772b6e7540bebb706a` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | Windows native toolchainを解決 |
+| frontend focused | selected 1 PASS / 0 FAIL、3 excluded-by-pattern | 4.816 | `33a743f89a7c5b96478d6efd8c8681bc95847f1bbb1a0551db4aba8426d28aaf` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | FT-B07-003。非対象はmemo/history/migration |
+| typecheck | PASS | 4.690 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | TypeScript error 0 |
+| frontend SBOM/build | PASS | 4.220 | `95e4d630bea29070aef177b1234740aca2176b90039d430307b11bcc97aa6566` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 665 components、unknown/prohibited license 0 |
+| Windows Rust canonical | 79 unit + 1 process PASS | 38.501 | `5ee2d1cc8eed6b193178209d27e3a25e32ab1f9495a51c91582df5a0025df2af` | `1224079c427889cff858febd62a78e42ce041254216a9a7d0a9806be6e1a3aa4` | fmt、check、locked full test、failed/ignored 0 |
+| release executable / freshness | PASS | 1.035 / 1.078 | `d2698e2d0ce303c91ab501cbe83c641d30cfe78f6f531853e1077d0c426900a1` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 現行input hashに束縛したexeを再利用 |
+| FT-B07-008 product | PASS | 13.702 | `4c76f20422276307d8a904d26d2a2c0a86c9627e88869572dc4ffe08d7825cc8` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 1保存、5更新、restart復元、unset、source difference 0 |
+| product cleanup audit | PASS | 0.946 | `b81f2b3b0194b087912b75a46012f276e1d5fa3249db6cd5d0d0a5b11413c467` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 製品/WebView2 process、port、SQLite lock残留0 |
+| CoDD scan | PASS | 1.490 | `ded830e4052a681dfd443bf3c2036714a8c7ee3811fa31054e2a61ec44190fcc` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 72 nodes / 148 edges |
+| CoDD check | exit 0 / red 0 | 25.791 | `be71b0b84e0b9eff95d499bca8dc2c69976296af83dd72b26d887163ad6dcae5` | `99315b41ae1bfa05c0f442da8956280b695ed3f9575c56ac3b72f0292ecd8e28` | `depends_on_consistency` PASS |
+| CoDD verify | exit 0 / red 0 | 30.496 | `32faa4d001584dd675af2e6a77a54e8ba77739eb36ebb7fd027986066846663e` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | canonical tests・typecheck・source integrity 13 files |
+
+accepted runの前にformal retryを2回行った。`imp-008-20260809T111354743Z`
+（JSON `wsl-20260809T111354Z-2.json`、SHA-256
+`127a61cd901990f6d89c954c206a4777dba2501634a7cd36db7c7313fca6c067`）はcodd-verifyで既存
+`confirm_next`の一過性full-suite failureとなり、後続accepted runのfull canonicalでPASSを再確認した。
+`imp-008-20260809T111737999Z`（JSON `wsl-20260809T111737Z-2.json`、SHA-256
+`9523d3189d6abda05c9b2df72ffc5e9df0aec28480801d6430ed06f4f5755074`）はRating要件外のshared
+cold-thumbnail wait timeoutでproduct-ratingが停止したため、rating laneから当該waitを除外した。両runは
+accepted evidenceへ再利用しない。
+
+CoDD verifyの任意profile advisoryは`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、
+verification tests 0の生値を維持し、ratingの機能PASSへ加算しない。IMP-008の直接判定は
+FT-B07-003、Rust rating契約、FT-B07-008、source-tree非破壊を正本とする。
+
+IMP-008の最終tracked差分は、rating product/UI source 1件、focused frontend test 1件、Python test 1件、
+共有Windows検証script 2件、要件・設計文書3件、台帳・roadmap・結果文書4件のexact 12 pathである。
+生成された`dist/`、`target/`、CoDD scan出力はcommit対象にしない。
+
 ## 現行suiteの所有境界（2026-08-09監査）
 
 本書のaccepted rawは2026-08-03時点の不変な履歴証跡であり、現在のtest件数を表さない。
@@ -110,8 +155,9 @@ IMP-007の最終tracked差分は、history product/UI source 1件、Python test 
 全clientをmockした旧`FT-B07-005`は削除した。原本、library file、`library.index`のbyte不変は
 Rustの`fr_b07_reading_position_separation_survives_metadata_crud`を正本とする。IMP-006はmemoについて
 mtimeを含む完全なdirectory treeと製品WebView2境界を追加観測した。IMP-007はhistoryについて
-success-only、dedup、order、restartと同じ製品境界を追加観測した。ratingは引き続き未測定であり、
-過去rawのSHA記録を現在のproduct PASSへ読み替えない。
+success-only、dedup、order、restartと同じ製品境界を追加観測した。IMP-008はratingについて1/5、
+restart、unset、viewer再openと同じ製品境界を追加観測した。過去rawのSHA記録を現在のproduct PASSへ
+読み替えない。
 
 ## cmd_400 実測範囲と接続境界（履歴）
 

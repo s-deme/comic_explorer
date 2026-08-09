@@ -47,6 +47,7 @@ and report both the missing capability and the locations that were searched.
   shortcut lane; `IMP-005`, `FUT-C-022`, and `TagsOnly` resolve to the tag lane.
   `IMP-006`, `FUT-C-023`, and `MemoOnly` resolve to the memo lane.
   `IMP-007`, `FUT-R-004`, and `HistoryOnly` resolve to the history lane.
+  `IMP-008`, `FUT-R-005`, and `RatingOnly` resolve to the rating lane.
   Each lane selects its own focused frontend file, optional exact test-name
   pattern, Rust filter, and product harness switch while sharing typecheck,
   frontend/SBOM generation, focused or
@@ -81,6 +82,10 @@ and report both the missing capability and the locations that were searched.
   prove identity deduplication and deterministic order, prove a corrupt-open
   failure is not recorded, restore the same rows after restart, and leave the
   library source tree byte-identical.
+  The rating product lane must save rating 1, update it to 5, restore 5 after
+  restart, clear it to unset, reopen the viewer to prove the unset value, and
+  leave the library source tree byte-identical. Invalid 0/6 requests remain a
+  Rust contract and are not injected through the product UI.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and
