@@ -34,6 +34,7 @@ import {
   normalizeShortcutBindings,
   type ShortcutBindings,
 } from "../input/shortcuts";
+import type { PageBookmark } from "../reading/collections";
 
 interface ViewerProps {
   session: ViewerSession;
@@ -51,6 +52,10 @@ interface ViewerProps {
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
+  bookmarks?: PageBookmark[];
+  onPageChange?: (index: number) => void;
+  onSaveBookmark?: (index: number) => void;
+  onNextBookmark?: (index: number) => number | null;
 }
 
 interface LoupeState {
@@ -79,6 +84,10 @@ export function Viewer({
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
+  bookmarks = [],
+  onPageChange,
+  onSaveBookmark,
+  onNextBookmark,
 }: ViewerProps) {
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
@@ -277,6 +286,15 @@ export function Viewer({
   }, [generation, session, state.index]);
 
   useEffect(() => {
+    onPageChange?.(state.index);
+  }, [onPageChange, state.index]);
+
+  function jumpToNextBookmark() {
+    const next = onNextBookmark?.(state.index);
+    if (next !== null && next !== undefined) dispatch({ type: "go", index: next });
+  }
+
+  useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       const command =
         customShortcutCommand(event, activeShortcuts) ??
@@ -454,6 +472,21 @@ export function Viewer({
         </button>
         <button onClick={toggleDirection}>
           読み方向
+        </button>
+        <button
+          type="button"
+          aria-label="しおりを保存"
+          onClick={() => onSaveBookmark?.(state.index)}
+        >
+          しおりを保存
+        </button>
+        <button
+          type="button"
+          aria-label="次のしおり"
+          disabled={bookmarks.length === 0}
+          onClick={jumpToNextBookmark}
+        >
+          次のしおり
         </button>
         <button
           ref={fullscreenButtonRef}

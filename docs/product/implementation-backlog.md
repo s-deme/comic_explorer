@@ -106,9 +106,9 @@ codd:
 | 39 | P2-2 / FR-B14 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Implemented / PASS | Done | successful openのsession recent menuを実装・実測 |
 | 51 | P2-3 / FR-B14 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Implemented / PASS | Done | back/forward履歴dropdownの直接移動を実装・実測 |
 | 46 | P2-4 / FR-B14 | `IMP-046` | `FUT-C-051` | 終了メニュー | Implemented / PASS | Done | file menuの明示終了commandを実装・実測 |
-| 40 | P3-1 / FR-B15 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Candidate / NOT TESTED | Candidate | しおりidentity、保存scope、永続化、open UIを要件化 |
-| 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Candidate / NOT TESTED | Candidate | 順序、wrap、無効条件を要件化 |
-| 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Candidate / NOT TESTED | Candidate | favoriteとの差、collection model、追加・除去を決定 |
+| 40 | P3-1 / FR-B15 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Implemented / PASS | Done | page bookmark local persistence/listを実装・実測 |
+| 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Implemented / PASS | Done | next bookmarkと末尾wrapを実装・実測 |
+| 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Implemented / PASS | Done | favoriteと分離したbookshelfを実装・実測 |
 | 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Candidate / NOT TESTED | Candidate | mask構文、kind、複数条件、保存scopeを決定 |
 | 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Candidate / NOT TESTED | Candidate | 対象row、column、encoding、path秘匿を決定 |
 | 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Candidate / NOT TESTED | Candidate | 採用command確定後にmenu IA、shortcut、disabled stateを設計 |

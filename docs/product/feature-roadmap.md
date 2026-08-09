@@ -58,7 +58,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 |---|---|---:|---|---|---|
 | P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Done` |
 | P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Done` |
-| P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Planned`（採用・要件化待ち） |
+| P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Done` |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Planned`（2機能の縦切り） |
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Planned`（先行command確定後） |
 | P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Planned`（Windows lifecycle要件待ち） |
@@ -608,13 +608,21 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B15 — しおり・本棚（Batch 15 / P3）
 
-- **状態:** `Planned`。対象行は`Candidate / NOT TESTED`のまま保持する。
+- **状態:** `Done`。対象3行を採用要件化し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-045`ページしおり保存・一覧、(2) `FUT-C-046`次のしおりへ移動、
   (3) `FUT-C-047`本棚表示・追加。
 - **優先理由:** 読書の継続性に直結し、既存のreading position・favorite・永続metadataを活用できる。
   自動保存される読書位置、利用者が明示保存するページしおり、作品collectionとしての本棚を区別する。
 - **採用gate:** identity、並び順、wrap、移動・欠損時の扱いを決める。本棚がfavoriteと同義なら
   新機能を作らず表示名・導線の変更としてB17へ統合する。
+
+#### FR-B15 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p3-しおり本棚)。
+- **実装根拠:** `src/features/reading/collections.ts`、`src/features/reading/collections.test.ts`、
+  `src/features/viewer/Viewer.tsx`、`src/App.tsx`。
+- **直接観測:** [FR-B15 focused test結果](../testing/fr-b15-results.md)。bookmarkのidentity/order/wrapと
+  bookshelfのunique/add/removeをSKIP 0で実測した。
 
 ### FR-B16 — filter・export（Batch 16 / P4）
 

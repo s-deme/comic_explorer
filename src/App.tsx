@@ -92,6 +92,15 @@ import {
 } from "./features/catalog/view-mode";
 import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
+  addBookshelfItem,
+  listBookmarks,
+  listBookshelf,
+  nextBookmark,
+  removeBookshelfItem,
+  saveBookmark,
+  type PageBookmark,
+} from "./features/reading/collections";
+import {
   catalogCsv,
   rangeSelection,
   selectEntriesByKind,
@@ -223,6 +232,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
+  const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
+  const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
+  const [bookshelfOpen, setBookshelfOpen] = useState(false);
+  const [bookshelfPaths, setBookshelfPaths] = useState<string[]>(() => listBookshelf());
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
@@ -559,6 +572,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       entry,
       ...current.filter((candidate) => candidate.relativePath !== entry.relativePath),
     ].slice(0, 12));
+  }
+
+  function refreshBookmarks(itemKey: string) {
+    setBookmarks(listBookmarks(itemKey));
+    setBookmarkNotice(null);
+  }
+
+  function saveCurrentBookmark(index: number) {
+    if (viewerSession === null) return;
+    const page = viewerSession.pages[index];
+    if (page === undefined) return;
+    setBookmarks(saveBookmark({
+      itemKey: viewerSession.itemKey,
+      pageIndex: index,
+      pageKey: page.relativePath,
+      createdAt: Date.now(),
+    }));
+    setBookmarkNotice(`しおりを保存しました: ${index + 1}ページ`);
+  }
+
+  function addSelectedToBookshelf() {
+    if (selectedPath === null) return;
+    setBookshelfPaths(addBookshelfItem(selectedPath));
   }
 
   async function copySelectedPaths() {
@@ -1436,6 +1472,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setMemoSaveState("idle");
     setRatingSaveState("idle");
     setMetadataNotice(null);
+    setBookmarks([]);
+    setBookmarkNotice(null);
   }
 
   function openComicEntry(entry: CatalogEntry) {
@@ -1447,6 +1485,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     void openComic(entry.relativePath, requestGeneration).then((response) => {
       if (response.status === "ok") {
         rememberRecent(entry);
+        refreshBookmarks(response.data.itemKey);
         setViewerSession(response.data);
         setLoadState({ status: "ready" });
         void loadItemMetadata(response.data.itemKey);
@@ -1519,6 +1558,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
           onClose={closeViewer}
           onNextItem={handleEndOfVolume}
+          bookmarks={bookmarks}
+          onPageChange={() => undefined}
+          onSaveBookmark={saveCurrentBookmark}
+          onNextBookmark={(index) => nextBookmark(bookmarks, index)?.pageIndex ?? null}
         />
         <section
           aria-label="作品メタデータ"
@@ -1588,7 +1631,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               </label>
             </>
           )}
-          {metadataNotice !== null && <p role="alert">{metadataNotice}</p>}
+        {metadataNotice !== null && <p role="alert">{metadataNotice}</p>}
+        {bookmarkNotice !== null && <p className="bookmark-notice" role="status">{bookmarkNotice}</p>}
         </section>
         {endOfVolumeNotice !== null && (
           <p className="end-of-volume-notice" role="status">
@@ -2034,6 +2078,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 }
               >
                 お気に入り
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-product-id="bookshelf-menu-item"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() => runMenuAction(() => setBookshelfOpen(true))}
+              >
+                本棚
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                aria-disabled={selectedPath === null}
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onClick={() => runMenuAction(addSelectedToBookshelf, selectedPath === null)}
+              >
+                本棚に追加
               </button>
               <button
                 type="button"
@@ -2716,6 +2782,42 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onResolve={reResolveFavorite}
           onRemove={removeFavoriteEntry}
         />
+      )}
+      {bookshelfOpen && (
+        <div className="dialog-backdrop">
+          <section className="bookshelf-dialog" role="dialog" aria-modal="true" aria-label="本棚">
+            <div className="quick-access-heading">
+              <h2>本棚</h2>
+              <button type="button" onClick={() => setBookshelfOpen(false)}>閉じる</button>
+            </div>
+            {bookshelfPaths.length === 0 ? (
+              <p role="status">本棚に登録された項目はありません。</p>
+            ) : (
+              <ul aria-label="本棚の項目">
+                {bookshelfPaths.map((path) => (
+                  <li key={path}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookshelfOpen(false);
+                        navigate(parentPath(path) ?? "", "push", path);
+                      }}
+                    >
+                      {path}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${path}を本棚から除去`}
+                      onClick={() => setBookshelfPaths(removeBookshelfItem(path))}
+                    >
+                      除去
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       )}
       {historyOpen && (
         <div className="dialog-backdrop">
