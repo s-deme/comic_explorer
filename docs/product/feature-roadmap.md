@@ -69,7 +69,7 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 | `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Planned` |
 | `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
 | `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Blocked`（semantic ACCEPT、CoDD非PASS・Windows UI未測定） |
-| `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（keyboard三契約semantic ACCEPT、touch/gamepad `BLOCKED_UNMEASURED`、CoDD/native UI未完了） |
+| `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（shortcutはproduct PASS、touch/gamepad `BLOCKED_UNMEASURED`） |
 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned` |
 
 ## バッチ仕様
@@ -428,11 +428,10 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B11 — 入力拡張（Batch 11）
 
-- **状態:** `Partial / BLOCKED`。keyboard三契約（FT-B11-001/004/005）のsemantic gateは受理したが、
-  touch/gamepadは `BLOCKED_UNMEASURED`、CoDD structural gateとWindows WebView2 native product UIも
-  未完了・未測定である。FR-B11全体を `Partial / BLOCKED` とし、未測定をPASSへ昇格しない。
+- **状態:** `Partial / BLOCKED`。`FUT-C-019`はFT-B11-006のWindows WebView2 product gateを
+  PASSした。touch/gamepadは `BLOCKED_UNMEASURED` のため、FR-B11全体はPartialを維持する。
 - **対象 feature ID:** `FUT-C-019`, `FUT-R-006`, `FUT-R-007`（user-defined shortcut、
-  touch、gamepad）。`FUT-C-019`はkeyboard部分を`Partial / BLOCKED`として台帳へ同期し、
+  touch、gamepad）。`FUT-C-019`は`Implemented / PASS`として台帳へ同期し、
   touch/gamepad候補は候補性を維持したまま未測定境界を記録する。
 - **user outcome:** 読者が操作割当を自分の環境へ合わせ、keyboard fallbackとfocus境界を保ったまま
   page/navigation/viewer操作を行える。touch/gamepadは対応機器上で同じ操作契約を検証できる状態を
@@ -448,18 +447,18 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
   今回は(1)、(2)、(5)のkeyboard connected sliceを受理した。
 - **focused test 範囲:** `FT-B11-001` remap/conflict/reset（ACCEPT）、`FT-B11-002` touch gesture と
   boundary（`BLOCKED_UNMEASURED`）、`FT-B11-003` gamepad mapping/disconnect（`BLOCKED_UNMEASURED`）、
-  `FT-B11-004` keyboard fallback/focus（ACCEPT）、`FT-B11-005` restart/accessibility（ACCEPT）。
+  `FT-B11-004` keyboard fallback/focus（ACCEPT）、`FT-B11-005` restart/accessibility（ACCEPT）、
+  `FT-B11-006` Windows product remap/restart/reset（PASS）。
 - **accepted source binding:** 最終keyboard test source manifestは
   `fr_b11_branded_identity_type_resume/source-sha.tsv` SHA-256
   `553b821a818756c1f260caef7443cd59968c23c776a2d9bee4743df84e426751`であり、最終test source
   `src/App.fr-b11.test.tsx` SHA-256は
   `f58e45d04ddaab3d2e4c0ef376ee5b16f5208c7d66dc9fdd70fe6a6bef78633a`である。詳細は[FR-B11結果](../testing/fr-b11-results.md)を正本とする。
 - **accepted gates:** focused exact3 `3 PASS / 0 FAIL / 0 SKIP`、App回帰 `39 PASS / 0 FAIL / 0 SKIP`、
-  Windows offline Rust `78 unit + 1 process PASS / failed 0 / ignored 0 / SKIP 0`、typecheck `PASS / SKIP 0`、
-  build `PASS / SKIP 0`。各manifest/stdout/stderr SHAはaccepted raw ledgerから転記し、今回再実行していない。
+  Windows Rust `79 unit + 1 process PASS / failed 0 / ignored 0 / SKIP 0`、typecheck `PASS / SKIP 0`、
+  release build `PASS / SKIP 0`、FT-B11-006 product gate PASS。
 - **batch末尾 gate:** keyboard semantic evidenceは受理するが、touch/gamepadが`BLOCKED_UNMEASURED`であり、
-  CoDD verifyの生値も`INCOMPLETE / NOT APPLICABLE`のためbatch末尾gateは未達。Windows WebView2 native
-  product UIとhardware accessibility observationをPASSへ昇格しない。
+  hardware accessibility observationが未測定のためbatch末尾gateは未達。
 
 #### FR-B11 実装・受入証跡
 
@@ -469,7 +468,8 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
   `src-tauri/src/state/repository.rs`、`src-tauri/src/lib.rs`、`src/App.fr-b11.test.tsx`。
 - **直接観測:** FT-B11-001はproduction Appのremap/conflict/reset、FT-B11-004はkeyboard fallback・
   focused input suppression・Viewer/navigation boundary、FT-B11-005はrestart persistence・accessible
-  help/name・safe default recoveryを接続境界で受理した。FT-B11-002/003はhardware unavailableのため
+  help/name・safe default recoveryを接続境界で受理した。FT-B11-006はrelease executableの
+  remap・restart・resetを観測した。FT-B11-002/003はhardware unavailableのため
   `BLOCKED_UNMEASURED`であり、PASS/SKIP countには含めない。
 - **rejected history:** false C0のselected path/command不一致、rustfmt失敗、E0382 partial-move、
   TS2322 branded identity typing failureは履歴のみとし、accepted PASS証跡へ混入させない。

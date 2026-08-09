@@ -76,15 +76,15 @@ codd:
 ## 実装バックログ
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
-[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-004` である。
+[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-005` である。
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
 | 1 | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
 | 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
 | 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Implemented / PASS | **Done** | `FT-B04-006`でWindows WebView2製品ゲート、原本差分0、focused回帰を完了 |
-| 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Partial / BLOCKED | **Next** | CoDD/native product UI gateを解消 |
-| 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Partial / BLOCKED | Blocked | CoDD structural exceptionとWindows UI gateを解消 |
+| 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Implemented / PASS | **Done** | `FT-B11-006`でremap・restart・reset・原本差分0、Rust 79+1を完了 |
+| 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Partial / BLOCKED | **Next** | CoDD structural exceptionとWindows UI gateを解消 |
 | 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |
 | 7 | `IMP-007` | `FUT-R-004` | 閲覧履歴 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |
 | 8 | `IMP-008` | `FUT-R-005` | 評価 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |

@@ -50,6 +50,11 @@ page navigationと読み方向に応じた左右キーの意味を保つ。click
 起動を停止させない。help UIは各commandのlabelと現在のshortcutをaccessible nameで提示し、
 変更・conflict・resetの結果を利用者が確認できる。
 
+Windows WebView2 product gateはrelease executableのhelp UIで次ページkeyを再割当し、
+新しいkeyでViewerが遷移すること、競合する割当が拒否されることを直接観測する。
+製品を再起動して再割当が復元され、全リセット後は既定keyだけが動作することを
+`FT-B11-006`として同一のapp-local dataで確認する。原本とlibrary treeの差分は0とする。
+
 ## REQ-FR-B11-004: touch and gamepad capability boundary
 
 touch gestureとgamepad mappingはkeyboard commandと同じcommand境界へ接続し、disconnect、未対応、
@@ -66,18 +71,19 @@ FT-B11-002/003を `BLOCKED_UNMEASURED` と記録する。未測定をPASSへ読�
 | FT-B11-003 | product gamepad input → viewer command | mapping、disconnect、未対応時の安全な復帰 | `BLOCKED_UNMEASURED` |
 | FT-B11-004 | App/viewer keydown → focus guard → navigation/viewer | fallback、focused input suppression、Viewer境界 | semantic ACCEPT |
 | FT-B11-005 | settings persistence → restart → accessible help | restart復元、safe default、accessible label/name | semantic ACCEPT |
+| FT-B11-006 | Windows WebView2 release executable → help UI → Viewer → restart | remap、conflict拒否、Viewer発火、restart復元、reset、原本差分0 | product gate |
 
 focused testはproduction Appと既存client/Tauri commandの接続境界を観測する。mockだけ、flagだけ、
 pure unitだけ、またはSKIPだけを完了根拠にしない。SKIPが1件でもある機能経路は完了扱いにしない。
 
 ## C0/C1および検証境界
 
-C0では全contract matrixをexact 5 ID（FT-B11-001〜005）として固定する。一方、accepted executable
+C0では全contract matrixをexact 6 ID（FT-B11-001〜006）として固定する。一方、accepted executable
 C0の選択対象はFT-B11-001/004/005のexact3で、selected_count=3とする。FT-B11-002/003は別の
 BLOCKED_UNMEASURED ledgerに記録し、accepted executableおよびPASS/SKIP countの外に置く。keyboard
 部分のaccepted source SHA、canonical command、toolchain選択、owned path、raw destinationも固定する。
-今回のaccepted keyboard sliceではFT-B11-001/004/005のfocused exact3、App回帰、Windows offline Rust、
-typecheck、buildを各一回の不変rawとして受理した。
+今回のaccepted keyboard sliceではFT-B11-001/004/005のfocused exact3、FT-B11-006のWindows
+WebView2 product gate、App回帰、Windows Rust、typecheck、release buildを受理する。
 文書同期ではこれらのcommandを再実行しない。初回FAIL、同一根因redo、source typing修正の履歴は
 accepted evidenceから分離する。CoDDのstructural exception、native UI、hardware未測定をPASSへ昇格しない。
 

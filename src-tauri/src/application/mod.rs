@@ -279,7 +279,7 @@ fn valid_shortcut_key(value: &str) -> bool {
             remainder = &remainder[modifier.len()..];
         }
     }
-    if remainder.is_empty() || remainder.contains('+') {
+    if remainder.is_empty() || (remainder.contains('+') && remainder != "+") {
         return false;
     }
     matches!(
@@ -2541,6 +2541,17 @@ fn unix_millis() -> i64 {
 mod shutdown_tests {
     use super::*;
     use std::sync::Condvar;
+
+    #[test]
+    fn shortcut_validation_accepts_default_and_modified_plus_bindings() {
+        assert_eq!(
+            normalize_shortcuts(&default_shortcuts()),
+            Some(default_shortcuts())
+        );
+        assert!(valid_shortcut_key("+"));
+        assert!(valid_shortcut_key("Ctrl++"));
+        assert!(!valid_shortcut_key("Ctrl+++"));
+    }
 
     #[test]
     fn catalog_view_mode_defaults_to_cover_list_for_missing_or_unknown_values() {

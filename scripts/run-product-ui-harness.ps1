@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$FullscreenOnly
+    [switch]$FullscreenOnly,
+    [switch]$ShortcutOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +14,7 @@ $missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
 $recoveryAppData = Join-Path $evidenceRoot "recovery-appdata"
 $keyboardAppData = Join-Path $evidenceRoot "keyboard-appdata"
-$port = 9224
+$port = Get-Random -Minimum 20000 -Maximum 40000
 $script:sequence = 0
 $script:socket = $null
 
@@ -64,14 +65,28 @@ function Invoke-Cdp([string]$Method, [hashtable]$Params) {
     }
     do {
         $stream = [IO.MemoryStream]::new()
-        do {
-            $buffer = New-Object byte[] 65536
-            $result = $script:socket.ReceiveAsync(
-                [ArraySegment[byte]]::new($buffer),
-                [Threading.CancellationToken]::None
-            ).GetAwaiter().GetResult()
-            $stream.Write($buffer, 0, $result.Count)
-        } while (-not $result.EndOfMessage)
+        $receiveTimeout = [Threading.CancellationTokenSource]::new(
+            [TimeSpan]::FromSeconds(10)
+        )
+        try {
+            do {
+                $buffer = New-Object byte[] 65536
+                $receiveTask = $script:socket.ReceiveAsync(
+                    [ArraySegment[byte]]::new($buffer),
+                    $receiveTimeout.Token
+                )
+                if (-not $receiveTask.Wait(10000)) {
+                    throw "Timed out waiting for a WebView2 DevTools response."
+                }
+                $result = $receiveTask.GetAwaiter().GetResult()
+                if ($result.MessageType -eq [Net.WebSockets.WebSocketMessageType]::Close) {
+                    throw "WebView2 DevTools socket closed before a response arrived."
+                }
+                $stream.Write($buffer, 0, $result.Count)
+            } while (-not $result.EndOfMessage)
+        } finally {
+            $receiveTimeout.Dispose()
+        }
         $message = [Text.Encoding]::UTF8.GetString($stream.ToArray()) |
             ConvertFrom-Json
     } while ($message.id -ne $id)
@@ -577,6 +592,131 @@ try {
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    if ($ShortcutOnly) {
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('.menu-trigger')].at(-1).click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('#help-menu') !== null" "shortcut help menu"
+        Invoke-Evaluate (
+            "document.querySelector('#help-menu [role=menuitem]').click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[role=dialog]') !== null && " +
+            "document.querySelector('#shortcut-nextPage').value === 'PageDown'"
+        ) "shortcut dialog defaults"
+        Invoke-Evaluate (
+            "document.querySelector('#shortcut-nextPage').dispatchEvent(" +
+            "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('#shortcut-nextPage').value === 'N'"
+        ) "shortcut remap persistence request"
+        Invoke-Evaluate (
+            "new Promise((resolve) => setTimeout(() => resolve(true), 1000))"
+        ) | Out-Null
+        Invoke-Evaluate (
+            "document.querySelector('#shortcut-previousPage').dispatchEvent(" +
+            "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[role=alert]')?.textContent.includes(" +
+            "'\u6b21\u30da\u30fc\u30b8') && " +
+            "document.querySelector('#shortcut-previousPage').value === 'PageUp'"
+        ) "shortcut conflict rejection"
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('[role=dialog] button')]" +
+            ".find((node) => node.textContent === '\u9589\u3058\u308b').click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('[role=dialog]') === null" "shortcut dialog close"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
+            "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer-toolbar span:last-of-type')" +
+            "?.textContent.startsWith('1 / 3')"
+        ) "custom shortcut viewer setup"
+        Invoke-Evaluate (
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer-toolbar span:last-of-type')" +
+            "?.textContent.startsWith('2 / 3')"
+        ) "custom shortcut viewer navigation"
+        Invoke-Evaluate (
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "custom shortcut viewer close"
+        Stop-Product $cold
+        $port += 1
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        ) "shortcut restart catalog"
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('.menu-trigger')].at(-1).click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('#help-menu') !== null" "restart shortcut help menu"
+        Invoke-Evaluate (
+            "document.querySelector('#help-menu [role=menuitem]').click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('#shortcut-nextPage').value === 'N'"
+        ) "shortcut restart restoration"
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('[role=dialog] button')]" +
+            ".find((node) => node.textContent === '\u3059\u3079\u3066\u65e2\u5b9a\u306b\u623b\u3059').click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('#shortcut-nextPage').value === 'PageDown'"
+        ) "shortcut reset"
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('[role=dialog] button')]" +
+            ".find((node) => node.textContent === '\u9589\u3058\u308b').click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('[role=dialog]') === null" "reset dialog close"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
+            "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer-toolbar span:last-of-type')" +
+            "?.textContent.startsWith('2 / 3')"
+        ) "reset shortcut viewer setup"
+        Invoke-Evaluate (
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer-toolbar span:last-of-type')" +
+            "?.textContent.startsWith('3 / 3')"
+        ) "reset default shortcut navigation"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Shortcut product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Shortcut product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B11-006"
+            remap = $true
+            conflictRejected = $true
+            viewerCommand = $true
+            restartRestored = $true
+            resetRestoredDefault = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
     if ($FullscreenOnly) {
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +

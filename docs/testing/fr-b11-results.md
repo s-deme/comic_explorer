@@ -23,12 +23,15 @@ recovery）は、production Appと既存settings・viewer/navigation境界に接
 3 PASS / 0 FAIL / 0 SKIPである。FT-B11-002 touchとFT-B11-003 gamepadは実機観測ができず
 `BLOCKED_UNMEASURED`であり、PASS/SKIPへ加算しない。
 
-したがってFR-B11の総合状態は `Partial / BLOCKED` である。offline/component evidenceを
-Windows WebView2 native product UI、UIA/screen-reader/DPI、OS syscall、touch/gamepad hardwareの
-測定済みPASSへ昇格しない。CoDD structural gateも非PASSの生値を保持する。
+IMP-004でFT-B11-006をWindows WebView2 release executableで実行し、remap、conflict拒否、
+Viewer command、restart復元、reset、原本差分0をPASSした。製品ゲートは既定`+`を無効と
+判定して保存を拒否するRust validatorの欠陥を検出し、修正後はWindows Rust 79 unit +
+1 processがPASSした。これにより`FUT-C-019`単体は `Implemented / PASS` とする。
 
-今回の作業はaccepted evidenceの四文書同期だけであり、functional test、App回帰、Windows Rust、
-typecheck、build、CoDDの再実行、retry、commit、pushを行っていない。
+したがってFR-B11の総合状態は、touch/gamepadのみが残るため `Partial / BLOCKED` である。
+UIA/screen-reader/DPI、OS syscall、touch/gamepad hardwareの
+測定済みPASSへ昇格しない。IMP-004のWindows-native CoDD scan/check/verifyはすべて
+exit 0である。
 
 ## 実装範囲
 
@@ -93,6 +96,7 @@ treated as a final PASS.
 | FT-B11-003 | product gamepad input → viewer command: mapping and disconnect recovery | `BLOCKED_UNMEASURED`; not counted |
 | FT-B11-004 | App/viewer keydown → focus guard → navigation/viewer: fallback, focused input suppression, Viewer boundary | semantic ACCEPT |
 | FT-B11-005 | settings persistence → restart → accessible help: persistence, safe default recovery, accessible name/label | semantic ACCEPT |
+| FT-B11-006 | Windows WebView2 release executable → help UI → Viewer → restart | PASS（remap/conflict/Viewer/restart/reset、原本差分0） |
 
 The focused exact3 output contains only FT-B11-001, FT-B11-004, and FT-B11-005. The unavailable device
 slices are not represented as skipped tests and are not added to the PASS denominator.
@@ -125,16 +129,16 @@ inflate the accepted test counts.
 
 ## CoDD and environment boundary
 
-The inherited approved structural reference is
+The historical inherited structural reference is
 `queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate/`. It records CoDD verify as
 `INCOMPLETE / NOT APPLICABLE` with raw values `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`
 and verification tests 0. The only exception is the approved structural trio
 `deployment_completeness`, `user_journey_coherence`, and `environment_coverage`; `task_completion` VACUOUS
-is disclosed separately, and functional-test SKIP has no exception. CoDD was not rerun for this documentation
-task and its non-PASS state is not added to the feature PASS count.
+is disclosed separately, and functional-test SKIP has no exception. IMP-004 supersedes that historical
+keyboard structural result with Windows-native scan/check/verify exit 0.
 
-Windows WebView2 native product UI, UIA/screen-reader/DPI, OS syscall, touch hardware, and gamepad hardware
-remain `UNMEASURED / BLOCKED`. Local/component evidence does not substitute for those product gates.
+Windows WebView2 keyboard product UIはFT-B11-006でPASSした。UIA/screen-reader/DPI、OS syscall、
+touch hardware、and gamepad hardware remain `UNMEASURED / BLOCKED`.
 
 ## Final path boundary
 
