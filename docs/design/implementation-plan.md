@@ -88,6 +88,11 @@ IMP-008/FUT-R-005は同じFR-B07 fileから`FT-B07-003`だけを選び、
 IMP-012/FUT-C-010は現行App suiteの`FT-B05-` prefixを選び、exact 5 PASS・0 FAIL・0 SKIPを
 machine-readable resultで強制する。`search_port_` Rust filterとSearchOnly product gateへ接続し、
 performanceの`FUT-D-001`はFR-S03へ分離したままこのlaneへ含めない。
+IMP-013/FUT-C-011はshared FR-B06 implementationから`FT-B06-001`と`FT-B06-002`だけを選び、exact 2 PASS・
+0 FAIL・0 SKIPをmachine-readable resultで強制する。
+`favorite_target_enforces_relative_path_and_eligible_kind_boundaries` Rust filterとQuickAccessOnly product
+gateへ接続する。restart/migration/missing/moved/re-resolveの`FUT-C-021`受入はIMP-014へ分離し、IMP-013の
+PASSから昇格させない。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -116,6 +121,12 @@ folder/archiveのrowとkindを観測する。resultを選ぶと親addressとsele
 clear後の通常catalogを確認する。harnessだけが一時probeを追加した後の明示検索は新結果へ置換し、
 probe除去後のlibrary file集合とSHAが初期値へ一致する。clear後に到着した旧generationの抑止は
 deferred frontend testを正本とする。これはwatcherではなくread-only rescanである。
+QuickAccessOnlyではrelease UIからavailableなfolder、comicFolder、archiveをそれぞれfavoriteへadd/removeし、
+対象ごとのexact quick access rowを観測する。同一identity addのdedupは`FT-B06-001`を正本とする。folder rowは
+address/選択済みtree node/catalogへ、comic rowは既存viewer
+境界へ遷移する。再走査とremoveが競合しても最新operationの結果とloading解除へ収束する。libraryの
+file/directory集合とSHAは初期値に一致し、restart、migration、missing/moved、
+再解決は後続IMP-014の`FUT-C-021`だけで扱う。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

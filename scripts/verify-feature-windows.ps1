@@ -31,6 +31,9 @@ $featureConfig = switch ($featureKey) {
     "imp-012" { [pscustomobject]@{ Id = "IMP-012"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
     "fut-c-010" { [pscustomobject]@{ Id = "FUT-C-010"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
     "searchonly" { [pscustomobject]@{ Id = "SearchOnly"; ProductSwitch = "-SearchOnly"; ProductStage = "search"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B05-"; ExpectedFrontendPasses = 5; RustFilter = "search_port_" } }
+    "imp-013" { [pscustomobject]@{ Id = "IMP-013"; ProductSwitch = "-QuickAccessOnly"; ProductStage = "quick-access"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B06-00[12]"; ExpectedFrontendPasses = 2; RustFilter = "favorite_target_enforces_relative_path_and_eligible_kind_boundaries" } }
+    "fut-c-011" { [pscustomobject]@{ Id = "FUT-C-011"; ProductSwitch = "-QuickAccessOnly"; ProductStage = "quick-access"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B06-00[12]"; ExpectedFrontendPasses = 2; RustFilter = "favorite_target_enforces_relative_path_and_eligible_kind_boundaries" } }
+    "quickaccessonly" { [pscustomobject]@{ Id = "QuickAccessOnly"; ProductSwitch = "-QuickAccessOnly"; ProductStage = "quick-access"; FrontendTest = "src\App.test.tsx"; FrontendTestName = "FT-B06-00[12]"; ExpectedFrontendPasses = 2; RustFilter = "favorite_target_enforces_relative_path_and_eligible_kind_boundaries" } }
     default { $null }
 }
 $resolvedFeatureId = if ($null -ne $featureConfig) { $featureConfig.Id } else { $Feature }
@@ -170,7 +173,7 @@ try {
         $failedStage = "feature-resolution"
         $overallExitCode = 2
         $errorPath = Join-Path $logRoot "feature-resolution.stderr.log"
-        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly, IMP-007, FUT-R-004, HistoryOnly, IMP-008, FUT-R-005, RatingOnly, IMP-012, FUT-C-010, SearchOnly."
+        $message = "Unsupported feature '$Feature'. Supported values: IMP-004, FUT-C-019, ShortcutOnly, IMP-005, FUT-C-022, TagsOnly, IMP-006, FUT-C-023, MemoOnly, IMP-007, FUT-R-004, HistoryOnly, IMP-008, FUT-R-005, RatingOnly, IMP-012, FUT-C-010, SearchOnly, IMP-013, FUT-C-011, QuickAccessOnly."
         $message | Set-Content -LiteralPath $errorPath -Encoding UTF8
         $now = [DateTimeOffset]::UtcNow
         $stages.Add([pscustomobject][ordered]@{

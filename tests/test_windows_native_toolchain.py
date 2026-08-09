@@ -60,6 +60,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             "imp-012",
             "fut-c-010",
             "searchonly",
+            "imp-013",
+            "fut-c-011",
+            "quickaccessonly",
         ):
             self.assertIn(f'"{feature}"', source)
         for field in (
@@ -116,6 +119,13 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertIn('ExpectedFrontendPasses = 5', source)
         self.assertIn('RustFilter = "search_port_"', source)
         self.assertIn('ProductSwitch = "-SearchOnly"', source)
+        self.assertIn('FrontendTestName = "FT-B06-00[12]"', source)
+        self.assertIn('ExpectedFrontendPasses = 2', source)
+        self.assertIn(
+            'RustFilter = "favorite_target_enforces_relative_path_and_eligible_kind_boundaries"',
+            source,
+        )
+        self.assertIn('ProductSwitch = "-QuickAccessOnly"', source)
         frontend_test = (ROOT / "src/App.fr-b07.test.tsx").read_text(
             encoding="utf-8"
         )
@@ -124,6 +134,8 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         self.assertEqual(frontend_test.count('it("FT-B07-003 '), 1)
         catalog_search_test = (ROOT / "src/App.test.tsx").read_text(encoding="utf-8")
         self.assertEqual(catalog_search_test.count('it("FT-B05-'), 5)
+        self.assertEqual(catalog_search_test.count('it("FT-B06-001 '), 1)
+        self.assertEqual(catalog_search_test.count('it("FT-B06-002 '), 1)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -277,7 +289,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         )
         self.assertIn("[switch]$RatingOnly", source)
         self.assertIn("if ($RatingOnly)", source)
-        self.assertIn("if (!$RatingOnly -and !$SearchOnly)", source)
+        self.assertIn(
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+        )
         for stage in (
             '"rating viewer setup"',
             '"rating $rating saved"',
@@ -312,7 +326,9 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         )
         self.assertIn("[switch]$SearchOnly", source)
         self.assertIn("if ($SearchOnly)", source)
-        self.assertIn("if (!$RatingOnly -and !$SearchOnly)", source)
+        self.assertIn(
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+        )
         for stage in (
             '"search normalized mixed-kind result"',
             '"search result navigation and selection"',
@@ -346,6 +362,67 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             'throw "Search product harness changed the source directory tree."',
             source,
         )
+
+    def test_quick_access_product_gate_opens_available_targets_and_removes_them(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$QuickAccessOnly", source)
+        self.assertIn("if ($QuickAccessOnly)", source)
+        self.assertIn(
+            "if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly)", source
+        )
+        for stage in (
+            '"quick access add $favoritePath"',
+            '"quick access exact favorite state"',
+            '"quick access available rows"',
+            '"quick access folder navigation"',
+            '"quick access comic viewer"',
+            '"quick access archive viewer"',
+            '"quick access archive remove"',
+            '"quick access comic remove"',
+            '"quick access folder remove and empty"',
+        ):
+            self.assertIn(stage, source)
+        for selector in (
+            "favorites-menu-item",
+            "favorite-toggle",
+            "quick-access-dialog",
+            "favorite-row",
+            "data-favorite-relative-path",
+            "favorite-open",
+            "favorite-remove",
+        ):
+            self.assertIn(selector, source)
+        self.assertIn('test = "FT-B06-006"', source)
+        self.assertIn(
+            'throw "Quick access product harness changed source archives."', source
+        )
+        self.assertIn(
+            'throw "Quick access product harness changed the source tree or created adjacent files."',
+            source,
+        )
+        self.assertIn(
+            'throw "Quick access product harness changed the source directory tree."',
+            source,
+        )
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        catalog_source = (ROOT / "src/features/catalog/CatalogGrid.tsx").read_text(
+            encoding="utf-8"
+        )
+        quick_access_source = (
+            ROOT / "src/features/catalog/QuickAccess.tsx"
+        ).read_text(encoding="utf-8")
+        self.assertIn('data-product-id="favorites-menu-item"', app_source)
+        self.assertIn('data-product-id="favorite-toggle"', catalog_source)
+        for selector in (
+            'data-product-id="quick-access-dialog"',
+            'data-product-id="favorite-row"',
+            "data-favorite-relative-path={favorite.relativePath}",
+            'data-product-id="favorite-open"',
+            'data-product-id="favorite-remove"',
+        ):
+            self.assertIn(selector, quick_access_source)
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(

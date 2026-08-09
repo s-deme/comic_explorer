@@ -1587,6 +1587,25 @@ describe("application shell", () => {
       expect(within(cell).getAllByRole("button", { name: "お気に入りから解除" })).toHaveLength(1),
     );
     expect(addFavoriteMock).toHaveBeenCalledTimes(2);
+
+    let resolveStaleFavorites:
+      | ((value: Awaited<ReturnType<typeof listFavorites>>) => void)
+      | undefined;
+    listFavoritesMock.mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof listFavorites>>>((resolve) => {
+          resolveStaleFavorites = resolve;
+        }),
+    );
+    chooseAppMenuItem("ライブラリ", "お気に入り");
+    const dialog = await screen.findByRole("dialog", { name: "お気に入り" });
+    expect(within(dialog).getByRole("button", { name: "確認中…" })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "解除" }));
+    expect(await within(dialog).findByText("お気に入りはありません。")).toBeInTheDocument();
+    await act(async () => {
+      resolveStaleFavorites!(favoritesResponse([added]));
+    });
+    expect(within(dialog).getByText("お気に入りはありません。")).toBeInTheDocument();
   });
 
   it("FT-B06-002 opens quick-access folders and comics through their connected boundaries", async () => {

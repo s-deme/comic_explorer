@@ -49,6 +49,7 @@ and report both the missing capability and the locations that were searched.
   `IMP-007`, `FUT-R-004`, and `HistoryOnly` resolve to the history lane.
   `IMP-008`, `FUT-R-005`, and `RatingOnly` resolve to the rating lane.
   `IMP-012`, `FUT-C-010`, and `SearchOnly` resolve to the name-search lane.
+  `IMP-013`, `FUT-C-011`, and `QuickAccessOnly` resolve to the quick-access lane.
   Each lane selects its own focused frontend file, optional exact test-name
   pattern, Rust filter, and product harness switch while sharing typecheck,
   frontend/SBOM generation, focused or
@@ -59,7 +60,8 @@ and report both the missing capability and the locations that were searched.
   When a test-name pattern is supplied, the focused runner parses its
   machine-readable result and fails unless the lane's configured
   `ExpectedFrontendPasses` count passes with zero failures. Atomic lanes configure
-  one selected test; SearchOnly configures the five `FT-B05-*` tests. Tests excluded
+  one selected test; SearchOnly configures the five `FT-B05-*` tests and QuickAccessOnly
+  configures `FT-B06-001`/`FT-B06-002` (two tests). Tests excluded
   by the feature pattern are reported separately from selected functional skips.
 - Every verification run emits a final JSON result on success and failure. It
   records each stage's UTC start/end, elapsed seconds, and exit code, plus the
@@ -95,6 +97,14 @@ and report both the missing capability and the locations that were searched.
   tree byte-identical. Cleared in-flight generation suppression remains a
   deterministic deferred frontend contract. This is not a filesystem watcher
   lane.
+  The quick-access product lane must add/remove available folder, comic-folder,
+  and archive
+  targets through the release UI, prove exact available rows, open
+  the folder through the catalog/navigation boundary and a comic through the
+  existing viewer boundary, settle removal to the empty state without a stale
+  refresh leaving the dialog loading, and leave the library file and directory tree
+  byte-identical. Restart, migration, missing/moved, and re-resolution belong
+  to the later persistence lane and are not inferred from this product result.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and

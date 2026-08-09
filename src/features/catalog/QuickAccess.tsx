@@ -49,6 +49,7 @@ export function QuickAccess({
     <div className="dialog-backdrop">
       <section
         className="quick-access-dialog"
+        data-product-id="quick-access-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-access-title"
@@ -79,7 +80,9 @@ export function QuickAccess({
               return (
                 <li
                   key={favorite.favoriteId}
+                  data-product-id="favorite-row"
                   data-favorite-id={favorite.favoriteId}
+                  data-favorite-relative-path={favorite.relativePath}
                   data-favorite-status={favorite.status}
                 >
                   <div className="quick-access-main">
@@ -95,6 +98,7 @@ export function QuickAccess({
                   <div className="quick-access-actions">
                     <button
                       type="button"
+                      data-product-id="favorite-open"
                       disabled={!canOpen}
                       onClick={() => onOpen(favorite)}
                     >
@@ -110,7 +114,11 @@ export function QuickAccess({
                         再走査
                       </button>
                     )}
-                    <button type="button" onClick={() => onRemove(favorite)}>
+                    <button
+                      type="button"
+                      data-product-id="favorite-remove"
+                      onClick={() => onRemove(favorite)}
+                    >
                       解除
                     </button>
                   </div>

@@ -6,7 +6,8 @@ param(
     [switch]$MemoOnly,
     [switch]$HistoryOnly,
     [switch]$RatingOnly,
-    [switch]$SearchOnly
+    [switch]$SearchOnly,
+    [switch]$QuickAccessOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +40,7 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
-    $freshnessFeature = if ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
+    $freshnessFeature = if ($QuickAccessOnly) { "IMP-013" } elseif ($SearchOnly) { "IMP-012" } elseif ($RatingOnly) { "IMP-008" } elseif ($HistoryOnly) { "IMP-007" } elseif ($MemoOnly) { "IMP-006" } elseif ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
         "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
         $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
@@ -769,7 +770,7 @@ try {
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
     ) "all catalog entries"
-    if (!$RatingOnly -and !$SearchOnly) {
+    if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly) {
         Wait-Evaluate (
             "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
             "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
@@ -890,6 +891,153 @@ try {
             navigated = $true
             emptyAndClear = $true
             freshRescan = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
+    if ($QuickAccessOnly) {
+        foreach ($favoritePath in @("folder-a", "comic-folder", "1-valid.cbz")) {
+            $favoritePathJson = $favoritePath | ConvertTo-Json -Compress
+            Invoke-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $favoritePathJson); " +
+                "const toggle = item?.closest('.catalog-cell')?.querySelector(" +
+                "'[data-product-id=favorite-toggle]'); if (!toggle) return false; " +
+                "toggle.click(); return true; })()"
+            ) | Out-Null
+            Wait-Evaluate (
+                "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+                ".find((node) => node.dataset.relativePath === $favoritePathJson); " +
+                "return item?.closest('.catalog-cell')?.querySelector(" +
+                "'[data-product-id=favorite-toggle]')?.dataset.favorite === 'true'; })()"
+            ) "quick access add $favoritePath"
+        }
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-product-id=favorite-toggle][data-favorite=true]').length === 3"
+        ) "quick access exact favorite state"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "quick access library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "(() => { const rows = [...document.querySelectorAll('[data-product-id=favorite-row]')]" +
+            ".map((row) => row.dataset.favoriteRelativePath + ':' + row.dataset.favoriteStatus).sort(); " +
+            "return document.querySelector('[data-product-id=quick-access-dialog]') !== null && " +
+            "JSON.stringify(rows) === JSON.stringify(['1-valid.cbz:available', " +
+            "'comic-folder:available', 'folder-a:available']); })()"
+        ) "quick access available rows"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"folder-a`"] " +
+            "[data-product-id=favorite-open]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "(() => { const entries = [...document.querySelectorAll('.catalog-item')]" +
+            ".map((item) => item.dataset.relativePath).sort(); " +
+            "const expected = ['folder-a/acl-denied', 'folder-a/child', " +
+            "'folder-a/still-readable'].sort(); return " +
+            "document.querySelector('[data-product-id=quick-access-dialog]') === null && " +
+            "document.querySelector('#address')?.value.endsWith('\\library\\folder-a') && " +
+            "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
+            "node.textContent === 'folder-a' && node.getAttribute('aria-selected') === 'true') && " +
+            "JSON.stringify(entries) === JSON.stringify(expected); })()"
+        ) "quick access folder navigation"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "quick access folder library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=quick-access-dialog]') !== null && " +
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"]') !== null"
+        ) "quick access comic row"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"] " +
+            "[data-product-id=favorite-open]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer .viewer-toolbar strong')?.textContent === 'comic-folder'"
+        ) "quick access comic viewer"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "quick access comic close"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "quick access archive library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=quick-access-dialog]') !== null && " +
+            "document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"]') !== null"
+        ) "quick access archive row"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"] " +
+            "[data-product-id=favorite-open]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer .viewer-toolbar strong')?.textContent === '1-valid.cbz'"
+        ) "quick access archive viewer"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "quick access archive close"
+        Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "quick access removal library menu"
+        Invoke-Evaluate "document.querySelector('[data-product-id=favorites-menu-item]')?.click(); true" |
+            Out-Null
+        Wait-Evaluate "document.querySelector('[data-product-id=quick-access-dialog]') !== null" "quick access removal dialog"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"1-valid.cbz`"] " +
+            "[data-product-id=favorite-remove]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-product-id=favorite-row]').length === 2 && " +
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"]') !== null && " +
+            "document.querySelector('[data-favorite-relative-path=`"folder-a`"]') !== null"
+        ) "quick access archive remove"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"comic-folder`"] " +
+            "[data-product-id=favorite-remove]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-product-id=favorite-row]').length === 1 && " +
+            "document.querySelector('[data-favorite-relative-path=`"folder-a`"]') !== null"
+        ) "quick access comic remove"
+        Invoke-Evaluate (
+            "document.querySelector('[data-favorite-relative-path=`"folder-a`"] " +
+            "[data-product-id=favorite-remove]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-product-id=favorite-row]').length === 0 && " +
+            "document.querySelector('[data-product-id=quick-access-dialog] .empty-state') !== null"
+        ) "quick access folder remove and empty"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Quick access product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$(($_.FullName.Substring($library.Length))):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Quick access product harness changed the source tree or created adjacent files."
+        }
+        $afterDirectories = Get-ChildItem $library -Directory -Recurse | Sort-Object FullName |
+            ForEach-Object { $_.FullName.Substring($library.Length) }
+        if (Compare-Object $beforeDirectories $afterDirectories) {
+            throw "Quick access product harness changed the source directory tree."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B06-006"
+            addedTargets = $true
+            availableRows = $true
+            folderOpened = $true
+            comicFolderOpened = $true
+            archiveOpened = $true
+            removed = $true
             sourceDifferenceCount = 0
         } | ConvertTo-Json -Compress
         return

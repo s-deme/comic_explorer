@@ -275,6 +275,7 @@ export function CatalogGrid({
                           aria-label={favorite ? "お気に入りから解除" : "お気に入りに追加"}
                           aria-pressed={favorite}
                           data-favorite={favorite}
+                          data-product-id="favorite-toggle"
                           onClick={(event) => {
                             event.stopPropagation();
                             onToggleFavorite(entry);

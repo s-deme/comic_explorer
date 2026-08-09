@@ -29,9 +29,9 @@ codd:
 
 | 区分 | 件数 | 扱い |
 |---|---:|---|
-| 実装・受入完了 | 9 | 実装、直接観測、正本同期、CoDD gateを完了済み |
+| 実装・受入完了 | 10 | 実装、直接観測、正本同期、CoDD gateを完了済み |
 | 実装が一部完了・受入待ち | 3 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
-| 未実装候補 | 17 | 採用判断、要件化、実装、直接観測を順に行う |
+| 未実装候補 | 16 | 採用判断、要件化、実装、直接観測を順に行う |
 | 保留・未決定 | 5 | 優先度と仕様を決めるまで実装しない |
 | 実機・外部環境待ち | 2 | 実装着手ではなく、測定環境を確保して判定する |
 | **実装バックログ合計** | **36** | `FUT-R-001`〜`003`、`FUT-R-008` の恒久Rejectedは含めない |
@@ -78,7 +78,7 @@ codd:
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
 [機能ロードマップ](./feature-roadmap.md)の順で採用判断する。ただし今回のユーザー指示により
-`IMP-009`〜`IMP-011`は状態を変えずにスキップし、現在の `Next` は `IMP-013` とする。
+`IMP-009`〜`IMP-011`は状態を変えずにスキップし、現在の `Next` は `IMP-014` とする。
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
@@ -94,8 +94,8 @@ codd:
 | 10 | `IMP-010` | `FUT-C-031` | 重複作品検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
 | 11 | `IMP-011` | `FUT-C-032` | 壊れた書庫検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
 | 12 | `IMP-012` | `FUT-C-010` | 名前検索 | Implemented / PASS | **Done** | `FT-B05-006`でnormalized mixed-kind、navigation、empty/clear、explicit rescan、原本差分0を完了 |
-| 13 | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Candidate / NOT TESTED | **Next** | 採用範囲を決定しFR-B06要件を作成 |
-| 14 | `IMP-014` | `FUT-C-021` | お気に入り保存 | Candidate / NOT TESTED | Candidate | `IMP-013`との境界を決定し要件化 |
+| 13 | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Implemented / PASS | **Done** | `FT-B06-006`でcurrent-session add/remove、available rows、folder/comic navigation、原本差分0を完了 |
+| 14 | `IMP-014` | `FUT-C-021` | お気に入り保存 | Candidate / NOT TESTED | **Next** | restart/migration/missing/moved/re-resolveをFR-B06 persistence gateで判定 |
 | 15 | `IMP-015` | `FUT-C-005` | WebPページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |
 | 16 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
 | 17 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |

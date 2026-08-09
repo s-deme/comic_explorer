@@ -546,6 +546,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     operation: Promise<Awaited<ReturnType<typeof listFavorites>>>,
   ) {
     const requestGeneration = favoriteGeneration.current;
+    setFavoritesLoading(true);
     setFavoriteNotice(null);
     try {
       const response = await operation;
@@ -558,6 +559,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     } catch {
       if (requestGeneration === favoriteGeneration.current) {
         setFavoriteNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === favoriteGeneration.current) {
+        setFavoritesLoading(false);
       }
     }
   }
@@ -1799,6 +1804,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="favorites-menu-item"
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
