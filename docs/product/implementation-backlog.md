@@ -76,87 +76,87 @@ codd:
 
 ## 実装バックログ
 
-作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
-[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。ただし今回のユーザー指示により
-`IMP-009`〜`IMP-011`は状態を変えずにスキップした。ユーザー指定の「IMP-015終わったら停止」により
-`IMP-015`完了後の `Next` は置かず、`IMP-016`以下はCandidateのまま保全する。
-`IMP-037`〜`IMP-072`は2026-08-09のLeeyes参照画面差分から登録した未採用候補である。
-追記順は優先順位を表さず、採用判断時にroadmapのbatchと安全境界を決める。
+`登録順`と`IMP-*`は履歴を保つ安定IDであり、優先度変更でも改番しない。表の物理行は
+[機能ロードマップ](./feature-roadmap.md)の現行優先度で並べ、P番号が小さいもの、同一Pでは枝番が
+小さいものから1件ずつ採用判断する。`Hold`は順位末尾ではなく、解除条件を満たすまで通常queueの
+対象外である。2026-08-10の再検討は着手指示ではないため、`Next` / `In Progress`は置かず、
+未実装行の台帳状態と作業状態は変更しない。`IMP-037`〜`IMP-072`は2026-08-09のLeeyes参照画面差分から
+登録した候補であり、commandの実体をshell UIより先に、file mutationを安全設計後に配置した。
 
-| 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
-|---:|---|---|---|---|---|---|
-| 1 | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
-| 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
-| 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Implemented / PASS | **Done** | `FT-B04-006`でWindows WebView2製品ゲート、原本差分0、focused回帰を完了 |
-| 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Implemented / PASS | **Done** | `FT-B11-006`でremap・restart・reset・原本差分0、Rust 79+1を完了 |
-| 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Implemented / PASS | **Done** | `FT-B10-005`で付与・検索・rename・restart・remove・原本差分0、canonical aggregateを完了 |
-| 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Implemented / PASS | **Done** | `FT-B07-006`でsave・再open・restart復元・clear・原本差分0、canonical aggregateを完了 |
-| 7 | `IMP-007` | `FUT-R-004` | 閲覧履歴 | Implemented / PASS | **Done** | `FT-B07-007`でsuccess-only・dedup・順序・restart復元・原本差分0、canonical aggregateを完了 |
-| 8 | `IMP-008` | `FUT-R-005` | 評価 | Implemented / PASS | **Done** | `FT-B07-008`で1→5・restart復元・unset・再open・原本差分0、canonical aggregateを完了 |
-| 9 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | Blocked | 今回の指示でスキップ。FR-B09のWindows file-change product gateは未解消 |
-| 10 | `IMP-010` | `FUT-C-031` | 重複作品検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
-| 11 | `IMP-011` | `FUT-C-032` | 壊れた書庫検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
-| 12 | `IMP-012` | `FUT-C-010` | 名前検索 | Implemented / PASS | **Done** | `FT-B05-006`でnormalized mixed-kind、navigation、empty/clear、explicit rescan、原本差分0を完了 |
-| 13 | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Implemented / PASS | **Done** | `FT-B06-006`でcurrent-session add/remove、available rows、folder/comic navigation、原本差分0を完了 |
-| 14 | `IMP-014` | `FUT-C-021` | お気に入り保存 | Implemented / PASS | **Done** | Rustでv1 migration、`FT-B06-007`でrestart、strict moved/missing/re-resolve、source tree差分0を完了 |
-| 15 | `IMP-015` | `FUT-C-005` | WebPページ表示 | Implemented / PASS | **Done** | `FT-B08-006`でfolder/ZIP/CBZ static WebP、local error recovery、原本差分0、canonical aggregateを完了 |
-| 16 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
-| 17 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |
-| 18 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |
-| 19 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
-| 20 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
-| 21 | `IMP-021` | `FUT-C-003` | PDF閲覧 | Candidate / NOT TESTED | Candidate | MVP後の採否とreader境界を決定 |
-| 22 | `IMP-022` | `FUT-C-004` | EPUB閲覧 | Candidate / NOT TESTED | Candidate | MVP後の採否とreader境界を決定 |
-| 23 | `IMP-023` | `FUT-C-009` | 動画対応 | Candidate / NOT TESTED | Candidate | 対応codec、再生、配布条件を決定 |
-| 24 | `IMP-024` | `FUT-C-024` | 名前変更 | Candidate / NOT TESTED | Candidate | 非破壊・確認・undo境界を要件化 |
-| 25 | `IMP-025` | `FUT-C-025` | 移動 | Candidate / NOT TESTED | Candidate | 非破壊・確認・失敗回復境界を要件化 |
-| 26 | `IMP-026` | `FUT-C-026` | コピー | Candidate / NOT TESTED | Candidate | 非破壊・上書き確認・失敗回復境界を要件化 |
-| 27 | `IMP-027` | `FUT-C-027` | 新規フォルダ | Candidate / NOT TESTED | Candidate | 非破壊・権限・失敗回復境界を要件化 |
-| 28 | `IMP-028` | `FUT-C-028` | ごみ箱移動 | Candidate / NOT TESTED | Candidate | OS連携、確認、復元境界を要件化 |
-| 29 | `IMP-029` | `FUT-C-029` | 完全削除 | Candidate / NOT TESTED | Candidate | TBD-007を再評価し安全条件を承認 |
-| 30 | `IMP-030` | `FUT-D-001` | 名前検索性能 | Deferred / NOT TESTED | Deferred | 検索UI採用後に性能受入を確定 |
-| 31 | `IMP-031` | `FUT-D-002` | 最大ファイルサイズ | Deferred / NOT TESTED | Deferred | 対象datasetと上限を決定 |
-| 32 | `IMP-032` | `FUT-D-003` | 性能計測条件の適用 | Deferred / NOT TESTED | Deferred | Windows基準環境で測定条件を確定 |
-| 33 | `IMP-033` | `FUT-D-004` | 作品別表示設定 | Deferred / NOT TESTED | Deferred | 採否と保存スコープを決定 |
-| 34 | `IMP-034` | `FUT-D-005` | 読書状態ラベル | Deferred / NOT TESTED | Deferred | 読書位置との状態モデル境界を決定 |
-| 35 | `IMP-035` | `FUT-R-006` | タッチ操作 | Candidate / NOT TESTED | Blocked | タッチ実機を確保してFR-B11を測定 |
-| 36 | `IMP-036` | `FUT-R-007` | ゲームパッド操作 | Candidate / NOT TESTED | Blocked | ゲームパッド実機を確保してFR-B11を測定 |
-| 37 | `IMP-037` | `FUT-C-042` | ファイル・フォルダを開く | Candidate / NOT TESTED | Candidate | picker対象、登録外path、open後のlibrary contextを決定 |
-| 38 | `IMP-038` | `FUT-C-043` | 指定動作で開く | Candidate / NOT TESTED | Candidate | 参照submenuの動作集合を確認して要件化 |
-| 39 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Candidate / NOT TESTED | Candidate | FUT-R-004再利用範囲とmenu semanticsを決定 |
-| 40 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Candidate / NOT TESTED | Candidate | しおりidentity、保存scope、永続化、open UIを要件化 |
-| 41 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Candidate / NOT TESTED | Candidate | 順序、wrap、無効条件を要件化 |
-| 42 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Candidate / NOT TESTED | Candidate | favoriteとの差、collection model、追加・除去を決定 |
-| 43 | `IMP-043` | `FUT-C-048` | メディア表示 | Candidate / NOT TESTED | Candidate | 対象media、表示semantics、data sourceを決定 |
-| 44 | `IMP-044` | `FUT-C-049` | 項目プロパティ | Candidate / NOT TESTED | Candidate | 表示metadata、複数選択時、error境界を決定 |
-| 45 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Candidate / NOT TESTED | Candidate | 対象row、column、encoding、path秘匿を決定 |
-| 46 | `IMP-046` | `FUT-C-051` | 終了メニュー | Candidate / NOT TESTED | Candidate | close、tray収納、未完了処理との境界を決定 |
-| 47 | `IMP-047` | `FUT-C-052` | 編集操作の元に戻す | Candidate / NOT TESTED | Candidate | undo対象、履歴、有効状態、失敗回復を要件化 |
-| 48 | `IMP-048` | `FUT-C-053` | クリップボードのファイル操作 | Candidate / NOT TESTED | Candidate | clipboard format、cut state、上書き・権限境界を決定 |
-| 49 | `IMP-049` | `FUT-C-054` | パスのコピー | Candidate / NOT TESTED | Candidate | 絶対・相対path、親folder、複数選択formatを決定 |
-| 50 | `IMP-050` | `FUT-C-055` | 複数・種別選択 | Candidate / NOT TESTED | Candidate | selection model、kind分類、virtual grid操作を要件化 |
-| 51 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Candidate / NOT TESTED | Candidate | 履歴表示順、直接jump、keyboard操作を要件化 |
-| 52 | `IMP-052` | `FUT-C-057` | 現在場所の手動更新 | Candidate / NOT TESTED | Candidate | F5、再読込範囲、cache扱い、selection維持を要件化 |
-| 53 | `IMP-053` | `FUT-C-058` | ファイルマスク | Candidate / NOT TESTED | Candidate | mask構文、kind、複数条件、保存scopeを決定 |
-| 54 | `IMP-054` | `FUT-C-059` | ファイル表示の切り替え | Candidate / NOT TESTED | Candidate | 参照commandの切替対象と有効条件を確認 |
-| 55 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Candidate / NOT TESTED | Candidate | 分離方式、lifecycle、focus、fullscreen、復帰を要件化 |
-| 56 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Candidate / NOT TESTED | Candidate | tray lifecycle、自動常駐、終了との区別を決定 |
-| 57 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Candidate / NOT TESTED | Candidate | 対象pane、表示状態の復元、keyboard導線を決定 |
-| 58 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Candidate / NOT TESTED | Candidate | 対象bar、復帰導線、profile保存scopeを決定 |
-| 59 | `IMP-059` | `FUT-C-064` | OS全体フォルダツリー | Candidate / NOT TESTED | Candidate | shell namespace、権限、network path、安全境界を決定 |
-| 60 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Candidate / NOT TESTED | Candidate | 採用command確定後にmenu IA、shortcut、disabled stateを設計 |
-| 61 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Candidate / NOT TESTED | Candidate | command集合、icon asset、accessible name、表示scopeを決定 |
-| 62 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Candidate / NOT TESTED | Candidate | visual fidelity、density、長名、responsive基準を決定 |
-| 63 | `IMP-063` | `FUT-C-068` | 現在位置付きステータス | Candidate / NOT TESTED | Candidate | index、total、selection、filter時の表示規則を決定 |
-| 64 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Candidate / NOT TESTED | Candidate | 統合対象、分類、適用・取消、永続化を要件化 |
-| 65 | `IMP-065` | `FUT-C-070` | プラグイン設定 | Candidate / NOT TESTED | Candidate | plugin方式、設定対象、安全・配布境界を評価 |
-| 66 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Candidate / NOT TESTED | Candidate | format、save/load/switch、migration、安全な除外項目を決定 |
-| 67 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Candidate / NOT TESTED | Candidate | 対象操作、device、context、conflict解決を決定 |
-| 68 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Candidate / NOT TESTED | Candidate | 管理対象、操作範囲、実行中状態を参照仕様から確認 |
-| 69 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Candidate / NOT TESTED | Candidate | 保存先、format、対象、上書き規則を決定 |
-| 70 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Candidate / NOT TESTED | Candidate | input source、format、対象範囲を参照仕様から確認 |
-| 71 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Candidate / NOT TESTED | Candidate | help構成、offline配布、検索・context導線を決定 |
-| 72 | `IMP-072` | `FUT-C-077` | バージョン情報 | Candidate / NOT TESTED | Candidate | 表示項目とdialog操作を決定 |
+| 登録順 | 現行優先度 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
+|---:|---|---|---|---|---|---|---|
+| 1 | Done | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
+| 2 | Done | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
+| 3 | Done | `IMP-003` | `FUT-C-017` | フルスクリーン | Implemented / PASS | **Done** | `FT-B04-006`でWindows WebView2製品ゲート、原本差分0、focused回帰を完了 |
+| 4 | Done | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Implemented / PASS | **Done** | `FT-B11-006`でremap・restart・reset・原本差分0、Rust 79+1を完了 |
+| 5 | Done | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Implemented / PASS | **Done** | `FT-B10-005`で付与・検索・rename・restart・remove・原本差分0、canonical aggregateを完了 |
+| 6 | Done | `IMP-006` | `FUT-C-023` | メモ保存 | Implemented / PASS | **Done** | `FT-B07-006`でsave・再open・restart復元・clear・原本差分0、canonical aggregateを完了 |
+| 7 | Done | `IMP-007` | `FUT-R-004` | 閲覧履歴 | Implemented / PASS | **Done** | `FT-B07-007`でsuccess-only・dedup・順序・restart復元・原本差分0、canonical aggregateを完了 |
+| 8 | Done | `IMP-008` | `FUT-R-005` | 評価 | Implemented / PASS | **Done** | `FT-B07-008`で1→5・restart復元・unset・再open・原本差分0、canonical aggregateを完了 |
+| 12 | Done | `IMP-012` | `FUT-C-010` | 名前検索 | Implemented / PASS | **Done** | `FT-B05-006`でnormalized mixed-kind、navigation、empty/clear、explicit rescan、原本差分0を完了 |
+| 13 | Done | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Implemented / PASS | **Done** | `FT-B06-006`でcurrent-session add/remove、available rows、folder/comic navigation、原本差分0を完了 |
+| 14 | Done | `IMP-014` | `FUT-C-021` | お気に入り保存 | Implemented / PASS | **Done** | Rustでv1 migration、`FT-B06-007`でrestart、strict moved/missing/re-resolve、source tree差分0を完了 |
+| 15 | Done | `IMP-015` | `FUT-C-005` | WebPページ表示 | Implemented / PASS | **Done** | `FT-B08-006`でfolder/ZIP/CBZ static WebP、local error recovery、原本差分0、canonical aggregateを完了 |
+| 52 | P1-1 / FR-B13 | `IMP-052` | `FUT-C-057` | 現在場所の手動更新 | Candidate / NOT TESTED | Candidate | F5、再読込範囲、cache扱い、selection維持を要件化 |
+| 50 | P1-2 / FR-B13 | `IMP-050` | `FUT-C-055` | 複数・種別選択 | Candidate / NOT TESTED | Candidate | selection model、kind分類、virtual grid操作を要件化 |
+| 49 | P1-3 / FR-B13 | `IMP-049` | `FUT-C-054` | パスのコピー | Candidate / NOT TESTED | Candidate | 絶対・相対path、親folder、複数選択formatを決定 |
+| 44 | P1-4 / FR-B13 | `IMP-044` | `FUT-C-049` | 項目プロパティ | Candidate / NOT TESTED | Candidate | 表示metadata、複数選択時、error境界を決定 |
+| 63 | P1-5 / FR-B13 | `IMP-063` | `FUT-C-068` | 現在位置付きステータス | Candidate / NOT TESTED | Candidate | index、total、selection、filter時の表示規則を決定 |
+| 37 | P2-1 / FR-B14 | `IMP-037` | `FUT-C-042` | ファイル・フォルダを開く | Candidate / NOT TESTED | Candidate | picker対象、登録外path、open後のlibrary contextを決定 |
+| 39 | P2-2 / FR-B14 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Candidate / NOT TESTED | Candidate | FUT-R-004再利用範囲とmenu semanticsを決定 |
+| 51 | P2-3 / FR-B14 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Candidate / NOT TESTED | Candidate | 履歴表示順、直接jump、keyboard操作を要件化 |
+| 46 | P2-4 / FR-B14 | `IMP-046` | `FUT-C-051` | 終了メニュー | Candidate / NOT TESTED | Candidate | close、tray収納、未完了処理との境界を決定 |
+| 40 | P3-1 / FR-B15 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Candidate / NOT TESTED | Candidate | しおりidentity、保存scope、永続化、open UIを要件化 |
+| 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Candidate / NOT TESTED | Candidate | 順序、wrap、無効条件を要件化 |
+| 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Candidate / NOT TESTED | Candidate | favoriteとの差、collection model、追加・除去を決定 |
+| 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Candidate / NOT TESTED | Candidate | mask構文、kind、複数条件、保存scopeを決定 |
+| 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Candidate / NOT TESTED | Candidate | 対象row、column、encoding、path秘匿を決定 |
+| 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Candidate / NOT TESTED | Candidate | 採用command確定後にmenu IA、shortcut、disabled stateを設計 |
+| 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Candidate / NOT TESTED | Candidate | command集合、icon asset、accessible name、表示scopeを決定 |
+| 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Candidate / NOT TESTED | Candidate | visual fidelity、density、長名、responsive基準を決定 |
+| 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Candidate / NOT TESTED | Candidate | 対象pane、current-session表示状態、keyboard導線を決定 |
+| 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Candidate / NOT TESTED | Candidate | 対象bar、current-session復帰導線を決定。永続化はB19へ送る |
+| 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Candidate / NOT TESTED | Candidate | 分離方式、lifecycle、focus、fullscreen、復帰を要件化 |
+| 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Candidate / NOT TESTED | Candidate | tray lifecycle、自動常駐、終了との区別を決定 |
+| 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Candidate / NOT TESTED | Candidate | 統合対象、分類、適用・取消、永続化を要件化 |
+| 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Candidate / NOT TESTED | Candidate | format、save/load/switch、migration、安全な除外項目を決定 |
+| 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Candidate / NOT TESTED | Candidate | 対象操作、device、context、conflict解決を決定 |
+| 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Candidate / NOT TESTED | Candidate | help構成、offline配布、検索・context導線を決定 |
+| 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Candidate / NOT TESTED | Candidate | 表示項目とdialog操作を決定 |
+| 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Candidate / NOT TESTED | Candidate | GIFの対応範囲とdecoderを決定 |
+| 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Candidate / NOT TESTED | Candidate | decoder、ライセンス、対応範囲を確認 |
+| 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Candidate / NOT TESTED | Candidate | 再生・停止・メモリ境界を要件化 |
+| 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
+| 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Candidate / NOT TESTED | Candidate | library、ライセンス、セキュリティ境界を確認 |
+| 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Candidate / NOT TESTED | Candidate | 管理対象、操作範囲、実行中状態を参照仕様から確認 |
+| 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Candidate / NOT TESTED | Candidate | 保存先、format、対象、上書き規則を決定 |
+| 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Candidate / NOT TESTED | Candidate | input source、format、対象範囲を参照仕様から確認 |
+| 27 | Hold / FR-S02 | `IMP-027` | `FUT-C-027` | 新規フォルダ | Candidate / NOT TESTED | Candidate | file mutationの安全設計と明示承認後に権限・失敗回復を要件化 |
+| 26 | Hold / FR-S02 | `IMP-026` | `FUT-C-026` | コピー | Candidate / NOT TESTED | Candidate | root/path、上書き確認、途中失敗・rollbackを要件化 |
+| 24 | Hold / FR-S02 | `IMP-024` | `FUT-C-024` | 名前変更 | Candidate / NOT TESTED | Candidate | identity、cache・読書情報移行、undo境界を要件化 |
+| 25 | Hold / FR-S02 | `IMP-025` | `FUT-C-025` | 移動 | Candidate / NOT TESTED | Candidate | identity移行、確認、失敗回復境界を要件化 |
+| 28 | Hold / FR-S02 | `IMP-028` | `FUT-C-028` | ごみ箱移動 | Candidate / NOT TESTED | Candidate | OS連携、確認、復元境界を要件化 |
+| 48 | Hold / FR-S02 | `IMP-048` | `FUT-C-053` | クリップボードのファイル操作 | Candidate / NOT TESTED | Candidate | mutation command後にclipboard format、cut state、権限境界を決定 |
+| 47 | Hold / FR-S02 | `IMP-047` | `FUT-C-052` | 編集操作の元に戻す | Candidate / NOT TESTED | Candidate | transaction/journal確立後にundo対象、履歴、失敗回復を要件化 |
+| 29 | Hold / FR-S02 | `IMP-029` | `FUT-C-029` | 完全削除 | Candidate / NOT TESTED | Candidate | TBD-007を再評価し、最後に不可逆操作の安全条件を承認 |
+| 38 | Hold / FR-S06 | `IMP-038` | `FUT-C-043` | 指定動作で開く | Candidate / NOT TESTED | Candidate | 参照submenuの動作集合を確認して要件化 |
+| 54 | Hold / FR-S06 | `IMP-054` | `FUT-C-059` | ファイル表示の切り替え | Candidate / NOT TESTED | Candidate | 参照commandの切替対象と有効条件を確認 |
+| 59 | Hold / FR-S06 | `IMP-059` | `FUT-C-064` | OS全体フォルダツリー | Candidate / NOT TESTED | Candidate | shell namespace、権限、network path、安全境界を決定 |
+| 43 | Hold / FR-S06 | `IMP-043` | `FUT-C-048` | メディア表示 | Candidate / NOT TESTED | Candidate | 対象media、表示semantics、data sourceを決定 |
+| 65 | Hold / FR-S06 | `IMP-065` | `FUT-C-070` | プラグイン設定 | Candidate / NOT TESTED | Candidate | plugin runtime、trust、設定対象、安全・配布境界を評価 |
+| 21 | Hold / FR-S01 | `IMP-021` | `FUT-C-003` | PDF閲覧 | Candidate / NOT TESTED | Candidate | 独立readerとして採否、library、license、配布境界を決定 |
+| 22 | Hold / FR-S01 | `IMP-022` | `FUT-C-004` | EPUB閲覧 | Candidate / NOT TESTED | Candidate | 独立readerとして採否、rendering、license、配布境界を決定 |
+| 23 | Hold / FR-S01 | `IMP-023` | `FUT-C-009` | 動画対応 | Candidate / NOT TESTED | Candidate | codec、再生lifecycle、license、配布条件を決定 |
+| 9 | Hold / FR-B09 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | Blocked | FR-B09のWindows file-change product gateを解消 |
+| 10 | Hold / FR-B09 | `IMP-010` | `FUT-C-031` | 重複作品検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
+| 11 | Hold / FR-B09 | `IMP-011` | `FUT-C-032` | 壊れた書庫検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
+| 35 | Hold / FR-B11 | `IMP-035` | `FUT-R-006` | タッチ操作 | Candidate / NOT TESTED | Blocked | タッチ実機を確保してFR-B11を測定 |
+| 36 | Hold / FR-B11 | `IMP-036` | `FUT-R-007` | ゲームパッド操作 | Candidate / NOT TESTED | Blocked | ゲームパッド実機を確保してFR-B11を測定 |
+| 30 | Hold / FR-S03 | `IMP-030` | `FUT-D-001` | 名前検索性能 | Deferred / NOT TESTED | Deferred | Windows基準環境で検索性能受入を確定 |
+| 32 | Hold / FR-S03 | `IMP-032` | `FUT-D-003` | 性能計測条件の適用 | Deferred / NOT TESTED | Deferred | Windows基準環境で測定条件を確定 |
+| 31 | Hold / FR-S04 | `IMP-031` | `FUT-D-002` | 最大ファイルサイズ | Deferred / NOT TESTED | Deferred | 対象datasetと上限を決定 |
+| 33 | Hold / FR-S04 | `IMP-033` | `FUT-D-004` | 作品別表示設定 | Deferred / NOT TESTED | Deferred | 採否と保存スコープを決定 |
+| 34 | Hold / FR-S04 | `IMP-034` | `FUT-D-005` | 読書状態ラベル | Deferred / NOT TESTED | Deferred | 読書位置との状態モデル境界を決定 |
 
 ## リリース確認バックログ
 

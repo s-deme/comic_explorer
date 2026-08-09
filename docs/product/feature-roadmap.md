@@ -40,37 +40,48 @@ codd:
 | `Blocked` | 明示された依存、環境、ライセンス、安全設計、または採否判断が未解決。未着手の候補を先行割当しない。 |
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
-FR-B02はC0採用承認とpilot実装・重点QCを完了し、`Done`へ更新した。FR-B03もC0/C1の
-connected evidence、focused QC、batch末尾gateを完了し、`Done`へ更新した。FR-B04は
-connected evidenceとfocused QCまでは通過したが、canonical aggregate（CoDD verify内の
-`scripts/run-tests.sh`）がexit 1となったため、batch末尾gate未達の`Blocked`で停止した。
-FUT-C-015〜017は未実測・外部環境待ちをPASSへ読み替えず、新redoでRCA後に再判定する。
-FR-B12は引き続き`Planned`であり、未着手の対象`FUT-*`行を実装決定や完了とは扱わない。FR-B05はIMP-012でWindows WebView2製品gateと現行canonical aggregateを完了し、単一feature `FUT-C-010`を`Done`へ更新した。FR-B06はIMP-013で`FUT-C-011`、IMP-014で`FUT-C-021`の原子的Windows WebView2製品gateとcanonical aggregateを完了し、aggregateを`Done`へ更新した。FR-B08はIMP-015で`FUT-C-005`のstatic WebP gateを完了したが、`FUT-C-006`〜`FUT-C-008`はCandidateのため`Partial`を維持する。FR-B09はsemantic gateを受理したが、CoDD structural gateとWindows WebView2 native product UIが未完了・未測定のため`Partial / BLOCKED`で保持する。FR-B10はIMP-005でWindows WebView2製品gateと現行canonical aggregateを完了し、`Done`へ更新した。FR-B11はkeyboard三契約のsemantic gateを受理した一方、touch/gamepad実機とCoDD/native product gateが未完了・未測定のため`Partial / BLOCKED`で保持する。
-FR-B07はIMP-006でmemo、IMP-007でhistory、IMP-008でratingのWindows product gateを完了し、
-3 atomic featureがすべて`Implemented / PASS`となったため`Done`へ更新した。
+FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B04、B09、B11は既存の未解消gateを
+`Blocked`として保持する。FR-B08はstatic WebPだけが完了した`Partial`、FR-B12は未着手の
+`Planned`である。2026-08-10の優先度再検討では、Leeyes代替としての利用価値、後続機能を
+解放する依存、原本非破壊、安全性、Windows製品での検証容易性を評価し、未実装候補を
+P1〜P10と分離trackへ再編した。これは優先順位案であり、台帳の`Candidate / NOT TESTED`を
+採用済みへ変更せず、`Next`または`In Progress`も自動設定しない。
 
 ## 推奨実装順
 
-順序は表示倍率、巻末動作、一覧表示形式、閲覧画面 mode、名前検索、お気に入り、
-読書情報、追加画像形式、library 診断、tag 管理、入力拡張、追加書庫形式で固定する。
-各バッチは原則3〜5原子機能を目標とする。ただし、台帳が明示的に原子化した機能や、
-同じ縦切りの親子境界を人工的に分割しないため、6機能または1〜2機能になるバッチは
-例外として記録する。IDを水増しして3〜5に見せない。
+優先度はP1が最優先で、同一priority内は対象feature IDの記載順に1件ずつ進める。Batch番号と
+`FR-Bxx`は履歴・受入証跡に結び付く安定IDであり、優先度変更時も改番しない。通常batchは
+原則3〜5原子機能を目標とし、2機能になるB16/B12は同じ縦切りを人工分割しない例外とする。
+`Hold`は順位末尾ではなく、安全・仕様・環境の解除条件を満たすまで通常queueへ入れないことを表す。
 
-| 固定ID | Batch | 領域 | 対象 feature ID（台帳の原子ID） | 現在の運用状態 |
-|---|---:|---|---|---|
-| `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done`（重点QC完了） |
-| `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done`（pilot実装・重点QC完了） |
-| `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done`（重点QC完了） |
-| `FR-B04` | 4 | 閲覧画面 mode | `FUT-C-015`〜`FUT-C-017` | `Blocked`（focused PASS、canonical aggregate FAIL） |
-| `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Done`（FT-B05-006 Windows WebView2 product gate・canonical aggregate完了） |
-| `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Done`（FT-B06-006 current-session、FT-B06-007 persistenceのWindows WebView2 product gate・canonical aggregate完了） |
-| `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done`（memo/history/ratingのWindows WebView2 product gate・canonical aggregate完了） |
-| `FR-B08` | 8 | 追加画像形式 | `FUT-C-005`〜`FUT-C-008` | `Partial`（IMP-015 static WebP product gate・canonical aggregate完了、GIF/AVIFはCandidate） |
-| `FR-B09` | 9 | library 診断 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（semantic ACCEPT、CoDD INCOMPLETE / NOT APPLICABLE、Windows product gate BLOCKED） |
-| `FR-B10` | 10 | tag 管理 | `FUT-C-022` | `Done`（Windows WebView2製品gate・canonical aggregate完了） |
-| `FR-B11` | 11 | 入力拡張 | `FUT-C-019`, `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（shortcutはproduct PASS、touch/gamepad `BLOCKED_UNMEASURED`） |
-| `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned` |
+| 現行優先度 | 固定ID | 登録Batch | 領域 | 対象 feature ID（実装順） | 現在の運用状態 |
+|---|---|---:|---|---|---|
+| P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Planned`（採用・要件化待ち） |
+| P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Planned`（採用・要件化待ち） |
+| P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Planned`（採用・要件化待ち） |
+| P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Planned`（2機能の縦切り） |
+| P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Planned`（先行command確定後） |
+| P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Planned`（Windows lifecycle要件待ち） |
+| P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Planned`（設定scope確定待ち） |
+| P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial`（WebP完了、残件はCandidate） |
+| P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Planned`（license・fixture確認待ち） |
+| P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Planned`（入出力仕様確定待ち） |
+| Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
+| Hold | `FR-S06` | — | 仕様・architecture未決定 | `FUT-C-043`, `FUT-C-059`, `FUT-C-064`, `FUT-C-048`, `FUT-C-070` | `Blocked`（product・security判断待ち） |
+| Hold | `FR-S01` | — | 独立reader・media | `FUT-C-003`, `FUT-C-004`, `FUT-C-009` | `Blocked`（別設計・license確認待ち） |
+| Hold | `FR-S03` | — | 性能・実測 | `FUT-D-001`, `FUT-D-003` | `Blocked`（基準Windows環境待ち） |
+| Hold | `FR-S04` | — | 未決定機能 | `FUT-D-002`, `FUT-D-004`, `FUT-D-005` | `Blocked`（採否・受入範囲待ち） |
+| Hold | `FR-B04` | 4 | 閲覧画面modeの受入 | `FUT-C-015`〜`FUT-C-017` | `Blocked`（既存canonical aggregate gate） |
+| Hold | `FR-B09` | 9 | library診断の受入 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（Windows product gate等） |
+| Hold | `FR-B11` | 11 | touch・gamepad実測 | `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（実機待ち） |
+| Rejected | `FR-S05` | — | 恒久非採用 | `FUT-R-001`〜`FUT-R-003`, `FUT-R-008` | `Rejected`（local-only・原本非破壊方針） |
+| Done | `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done` |
+| Done | `FR-B02` | 2 | 巻末動作 | `FUT-C-020`, `FUT-C-038`〜`FUT-C-041` | `Done` |
+| Done | `FR-B03` | 3 | 一覧表示形式 | `FUT-C-012`〜`FUT-C-014` | `Done` |
+| Done | `FR-B05` | 5 | 名前検索 | `FUT-C-010` | `Done` |
+| Done | `FR-B06` | 6 | お気に入り | `FUT-C-011`, `FUT-C-021` | `Done` |
+| Done | `FR-B07` | 7 | 読書情報 | `FUT-C-023`, `FUT-R-004`, `FUT-R-005` | `Done` |
+| Done | `FR-B10` | 10 | tag管理 | `FUT-C-022` | `Done` |
 
 ## バッチ仕様
 
@@ -374,8 +385,9 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   thumbnail/cache、error classification、license/SBOM 記録。
 - **依存:** `REQ-MVP-008`、`REQ-MVP-009` の image pipeline と `REQ-MVP-017` の原本非破壊。
   decoder のライセンスと platform availability が未確認なら `Blocked` とし、推測で PASS にしない。
-- **残る実装順:** (1) static/animation GIF、(2) AVIF、(3) featureごとのthumbnail/cache/error と
-  viewer integration。ユーザー指定の停止によりIMP-016を`Next`へ繰り上げない。
+- **残る実装順（P8）:** (1) `FUT-C-006` static GIF、(2) `FUT-C-008` AVIF、
+  (3) `FUT-C-007` animation GIF。静止画decoderの縦切りを先に完了し、再生・停止・frame memory
+  policyを要するanimation GIFを後段に置く。優先度の再検討だけではいずれも`Next`へ変更しない。
 - **focused test 範囲:** `FT-B08-001` WebP、`FT-B08-002` static GIF、`FT-B08-003` animation
   GIF の frame policy、`FT-B08-004` AVIF、`FT-B08-005` corrupt/unsupported fallback と
   cache/原本 snapshot。
@@ -557,6 +569,89 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **batch末尾 gate:** license/SBOM と各形式の focused test を SKIP 0 で実測し、原本差分0、
   一時展開物0、既存 ZIP/CBZ 回帰0を確認して `BATCH-END-GATE`。その後に全体最終QCを行う。
 
+### FR-B13 — catalog command基盤（Batch 13 / P1）
+
+- **状態:** `Planned`。対象行はすべて`Candidate / NOT TESTED`であり、採用・要件化前に着手しない。
+- **対象と実装順:** (1) `FUT-C-057` 現在場所の手動更新、(2) `FUT-C-055` 複数・種別選択、
+  (3) `FUT-C-054` path copy、(4) `FUT-C-049`項目properties、(5) `FUT-C-068`現在位置付きstatus。
+- **優先理由:** 原本を変更せず、後続のexport、file operation、menu commandが共有する一覧の
+  freshness、focus・anchor・selection、件数表示を先に確立できる。F5更新後のselection消失、3表示形式、
+  sort/filterとの同期を同じcatalog state契約で扱う。
+- **採用gate:** refresh/cacheの整合、複数選択のkeyboard・accessibility、clipboard adapter、
+  複数選択時properties/statusの規則を要件化し、file writeをこのbatchへ混ぜない。
+
+### FR-B14 — open・navigation（Batch 14 / P2）
+
+- **状態:** `Planned`。B13のcatalog state確定後に採用判断する。
+- **対象と実装順:** (1) `FUT-C-042` file・folderを開く、(2) `FUT-C-044`最近開いたfile menu、
+  (3) `FUT-C-056`履歴dropdown移動、(4) `FUT-C-051`終了menu。
+- **優先理由:** 参照アプリの主要導線を早期に満たし、既存のnavigation historyと`FUT-R-004`を
+  再利用できる。履歴保存を重複実装せず、採用時に成功・失敗時のrecent更新規則を決める。
+- **採用gate:** `FUT-C-042`は登録root内だけを開くか、一時contextを許すかを先に決定する。
+  root/path検証を緩めない。recentを漫画openだけに限定するか、file・folderを含む共有履歴modelへ
+  拡張するかを明示する。終了はB18のtray lifecycleと矛盾しないclose policyを定義する。
+
+### FR-B15 — しおり・本棚（Batch 15 / P3）
+
+- **状態:** `Planned`。対象行は`Candidate / NOT TESTED`のまま保持する。
+- **対象と実装順:** (1) `FUT-C-045`ページしおり保存・一覧、(2) `FUT-C-046`次のしおりへ移動、
+  (3) `FUT-C-047`本棚表示・追加。
+- **優先理由:** 読書の継続性に直結し、既存のreading position・favorite・永続metadataを活用できる。
+  自動保存される読書位置、利用者が明示保存するページしおり、作品collectionとしての本棚を区別する。
+- **採用gate:** identity、並び順、wrap、移動・欠損時の扱いを決める。本棚がfavoriteと同義なら
+  新機能を作らず表示名・導線の変更としてB17へ統合する。
+
+### FR-B16 — filter・export（Batch 16 / P4）
+
+- **状態:** `Planned`。2機能で一つの原本非破壊の縦切りとする。
+- **対象と実装順:** (1) `FUT-C-058` file mask、(2) `FUT-C-050` CSV出力。
+- **優先理由:** B13の複数選択・件数stateを使い、表示対象の絞り込みと一覧情報の持ち出しを
+  原本非破壊で提供できる。mask適用後のcurrent/totalとexport対象を同じquery modelへ揃える。
+- **採用gate:** mask構文・対象kind・保存scope、CSV列・encoding・選択/filtered/allの範囲、
+  path情報の取り扱いを要件化する。
+
+### FR-B17 — 参照shell UI（Batch 17 / P5）
+
+- **状態:** `Planned`。B13〜B16で採用commandとstateを確定してから着手する。
+- **対象と実装順:** (1) `FUT-C-065`参照menu構成、(2) `FUT-C-066`icon command toolbar、
+  (3) `FUT-C-067`参照型thumbnail tile。
+- **優先理由:** Leeyesとの差を縮めるが、先に外観だけを作るとdisabled commandやshortcutを
+  作り直すため、実機能の後段に置く。既存のview mode・sort・thumbnail取得を再利用する。
+- **採用gate:** menu/toolbarは既存commandを呼ぶpresentation層とし、機能を二重実装しない。
+  accessible name、keyboard menu操作、long name、density、DPIの受入基準を決める。
+
+### FR-B18 — workspace・window（Batch 18 / P6）
+
+- **状態:** `Planned`。Windows lifecycleの製品要件と検証環境を確定してから採用する。
+- **対象と実装順:** (1) `FUT-C-062` pane表示切替、(2) `FUT-C-063` bar・menu表示切替、
+  (3) `FUT-C-060`画像表示領域の分離、(4) `FUT-C-061`task tray収納。
+- **優先理由:** 同一window内の可逆な表示切替を先に作り、別window・trayのfocus、復帰、fullscreen、
+  process終了といったnative lifecycleを後段へ隔離する。
+- **採用gate:** 常に戻せる導線、複数windowのowner、B14の終了menuとの相互作用を要件化し、
+  release WebView2で直接観測する。B18単独では表示状態をcurrent sessionに限定し、永続化・profile
+  schemaはB19で一度だけ設計する。
+
+### FR-B19 — 設定・help（Batch 19 / P7）
+
+- **状態:** `Planned`。設定対象となる先行機能のscope確定後に着手する。
+- **対象と実装順:** (1) `FUT-C-069`統合設定画面、(2) `FUT-C-071`設定profile、
+  (3) `FUT-C-072`mouse gesture設定、(4) `FUT-C-076`一般help、(5) `FUT-C-077`version情報。
+- **優先理由:** 個別設定を先に増殖させず、apply/cancel、migration、safe defaultを共有する。
+  既存`FUT-C-019`のkeyboard shortcut設定は再実装せず統合導線から利用する。
+- **採用gate:** profileへ含める値と秘密・machine固有値の除外、gesture conflict、offline help配布、
+  version/license表示項目を決める。
+
+### FR-B20 — thumbnail保守（Batch 20 / P10）
+
+- **状態:** `Planned`。既存thumbnail cacheは破棄可能なapp-local dataであり、入出力仕様が
+  決まるまで利用者データ契約へ変更しない。
+- **対象と実装順:** (1) `FUT-C-073` thumbnail管理、(2) `FUT-C-074`表示中thumbnailの保存、
+  (3) `FUT-C-075` thumbnail一括読込。
+- **優先理由:** 日常閲覧の必須導線より専門性が高く、cache形式・容量・overwrite・互換性を
+  公開契約にする設計コストが大きいため通常候補の最後に置く。
+- **採用gate:** 管理対象、保存format、input source、容量上限、取消・失敗回復、既存cache migration、
+  原本非破壊を要件化する。
+
 ## 重複・umbrella 境界台帳
 
 同じ user outcome を二度実装しないため、以下の親子・非重複境界を固定する。
@@ -567,11 +662,18 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 | `FUT-C-020` / `FUT-C-038`〜`FUT-C-041` | `FUT-C-020` は巻末動作設定の umbrella、後四つは確認、一覧復帰、停止、loop の原子 option。FR-B02の共通 policy と option mapping に集約し、umbrella 自体へ別実装を作らない。既存 `REQ-MVP-016` の固定既定動作は維持する。 |
 | `FUT-C-010` / `FUT-D-001` | `FUT-C-010` は名前検索の機能/UI umbrella。`FUT-D-001` は10,000項目・1秒以内の性能受入であり、同じ検索 UI の二重機能ではない。FR-B05の機能テストと FR-S03 の性能実測を分離する。 |
 | `REQ-MVP-015` / 読書情報 | MVPの reading position は既存の保存・復元機能であり、FR-B07の memo/history/rating や未決定の読書状態ラベルへ再実装しない。 |
+| `REQ-MVP-015` / `FUT-C-045`, `FUT-C-046` | reading positionは最後に読んだ位置の自動保存、page bookmarkは利用者が明示した複数位置の保存・移動。永続化基盤は共有しても意味とUIを混同しない。 |
+| `FUT-C-011`, `FUT-C-021` / `FUT-C-047` | favorite/quick accessと本棚が同じcollection semanticsなら新しい保存modelを作らない。別collectionを採用する場合だけ差分要件を先に固定する。 |
+| `REQ-MVP-004`, `FUT-R-004` / `FUT-C-044`, `FUT-C-056` | navigation stackと閲覧履歴を再利用する。recentの対象を漫画だけにするかfile・folderまで広げるかを要件化し、同じ対象集合の履歴を二重保存しない。 |
+| `FUT-C-030` / `FUT-C-057` | `FUT-C-030`は自動変更検出、`FUT-C-057`は利用者が起動する現在場所の再読込。F5更新だけで自動監視を実装済みとしない。 |
+| `FUT-C-012`〜`FUT-C-014`, `REQ-MVP-005`, `REQ-MVP-006` / `FUT-C-067` | 既存view mode、catalog state、thumbnail取得を維持し、参照型tileはvisual・interaction差分だけを実装する。 |
+| `REQ-MVP-006` / `FUT-C-073`〜`FUT-C-075` | 既存の内部cache生成・上限制御と、利用者向け管理・保存・一括読込を分離する。後者の採用で既存cacheを暗黙の永続user dataへ変えない。 |
+| `FR-B13`〜`FR-B16` / `FR-B17` | menu/toolbarは先行batchのcommandを呼ぶ情報設計・presentation層。B17内に同じ処理を再実装しない。 |
 | 追加書庫 / PDF・EPUB・video | FR-B12は画像書庫の RAR/CBR・7z だけを対象にする。PDF、EPUB、video は reader/codec/license の別境界であり、FR-S01へ隔離する。 |
 
 ## 通常 Feature Lane から分離するトラック
 
-分離トラックは、通常12バッチへ未承認のまま割り当てない。状態はロードマップ上の
+分離トラックは、通常batchへ未承認のまま割り当てない。状態はロードマップ上の
 `Blocked` または採用対象外として記録し、前提が解消されたら新しい task/cmd で再評価する。
 
 ### FR-S01 — PDF / EPUB / video reader
@@ -582,13 +684,17 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   seek 契約が必要。FR-B08/B12へ混ぜず、採用承認、技術調査、license/SBOM、専用E2Eを先に行う。
 - **状態:** `Blocked`（別設計・別Feature Lane待ち）。未実装を `Done` としない。
 
-### FR-S02 — 破壊的 file operation
+### FR-S02 — file mutation・undo
 
-- **対象:** `FUT-C-024`, `FUT-C-025`, `FUT-C-026`, `FUT-C-027`, `FUT-C-028`, `FUT-C-029`
-  （名前変更、移動、copy、新規 folder、ごみ箱移動、完全削除）。
+- **対象:** `FUT-C-024`〜`FUT-C-029`, `FUT-C-052`, `FUT-C-053`
+  （名前変更、移動、copy、新規folder、ごみ箱移動、完全削除、undo、clipboard file operation）。
   台帳上は `Candidate / NOT TESTED`。
 - **分離理由:** 原本非破壊の恒久方針と衝突し得るため、確認、権限、rollback、対象範囲、
-  trash と完全削除の安全設計を通常laneで短縮しない。専用の安全設計と明示承認が必要。
+  identity/cache/読書情報の移行、trashと完全削除の安全設計を通常laneで短縮しない。
+  clipboardやundoをmutation commandの代替として先行実装せず、専用の安全設計と明示承認を必要とする。
+- **解除後の評価順:** `FUT-C-027`新規folder、`FUT-C-026`copy、`FUT-C-024`rename、
+  `FUT-C-025`move、`FUT-C-028`trash、`FUT-C-053`clipboard、`FUT-C-052`undo、
+  `FUT-C-029`完全削除。各段階でroot/path、collision、途中失敗、rollbackを再評価する。
 - **状態:** `Blocked`（安全設計・採用判断待ち）。このロードマップのバッチは file operation
   を発行しない。
 
@@ -616,6 +722,16 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   外部送信禁止・原本非破壊の恒久方針により本ロードマップへ入れない。方針変更と新しい根拠が
   ない限り `Planned` や `Done` へ変更しない。
 
+### FR-S06 — 仕様・architecture境界未決定
+
+- **対象:** `FUT-C-043`（指定動作で開く）、`FUT-C-059`（file表示の切替）、
+  `FUT-C-064`（OS全体folder tree）、`FUT-C-048`（media表示）、`FUT-C-070`（plugin設定）。
+  台帳上は`Candidate / NOT TESTED`。
+- **分離理由:** screenshotだけではcommand semanticsまたは対象dataが確定せず、OS namespace、
+  登録root外access、plugin runtime・trust・distributionは現行architectureとsecurity境界を変え得る。
+- **状態:** `Blocked`（product semantics、採用範囲、architecture/security決定待ち）。設定UIだけを
+  runtimeより先に作らず、決定後に通常batchを新設または既存batchへ明示統合する。
+
 ## 共通の実装・検証運用
 
 1. **承認前:** 対象行の一次根拠と台帳状態を読み、`Candidate` を採用決定とみなさない。
@@ -633,7 +749,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 6. **完了更新:** focused test と直接観測根拠を確認してから、feature-status の該当行、実装path、
    検証根拠を突合する。roadmapの `Done` は台帳の `Implemented + PASS` と矛盾してはならない。
 
-### BATCH-END-GATE（各 FR-B01〜FR-B12 共通）
+### BATCH-END-GATE（各通常 FR-Bxx 共通）
 
 - 対象バッチの全 focused test が実測済みで `SKIP=0`、失敗0、環境別 `Blocked` の根拠あり。
 - 直接影響する既存回帰、type/build/test、原本 snapshot/hash、local-only/外部通信0を確認。
