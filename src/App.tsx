@@ -92,6 +92,13 @@ import {
 } from "./features/catalog/view-mode";
 import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
+  catalogCsv,
+  rangeSelection,
+  selectEntriesByKind,
+  toggleEntrySelection,
+  type SelectionAction,
+} from "./features/catalog/commands";
+import {
   presentError,
   presentUnexpectedError,
 } from "./features/errors/presentation";
@@ -212,6 +219,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
@@ -280,6 +290,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
 
+  function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
+    const next = action === "toggle"
+      ? toggleEntrySelection(selectedPaths, entry.relativePath)
+      : action === "range"
+        ? rangeSelection(sortedEntries, selectedPath, entry.relativePath)
+        : [entry.relativePath];
+    setSelectedPaths(next);
+    setSelectedPath(next.at(-1) ?? null);
+    setSelectionNotice(null);
+  }
+
   useEffect(() => {
     if (activeMenu === null) return;
     const frame = requestAnimationFrame(() => {
@@ -294,6 +315,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   useEffect(() => {
     function handleMnemonic(event: KeyboardEvent) {
+      if (event.key === "F5" && libraryRoot !== null && viewerSession === null) {
+        event.preventDefault();
+        refreshCatalog();
+        return;
+      }
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       if (libraryRoot === null || viewerSession !== null) return;
       if (event.key === "ArrowLeft") {
@@ -348,7 +374,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, libraryRoot, navigation, viewerSession]);
+  }, [activeMenu, libraryRoot, navigation, selectedPath, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -444,7 +470,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
         setEntries(response.data);
-        setSelectedPath(selectionPath);
+        const nextSelection = selectionPath !== null && response.data.some(
+          (entry) => entry.relativePath === selectionPath,
+        ) ? [selectionPath] : [];
+        setSelectedPaths(nextSelection);
+        setSelectedPath(nextSelection.at(-1) ?? null);
         setLoadState({ status: "ready" });
       } else if (response.status === "error") {
         setLoadState({
@@ -478,6 +508,59 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       await load("");
     } else if (response.status === "error") {
       setLoadState({ status: "error", path: rootInput, message: presentError(response.error) });
+    }
+  }
+
+  function refreshCatalog() {
+    setSelectionNotice(null);
+    void load(navigation.current, selectedPath);
+  }
+
+  function selectAll() {
+    const next = sortedEntries.map((entry) => entry.relativePath);
+    setSelectedPaths(next);
+    setSelectedPath(next.at(-1) ?? null);
+    setSelectionNotice(null);
+  }
+
+  function selectByKind(kind: CatalogEntry["kind"] | "image") {
+    const next = selectEntriesByKind(sortedEntries, kind);
+    setSelectedPaths(next);
+    setSelectedPath(next.at(-1) ?? null);
+    setSelectionNotice(null);
+  }
+
+  function invertSelection() {
+    const selected = new Set(selectedPaths);
+    const next = sortedEntries
+      .filter((entry) => !selected.has(entry.relativePath))
+      .map((entry) => entry.relativePath);
+    setSelectedPaths(next);
+    setSelectedPath(next.at(-1) ?? null);
+    setSelectionNotice(null);
+  }
+
+  function clearSelection() {
+    setSelectedPaths([]);
+    setSelectedPath(null);
+    setSelectionNotice(null);
+  }
+
+  async function copySelectedPaths() {
+    const paths = selectedPaths.length > 0 ? selectedPaths : selectedPath === null ? [] : [selectedPath];
+    if (paths.length === 0) {
+      setSelectionNotice("コピーする項目を選択してください。");
+      return;
+    }
+    if (navigator.clipboard?.writeText === undefined) {
+      setSelectionNotice("クリップボードを利用できません。");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(paths.join("\n"));
+      setSelectionNotice(`${paths.length}件の相対パスをコピーしました。`);
+    } catch {
+      setSelectionNotice("パスをコピーできませんでした。");
     }
   }
 
@@ -1575,6 +1658,83 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               >
                 ライブラリを変更…
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                aria-keyshortcuts="F5"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(refreshCatalog)}
+              >
+                現在場所を更新
+                <span className="menu-shortcut">F5</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={selectedPaths.length === 0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => void copySelectedPaths(), selectedPaths.length === 0)}
+              >
+                パスをコピー
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={selectedPaths.length !== 1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => setPropertiesOpen(true), selectedPaths.length !== 1)}
+              >
+                プロパティ
+              </button>
+              <div className="menu-separator" role="separator" />
+              <span className="menu-heading">選択</span>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(selectAll)}
+              >
+                すべて選択
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => selectByKind("page"))}
+              >
+                画像だけ選択
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(invertSelection)}
+              >
+                選択を反転
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={selectedPaths.length === 0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(clearSelection, selectedPaths.length === 0)}
+              >
+                選択を解除
+              </button>
             </div>
           )}
         </div>
@@ -2235,8 +2395,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <CatalogGrid
               entries={sortedEntries}
               selectedPath={selectedPath}
+              selectedPaths={selectedPaths}
               viewMode={catalogViewMode}
-              onSelect={(entry) => setSelectedPath(entry.relativePath)}
+              onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
               thumbnailFor={(entry) =>
@@ -2253,9 +2414,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         </section>
       </div>
       <footer className="status-bar" aria-live="polite">
-        <span>{entries.length}項目</span>
+        <span>
+          現在位置: {selectedPath === null ? "—" : `${Math.max(1, sortedEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${sortedEntries.length}`}
+        </span>
+        <span>{sortedEntries.length}項目</span>
+        <span>{selectedPaths.length}件選択</span>
         <span>{selected ? `選択: ${selected.relativePath}` : "選択なし"}</span>
         <span>{loadState.status === "loading" ? "読み込み中" : "準備完了"}</span>
+        {selectionNotice !== null && <span role="status">{selectionNotice}</span>}
       </footer>
       {helpOpen && (
         <div className="dialog-backdrop">
@@ -2320,6 +2486,26 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             </section>
             <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
           </div>
+        </div>
+      )}
+      {propertiesOpen && selected !== undefined && (
+        <div className="dialog-backdrop">
+          <section
+            className="properties-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="項目プロパティ"
+          >
+            <h2>項目プロパティ</h2>
+            <dl>
+              <div><dt>名前</dt><dd>{entryDisplayName(selected)}</dd></div>
+              <div><dt>種別</dt><dd>{entryKindLabel(selected)}</dd></div>
+              <div><dt>相対パス</dt><dd>{selected.relativePath}</dd></div>
+              <div><dt>サイズ</dt><dd>{selected.byteSize?.toLocaleString("ja-JP") ?? "—"} bytes</dd></div>
+              <div><dt>更新日時</dt><dd>{selected.modifiedMs === undefined ? "—" : new Date(selected.modifiedMs).toLocaleString("ja-JP")}</dd></div>
+            </dl>
+            <button type="button" onClick={() => setPropertiesOpen(false)}>閉じる</button>
+          </section>
         </div>
       )}
       {tagsOpen && (

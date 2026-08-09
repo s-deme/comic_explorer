@@ -6,7 +6,8 @@ import type { CatalogViewMode } from "./view-mode";
 interface CatalogGridProps {
   entries: CatalogEntry[];
   selectedPath: string | null;
-  onSelect: (entry: CatalogEntry) => void;
+  selectedPaths?: string[];
+  onSelect: (entry: CatalogEntry, action?: "toggle" | "range") => void;
   onNavigate: (entry: CatalogEntry) => void;
   onRead: (entry: CatalogEntry) => void;
   viewMode?: CatalogViewMode;
@@ -64,6 +65,7 @@ function formatModified(value: number | undefined): string {
 export function CatalogGrid({
   entries,
   selectedPath,
+  selectedPaths,
   onSelect,
   onNavigate,
   onRead,
@@ -190,7 +192,7 @@ export function CatalogGrid({
                   return (
                     <div
                       role="gridcell"
-                      aria-selected={selectedPath === entry.relativePath}
+                      aria-selected={selectedPaths?.includes(entry.relativePath) ?? selectedPath === entry.relativePath}
                       className="catalog-cell"
                       key={entry.relativePath}
                     >
@@ -201,7 +203,7 @@ export function CatalogGrid({
                           else itemRefs.current.delete(entry.relativePath);
                         }}
                         className={`catalog-item catalog-item--${viewMode}`}
-                        data-selected={selectedPath === entry.relativePath}
+                        data-selected={selectedPaths?.includes(entry.relativePath) ?? selectedPath === entry.relativePath}
                         data-relative-path={entry.relativePath}
                         data-kind={entry.kind}
                         data-archive-kind={entry.archiveKind ?? "missing"}
@@ -216,7 +218,11 @@ export function CatalogGrid({
                             ? 0
                             : -1
                         }
-                        onClick={() => onSelect(entry)}
+                        onClick={(event) => {
+                          if (event.shiftKey) onSelect(entry, "range");
+                          else if (event.ctrlKey || event.metaKey) onSelect(entry, "toggle");
+                          else onSelect(entry);
+                        }}
                         onDoubleClick={() =>
                           canNavigate
                             ? onNavigate(entry)

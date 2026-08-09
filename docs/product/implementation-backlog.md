@@ -97,11 +97,11 @@ codd:
 | 13 | Done | `IMP-013` | `FUT-C-011` | お気に入り・クイックアクセス | Implemented / PASS | **Done** | `FT-B06-006`でcurrent-session add/remove、available rows、folder/comic navigation、原本差分0を完了 |
 | 14 | Done | `IMP-014` | `FUT-C-021` | お気に入り保存 | Implemented / PASS | **Done** | Rustでv1 migration、`FT-B06-007`でrestart、strict moved/missing/re-resolve、source tree差分0を完了 |
 | 15 | Done | `IMP-015` | `FUT-C-005` | WebPページ表示 | Implemented / PASS | **Done** | `FT-B08-006`でfolder/ZIP/CBZ static WebP、local error recovery、原本差分0、canonical aggregateを完了 |
-| 52 | P1-1 / FR-B13 | `IMP-052` | `FUT-C-057` | 現在場所の手動更新 | Candidate / NOT TESTED | Candidate | F5、再読込範囲、cache扱い、selection維持を要件化 |
-| 50 | P1-2 / FR-B13 | `IMP-050` | `FUT-C-055` | 複数・種別選択 | Candidate / NOT TESTED | Candidate | selection model、kind分類、virtual grid操作を要件化 |
-| 49 | P1-3 / FR-B13 | `IMP-049` | `FUT-C-054` | パスのコピー | Candidate / NOT TESTED | Candidate | 絶対・相対path、親folder、複数選択formatを決定 |
-| 44 | P1-4 / FR-B13 | `IMP-044` | `FUT-C-049` | 項目プロパティ | Candidate / NOT TESTED | Candidate | 表示metadata、複数選択時、error境界を決定 |
-| 63 | P1-5 / FR-B13 | `IMP-063` | `FUT-C-068` | 現在位置付きステータス | Candidate / NOT TESTED | Candidate | index、total、selection、filter時の表示規則を決定 |
+| 52 | P1-1 / FR-B13 | `IMP-052` | `FUT-C-057` | 現在場所の手動更新 | Implemented / PASS | Done | F5/menu再走査、generation、selection維持を実装・実測 |
+| 50 | P1-2 / FR-B13 | `IMP-050` | `FUT-C-055` | 複数・種別選択 | Implemented / PASS | Done | 修飾キー範囲、全選択、画像選択、反転、解除を実装・実測 |
+| 49 | P1-3 / FR-B13 | `IMP-049` | `FUT-C-054` | パスのコピー | Implemented / PASS | Done | library-root相対pathのclipboard copyを実装・実測 |
+| 44 | P1-4 / FR-B13 | `IMP-044` | `FUT-C-049` | 項目プロパティ | Implemented / PASS | Done | 単一項目の参照property dialogを実装・実測 |
+| 63 | P1-5 / FR-B13 | `IMP-063` | `FUT-C-068` | 現在位置付きステータス | Implemented / PASS | Done | sort後のindex/total/selection statusを実装・実測 |
 | 37 | P2-1 / FR-B14 | `IMP-037` | `FUT-C-042` | ファイル・フォルダを開く | Candidate / NOT TESTED | Candidate | picker対象、登録外path、open後のlibrary contextを決定 |
 | 39 | P2-2 / FR-B14 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Candidate / NOT TESTED | Candidate | FUT-R-004再利用範囲とmenu semanticsを決定 |
 | 51 | P2-3 / FR-B14 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Candidate / NOT TESTED | Candidate | 履歴表示順、直接jump、keyboard操作を要件化 |

@@ -56,7 +56,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 
 | 現行優先度 | 固定ID | 登録Batch | 領域 | 対象 feature ID（実装順） | 現在の運用状態 |
 |---|---|---:|---|---|---|
-| P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Planned`（採用・要件化待ち） |
+| P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Done` |
 | P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Planned`（採用・要件化待ち） |
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Planned`（採用・要件化待ち） |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Planned`（2機能の縦切り） |
@@ -571,7 +571,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B13 — catalog command基盤（Batch 13 / P1）
 
-- **状態:** `Planned`。対象行はすべて`Candidate / NOT TESTED`であり、採用・要件化前に着手しない。
+- **状態:** `Done`。対象5行を採用要件化し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-057` 現在場所の手動更新、(2) `FUT-C-055` 複数・種別選択、
   (3) `FUT-C-054` path copy、(4) `FUT-C-049`項目properties、(5) `FUT-C-068`現在位置付きstatus。
 - **優先理由:** 原本を変更せず、後続のexport、file operation、menu commandが共有する一覧の
@@ -579,6 +579,14 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   sort/filterとの同期を同じcatalog state契約で扱う。
 - **採用gate:** refresh/cacheの整合、複数選択のkeyboard・accessibility、clipboard adapter、
   複数選択時properties/statusの規則を要件化し、file writeをこのbatchへ混ぜない。
+
+#### FR-B13 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p1-catalog-command基盤)。
+- **実装根拠:** `src/App.tsx`、`src/features/catalog/CatalogGrid.tsx`、
+  `src/features/catalog/commands.ts`、`src/features/catalog/commands.test.ts`。
+- **直接観測:** [FR-B13 focused test結果](../testing/fr-b13-results.md)。FT-B13-001〜005相当を
+  focused testでSKIP 0として実測し、既存CatalogGrid回帰も通過した。
 
 ### FR-B14 — open・navigation（Batch 14 / P2）
 
