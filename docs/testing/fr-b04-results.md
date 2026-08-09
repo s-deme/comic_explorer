@@ -39,8 +39,8 @@ fullscreen adapter呼出しを直接観測した。
 | Test ID | C0/C1 checkpoint | 接続して観測した結果 | 結果 | 根拠 |
 |---|---|---|---|---|
 | FT-B04-001 | C0 enum/default/persistence boundary | modelの3値・未知値fallbackと、接続Appの既定`paged`→layout selector→保存呼出しを確認 | PASS | `src/features/viewer/model.test.ts`; `src/App.test.tsx` |
-| FT-B04-002 | C1 layout/anchor/focus | App→Viewer→DOMで縦・横layoutを切替。startIndexのpage anchor、全page article、anchor focusを確認 | PASS | `src/features/viewer/Viewer.test.tsx`; `src/App.test.tsx` |
-| FT-B04-003 | C1 interaction | 読み方向の`r`切替、directionに従うArrowLeft navigation、anchor focus、scroll layoutでnative wheelを奪わないこと、通常Escでcloseを確認 | PASS | `src/features/viewer/Viewer.test.tsx` |
+| FT-B04-002 | C1 layout/anchor/focus | App→Viewer→DOMで縦・横layoutを切替。startIndexのpage anchor、全page article、anchor focusを確認。横layoutは読み方向に応じたページ順とwheel横移動を保持 | PASS | `src/features/viewer/Viewer.test.tsx`; `src/App.test.tsx` |
+| FT-B04-003 | C1 interaction | 読み方向の`r`切替、directionに従うArrowLeft navigation、anchor focus、scroll layoutのwheel入力、通常Escでcloseを確認 | PASS | `src/features/viewer/Viewer.test.tsx` |
 | FT-B04-004 | C1 window state | App→Viewer→adapterのenter/exit、fullscreen中Esc、adapter error status、Tauri window delegateを確認。fullscreenはlayout selectorと別状態 | PASS（connected） | `src/App.test.tsx`; `src/features/viewer/Viewer.test.tsx`; `src/features/viewer/fullscreen.test.ts` |
 | FT-B04-005 | C1 persistence/non-persistence | App settingsからlayout・B01 scale/loupeを復元し、fullscreenを復元しないこと、Rust SQLite reopenでlayoutを復元 | PASS | `src/App.test.tsx`; `src-tauri/src/state/repository.rs` |
 
@@ -50,7 +50,13 @@ focused command:
 npm test -- --run src/features/catalog/view-mode.test.ts src/features/catalog/CatalogGrid.test.tsx src/features/catalog/end-of-volume.test.ts src/features/catalog/sort.test.ts src/features/viewer/model.test.ts src/features/viewer/fullscreen.test.ts src/features/viewer/Viewer.test.tsx src/App.test.tsx --pool=threads --poolOptions.threads.singleThread=true --reporter=dot
 ```
 
-結果: `Test Files 8 passed (8)`, `Tests 67 passed (67)`, `failed 0`、`SKIP 0`、exit 0。
+結果: `Test Files 8 passed (8)`, `Tests 68 passed (68)`, `failed 0`、`SKIP 0`、exit 0。
+
+IMP-002の追加観測では、横layoutをright-to-leftで開いた場合にページ列が
+`3, 2, 1`、読み方向をleft-to-rightへ切り替えた場合に`1, 2, 3`となること、通常wheelの
+`deltaY`が横スクロールへ変換されること、いずれもpage anchorを変更しないことを確認した。
+実装根拠は`src/features/viewer/Viewer.tsx`、focused testは
+`src/features/viewer/Viewer.test.tsx`の`FT-C-016`ケースである。
 
 ## batch末尾 gate
 
@@ -66,12 +72,12 @@ records_compared=5 / checked_count=5`となった。
 
 | Gate | 結果 | 備考 |
 |---|---|---|
-| FT-B04-001〜005 focused | PASS | 67/67、SKIP 0、失敗0。5本すべてconnected evidence。FT-B04-004はconnected判定のみPASS |
+| FT-B04-001〜005 focused | PASS | 68/68、SKIP 0、失敗0。5本すべてconnected evidence。FT-B04-004はconnected判定のみPASS |
 | viewer/catalog回帰 | PASS | focused commandに既存catalog 4 suiteとViewer回帰を含め、SKIP 0 |
 | TypeScript typecheck | PASS | `npm run typecheck` exit 0 |
 | production build | PASS | Vite 7.3.6、52 modules transformed、exit 0 |
 | Rust fmt/check/test | PASS | canonical `scripts/run-rust-check.cmd`、56 lib + 1 shutdown integration、ignored 0、SKIP 0、exit 0 |
-| CoDD scan/check | BLOCKED (v9fs root) | `/mnt/e`直実行は9p I/O待ち。ext4ミラーでの`codd check`はred gate 0、advisory 3件 |
+| CoDD scan/check | BLOCKED (v9fs root) | `codd scan`は完了。`codd check`はred gate判定前に9p上のdag verifyで長時間停止したため中断。canonical consistencyは別経路でPASS |
 | CoDD verify / canonical aggregate | PASS | WSL ext4ミラー経路で実CoDDを実行。`scripts/run-tests.sh`全体もexit 0 |
 | Windows WebView2 product fullscreen | BLOCKED disclosed | WSL/Linux sessionでは実行しない。未実行をPASS化しない |
 
@@ -85,5 +91,5 @@ SQLiteへ保存しない。layout切替時もB01のscale mode、倍率、loupe�
 ## 非破壊・通信境界
 
 原本snapshot差分0、library管理file 0、network 0、push 0。`dist/`、`target/`、CoDD生成物は
-追跡対象へ含めない。connected adapter/component evidenceとcanonical aggregate failure、Windows
-WebView2製品gateを混同せず、FUT-C-015〜017は台帳上`Partial / BLOCKED`を維持する。
+追跡対象へ含めない。FUT-C-015とFUT-C-016は台帳上`Implemented / PASS`、FUT-C-017は
+Windows WebView2製品gate未測定のため`Partial / BLOCKED`を維持する。

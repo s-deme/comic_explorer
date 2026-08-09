@@ -104,6 +104,7 @@ export function Viewer({
     [shortcuts],
   );
   const stageRef = useRef<HTMLDivElement>(null);
+  const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const layoutInitialized = useRef(false);
   const visible = useMemo(
@@ -323,7 +324,11 @@ export function Viewer({
       ? [...visible].reverse()
       : visible;
   const scrollLayout = layoutMode !== "paged";
-  const scrollIndices = session.pages.map((_, index) => index);
+  const naturalScrollIndices = session.pages.map((_, index) => index);
+  const scrollIndices =
+    state.direction === "rightToLeft"
+      ? [...naturalScrollIndices].reverse()
+      : naturalScrollIndices;
   const renderPage = (index: number, withAnchor = false) => {
     const page = session.pages[index];
     const content = imageErrors.has(index) ? (
@@ -474,6 +479,16 @@ export function Viewer({
           if (event.ctrlKey) {
             event.preventDefault();
             applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
+          } else if (layoutMode === "horizontal_scroll") {
+            const spread = spreadRef.current;
+            if (spread) {
+              const delta =
+                Math.abs(event.deltaX) > Math.abs(event.deltaY)
+                  ? event.deltaX
+                  : event.deltaY;
+              spread.scrollLeft += delta;
+              event.preventDefault();
+            }
           } else if (!scrollLayout) {
             if (event.deltaY > 0) next();
             else if (event.deltaY < 0) dispatch({ type: "previous" });
@@ -494,6 +509,7 @@ export function Viewer({
           />
         )}
         <div
+          ref={spreadRef}
           className="page-spread"
           data-layout-mode={layoutMode}
           data-direction={state.direction}

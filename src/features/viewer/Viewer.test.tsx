@@ -220,6 +220,50 @@ describe("Viewer settings", () => {
     });
   });
 
+  it("FT-C-016 preserves reading order and maps wheel input to horizontal scrolling", async () => {
+    const threePageSession = {
+      ...multiPageSession,
+      pages: [
+        ...multiPageSession.pages,
+        {
+          id: "page-3" as never,
+          relativePath: "3.png" as never,
+          mediaUri: "comic://localhost/three",
+        },
+      ],
+    };
+    render(
+      <Viewer
+        session={threePageSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="horizontal_scroll"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    const spread = document.querySelector<HTMLElement>(".page-spread");
+    expect(spread).not.toBeNull();
+    expect(
+      screen.getAllByRole("article").map((page) => page.getAttribute("aria-label")),
+    ).toEqual(["ページ 3", "ページ 2", "ページ 1"]);
+
+    fireEvent.keyDown(window, { key: "r" });
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("article").map((page) => page.getAttribute("aria-label")),
+      ).toEqual(["ページ 1", "ページ 2", "ページ 3"]),
+    );
+
+    const stage = document.querySelector(".viewer-stage");
+    expect(stage).not.toBeNull();
+    fireEvent.wheel(stage as HTMLElement, { deltaY: 120 });
+    expect(spread).toHaveProperty("scrollLeft", 120);
+    expect(spread).toHaveAttribute("data-page-anchor", "0");
+  });
+
   it("FT-B04-003 preserves reading direction, keyboard navigation, native wheel and Escape", async () => {
     const onSettingsChange = vi.fn();
     const onClose = vi.fn();

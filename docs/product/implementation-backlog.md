@@ -29,7 +29,7 @@ codd:
 
 | 区分 | 件数 | 扱い |
 |---|---:|---|
-| 実装が一部完了・受入待ち | 11 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
+| 実装が一部完了・受入待ち | 10 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
 | 未実装候補 | 18 | 採用判断、要件化、実装、直接観測を順に行う |
 | 保留・未決定 | 5 | 優先度と仕様を決めるまで実装しない |
 | 実機・外部環境待ち | 2 | 実装着手ではなく、測定環境を確保して判定する |
@@ -76,13 +76,13 @@ codd:
 ## 実装バックログ
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
-[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-001` である。
+[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-003` である。
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
 | 1 | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
-| 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Partial / BLOCKED | **Next** | `IMP-001`で解消したaggregate経路でfocused testを再確認 |
-| 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Partial / BLOCKED | Blocked | Windows WebView2製品ゲートとfocused testを実行 |
+| 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
+| 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Partial / BLOCKED | **Next** | Windows WebView2製品ゲートとfocused testを実行 |
 | 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Partial / BLOCKED | Blocked | CoDD/native product UI gateを解消 |
 | 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Partial / BLOCKED | Blocked | CoDD structural exceptionとWindows UI gateを解消 |
 | 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |

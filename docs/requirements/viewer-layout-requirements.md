@@ -48,7 +48,10 @@ spread）を置換せず、scale mode、倍率、ルーペ、読み方向、読�
 layout切替と再描画では現在の自然順page indexをpage anchorとして保持する。縦／横layout
 ではanchor pageへスクロール位置を寄せ、anchor項目をkeyboard focus可能にする。既存の
 right-to-left / left-to-right読み方向、単ページ／見開きの進行、Esc・矢印・PageUp/
-PageDown・wheel入力はlayout切替で失われてはならない。
+PageDown・wheel入力はlayout切替で失われてはならない。横layoutのページ列は
+left-to-rightでは自然順、right-to-leftでは逆順に配置し、現在のpage indexとfocus対象は
+どちらの方向でも変えない。横layoutで通常wheelを受けた場合は横スクロールへ変換し、
+ctrl+wheelの倍率操作は従来どおり維持する。
 
 ### REQ-FR-B04-003: scale/fit boundary
 
