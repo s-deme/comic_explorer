@@ -37,11 +37,18 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         for extension in (".COM", ".EXE", ".BAT", ".CMD"):
             self.assertIn(extension, bootstrap)
 
-    def test_feature_runner_has_shortcut_aliases_and_failure_json(self) -> None:
+    def test_feature_runner_has_feature_aliases_and_failure_json(self) -> None:
         source = (ROOT / "scripts/verify-feature-windows.ps1").read_text(
             encoding="utf-8"
         )
-        for feature in ("imp-004", "fut-c-019", "shortcutonly"):
+        for feature in (
+            "imp-004",
+            "fut-c-019",
+            "shortcutonly",
+            "imp-005",
+            "fut-c-022",
+            "tagsonly",
+        ):
             self.assertIn(f'"{feature}"', source)
         for field in (
             "failedStage",
@@ -58,6 +65,13 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         )
         self.assertIn('$exception.Data["ExitCode"] = $ExitCode', task_runner)
         self.assertIn('$exitCode = [int]$_.Exception.Data["ExitCode"]', task_runner)
+        self.assertIn('[string]$FrontendTest = "src\\App.fr-b11.test.tsx"', task_runner)
+        self.assertIn('[string]$RustFilter = "shortcut"', task_runner)
+        self.assertIn('"-FrontendTest", $frontendTest', source)
+        self.assertIn('"-RustFilter", $rustFilter', source)
+        self.assertIn('"src\\App.fr-b10.test.tsx"', source)
+        self.assertIn('RustFilter = "fr_b10"', source)
+        self.assertIn('ProductSwitch = "-TagsOnly"', source)
         self.assertIn('if ($RustMode -eq "Canonical")', source)
         self.assertLess(
             source.index('Name = "frontend-sbom"'),
@@ -95,6 +109,41 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(r'\.test\.(ts|tsx)$', freshness_source)
+
+    def test_tag_product_gate_exercises_release_ui_persistence_and_nonmutation(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$TagsOnly", source)
+        self.assertIn('if ($TagsOnly)', source)
+        for stage in (
+            '"tag item selection"',
+            '"tag library menu"',
+            '"tag assignment"',
+            '"nonmatching tag seed"',
+            '"normalized tag query"',
+            '"tag rename"',
+            '"tag restart item selection"',
+            '"tag restart library menu"',
+            '"tag restart persistence"',
+            '"tag removal"',
+        ):
+            self.assertIn(stage, source)
+        self.assertIn("document.querySelectorAll('[data-tag-id]').length === 2", source)
+        self.assertIn(
+            "document.querySelector('#tag-query').value === '\\uFF26\\uFF21\\uFF36'",
+            source,
+        )
+        self.assertIn("[aria-controls=library-menu]", source)
+        self.assertIn("[data-product-id=tag-manager-menu-item]", source)
+        app_source = (ROOT / "src/App.tsx").read_text(encoding="utf-8")
+        self.assertIn('data-product-id="tag-manager-menu-item"', app_source)
+        self.assertIn('test = "FT-B10-005"', source)
+        self.assertIn('throw "Tag product harness changed source archives."', source)
+        self.assertIn(
+            'throw "Tag product harness changed the source tree or created adjacent files."',
+            source,
+        )
 
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(

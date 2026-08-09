@@ -44,12 +44,13 @@ and report both the missing capability and the locations that were searched.
   workspace must not rely on a stale `dist/SBOM.json` from an earlier run.
 - One Windows-native PowerShell feature-verification command accepts a feature
   or management ID. `IMP-004`, `FUT-C-019`, and `ShortcutOnly` resolve to the
-  shortcut verification lane containing focused frontend tests, typecheck,
-  frontend/SBOM generation, focused or final canonical Rust verification,
-  release-executable freshness, the product harness, and CoDD gates. The
-  development-focused lane runs `scan`/`check`; the formal canonical lane also
-  runs `verify`, whose configured test command already executes the full
-  canonical frontend suite and typecheck.
+  shortcut lane; `IMP-005`, `FUT-C-022`, and `TagsOnly` resolve to the tag lane.
+  Each lane selects its own focused frontend file, Rust filter, and product
+  harness switch while sharing typecheck, frontend/SBOM generation, focused or
+  final canonical Rust verification, release-executable freshness, cleanup,
+  and CoDD gates. The development-focused lane runs `scan`/`check`; the formal
+  canonical lane also runs `verify`, whose configured test command already
+  executes the full canonical frontend suite and typecheck.
 - Every verification run emits a final JSON result on success and failure. It
   records each stage's UTC start/end, elapsed seconds, and exit code, plus the
   failed stage and total elapsed seconds.
@@ -62,6 +63,9 @@ and report both the missing capability and the locations that were searched.
   fixed save delay, treats restored reading position as the relative starting
   point, bounds all process/socket/UI waits, emits stage/DOM/process/port
   diagnostics on timeout, and leaves no product process, port, or SQLite lock.
+  The tag product lane must wait across React-controlled selection/menu state,
+  prove normalization by filtering a nonmatching tag, verify restart
+  persistence and removal, and leave the library source tree byte-identical.
 - Development verification runs focused Rust coverage before the final change;
   the full canonical Rust gate runs once for final acceptance. Timings for
   focused tests, release compilation, canonical tests, product automation, and

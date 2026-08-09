@@ -29,7 +29,8 @@ codd:
 
 | 区分 | 件数 | 扱い |
 |---|---:|---|
-| 実装が一部完了・受入待ち | 10 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
+| 実装・受入完了 | 5 | 実装、直接観測、正本同期、CoDD gateを完了済み |
+| 実装が一部完了・受入待ち | 6 | 既存実装を修正または不足分を実装し、blocked gateを解消する |
 | 未実装候補 | 18 | 採用判断、要件化、実装、直接観測を順に行う |
 | 保留・未決定 | 5 | 優先度と仕様を決めるまで実装しない |
 | 実機・外部環境待ち | 2 | 実装着手ではなく、測定環境を確保して判定する |
@@ -76,7 +77,7 @@ codd:
 ## 実装バックログ
 
 作業順は、まず既存の `Partial / BLOCKED` を1件ずつ解消し、その後に未実装候補を
-[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-005` である。
+[機能ロードマップ](./feature-roadmap.md)の順で採用判断する。現在の `Next` は `IMP-006` である。
 
 | 順 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|
@@ -84,8 +85,8 @@ codd:
 | 2 | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
 | 3 | `IMP-003` | `FUT-C-017` | フルスクリーン | Implemented / PASS | **Done** | `FT-B04-006`でWindows WebView2製品ゲート、原本差分0、focused回帰を完了 |
 | 4 | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Implemented / PASS | **Done** | `FT-B11-006`でremap・restart・reset・原本差分0、Rust 79+1を完了 |
-| 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Partial / BLOCKED | **Next** | CoDD structural exceptionとWindows UI gateを解消 |
-| 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |
+| 5 | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Implemented / PASS | **Done** | `FT-B10-005`で付与・検索・rename・restart・remove・原本差分0、canonical aggregateを完了 |
+| 6 | `IMP-006` | `FUT-C-023` | メモ保存 | Partial / BLOCKED | **Next** | FR-B07のCoDD・Windows product gateを解消 |
 | 7 | `IMP-007` | `FUT-R-004` | 閲覧履歴 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |
 | 8 | `IMP-008` | `FUT-R-005` | 評価 | Partial / BLOCKED | Blocked | FR-B07のCoDD・Windows product gateを解消 |
 | 9 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |

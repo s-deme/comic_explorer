@@ -13,18 +13,57 @@ codd:
       semantic: "connected-app-boundary"
 ---
 
-# FR-B10 タグ管理 — 最終受入結果（cmd_400）
+# FR-B10 タグ管理 — 最終受入結果
 
 ## 判定
 
-FR-B10のsemantic gateは受理する。focused exact4、App回帰、Windows offline Rust、typecheck、buildは
-accepted rawによりPASSである。一方、CoDD structural exceptionの生値は
-`INCOMPLETE / NOT APPLICABLE`であり、Windows WebView2 native product UIは
-`UNMEASURED / BLOCKED`のため、FR-B10の総合状態は `Partial / BLOCKED` とする。offline Rustの成功を
-native Windows product UIの測定済みPASSへ昇格しない。
+FR-B10は `Implemented / PASS` とする。既存のfocused exact4、Rust保存契約、typecheck/buildに加え、
+IMP-005でWindows release WebView2製品gate `FT-B10-005`を実行し、タグの付与、互換Unicodeを含む
+正規化検索、rename、再起動後の復元、除去を実SQLite接続で観測した。前後のlibrary source treeは
+path・bytes・SHAが一致し、差分0である。
 
-今回の作業はこの文書と関連する三文書のaccepted evidence同期だけであり、機能、focused test、App回帰、
-Rust、typecheck、build、CoDDの再実行、commit、pushは行っていない。
+Windows-native canonical aggregateはfocused frontend、typecheck、SBOM/build、canonical Rust、release
+freshness、製品gate、process cleanup、CoDD scan/check/verifyの全stageがexit 0である。CoDDの構造的
+SKIP/VACUOUSは生値を開示し、機能PASSへ加算しない。旧cmd_400のCoDD rawと未測定product判定は履歴として
+保持し、今回の現行source実測で置き換える。
+
+## IMP-005 Windows製品・canonical結果
+
+正本コマンドは`./scripts/run-feature-verification-wsl.sh IMP-005 -RustMode Canonical`である。
+Windows側の`verify-feature-windows.ps1`はFR-B10のfrontend fileとRust `fr_b10` filterを選択し、
+`run-product-ui-harness.ps1 -TagsOnly`へ接続する。
+
+accepted runは`imp-005-20260809T095506040Z`で、UTC 2026-08-09 09:55:06から09:58:42、
+全12 stage、合計216.746秒、accepted run自体のretryは0である。log rootは
+`src-tauri/target/verification/imp-005-20260809T095506040Z/`、最終JSONは
+`src-tauri/target/verification/wsl-20260809T095505Z-2.json`、JSON SHA-256は
+`a4dacb82fe5a347874eb892217f088aded0d663309ecbcb8a6c6a6f35ea03e4f`である。
+release input hashは`c28b579741ff14fdf142a4d1c0c84ca2a3dab97cdb26c55c6c09e91491cc6bfa`、
+exe SHA-256は`ff35ae784bbfb5e85b7b13cc8abd350c2a7a66a47e65f173b01fbe516f8bdf13`である。
+製品selector `src/App.tsx` SHA-256は`300473a2e335627ff7f8c9e576e71c66de5e42da8a6da30b3c2d21ea04002679`、
+product harnessは`419b0a79caae12b35b8ff84be98ad3f261dc7e12e6e6b303a3daa7bba38feae8`、
+feature runnerは`af97adbff478c12d091bc6bd20d22f33b79bde06561759c39546dc1395738c7f`へ束縛する。
+
+| Gate | 結果 | 秒 | stdout SHA-256 | 直接観測 |
+|---|---|---:|---|---|
+| frontend focused | 4 PASS / 0 SKIP | 37.973 | `e32f6d409c9dd36142bbc5ae357e7a245f346661aa83e74e285e10fe5ba3daf2` | FT-B10-001〜004 exact4 |
+| typecheck | PASS | 8.285 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | TypeScript error 0 |
+| frontend SBOM/build | PASS | 3.907 | `9c6bb0f24932673a905890799a7da0297633dc57e8564ce49ea60045cac2a478` | lock-backed build、unknown/prohibited license 0 |
+| Windows Rust canonical | 79 unit + 1 process PASS | 80.004 | `d5fc064ae969a19229cadf324043e5d5bebed3f58d93e39eeb17c63be180d843` | fmt、check、locked full test、failed/ignored 0 |
+| release executable / freshness | PASS | 1.147 / 1.243 | `05d415c2c8794c9091999688d166f75263a4eeaa65408116b26022e3fdfa77fe` | 現行input hashに束縛したexeを再利用 |
+| FT-B10-005 product | PASS | 13.749 | `f3f7a7eb1349de3d26a183a5389c34acc59f27d98a8b98e026e632fd34aebf4d` | assign、normalized query、rename、restart、remove、source difference 0 |
+| product cleanup audit | PASS | 0.980 | `b81f2b3b0194b087912b75a46012f276e1d5fa3249db6cd5d0d0a5b11413c467` | 製品/WebView2 process、port、SQLite lock残留0 |
+| CoDD scan | PASS | 2.247 | `ded830e4052a681dfd443bf3c2036714a8c7ee3811fa31054e2a61ec44190fcc` | 72 nodes / 148 edges |
+| CoDD check | exit 0 / red 0 | 29.304 | `be71b0b84e0b9eff95d499bca8dc2c69976296af83dd72b26d887163ad6dcae5` | `depends_on_consistency` PASS |
+| CoDD verify | exit 0 / red 0 | 33.106 | `7a14d17eef24fb47067e4e385fcf83eb9417c93f231dd294865e4c6da05ad8f8` | canonical tests・typecheck実行 |
+
+CoDD verifyが報告する任意profileのadvisoryはPASSへ読み替えない。FR-B10の直接機能判定は
+FT-B10-001〜005とRust/product非破壊観測を正本とし、CoDDはred failureがないことと実行経路の整合を
+別gateとして扱う。
+
+IMP-005のtracked差分は、製品selector 1件、共有Windows検証script 3件、focused Python test 1件、
+要件・設計・台帳・結果文書7件のexact 12 pathである。生成された`dist/`、`target/`、CoDD scan出力は
+commit対象にしない。
 
 ## 実装範囲
 
@@ -34,7 +73,7 @@ Rust、typecheck、build、CoDDの再実行、commit、pushは行っていない
 - 漫画folder、ZIP/CBZ、画像、sidecar、library管理fileへの書込み、network、外部同期、
   `FUT-D-004`は範囲外のまま保持した。
 
-## Accepted evidence
+## cmd_400 accepted evidence（履歴）
 
 accepted evidence rootは次のとおりである。
 
@@ -69,13 +108,14 @@ The typecheck/build/focused manifests each record source SHA `6ee91612`; Rust re
 | FT-B10-002 | canonical query, Unicode normalization, partial match, empty query, and local-only behavior |
 | FT-B10-003 | rename, duplicate merge, idempotence, and empty/invalid rejection without metadata corruption |
 | FT-B10-004 | v1→v2→v3→v4 migration, reopen/restart persistence, tag restoration, and original/sidecar separation |
+| FT-B10-005 | Windows release WebView2 assign/query/rename/restart/remove and library source-tree nonmutation |
 
 The repository migration advances one version per transaction: v1 creates the base metadata tables, v2 adds
 favorites, v3 adds memo/history/rating, and v4 adds `tags`, `item_tags`, and their indexes. The accepted Rust
 evidence confirms the v1/v2/v3 data-preservation expectation, v3-to-v4 tag migration, repeated open, restored
 assignment, and original/sidecar byte equality. No migration step promotes a lower marker directly to v4.
 
-## CoDD and environment boundary
+## cmd_400 CoDD and environment boundary（履歴）
 
 The inherited approved structural reference is recorded without rerun:
 
@@ -104,6 +144,11 @@ CoDD verifyの生値は `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS
 - `fr_b10_schema_v4_migration_repair/typecheck.*`: exit 2、`exact` propertyに関するTS2769が9件。
 - `fr_b07_reject_codd_draft_restore_gate/draft_*`: REJECTED_UNCOMMITTED_DRAFTの捕捉・撤回記録であり、CoDD verify raw自体も
   structural non-PASSとしてのみ参照する。
+- `imp-005-20260809T094630910Z`: IMP-005初回canonicalは`product-tags`で停止した。日本語を直接含む
+  PowerShell selectorがWindows PowerShell 5.1で文字化けし、`tag library menu`待機がtimeoutした。
+  result JSON SHA-256は`deb416e89e98d5bd09b4de745249aad768b71872fed7860838df9d565b9b84ac`、
+  product stderr SHA-256は`6482a8bd85d3dd6655a85d94fac8a782457b3a31dd498eb404d1f84f0fc32200`である。
+  ASCII stable product IDとUnicode escapeへ修正後のaccepted runだけをPASSに使用する。
 
 `fr_b10_ft004_persistence_semantic_repair/`のsource SHA `7703e916`に束縛された中間focused PASSは、
 typing-only変更後の最終source SHA `6ee91612`によりsupersededとなった。最終受入値には使用していない。
@@ -111,7 +156,8 @@ typing-only変更後の最終source SHA `6ee91612`によりsupersededとなっ�
 旧rootの失敗をPASSへ書き換えず、最終focused sourceのtyping-only修正後に取得したaccepted rawだけを
 最終値として扱う。
 
-## 最終差分境界
+## cmd_400 最終差分境界（履歴）
 
-project diffは機能/test 6 pathと本四文書4 pathのexact 10 path、contamination 0、staged path 0である。
-`git diff --check`を確認し、commitとpushは行わず、Gunshiのcomplete diff QCを依頼する。
+当時のproject diffは機能/test 6 pathと四文書4 pathのexact 10 path、contamination 0、staged path 0だった。
+当時は`git diff --check`を確認し、commitとpushを行っていない。この記録を現在のIMP-005差分境界や
+publish状態へ読み替えない。

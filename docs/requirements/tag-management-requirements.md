@@ -66,9 +66,11 @@ UIはproduction `App`からTypeScript client/Tauri commandへ、tagの一覧・q
 | FT-B10-002 | tag query client/command → UI | query、Unicode normalization、空query、local-only |
 | FT-B10-003 | rename UI/client/command → SQLite | rename、duplicate merge、empty/invalid拒否 |
 | FT-B10-004 | StateStore migration/reopen → App | migration、restart persistence、SQLite局所性、原本/sidecar snapshot hash不変 |
+| FT-B10-005 | Windows release WebView2 → App → command → SQLite | assign、正規化query、rename、製品restart復元、remove、library source tree差分0 |
 
 Rust focused testsはFT-B10-001〜004の保存境界を、frontend focused testsはproduction Appから
-client commandを呼ぶ接続境界を検査する。SKIPが1件でもあればFR-B10を完了扱いにしない。
+client commandを呼ぶ接続境界を検査する。FT-B10-005はmockを使わないWindows release製品から同じ
+command/SQLite境界へ接続する。機能testにSKIPが1件でもあればFR-B10を完了扱いにしない。
 
 ## C0/C1および検証境界
 
@@ -79,7 +81,18 @@ typecheck、build、CoDDを各一回だけ実測し、stdout/stderr/exit/SHAを�
 生値で開示するだけで、新plugin、contract、oracle、validator、capture、monitor、schema版を
 追加しない。
 
-## 最終受入証跡（cmd_400）
+## IMP-005 完了ゲート
+
+`scripts/run-feature-verification-wsl.sh IMP-005 -RustMode Canonical`をWindows-native toolchainへ橋渡しする
+正本コマンドとする。frontend FT-B10-001〜004、typecheck、SBOM/build、canonical Rust、release executableの
+freshness、FT-B10-005、製品process cleanup、CoDD scan/check/verifyを同じsourceに束縛して実行する。
+
+CoDDの任意profileに由来する構造的SKIP/VACUOUSは生値を開示し、機能testのPASSへ加算しない。一方、
+canonical test command内で`depends_on_consistency`の実producerと比較5件を実行し、Windows-native CoDDの
+exit 0・red 0を必須とする。これにより旧cmd_400の構造rawをPASSへ改称せず、現行sourceの実行証跡で
+IMP-005を判定する。
+
+## 履歴受入証跡（cmd_400）
 
 最終frontend focused source SHA-256は
 `6ee91612e6710ff20d97795110306324a14e584c8c9149ce18ffb90da1bc61ff`、Rust repository source SHA-256は
@@ -108,7 +121,8 @@ The accepted functional state does not imply all-gates PASS. The inherited CoDD 
 `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS` with verification tests 0, so it is disclosed as
 `INCOMPLETE / NOT APPLICABLE` and not added to PASS counts. Only the approved structural checks
 `deployment_completeness`, `user_journey_coherence`, and `environment_coverage` are excepted; functional test SKIP
-has no exception. Windows WebView2 native product UI and OS syscall observation remain `UNMEASURED / BLOCKED`.
+has no exception. At cmd_400, Windows WebView2 native product UI and OS syscall observation were
+`UNMEASURED / BLOCKED`; the WebView2 boundary is superseded by the IMP-005 gate above.
 
 The initial fixture failure, selector failures, migration failure, and typing failure roots remain history-only
 evidence. They are not relabeled as PASS and are listed in [FR-B10結果](../testing/fr-b10-results.md). The final

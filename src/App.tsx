@@ -1772,6 +1772,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="tag-manager-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("library", event)}

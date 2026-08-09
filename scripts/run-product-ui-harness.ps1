@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$FullscreenOnly,
-    [switch]$ShortcutOnly
+    [switch]$ShortcutOnly,
+    [switch]$TagsOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,9 +35,10 @@ function Get-FreeTcpPort {
 $port = Get-FreeTcpPort
 $freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
 if (!$freshness.Fresh) {
+    $freshnessFeature = if ($TagsOnly) { "IMP-005" } else { "IMP-004" }
     $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
-        "-Feature IMP-004 to rebuild and bind the executable. manifest={1} inputHash={2}") -f `
-        $freshness.Reason, $freshness.ManifestPath, $freshness.InputHash
+        "-Feature {1} to rebuild and bind the executable. manifest={2} inputHash={3}") -f `
+        $freshness.Reason, $freshnessFeature, $freshness.ManifestPath, $freshness.InputHash
     throw $staleMessage
 }
 
@@ -763,6 +765,188 @@ try {
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    if ($TagsOnly) {
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.catalog-item[data-selected=true]')?.dataset.relativePath === " +
+            "'comic-folder'"
+        ) "tag item selection"
+        Invoke-Evaluate (
+            "document.querySelector('[aria-controls=library-menu]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "tag library menu"
+        Invoke-Evaluate (
+            "(() => { const action = document.querySelector(" +
+            "'[data-product-id=tag-manager-menu-item]'); if (!action) return false; " +
+            "action.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.tag-manager-dialog') !== null && " +
+            "document.querySelector('.tag-manager-dialog > p')?.textContent.endsWith('comic-folder')"
+        ) "tag manager setup"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#tag-name');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '\uFF26\uFF21\uFF36\uFF2F\uFF32\uFF29\uFF34\uFF25');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-item-tag-id]')?.textContent.includes('favorite') && " +
+            "document.querySelector('[data-tag-id]')?.textContent.includes('favorite')"
+        ) "tag assignment"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#tag-name');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'other');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.closest('form').querySelector('button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelectorAll('[data-item-tag-id]').length === 2 && " +
+            "document.querySelectorAll('[data-tag-id]').length === 2 && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('favorite')) && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('other'))"
+        ) "nonmatching tag seed"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#tag-query');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '\uFF26\uFF21\uFF36');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('#tag-query').value === '\uFF26\uFF21\uFF36' && " +
+            "document.querySelectorAll('[data-tag-id]').length === 1 && " +
+            "document.querySelector('[data-tag-id]')?.textContent.includes('favorite') && " +
+            "!document.querySelector('[data-tag-id]')?.textContent.includes('other')"
+        ) "normalized tag query"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#tag-query');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, '');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('#tag-query').value === '' && " +
+            "document.querySelectorAll('[data-tag-id]').length === 2 && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('favorite')) && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('other'))"
+        ) "tag rename setup"
+        Invoke-Evaluate @"
+(() => {
+  const row = [...document.querySelectorAll('[data-tag-id]')]
+    .find((node) => node.querySelector('span')?.textContent === 'favorite');
+  if (!row) return false;
+  const input = row.querySelector('input');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'reading');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  row.querySelector('button').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "[...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('reading')) && " +
+            "[...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('other')) && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('reading'))"
+        ) "tag rename"
+        Stop-Product $cold
+        $cold = Start-Product
+        Wait-Evaluate (
+            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        ) "tag restart catalog"
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            "if (!item) return false; item.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.catalog-item[data-selected=true]')?.dataset.relativePath === " +
+            "'comic-folder'"
+        ) "tag restart item selection"
+        Invoke-Evaluate (
+            "document.querySelector('[aria-controls=library-menu]')?.click(); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('#library-menu') !== null" "tag restart library menu"
+        Invoke-Evaluate (
+            "(() => { const action = document.querySelector(" +
+            "'[data-product-id=tag-manager-menu-item]'); if (!action) return false; " +
+            "action.click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "[...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('reading')) && " +
+            "[...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('other')) && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.textContent.includes('reading'))"
+        ) "tag restart persistence"
+        Invoke-Evaluate @"
+(() => {
+  const row = [...document.querySelectorAll('[data-item-tag-id]')]
+    .find((node) => node.textContent.includes('reading'));
+  if (!row) return false;
+  row.querySelector('button').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
+            "![...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('reading')) && " +
+            "[...document.querySelectorAll('[data-item-tag-id]')].some((node) => " +
+            "node.textContent.includes('other')) && " +
+            "[...document.querySelectorAll('[data-tag-id]')].some((node) => " +
+            "node.querySelector('span')?.textContent === 'reading' && " +
+            "node.querySelectorAll('span')[1]?.textContent.startsWith('0'))"
+        ) "tag removal"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Tag product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Tag product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B10-005"
+            assigned = $true
+            queried = $true
+            renamed = $true
+            restartPersisted = $true
+            removed = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
     if ($ShortcutOnly) {
         Invoke-Evaluate (
             "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"

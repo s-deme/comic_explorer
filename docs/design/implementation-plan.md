@@ -74,6 +74,9 @@ MVPの自動化範囲に含めず、Actions実行からの取得を配布ビル�
 Windows product featureは`verify-feature-windows.ps1 -Feature <ID>`を単一入口とする。
 IMP-004/FUT-C-019はfocused frontend、typecheck、frontend/SBOM、focused Rust、hashで鮮度を
 保証したrelease executable、ShortcutOnly product gate、CoDD scan/checkの順で開発検証する。
+IMP-005/FUT-C-022も同じpipelineを共有し、設定tableからFR-B10 frontend file、`fr_b10` Rust filter、
+TagsOnly product gateを選ぶ。featureごとの差はこの三点へ限定し、release freshness、cleanup、
+CoDD工程を複製しない。
 Tauriのbundle resourceである`dist/SBOM.json`をCargoが解決する前に生成し、過去runの
 staleな`dist`へ依存しない。
 最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
@@ -86,6 +89,8 @@ product gateへ渡す。入力不変のwarm再実行はrelease compileを省略�
 exe差替えはいずれもproduct起動前に停止または再buildする。production bundleに入らない
 frontend `*.test.ts(x)`はrelease入力から除外する。product harnessはaccessibleな
 保存状態と相対reading positionを観測し、socket/UI/process/port/cleanupを有限時間で終了する。
+TagsOnlyではReactの選択とmenu描画を段階ごとに待ち、非一致tagを含む検索前集合から正規化queryで
+一件へ絞り込む。rename、再起動復元、removeの完了後にlibrary file集合とSHAを比較する。
 
 #### IMP-004 workflow timing record (2026-08-09)
 

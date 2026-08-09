@@ -87,7 +87,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-019 | ユーザー定義ショートカット | 操作割当変更 | Implemented | PASS | 希望 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md) | `src/features/input/shortcuts.ts`; `src/App.tsx`; `src/features/viewer/Viewer.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs`; `src-tauri/src/lib.rs`; `src/App.fr-b11.test.tsx`; `scripts/run-product-ui-harness.ps1` | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-001/004/005、FT-B11-006 Windows product PASS） | 既定`+`の保存拒否を修正。remap、conflict、Viewer発火、restart復元、reset、原本差分0を製品実測。touch/gamepadは別feature。 |
 | FUT-C-020 | 巻末動作設定・自動遷移 | 自動的に次の巻を開く設定 | Implemented | PASS | 希望 | FR-B02 | [FR-B02要件](../requirements/end-of-volume-requirements.md#req-fr-b02-001-policy-interface); Q5-6 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/catalog/end-of-volume.ts`; `src-tauri/src/application/mod.rs` | [FT-B02-001](../testing/fr-b02-results.md#ft-b02-001) | C0採用、既定値auto_nextでREQ-MVP-016互換 |
 | FUT-C-021 | お気に入り保存 | お気に入り永続化 | Candidate | NOT TESTED | 希望 | 将来 | Q6-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
-| FUT-C-022 | タグ付与・検索 | タグ管理 | Partial | BLOCKED | 将来 | FR-B10 | [FR-B10要件](../requirements/tag-management-requirements.md#fr-b10タグ管理要件); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/state/repository.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/lib.rs`; `src/features/library/client.ts`; `src/App.tsx`; `src/App.fr-b10.test.tsx` | [FR-B10結果](../testing/fr-b10-results.md)（semantic ACCEPT、focused exact4 4/4 PASS、App回帰39/39 PASS、Windows Rust 78 unit+1 process、typecheck/build PASS） | 最終frontend source SHA `6ee91612`、repository SHA `dc564575`。CoDDは`INCOMPLETE / NOT APPLICABLE`、Windows WebView2 native product UIは`UNMEASURED / BLOCKED`のため総合状態はPartial/BLOCKED。 |
+| FUT-C-022 | タグ付与・検索 | タグ管理 | Implemented | PASS | 将来 | FR-B10 | [FR-B10要件](../requirements/tag-management-requirements.md#fr-b10タグ管理要件); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/state/repository.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/lib.rs`; `src/features/library/client.ts`; `src/App.tsx`; `src/App.fr-b10.test.tsx`; `scripts/run-product-ui-harness.ps1` | [FR-B10結果](../testing/fr-b10-results.md)（focused exact4、Rust exact4、Windows WebView2 `FT-B10-005`、canonical aggregate PASS） | release製品で付与・正規化検索・rename・再起動復元・除去を直接観測。library原本差分0、Windows-native CoDD scan/check/verify exit 0・red 0。構造advisoryは生値を開示し、機能PASSへ加算しない。 |
 | FUT-C-023 | メモ保存 | メモ管理 | Partial | BLOCKED | 将来 | FR-B07 | [FR-B07要件](../requirements/reading-metadata-requirements.md#req-fr-b07-001-作品identityとmemo); Q6-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs` | 2026-08-03のfrontend exact5は履歴raw。現行はfrontend接続4件とRust契約5件へ分離 | CoDDは3 SKIP/1 VACUOUS/verification 0のためINCOMPLETE/NOT APPLICABLE。Windows product gateはBLOCKED。 |
 | FUT-C-024 | 名前変更 | ファイル名変更 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
 | FUT-C-025 | 移動 | ファイル移動 | Candidate | NOT TESTED | 将来 | 将来 | Q7-2 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | ユーザー明示操作が前提 |
@@ -196,7 +196,13 @@ Feature Lane fallback、quoted wrapper起動失敗、callback typing failure、c
 最終差分は許可された四文書だけを対象とし、draft contamination 0、staged path 0、
 `git diff --check PASS`を確認した。commit/pushは行っていない。
 
-## FR-B10 最終受入証跡（cmd_400）
+## FR-B10 受入証跡
+
+IMP-005でWindows release WebView2の`FT-B10-005`と現行canonical aggregateを完了したため、
+`FUT-C-022`は`Implemented / PASS`である。以下のcmd_400証跡は、focused/Rust契約と当時のblocked理由を
+保存する履歴であり、現在のproduct gate状態を表さない。
+
+### cmd_400 履歴
 
 FR-B10の実装とconnected semantic gateは受理済みである。focused exact4は4 PASS / 0 FAIL / 0 SKIP、
 App回帰は39 PASS / 0 FAIL / 0 SKIP、Windows offline Rustは78 unit + 1 process PASS / failed 0 /
@@ -220,11 +226,13 @@ Feature Lane fallback、selector、migration、typingのrejected rootsは受入P
 CoDDは承認済み`queue/reports/evidence/cmd_400/fr_b07_reject_codd_draft_restore_gate/`のrawを参照する。
 verifyの生値は`3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification tests 0であり、
 `INCOMPLETE / NOT APPLICABLE`としてPASS数へ加算しない。例外は三つの構造的SKIPだけで、functional testの
-SKIPを免除しない。Windows WebView2 native product UIとOS syscallは`UNMEASURED / BLOCKED`のまま保持する。
+SKIPを免除しない。当時のWindows WebView2 native product UIとOS syscallは`UNMEASURED / BLOCKED`だった。
+WebView2 product UIはIMP-005で解消済みであり、OS syscall完全観測はFR-B10単体の完了根拠へ加算しない。
 初回FAIL、selector、migration、typingのrejected rootsは結果文書で履歴のみとして開示する。
 
-最終project diffは機能/test 6 path + 本四文書4 path = exact 10、contamination 0、staged path 0、
-`git diff --check PASS`であり、commit/pushは行わない。
+cmd_400当時の最終project diffは機能/test 6 path + 本四文書4 path = exact 10、contamination 0、
+staged path 0、`git diff --check PASS`だった。当時はcommit/pushを行っていない。この履歴を現在の
+IMP-005差分やpublish状態へ読み替えない。
 
 ## FR-B11 最終受入証跡（cmd_400）
 

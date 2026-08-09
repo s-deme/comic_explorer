@@ -3,6 +3,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("Bootstrap", "FrontendFocused", "Typecheck", "Release", "FrontendSbom", "ReleaseExecutable", "RustFocused", "RustCanonical", "Freshness")]
     [string]$Task,
+    [string]$FrontendTest = "src\App.fr-b11.test.tsx",
+    [string]$RustFilter = "shortcut",
     [switch]$ForceRelease
 )
 
@@ -76,10 +78,18 @@ try {
     switch ($Task) {
         "Bootstrap" { $toolchain | ConvertTo-Json -Compress }
         "FrontendFocused" {
-            Invoke-Checked "Focused FR-B11 frontend test" $toolchain.Node `
+            $frontendTestPath = if ([IO.Path]::IsPathRooted($FrontendTest)) {
+                $FrontendTest
+            } else {
+                Join-Path $projectRoot $FrontendTest
+            }
+            if (!(Test-Path -LiteralPath $frontendTestPath -PathType Leaf)) {
+                throw "Focused frontend test was not found: $FrontendTest"
+            }
+            Invoke-Checked "Focused frontend test ($FrontendTest)" $toolchain.Node `
                 @(
                     (Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
-                    (Join-Path $projectRoot "src\App.fr-b11.test.tsx"),
+                    $frontendTestPath,
                     "--pool=threads", "--poolOptions.threads.singleThread=true"
                 ) $projectRoot
         }
@@ -95,8 +105,11 @@ try {
         "FrontendSbom" { Invoke-FrontendSbom -IncludeTypecheck $false }
         "ReleaseExecutable" { Invoke-ReleaseExecutable }
         "RustFocused" {
-            Invoke-Checked "Focused shortcut Rust test" $toolchain.Cargo `
-                @("test", "--locked", "--lib", "shortcut") (Join-Path $projectRoot "src-tauri")
+            if ([string]::IsNullOrWhiteSpace($RustFilter)) {
+                throw "RustFilter must identify the focused Rust test."
+            }
+            Invoke-Checked "Focused Rust test ($RustFilter)" $toolchain.Cargo `
+                @("test", "--locked", "--lib", $RustFilter) (Join-Path $projectRoot "src-tauri")
         }
         "RustCanonical" {
             Invoke-Checked "Rust format check" $toolchain.Cargo @("fmt", "--check") (Join-Path $projectRoot "src-tauri")
