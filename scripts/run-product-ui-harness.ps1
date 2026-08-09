@@ -896,7 +896,7 @@ try {
     Wait-Evaluate (
         "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('2 / 3')"
     ) "click next navigation"
-    Invoke-Evaluate "document.querySelector('.viewer-toolbar button:nth-of-type(1)').click(); true" |
+    Invoke-Evaluate "[...document.querySelectorAll('.viewer-toolbar button')][3].click(); true" |
         Out-Null
     Wait-Evaluate (
         "document.querySelectorAll('.page-spread img:not(.prefetch-page)').length === 1"
@@ -927,7 +927,7 @@ try {
     Wait-Evaluate (
         "document.querySelector('.viewer-toolbar span:last-of-type').textContent.startsWith('1-2 / 3')"
     ) "spread history returns leading page"
-    Invoke-Evaluate "document.querySelector('.viewer-toolbar button:nth-of-type(2)').click(); true" |
+    Invoke-Evaluate "[...document.querySelectorAll('.viewer-toolbar button')][4].click(); true" |
         Out-Null
     Wait-Evaluate (
         "document.querySelector('.page-spread').dataset.direction === 'leftToRight' && " +
