@@ -17,6 +17,12 @@ on the Windows filesystem. The path must use a Windows Python virtual
 environment and Windows Node.js/npm, and must not depend on mounted-path
 translation, a Linux virtual environment, or an ext4 mirror.
 
+Toolchain discovery and feature verification are part of this path. Cargo,
+Node.js, Python, Visual Studio, and the Windows SDK must be resolved by one
+shared bootstrap without embedding a user name, Python version, or Node.js
+installation directory. A missing tool must fail before build/test work starts
+and report both the missing capability and the locations that were searched.
+
 ## Acceptance criteria
 
 - A PowerShell CoDD runner invokes the Windows Python interpreter with UTF-8
@@ -30,5 +36,38 @@ translation, a Linux virtual environment, or an ext4 mirror.
   use the same Windows Node.js toolchain.
 - The Windows path preserves non-zero exit codes and does not report a pass
   when a subprocess fails.
+- Release and Rust compatibility wrappers use the shared bootstrap and return
+  the exact child exit code; frontend, SBOM, and Rust release work cannot
+  continue after an earlier failed child command.
+- One Windows-native PowerShell feature-verification command accepts a feature
+  or management ID. `IMP-004`, `FUT-C-019`, and `ShortcutOnly` resolve to the
+  shortcut verification lane containing focused frontend tests, typecheck,
+  frontend/SBOM generation, focused or final canonical Rust verification,
+  release-executable freshness, the product harness, and CoDD gates. The
+  development-focused lane runs `scan`/`check`; the formal canonical lane also
+  runs `verify`, whose configured test command already executes the full
+  canonical frontend suite and typecheck.
+- Every verification run emits a final JSON result on success and failure. It
+  records each stage's UTC start/end, elapsed seconds, and exit code, plus the
+  failed stage and total elapsed seconds.
+- A product gate must prove that the release executable matches a deterministic
+  manifest of its production source/build inputs. Frontend test-only files do
+  not invalidate a production executable. A stale or unbound executable is
+  rebuilt or rejected before the product process starts; unchanged warm runs
+  reuse it.
+- Product automation observes accessible or stable product state instead of a
+  fixed save delay, treats restored reading position as the relative starting
+  point, bounds all process/socket/UI waits, emits stage/DOM/process/port
+  diagnostics on timeout, and leaves no product process, port, or SQLite lock.
+- Development verification runs focused Rust coverage before the final change;
+  the full canonical Rust gate runs once for final acceptance. Timings for
+  focused tests, release compilation, canonical tests, product automation, and
+  CoDD are retained so cold/warm regressions can be compared without weakening
+  the canonical gate.
+- For a repository stored on the Windows filesystem, including invocation from
+  WSL, the Windows-native runner is selected first. A WSL bridge follows the
+  Windows completion result/sentinel and final JSON instead of trusting the
+  initial interop process return, and the same change is not re-run through the
+  Linux CoDD runner.
 - The existing Linux/CI Bash runners remain available and unchanged in
   behavior.

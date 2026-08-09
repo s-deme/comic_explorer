@@ -741,7 +741,7 @@ describe("application shell", () => {
     await registerTestLibrary([]);
 
     fireEvent.keyDown(window, { key: "n", altKey: true });
-    const navigationMenu = screen.getByRole("menu", { name: "移動" });
+    const navigationMenu = await screen.findByRole("menu", { name: "移動" });
     const back = within(navigationMenu).getByRole("menuitem", { name: /戻る/ });
     const up = within(navigationMenu).getByRole("menuitem", {
       name: /上のフォルダへ/,

@@ -10,18 +10,20 @@ $venvRoot = if ([IO.Path]::IsPathRooted($VenvPath)) {
 } else {
     Join-Path $projectRoot $VenvPath
 }
-$python = Join-Path $venvRoot "Scripts\python.exe"
+$toolchainScript = Join-Path $PSScriptRoot "windows-toolchain.ps1"
+. $toolchainScript
+$python = (Resolve-ExecutablePath -ToolName "Windows Python virtual environment" `
+    -CandidatePaths @((Join-Path $venvRoot "Scripts\python.exe"))).Path
 $runner = Join-Path $projectRoot "scripts\run-codd-consistency.py"
-
-if (!(Test-Path -LiteralPath $python -PathType Leaf)) {
-    throw "Windows Python venv not found: $python"
-}
 
 function Invoke-PythonChecked {
     param([string[]]$Arguments)
-    & $python -X utf8 @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Windows Python command failed with exit code $LASTEXITCODE"
+    $result = Invoke-TrackedNative -FilePath $python -Arguments (@("-X", "utf8") + $Arguments) `
+        -WorkingDirectory $projectRoot
+    if ($result.StandardOutput) { [Console]::Out.Write($result.StandardOutput) }
+    if ($result.StandardError) { [Console]::Error.Write($result.StandardError) }
+    if ($result.ExitCode -ne 0) {
+        throw "Windows Python command failed with exit code $($result.ExitCode)"
     }
 }
 

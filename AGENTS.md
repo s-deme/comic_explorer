@@ -22,6 +22,23 @@ They default to the project-local `.venv-windows` environment:
 .\scripts\run-codd-windows.ps1 verify
 ```
 
+When the repository is on a Windows filesystem, including a `/mnt/<drive>/...`
+path invoked from WSL, select the Windows-native runner first. Do not probe the
+Linux CoDD runner and then repeat the same gate on Windows. For `IMP-004`,
+`FUT-C-019`, and `ShortcutOnly`, the formal final command is:
+
+```powershell
+.\scripts\verify-feature-windows.ps1 -Feature IMP-004 -RustMode Canonical
+```
+
+From WSL, use `scripts/run-feature-verification-wsl.sh IMP-004 -RustMode
+Canonical`. The bridge waits for the Windows runner's final JSON sentinel and
+uses its recorded exit code; do not treat the initial WSL interop process return
+as completion while Windows child processes remain active. During development,
+omit `-RustMode Canonical` to use the focused Rust lane with CoDD scan/check but
+without the full-suite CoDD verify. Run the canonical lane, including CoDD
+verify, once after the final source change.
+
 Before implementing or changing user-visible behavior:
 
 1. Record or update the applicable requirement under `docs/requirements/`.

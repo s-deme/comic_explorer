@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "release-freshness.ps1")
+Set-StrictMode -Off
 $executable = Join-Path $projectRoot "src-tauri\target\release\comic-explorer.exe"
 $evidenceRoot = Join-Path $projectRoot "dist\product-ui-harness"
 $library = Join-Path $evidenceRoot "library"
@@ -14,28 +16,90 @@ $missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
 $recoveryAppData = Join-Path $evidenceRoot "recovery-appdata"
 $keyboardAppData = Join-Path $evidenceRoot "keyboard-appdata"
-$port = Get-Random -Minimum 20000 -Maximum 40000
 $script:sequence = 0
 $script:socket = $null
+$script:testStage = "preflight"
+$script:activeProduct = $null
 
-function Connect-Cdp {
-    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+function Get-FreeTcpPort {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+    try {
+        $listener.Start()
+        return ([Net.IPEndPoint]$listener.LocalEndpoint).Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
+$port = Get-FreeTcpPort
+$freshness = Test-ReleaseFreshness -ProjectRoot $projectRoot
+if (!$freshness.Fresh) {
+    $staleMessage = ("STALE_RELEASE: {0}. Run scripts\verify-feature-windows.ps1 " +
+        "-Feature IMP-004 to rebuild and bind the executable. manifest={1} inputHash={2}") -f `
+        $freshness.Reason, $freshness.ManifestPath, $freshness.InputHash
+    throw $staleMessage
+}
+
+function Get-HarnessDiagnostics {
+    $dom = $null
+    try {
+        if (!$script:socket -or $script:socket.State -ne [Net.WebSockets.WebSocketState]::Open) {
+            throw "CDP socket is not open."
+        }
+        $dom = Invoke-Evaluate (
+            "(() => ({url: location.href, title: document.title, readyState: document.readyState, " +
+            "text: document.body?.innerText.slice(0, 3000), active: document.activeElement?.outerHTML.slice(0, 500), " +
+            "dialogs: [...document.querySelectorAll('[role=dialog]')].map(n => n.outerHTML.slice(0, 1000)), " +
+            "statuses: [...document.querySelectorAll('[role=status],[role=alert]')].map(n => n.outerHTML.slice(0, 500))}))()"
+        )
+    } catch { $dom = @{ error = $_.Exception.Message } }
+    $processIds = @()
+    if ($script:activeProduct) {
+        $processIds = @($script:activeProduct.Id) + @(Get-DescendantProcessIds $script:activeProduct.Id)
+    }
+    $processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $processIds -contains [int]$_.ProcessId } |
+        Select-Object ProcessId, ParentProcessId, Name, CommandLine)
+    $ports = $null
+    try {
+        $ports = Get-NetTCPConnection -LocalPort $port -ErrorAction Stop |
+            Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess
+    } catch { $ports = @() }
+    return [pscustomobject]@{
+        stage = $script:testStage
+        port = $port
+        dom = $dom
+        processes = @($processes)
+        connections = @($ports)
+    }
+}
+
+function Connect-Cdp([int]$TimeoutSeconds = 30) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
         try {
-            $pages = Invoke-RestMethod "http://127.0.0.1:$port/json"
+            $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 2
             $page = $pages | Where-Object { $_.type -eq "page" } | Select-Object -First 1
             if ($page) {
                 $script:socket = [Net.WebSockets.ClientWebSocket]::new()
-                $script:socket.ConnectAsync(
-                    [Uri]$page.webSocketDebuggerUrl,
-                    [Threading.CancellationToken]::None
-                ).GetAwaiter().GetResult() | Out-Null
+                $connectTimeout = [Threading.CancellationTokenSource]::new(
+                    [TimeSpan]::FromSeconds(10)
+                )
+                try {
+                    $script:socket.ConnectAsync(
+                        [Uri]$page.webSocketDebuggerUrl,
+                        $connectTimeout.Token
+                    ).GetAwaiter().GetResult() | Out-Null
+                } finally {
+                    $connectTimeout.Dispose()
+                }
                 return
             }
         } catch {}
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw "WebView2 DevTools endpoint did not become ready."
+    throw ("WebView2 DevTools endpoint did not become ready. diagnostics=" +
+        ((Get-HarnessDiagnostics) | ConvertTo-Json -Depth 6 -Compress))
 }
 
 function Invoke-Cdp([string]$Method, [hashtable]$Params) {
@@ -90,7 +154,7 @@ function Invoke-Cdp([string]$Method, [hashtable]$Params) {
         $message = [Text.Encoding]::UTF8.GetString($stream.ToArray()) |
             ConvertFrom-Json
     } while ($message.id -ne $id)
-    if ($message.error) { throw $message.error.message }
+    if ($message.PSObject.Properties["error"]) { throw $message.error.message }
     return $message.result
 }
 
@@ -100,7 +164,7 @@ function Invoke-Evaluate([string]$Expression) {
         awaitPromise = $true
         returnByValue = $true
     }
-    if ($result.exceptionDetails) {
+    if ($result.PSObject.Properties["exceptionDetails"]) {
         throw (
             "$($result.exceptionDetails.text): " +
             "$($result.exceptionDetails.exception.description) in $Expression"
@@ -110,21 +174,31 @@ function Invoke-Evaluate([string]$Expression) {
 }
 
 function Wait-Evaluate([string]$Expression, [string]$Description) {
+    $script:testStage = $Description
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
         if (Invoke-Evaluate $Expression) { return }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    $diagnostic = Invoke-Evaluate (
-        "(async () => { const image = document.querySelector('.thumbnail img'); " +
-        "let fetchResult = null; if (image) { try { const response = await fetch(image.src); " +
-        "fetchResult = {status: response.status, headers: [...response.headers]}; } " +
-        "catch (error) { fetchResult = String(error); } } return {url: location.href, " +
-        "text: document.body.innerText, image: image && {complete: image.complete, " +
-        "naturalWidth: image.naturalWidth, src: image.src}, fetchResult, thumbnails: " +
-        "[...document.querySelectorAll('.thumbnail')].map((node) => node.outerHTML)}; })()"
+    throw ("Timed out waiting for $Description. diagnostics=" +
+        ((Get-HarnessDiagnostics) | ConvertTo-Json -Depth 7 -Compress))
+}
+
+function Get-ViewerPagePosition {
+    $position = Invoke-Evaluate (
+        "(() => { const text = document.querySelector('.viewer-toolbar span:last-of-type')?.textContent || ''; " +
+        "const match = text.match(/(\d+)\s*\/\s*(\d+)/); return match ? " +
+        "{page:Number(match[1]), count:Number(match[2])} : null; })()"
     )
-    throw "Timed out waiting for $Description. thumbnails=$($diagnostic | ConvertTo-Json -Compress)"
+    if ($null -eq $position) { throw "Viewer page position is not available." }
+    return $position
+}
+
+function Wait-ViewerPage([int]$Expected, [string]$Description) {
+    Wait-Evaluate (
+        "(() => { const match = (document.querySelector('.viewer-toolbar span:last-of-type')?.textContent || '')" +
+        ".match(/(\d+)\s*\//); return match && Number(match[1]) === $Expected; })()"
+    ) $Description
 }
 
 function Invoke-Key(
@@ -320,15 +394,27 @@ function Assert-CatalogSort([string]$Field, [string]$Direction) {
 }
 
 function Start-Product([string]$DataRoot = $appData) {
-    $env:LOCALAPPDATA = $DataRoot
-    $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
-    $process = Start-Process -FilePath $executable -PassThru
-    try {
-        Connect-Cdp
-        return $process
-    } catch {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        throw
+    $script:testStage = "product start"
+    $attemptErrors = [Collections.Generic.List[string]]::new()
+    foreach ($attempt in 1..2) {
+        $script:port = Get-FreeTcpPort
+        $env:LOCALAPPDATA = $DataRoot
+        $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
+        $process = Start-Process -FilePath $executable -PassThru
+        $script:activeProduct = $process
+        try {
+            $timeout = if ($attempt -eq 1) { 10 } else { 20 }
+            Connect-Cdp -TimeoutSeconds $timeout
+            return $process
+        } catch {
+            $attemptErrors.Add("attempt=$attempt port=$port error=$($_.Exception.Message)")
+            try { Stop-Product $process -Force } catch {
+                $attemptErrors.Add("attempt=$attempt cleanup=$($_.Exception.Message)")
+            }
+            if ($attempt -eq 2) {
+                throw "Product start failed after 2 bounded attempts: $($attemptErrors -join '; ')"
+            }
+        }
     }
 }
 
@@ -444,30 +530,115 @@ function Wait-ProductWindowBounds(
         ($last | ConvertTo-Json -Compress))
 }
 
+function Get-DescendantProcessIds([int]$RootId) {
+    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    $pending = [Collections.Generic.Queue[int]]::new()
+    $result = [Collections.Generic.List[int]]::new()
+    $pending.Enqueue($RootId)
+    while ($pending.Count -gt 0) {
+        $parentId = $pending.Dequeue()
+        foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $parentId }) {
+            if (!$result.Contains([int]$child.ProcessId)) {
+                $result.Add([int]$child.ProcessId)
+                $pending.Enqueue([int]$child.ProcessId)
+            }
+        }
+    }
+    return @($result)
+}
+
+function Stop-HarnessDescendants([int[]]$ProcessIds) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(2)
+    do {
+        $remaining = @($ProcessIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+        if ($remaining.Count -eq 0) { return }
+        foreach ($processId in $remaining) {
+            Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    # WebView2 helpers can retain the harness console handle and disappear only
+    # after this PowerShell process exits. The parent runner audits them from a
+    # separate process after the harness has returned.
+}
+
+function Wait-ProcessIdReleased([int]$ProcessId, [int]$TimeoutSeconds = 5) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        if (!(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Product process $ProcessId did not exit within $TimeoutSeconds seconds."
+}
+
+function Wait-CdpPortReleased([int]$Port) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if (!$listener) { return }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "WebView2 CDP port $Port remained in LISTEN state after cleanup."
+}
+
 function Stop-Product($Process, [switch]$Force) {
+    $descendants = @(Get-DescendantProcessIds $Process.Id)
+    $processPort = $port
     if ($script:socket) {
         $script:socket.Dispose()
         $script:socket = $null
     }
-    if ($Process.HasExited) { return }
+    $Process.Refresh()
+    if ($Process.HasExited) {
+        if ($script:activeProduct -and $script:activeProduct.Id -eq $Process.Id) {
+            $script:activeProduct = $null
+        }
+        Stop-HarnessDescendants $descendants
+        Wait-CdpPortReleased $processPort
+        return
+    }
     if ($Force) {
         Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
-        $Process.WaitForExit()
+        Wait-ProcessIdReleased $Process.Id
+        if ($script:activeProduct -and $script:activeProduct.Id -eq $Process.Id) {
+            $script:activeProduct = $null
+        }
+        Stop-HarnessDescendants $descendants
+        Wait-CdpPortReleased $processPort
         return
     }
     if (-not $Process.CloseMainWindow()) {
         throw "Product main window could not be closed normally."
     }
-    if (-not $Process.WaitForExit(10000)) {
+    try {
+        Wait-ProcessIdReleased $Process.Id 10
+    } catch {
         Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
         throw "Product did not exit within 10 seconds after a normal window close."
     }
+    $Process.WaitForExit(0) | Out-Null
     if ($Process.ExitCode -ne 0) {
         throw "Product normal exit returned code $($Process.ExitCode)."
     }
+    if ($script:activeProduct -and $script:activeProduct.Id -eq $Process.Id) {
+        $script:activeProduct = $null
+    }
+    Stop-HarnessDescendants $descendants
+    Wait-CdpPortReleased $processPort
 }
 
-Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
+function Remove-HarnessEvidence {
+    if (!(Test-Path -LiteralPath $evidenceRoot)) { return }
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if (!(Test-Path -LiteralPath $evidenceRoot)) { return }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Harness evidence could not be removed within 5 seconds; a SQLite/file lock remains: $evidenceRoot"
+}
+
+Remove-HarnessEvidence
 New-Item $library -ItemType Directory -Force | Out-Null
 Copy-Item (
     Join-Path $projectRoot "tests\fixtures\generated\FIX-ZIP-001\standard.cbz"
@@ -594,14 +765,14 @@ try {
     ) "cold thumbnail image decode"
     if ($ShortcutOnly) {
         Invoke-Evaluate (
-            "[...document.querySelectorAll('.menu-trigger')].at(-1).click(); true"
+            "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('#help-menu') !== null" "shortcut help menu"
         Invoke-Evaluate (
-            "document.querySelector('#help-menu [role=menuitem]').click(); true"
+            "document.querySelector('[data-product-id=shortcut-help-menu-item]').click(); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('[role=dialog]') !== null && " +
+            "document.querySelector('[data-product-id=shortcut-dialog]') !== null && " +
             "document.querySelector('#shortcut-nextPage').value === 'PageDown'"
         ) "shortcut dialog defaults"
         Invoke-Evaluate (
@@ -609,11 +780,9 @@ try {
             "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('#shortcut-nextPage').value === 'N'"
-        ) "shortcut remap persistence request"
-        Invoke-Evaluate (
-            "new Promise((resolve) => setTimeout(() => resolve(true), 1000))"
-        ) | Out-Null
+            "document.querySelector('#shortcut-nextPage').value === 'N' && " +
+            "document.querySelector('[data-shortcut-save-status=saved]') !== null"
+        ) "shortcut remap backend save completion"
         Invoke-Evaluate (
             "document.querySelector('#shortcut-previousPage').dispatchEvent(" +
             "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
@@ -624,74 +793,78 @@ try {
             "document.querySelector('#shortcut-previousPage').value === 'PageUp'"
         ) "shortcut conflict rejection"
         Invoke-Evaluate (
-            "[...document.querySelectorAll('[role=dialog] button')]" +
-            ".find((node) => node.textContent === '\u9589\u3058\u308b').click(); true"
+            "document.querySelector('[data-product-id=shortcut-dialog-close]').click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('[role=dialog]') === null" "shortcut dialog close"
+        Wait-Evaluate "document.querySelector('[data-product-id=shortcut-dialog]') === null" "shortcut dialog close"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
             ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
             "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
         ) | Out-Null
-        Wait-Evaluate (
-            "document.querySelector('.viewer-toolbar span:last-of-type')" +
-            "?.textContent.startsWith('1 / 3')"
-        ) "custom shortcut viewer setup"
+        Wait-Evaluate "document.querySelector('.viewer') !== null" "custom shortcut viewer setup"
+        $customStart = Get-ViewerPagePosition
+        $customExpected = [Math]::Min($customStart.count, $customStart.page + 1)
+        if ($customExpected -eq $customStart.page) {
+            throw "Custom shortcut relative navigation started on the final page."
+        }
         Invoke-Evaluate (
             "window.dispatchEvent(new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
         ) | Out-Null
-        Wait-Evaluate (
-            "document.querySelector('.viewer-toolbar span:last-of-type')" +
-            "?.textContent.startsWith('2 / 3')"
-        ) "custom shortcut viewer navigation"
+        Wait-ViewerPage $customExpected "custom shortcut viewer relative navigation"
+        $customAfter = Get-ViewerPagePosition
         Invoke-Evaluate (
             "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') === null" "custom shortcut viewer close"
         Stop-Product $cold
-        $port += 1
+        $port = Get-FreeTcpPort
         $cold = Start-Product
         Wait-Evaluate (
             "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
         ) "shortcut restart catalog"
         Invoke-Evaluate (
-            "[...document.querySelectorAll('.menu-trigger')].at(-1).click(); true"
+            "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('#help-menu') !== null" "restart shortcut help menu"
         Invoke-Evaluate (
-            "document.querySelector('#help-menu [role=menuitem]').click(); true"
+            "document.querySelector('[data-product-id=shortcut-help-menu-item]').click(); true"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('#shortcut-nextPage').value === 'N'"
         ) "shortcut restart restoration"
         Invoke-Evaluate (
-            "[...document.querySelectorAll('[role=dialog] button')]" +
+            "[...document.querySelectorAll('[data-product-id=shortcut-dialog] button')]" +
             ".find((node) => node.textContent === '\u3059\u3079\u3066\u65e2\u5b9a\u306b\u623b\u3059').click(); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('#shortcut-nextPage').value === 'PageDown'"
-        ) "shortcut reset"
+            "document.querySelector('#shortcut-nextPage').value === 'PageDown' && " +
+            "document.querySelector('[data-shortcut-save-status=saved]') !== null"
+        ) "shortcut reset backend save completion"
         Invoke-Evaluate (
-            "[...document.querySelectorAll('[role=dialog] button')]" +
-            ".find((node) => node.textContent === '\u9589\u3058\u308b').click(); true"
+            "document.querySelector('[data-product-id=shortcut-dialog-close]').click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('[role=dialog]') === null" "reset dialog close"
+        Wait-Evaluate "document.querySelector('[data-product-id=shortcut-dialog]') === null" "reset dialog close"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
             ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
             "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
         ) | Out-Null
-        Wait-Evaluate (
-            "document.querySelector('.viewer-toolbar span:last-of-type')" +
-            "?.textContent.startsWith('2 / 3')"
-        ) "reset shortcut viewer setup"
+        Wait-Evaluate "document.querySelector('.viewer') !== null" "reset shortcut viewer setup"
+        $resetStart = Get-ViewerPagePosition
+        if ($resetStart.page -ne $customAfter.page) {
+            throw "Reading position was not restored relatively: expected $($customAfter.page), got $($resetStart.page)."
+        }
+        if ($resetStart.page -lt $resetStart.count) {
+            $resetKey = "PageDown"
+            $resetExpected = $resetStart.page + 1
+        } else {
+            $resetKey = "PageUp"
+            $resetExpected = $resetStart.page - 1
+        }
         Invoke-Evaluate (
-            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true"
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'$resetKey', bubbles:true})); true"
         ) | Out-Null
-        Wait-Evaluate (
-            "document.querySelector('.viewer-toolbar span:last-of-type')" +
-            "?.textContent.startsWith('3 / 3')"
-        ) "reset default shortcut navigation"
+        Wait-ViewerPage $resetExpected "reset default shortcut relative navigation"
         $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
         if (Compare-Object $before $after) {
             throw "Shortcut product harness changed source archives."
@@ -1446,19 +1619,22 @@ try {
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {
+    $cleanupErrors = [Collections.Generic.List[string]]::new()
     if ($deniedRule -and (Test-Path $deniedPath)) {
         $deniedAcl = Get-Acl $deniedPath
         $deniedAcl.RemoveAccessRuleSpecific($deniedRule)
         Set-Acl $deniedPath $deniedAcl
     }
-    if ($cold) { Stop-Product $cold -Force }
-    if ($warm) { Stop-Product $warm -Force }
-    if ($viewerRestart) { Stop-Product $viewerRestart -Force }
-    if ($rootRecovery) { Stop-Product $rootRecovery -Force }
-    if ($appDataRecovery) { Stop-Product $appDataRecovery -Force }
-    if ($keyboardProduct) { Stop-Product $keyboardProduct -Force }
+    foreach ($product in @($cold, $warm, $viewerRestart, $rootRecovery, $appDataRecovery, $keyboardProduct)) {
+        if ($product) {
+            try { Stop-Product $product -Force } catch { $cleanupErrors.Add($_.Exception.Message) }
+        }
+    }
     if ((Test-Path $missingLibrary) -and -not (Test-Path $library)) {
         Move-Item $missingLibrary $library
     }
-    Remove-Item $evidenceRoot -Recurse -Force -ErrorAction SilentlyContinue
+    try { Remove-HarnessEvidence } catch { $cleanupErrors.Add($_.Exception.Message) }
+    if ($cleanupErrors.Count -gt 0) {
+        throw "Product harness cleanup failed: $($cleanupErrors -join '; ')"
+    }
 }

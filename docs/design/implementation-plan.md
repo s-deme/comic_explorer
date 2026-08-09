@@ -20,6 +20,9 @@ codd:
     - id: "test:test-cases"
       relation: "executes"
       semantic: "behavioral"
+    - id: "req:windows-native-toolchain"
+      relation: "implements"
+      semantic: "windows-feature-verification-workflow"
 ---
 
 # Comic Explorer 製造実装計画
@@ -54,8 +57,10 @@ MVPの自動化範囲に含めず、Actions実行からの取得を配布ビル�
 
 - 要件を変更する場合は、先に`docs/requirements/`を更新する。
 - 要件、設計、コード、設定、テストを変更する前後にCoDDを実行する。
-- 各変更前に`.venv/bin/codd scan`と`.venv/bin/codd impact`を実行する。
-- 各変更後に`.venv/bin/codd scan`、`.venv/bin/codd check`を実行する。
+- Linux/CIでは各変更前に`.venv/bin/codd scan`と`.venv/bin/codd impact`を実行する。
+- Windows filesystem上のrepositoryでは、WSLからの呼び出しを含めWindows-native runnerを
+  最初から選び、同じ変更をLinux runnerで重複実行しない。
+- 各変更後に選択済みplatformのCoDD `scan`、`check`を実行する。
 - 実行可能なコードとテストが揃ったフェーズでは`.venv/bin/codd verify`を実行する。
 - 関連するCoDDのred gateが残っている状態では、フェーズ完了と報告しない。
 - 生成物の`codd/scan/`はバージョン管理へ追加しない。
@@ -63,6 +68,46 @@ MVPの自動化範囲に含めず、Actions実行からの取得を配布ビル�
 - テストは空実装、無条件成功、skipで完了扱いにせず、対象機能と同じ変更で追加する。
 - 各フェーズの「主な検証」はそのフェーズで自動化する範囲を示す。製品全体に対する
   E2E、アクセシビリティ、外部通信、性能、配布の最終判定はPhase 6で行う。
+
+### Windows feature verification
+
+Windows product featureは`verify-feature-windows.ps1 -Feature <ID>`を単一入口とする。
+IMP-004/FUT-C-019はfocused frontend、typecheck、focused Rust、frontend/SBOM、hashで鮮度を
+保証したrelease executable、ShortcutOnly product gate、CoDD scan/checkの順で開発検証する。
+最終source変更後だけ`-RustMode Canonical`でRust fmt/check/full testとCoDD verifyを一回実行する。
+CoDD verifyの設定済みtest/typecheckがfull canonical frontendとtypecheckを再実行するため、開発用
+focused laneではCoDD verifyを重複実行しない。各child processはPIDと実exit codeを追跡し、最終
+JSONへ工程開始・終了・秒数・exit codeを残す。WSL bridgeはこのJSONの生成を完了sentinelとして待機する。
+
+release executableはsource/build inputのSHA-256 manifestとexe自身のhashが一致する場合だけ
+product gateへ渡す。入力不変のwarm再実行はrelease compileを省略し、stale、manifest欠損、
+exe差替えはいずれもproduct起動前に停止または再buildする。production bundleに入らない
+frontend `*.test.ts(x)`はrelease入力から除外する。product harnessはaccessibleな
+保存状態と相対reading positionを観測し、socket/UI/process/port/cleanupを有限時間で終了する。
+
+#### IMP-004 workflow timing record (2026-08-09)
+
+「cold-process」はWindows childを新規起動した初回測定、「rebuild」はrelease入力hashを意図的に
+不一致にした測定、「warm」は同一入力・同一target cacheでの直後の再実行を表す。Cargo targetと
+OS file cacheは削除していないため、完全な空cache測定とは区別する。変更前の手動pipelineは失敗後も
+後続工程を実行しており、合計時間とともに赤だった工程を明記する。
+
+| 構成 | Frontend focused | Typecheck | Rust | Release | Product | CoDD scan/check/verify | Total |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 変更前 cold-process | 2.048s (FAIL) | 1.074s (FAIL) | 594.160s canonical | 25.683s (FAIL) | 25.289s (FAIL) | 3.049 / 33.341 / 6.081s | 690.765s |
+| 変更前 warm-cache | 2.054s (FAIL) | 3.084s | 390.260s canonical | 332.231s rebuild | 13.368s | 6.092 / 39.474 / 7.100s | 793.707s |
+| 変更後 rebuild/canonical | 8.598s | 6.384s | 96.528s canonical | 84.810s rebuild + 1.574s freshness | 33.619s + 1.126s cleanup | 3.140 / 35.980 / 45.967s | 329.706s |
+| 変更後 warm/focused (重複整理前) | 7.280s | 5.967s | 14.778s focused | 1.269s hash reuse + 1.291s freshness | 14.659s + 1.336s cleanup | 2.378 / 36.895 / 45.703s | 147.010s |
+| 最終 warm/canonical | 5.222s | 4.115s | 55.545s canonical | 1.004s hash reuse + 1.022s freshness | 25.956s + 1.053s cleanup | 1.677 / 25.000 / 37.462s | 166.289s |
+| 最終 warm/focused (重複整理後) | 6.508s | 4.358s | 9.433s focused | 1.117s hash reuse + 1.096s freshness | 13.333s + 0.994s cleanup | 2.107 / 24.574 / — | 72.202s |
+
+Rust候補の分離測定ではdebug focusedが初回66.053秒、warm 12.591秒、同じfocused testの
+`cargo test --release`は201.983秒だった。変更前canonicalは初回594.160秒、直後390.260秒である。
+このため開発laneはdebug focusedと共有target cacheを採用し、release test profileへの統合は採用
+しない。正確性を保つcanonical laneは最終source変更後に一度実行し、release profileの重複は
+入力hash一致時のbuild省略で短縮する。focused laneからfull-suite CoDD verifyを除いたことで、
+warm全体は147.010秒から72.202秒へ短縮した。最終JSONは成功・失敗にかかわらずignoredな
+`src-tauri/target/verification/`へ保存し、生成物はcommitしない。
 
 ## 3. フェーズ一覧
 

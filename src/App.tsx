@@ -233,6 +233,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     ...DEFAULT_SHORTCUTS,
   }));
   const [shortcutNotice, setShortcutNotice] = useState<string | null>(null);
+  const [shortcutSaveState, setShortcutSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const shortcutSaveRequest = useRef(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
@@ -944,20 +948,33 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   function closeHelp() {
     setHelpOpen(false);
     setShortcutNotice(null);
+    setShortcutSaveState("idle");
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
   }
 
   function persistShortcutBindings(next: ShortcutBindings) {
     setShortcuts(next);
     setShortcutNotice(null);
+    setShortcutSaveState("saving");
+    const saveRequest = shortcutSaveRequest.current + 1;
+    shortcutSaveRequest.current = saveRequest;
     settingsGeneration.current += 1;
     void saveShortcutBindings(next, settingsGeneration.current)
       .then((response) => {
+        if (saveRequest !== shortcutSaveRequest.current) return;
         if (response.status === "ok") {
           setShortcuts(normalizeShortcutBindings(response.data));
+          setShortcutSaveState("saved");
+        } else {
+          setShortcutSaveState("error");
+          setShortcutNotice("ショートカットを保存できませんでした。");
         }
       })
-      .catch(() => setShortcutNotice("ショートカットを保存できませんでした。"));
+      .catch(() => {
+        if (saveRequest !== shortcutSaveRequest.current) return;
+        setShortcutSaveState("error");
+        setShortcutNotice("ショートカットを保存できませんでした。");
+      });
   }
 
   function captureShortcut(
@@ -1793,6 +1810,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             type="button"
             role="menuitem"
             aria-label="ヘルプ"
+            data-product-id="help-menu-trigger"
             aria-haspopup="menu"
             aria-expanded={activeMenu === "help"}
             aria-controls="help-menu"
@@ -1820,6 +1838,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="shortcut-help-menu-item"
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
@@ -2174,6 +2193,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="help-title"
+            data-product-id="shortcut-dialog"
             className="help-dialog"
             onKeyDown={(event) => {
               if (event.key === "Escape") closeHelp();
@@ -2213,9 +2233,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button type="button" onClick={resetAllShortcuts}>
                 すべて既定に戻す
               </button>
+              <p
+                role="status"
+                aria-live="polite"
+                data-shortcut-save-status={shortcutSaveState}
+              >
+                {shortcutSaveState === "saving"
+                  ? "ショートカットを保存中です。"
+                  : shortcutSaveState === "saved"
+                    ? "ショートカットを保存しました。"
+                    : shortcutSaveState === "error"
+                      ? "ショートカットの保存に失敗しました。"
+                      : "ショートカットの変更はありません。"}
+              </p>
               {shortcutNotice !== null && <p role="alert">{shortcutNotice}</p>}
             </section>
-            <button autoFocus onClick={closeHelp}>閉じる</button>
+            <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
           </div>
         </div>
       )}

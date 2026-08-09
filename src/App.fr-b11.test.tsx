@@ -238,6 +238,15 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     expect(nextInput).toHaveValue("PageDown");
     fireEvent.keyDown(nextInput, { key: "N" });
     await waitFor(() => expect(nextInput).toHaveValue("N"));
+    await waitFor(() =>
+      expect(within(dialog).getByRole("status")).toHaveAttribute(
+        "data-shortcut-save-status",
+        "saved",
+      ),
+    );
+    expect(within(dialog).getByRole("status")).toHaveTextContent(
+      "ショートカットを保存しました。",
+    );
     expect(saveShortcutMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ nextPage: "N" }),
       expect.any(Number),
