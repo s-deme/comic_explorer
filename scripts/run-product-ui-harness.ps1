@@ -1,3 +1,8 @@
+[CmdletBinding()]
+param(
+    [switch]$FullscreenOnly
+)
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -196,8 +201,10 @@ function Assert-CatalogSort([string]$Field, [string]$Direction) {
           name: item.dataset.relativePath.split('/').at(-1),
           kind: item.dataset.kind,
           archiveKind: item.dataset.archiveKind || null,
-          modifiedMs: item.dataset.modifiedMs === undefined ? null : Number(item.dataset.modifiedMs),
-          byteSize: item.dataset.byteSize === undefined ? null : Number(item.dataset.byteSize),
+          modifiedMs: Number.isFinite(Number(item.dataset.modifiedMs)) ?
+            Number(item.dataset.modifiedMs) : null,
+          byteSize: Number.isFinite(Number(item.dataset.byteSize)) ?
+            Number(item.dataset.byteSize) : null,
         });
       });
     }
@@ -255,8 +262,8 @@ function Assert-CatalogSort([string]$Field, [string]$Direction) {
     item.kind === 'comicFolder' ? 1 :
     item.archiveKind === 'zip' ? 2 : item.archiveKind === 'cbz' ? 3 : 4;
   const compareOptional = (left, right) => {
-    if (left === null) return right === null ? 0 : 1;
-    if (right === null) return -1;
+    if (left == null) return right == null ? 0 : 1;
+    if (right == null) return -1;
     return $descendingJson ? right - left : left - right;
   };
   const expected = [...actual].sort((left, right) => {
@@ -308,6 +315,118 @@ function Start-Product([string]$DataRoot = $appData) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
         throw
     }
+}
+
+if (-not ("ComicExplorerWindowInterop" -as [type])) {
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class ComicExplorerWindowInterop
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect Work;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(
+        IntPtr monitor,
+        ref MonitorInfo info
+    );
+
+    public static Rect WindowRect(IntPtr hWnd)
+    {
+        Rect rect;
+        if (!GetWindowRect(hWnd, out rect))
+            throw new InvalidOperationException("GetWindowRect failed.");
+        return rect;
+    }
+
+    public static Rect MonitorRect(IntPtr hWnd)
+    {
+        var monitor = MonitorFromWindow(hWnd, 2);
+        if (monitor == IntPtr.Zero)
+            throw new InvalidOperationException("MonitorFromWindow failed.");
+        var info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
+        if (!GetMonitorInfo(monitor, ref info))
+            throw new InvalidOperationException("GetMonitorInfo failed.");
+        return info.Monitor;
+    }
+}
+"@
+}
+
+function Get-ProductWindowBounds($Process) {
+    $Process.Refresh()
+    if ($Process.MainWindowHandle -eq [IntPtr]::Zero) {
+        throw "Product main window handle is not available."
+    }
+    $window = [ComicExplorerWindowInterop]::WindowRect($Process.MainWindowHandle)
+    $monitor = [ComicExplorerWindowInterop]::MonitorRect($Process.MainWindowHandle)
+    [pscustomobject]@{
+        left = $window.Left
+        top = $window.Top
+        right = $window.Right
+        bottom = $window.Bottom
+        monitorLeft = $monitor.Left
+        monitorTop = $monitor.Top
+        monitorRight = $monitor.Right
+        monitorBottom = $monitor.Bottom
+    }
+}
+
+function Test-SameBounds($Left, $Right, [int]$Tolerance = 2) {
+    return (
+        [Math]::Abs($Left.left - $Right.left) -le $Tolerance -and
+        [Math]::Abs($Left.top - $Right.top) -le $Tolerance -and
+        [Math]::Abs($Left.right - $Right.right) -le $Tolerance -and
+        [Math]::Abs($Left.bottom - $Right.bottom) -le $Tolerance
+    )
+}
+
+function Test-MonitorFullscreenBounds($Bounds, [int]$Tolerance = 2) {
+    return (
+        [Math]::Abs($Bounds.left - $Bounds.monitorLeft) -le $Tolerance -and
+        [Math]::Abs($Bounds.top - $Bounds.monitorTop) -le $Tolerance -and
+        [Math]::Abs($Bounds.right - $Bounds.monitorRight) -le $Tolerance -and
+        [Math]::Abs($Bounds.bottom - $Bounds.monitorBottom) -le $Tolerance
+    )
+}
+
+function Wait-ProductWindowBounds(
+    $Process,
+    [scriptblock]$Predicate,
+    [string]$Description
+) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+        $bounds = Get-ProductWindowBounds $Process
+        if (& $Predicate $bounds) { return $bounds }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    $last = Get-ProductWindowBounds $Process
+    throw ("Timed out waiting for " + $Description + ": " +
+        ($last | ConvertTo-Json -Compress))
 }
 
 function Stop-Product($Process, [switch]$Force) {
@@ -458,6 +577,66 @@ try {
         "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
         ".every((image) => image.complete && image.naturalWidth > 0)"
     ) "cold thumbnail image decode"
+    if ($FullscreenOnly) {
+        Invoke-Evaluate (
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.title.startsWith('comic-folder ')); item.click(); " +
+            "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') !== null" "fullscreen viewer setup"
+        $normalFullscreenBounds = Get-ProductWindowBounds $cold
+        $progressBeforeFullscreen = Invoke-Evaluate (
+            "document.querySelector('.viewer-toolbar span:last-of-type').textContent"
+        )
+        Invoke-Evaluate (
+            "[...document.querySelectorAll('.viewer-toolbar button[aria-pressed]')].at(-1).click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer')?.dataset.fullscreen === 'true' && " +
+            "document.querySelector('.viewer-toolbar button[aria-pressed=true]') !== null"
+        ) "native fullscreen DOM state"
+        $fullscreenBounds = Wait-ProductWindowBounds $cold {
+            param($bounds) Test-MonitorFullscreenBounds $bounds
+        } "native fullscreen window bounds"
+        Invoke-Evaluate (
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+        ) | Out-Null
+        $progressJson = $progressBeforeFullscreen | ConvertTo-Json -Compress
+        Wait-Evaluate (
+            "document.querySelector('.viewer')?.dataset.fullscreen === 'false' && " +
+            "document.querySelector('.viewer-toolbar span:last-of-type').textContent === " +
+            $progressJson
+        ) "fullscreen Escape viewer preservation"
+        $restoredFullscreenBounds = Wait-ProductWindowBounds $cold {
+            param($bounds) Test-SameBounds $bounds $normalFullscreenBounds
+        } "fullscreen window bounds restoration"
+        Invoke-Evaluate (
+            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+        ) | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "normal Escape viewer close"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "Fullscreen product harness changed source archives."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "Fullscreen product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B04-006"
+            fullscreenNativeWindow = $true
+            fullscreenEscPreservedViewer = $true
+            fullscreenBoundsRestored = $true
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
         ".find((node) => node.title.startsWith('comic-folder ')); item.click(); item.focus(); " +
@@ -799,6 +978,42 @@ try {
         "node.textContent.includes('comic-folder')) && " +
         "document.activeElement?.title?.startsWith('comic-folder ')"
     ) "viewer context restoration"
+    Invoke-Evaluate (
+        "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+        ".find((node) => node.title.startsWith('comic-folder ')); item.click(); " +
+        "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+    ) | Out-Null
+    Wait-Evaluate "document.querySelector('.viewer') !== null" "fullscreen viewer setup"
+    $normalFullscreenBounds = Get-ProductWindowBounds $warm
+    $progressBeforeFullscreen = Invoke-Evaluate (
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent"
+    )
+    Invoke-Evaluate (
+        "[...document.querySelectorAll('.viewer-toolbar button[aria-pressed]')].at(-1).click(); true"
+    ) | Out-Null
+    Wait-Evaluate (
+        "document.querySelector('.viewer')?.dataset.fullscreen === 'true' && " +
+        "document.querySelector('.viewer-toolbar button[aria-pressed=true]') !== null"
+    ) "native fullscreen DOM state"
+    $fullscreenBounds = Wait-ProductWindowBounds $warm {
+        param($bounds) Test-MonitorFullscreenBounds $bounds
+    } "native fullscreen window bounds"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+    ) | Out-Null
+    $progressJson = $progressBeforeFullscreen | ConvertTo-Json -Compress
+    Wait-Evaluate (
+        "document.querySelector('.viewer')?.dataset.fullscreen === 'false' && " +
+        "document.querySelector('.viewer-toolbar span:last-of-type').textContent === " +
+        $progressJson
+    ) "fullscreen Escape viewer preservation"
+    $restoredFullscreenBounds = Wait-ProductWindowBounds $warm {
+        param($bounds) Test-SameBounds $bounds $normalFullscreenBounds
+    } "fullscreen window bounds restoration"
+    Invoke-Evaluate (
+        "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+    ) | Out-Null
+    Wait-Evaluate "document.querySelector('.viewer') === null" "normal Escape viewer close"
     Stop-Product $warm
     $warm = $null
 
@@ -1085,6 +1300,9 @@ try {
         landscapeAndOddPagesAlone = $true
         viewerContextRestored = $true
         viewerSettingsRestored = $true
+        fullscreenNativeWindow = $true
+        fullscreenEscPreservedViewer = $true
+        fullscreenBoundsRestored = $true
         sourceDifferenceCount = 0
     } | ConvertTo-Json -Compress
 } finally {

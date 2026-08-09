@@ -172,9 +172,9 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
 
 ### FR-B04 — 閲覧画面 mode（Batch 4）
 
-- **状態:** `Blocked`。focused connected evidenceは通過したが、canonical aggregateが
-  `scripts/run-tests.sh` exit 1で失敗したため、batch末尾gateは未達。`FUT-C-015`〜017は
-  台帳上`Partial / BLOCKED`へ保持し、新redoのRCA・軍師review後までPASS化しない。
+- **状態:** `Blocked`。`FUT-C-015`〜017のfocused connected evidenceは通過し、
+  `FUT-C-017`のWindows WebView2 product gateもPASSしたが、canonical aggregateは
+  既存のspread history回帰で未達のためbatch末尾gateを保留する。
 - **対象 feature ID:** `FUT-C-015`, `FUT-C-016`, `FUT-C-017`。
 - **user outcome:** 読者が縦スクロール、横スクロール、full-screen を選び、現在ページ、
   読み方向、focus を保ったまま閲覧できる。
@@ -200,13 +200,15 @@ FR-B07は実装境界と機能rawを受理したが、CoDD構造ゲートとWind
   `src-tauri/capabilities/default.json`。
 - **直接観測:** [FR-B04 focused test結果](../testing/fr-b04-results.md)。FT-B04-001〜005は
   selector、App→Viewer→DOM、page anchor/focus、読み方向・wheel・Esc、adapter lifecycle、
-  persistenceを接続境界で直接観測し、focused scopeではPASSした。ただしcanonical aggregate
-  がFAILのためbatch完了根拠には昇格していない。
+  persistenceを接続境界で直接観測し、FT-B04-006はrelease WebView2のOS boundsとEsc復帰を
+  直接観測した。focused scopeはPASSしたが、canonical aggregateが未達のためbatch完了根拠には
+  昇格していない。
 - **保存・非永続境界:** `layoutMode`だけを既存app-local SQLiteへ保存し、fullscreenはOS
   window stateへ委譲して保存しない。旧値・未知値は`paged`へ戻し、B01のview/scale/fit/
   loupe/reading positionを独立に保全する。原本・書庫・library root配下への書込みと外部通信は0。
-- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定は非Windows環境外であり
-  `BLOCKED`。さらにcanonical aggregate FAILのため、未実行・未完了をPASSへ昇格しない。
+- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定は`FT-B04-006`でPASSした。
+  canonical aggregateのspread history回帰は別の未解消gateとして保持し、未完了部分をPASSへ
+  昇格しない。
 
 ### FR-B05 — 名前検索（Batch 5）
 

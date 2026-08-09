@@ -72,6 +72,12 @@ fullscreen stateは`layoutMode`、`viewMode`、scale/fit、読み方向、page a
 する。OS差はconnected component adapter testとWindows WebView2実機testを別gateとして
 扱い、実Windows実測がない場合は`BLOCKED`と記録し、PASSへ読み替えない。
 
+Windows WebView2 product gateでは、release executableを実際に起動し、Viewerの全画面操作で
+OS window boundsが対象monitorの全画面boundsへ変化することを直接観測する。全画面中のEscは
+OS windowを通常boundsへ戻しつつViewerと現在pageを維持し、通常状態のEscだけがViewerを閉じる
+ことを確認する。これは`FT-B04-006`としてproduct harnessで測定し、bounds・DOM state・Viewer
+復帰を同一実行で記録する。
+
 ### REQ-FR-B04-005: persistence
 
 `layoutMode`は既存app-local SQLite `settings` tableの`layoutMode`へ保存し、再起動時に

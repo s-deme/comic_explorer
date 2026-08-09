@@ -15,14 +15,15 @@ codd:
 
 # FR-B04 閲覧画面 mode 直接観測結果
 
-**batch判定:** `BLOCKED`。縦・横スクロールのfocused scopeとcanonical aggregateはPASSした。
-フルスクリーンのWindows WebView2 product gateだけが未測定のため、FR-B04 batch全体は
-BLOCKEDを維持する。
+**batch判定:** `BLOCKED`。縦・横スクロールとフルスクリーンのfocused scopeはPASSしたが、
+FR-B04全体のcanonical aggregateは既存のspread history回帰で未達のため、batch全体は
+BLOCKEDを維持する。フルスクリーン単体のWindows WebView2 product gateはPASSした。
 
 ## 実測範囲
 
 - 対象: `FUT-C-015`, `FUT-C-016`, `FUT-C-017`
 - C0 enum: `paged`, `vertical_scroll`, `horizontal_scroll`
+- Windows product focused command: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-product-ui-harness.ps1 -FullscreenOnly`
 - default: `paged`。既存`viewMode`（single/spread）とB01 scale/fit・loupe・reading positionは独立保持
 - C1 integration owner: ashigaru6。model → Viewer → App → API/SQLite → window adapterを一名で直列統合
 - path ownership: [FR-B04要件](../requirements/viewer-layout-requirements.md#c0c1-ownership-checkpoint)
@@ -43,6 +44,7 @@ fullscreen adapter呼出しを直接観測した。
 | FT-B04-003 | C1 interaction | 読み方向の`r`切替、directionに従うArrowLeft navigation、anchor focus、scroll layoutのwheel入力、通常Escでcloseを確認 | PASS | `src/features/viewer/Viewer.test.tsx` |
 | FT-B04-004 | C1 window state | App→Viewer→adapterのenter/exit、fullscreen中Esc、adapter error status、Tauri window delegateを確認。fullscreenはlayout selectorと別状態 | PASS（connected） | `src/App.test.tsx`; `src/features/viewer/Viewer.test.tsx`; `src/features/viewer/fullscreen.test.ts` |
 | FT-B04-005 | C1 persistence/non-persistence | App settingsからlayout・B01 scale/loupeを復元し、fullscreenを復元しないこと、Rust SQLite reopenでlayoutを復元 | PASS | `src/App.test.tsx`; `src-tauri/src/state/repository.rs` |
+| FT-B04-006 | Windows WebView2 product window | release executableでOS window boundsがmonitor全画面boundsへ変化し、fullscreen中Escでbounds・pageを復元、通常EscでViewerを閉じることを確認。原本snapshot差分0 | PASS | `scripts/run-product-ui-harness.ps1 -FullscreenOnly` |
 
 focused command:
 
@@ -50,7 +52,7 @@ focused command:
 npm test -- --run src/features/catalog/view-mode.test.ts src/features/catalog/CatalogGrid.test.tsx src/features/catalog/end-of-volume.test.ts src/features/catalog/sort.test.ts src/features/viewer/model.test.ts src/features/viewer/fullscreen.test.ts src/features/viewer/Viewer.test.tsx src/App.test.tsx --pool=threads --poolOptions.threads.singleThread=true --reporter=dot
 ```
 
-結果: `Test Files 8 passed (8)`, `Tests 68 passed (68)`, `failed 0`、`SKIP 0`、exit 0。
+結果: `Test Files 8 passed (8)`, `Tests 85 passed (85)`, `failed 0`、`SKIP 0`、exit 0。
 
 IMP-002の追加観測では、横layoutをright-to-leftで開いた場合にページ列が
 `3, 2, 1`、読み方向をleft-to-rightへ切り替えた場合に`1, 2, 3`となること、通常wheelの
@@ -77,7 +79,8 @@ records_compared=5 / checked_count=5`となった。
 | Rust fmt/check/test | PASS | canonical `scripts/run-rust-check.cmd`、56 lib + 1 shutdown integration、ignored 0、SKIP 0、exit 0 |
 | CoDD scan/check | PASS | Windows-native PowerShell runner、red gate 0、advisory 4件 |
 | CoDD verify / canonical aggregate | PASS | Windows-native runnerでDAG 3 PASS / 0 FAIL、consistency 5/5 PASS |
-| Windows WebView2 product fullscreen | BLOCKED disclosed | Windows WebView2製品実機gateは別途未測定。未実行をPASS化しない |
+| Windows WebView2 product fullscreen | PASS | `FT-B04-006` focused harnessでOS bounds、Esc復帰、Viewer終了、原本差分0を直接観測 |
+| FR-B04 full canonical aggregate | BLOCKED disclosed | full product harnessは既存のspread history回帰（`spread history returns leading page`）で停止。FUT-C-017のfocused gateとは分離 |
 
 ## 実装・保存境界
 
@@ -89,5 +92,5 @@ SQLiteへ保存しない。layout切替時もB01のscale mode、倍率、loupe�
 ## 非破壊・通信境界
 
 原本snapshot差分0、library管理file 0、network 0、push 0。`dist/`、`target/`、CoDD生成物は
-追跡対象へ含めない。FUT-C-015とFUT-C-016は台帳上`Implemented / PASS`、FUT-C-017は
-Windows WebView2製品gate未測定のため`Partial / BLOCKED`を維持する。
+追跡対象へ含めない。FUT-C-015〜FUT-C-017は各focused scopeでは`Implemented / PASS`とする。
+ただしFR-B04 batchはcanonical aggregateのspread history回帰が残るため`BLOCKED`を維持する。
