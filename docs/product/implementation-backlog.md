@@ -102,10 +102,10 @@ codd:
 | 49 | P1-3 / FR-B13 | `IMP-049` | `FUT-C-054` | パスのコピー | Implemented / PASS | Done | library-root相対pathのclipboard copyを実装・実測 |
 | 44 | P1-4 / FR-B13 | `IMP-044` | `FUT-C-049` | 項目プロパティ | Implemented / PASS | Done | 単一項目の参照property dialogを実装・実測 |
 | 63 | P1-5 / FR-B13 | `IMP-063` | `FUT-C-068` | 現在位置付きステータス | Implemented / PASS | Done | sort後のindex/total/selection statusを実装・実測 |
-| 37 | P2-1 / FR-B14 | `IMP-037` | `FUT-C-042` | ファイル・フォルダを開く | Candidate / NOT TESTED | Candidate | picker対象、登録外path、open後のlibrary contextを決定 |
-| 39 | P2-2 / FR-B14 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Candidate / NOT TESTED | Candidate | FUT-R-004再利用範囲とmenu semanticsを決定 |
-| 51 | P2-3 / FR-B14 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Candidate / NOT TESTED | Candidate | 履歴表示順、直接jump、keyboard操作を要件化 |
-| 46 | P2-4 / FR-B14 | `IMP-046` | `FUT-C-051` | 終了メニュー | Candidate / NOT TESTED | Candidate | close、tray収納、未完了処理との境界を決定 |
+| 37 | P2-1 / FR-B14 | `IMP-037` | `FUT-C-042` | ファイル・フォルダを開く | Implemented / PASS | Done | selected item openとroot内境界を実装・実測 |
+| 39 | P2-2 / FR-B14 | `IMP-039` | `FUT-C-044` | 最近開いたファイルメニュー | Implemented / PASS | Done | successful openのsession recent menuを実装・実測 |
+| 51 | P2-3 / FR-B14 | `IMP-051` | `FUT-C-056` | 履歴ドロップダウン移動 | Implemented / PASS | Done | back/forward履歴dropdownの直接移動を実装・実測 |
+| 46 | P2-4 / FR-B14 | `IMP-046` | `FUT-C-051` | 終了メニュー | Implemented / PASS | Done | file menuの明示終了commandを実装・実測 |
 | 40 | P3-1 / FR-B15 | `IMP-040` | `FUT-C-045` | ページしおり保存・一覧 | Candidate / NOT TESTED | Candidate | しおりidentity、保存scope、永続化、open UIを要件化 |
 | 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Candidate / NOT TESTED | Candidate | 順序、wrap、無効条件を要件化 |
 | 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Candidate / NOT TESTED | Candidate | favoriteとの差、collection model、追加・除去を決定 |

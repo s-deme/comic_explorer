@@ -57,7 +57,7 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | 現行優先度 | 固定ID | 登録Batch | 領域 | 対象 feature ID（実装順） | 現在の運用状態 |
 |---|---|---:|---|---|---|
 | P1 | `FR-B13` | 13 | catalog command基盤 | `FUT-C-057`, `FUT-C-055`, `FUT-C-054`, `FUT-C-049`, `FUT-C-068` | `Done` |
-| P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Planned`（採用・要件化待ち） |
+| P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Done` |
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Planned`（採用・要件化待ち） |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Planned`（2機能の縦切り） |
 | P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Planned`（先行command確定後） |
@@ -590,7 +590,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B14 — open・navigation（Batch 14 / P2）
 
-- **状態:** `Planned`。B13のcatalog state確定後に採用判断する。
+- **状態:** `Done`。B13のcatalog stateを再利用し、focused test、typecheck、CoDD gateを通過した。
 - **対象と実装順:** (1) `FUT-C-042` file・folderを開く、(2) `FUT-C-044`最近開いたfile menu、
   (3) `FUT-C-056`履歴dropdown移動、(4) `FUT-C-051`終了menu。
 - **優先理由:** 参照アプリの主要導線を早期に満たし、既存のnavigation historyと`FUT-R-004`を
@@ -598,6 +598,13 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **採用gate:** `FUT-C-042`は登録root内だけを開くか、一時contextを許すかを先に決定する。
   root/path検証を緩めない。recentを漫画openだけに限定するか、file・folderを含む共有履歴modelへ
   拡張するかを明示する。終了はB18のtray lifecycleと矛盾しないclose policyを定義する。
+
+#### FR-B14 実装・直接観測証跡
+
+- **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p2-opennavigation)。
+- **実装根拠:** `src/App.tsx`、`src/features/navigation/navigation.ts`。
+- **直接観測:** [FR-B14 focused test結果](../testing/fr-b14-results.md)。既存navigation focusedと
+  App接続境界で、open/recent/history/quitの4契約を確認した。
 
 ### FR-B15 — しおり・本棚（Batch 15 / P3）
 

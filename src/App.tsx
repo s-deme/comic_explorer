@@ -222,6 +222,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
@@ -544,6 +545,20 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setSelectedPaths([]);
     setSelectedPath(null);
     setSelectionNotice(null);
+  }
+
+  function openSelectedEntry() {
+    const entry = sortedEntries.find((candidate) => candidate.relativePath === selectedPath);
+    if (entry === undefined) return;
+    if (entry.kind === "folder") navigate(entry.relativePath);
+    else if (entry.kind === "comicFolder" || entry.kind === "archive") openComicEntry(entry);
+  }
+
+  function rememberRecent(entry: CatalogEntry) {
+    setRecentEntries((current) => [
+      entry,
+      ...current.filter((candidate) => candidate.relativePath !== entry.relativePath),
+    ].slice(0, 12));
   }
 
   async function copySelectedPaths() {
@@ -1431,6 +1446,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const requestGeneration = viewerGeneration.current;
     void openComic(entry.relativePath, requestGeneration).then((response) => {
       if (response.status === "ok") {
+        rememberRecent(entry);
         setViewerSession(response.data);
         setLoadState({ status: "ready" });
         void loadItemMetadata(response.data.itemKey);
@@ -1661,6 +1677,35 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                aria-disabled={selectedPath === null}
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(openSelectedEntry, selectedPath === null)}
+              >
+                選択項目を開く
+                <span className="menu-shortcut">Enter</span>
+              </button>
+              <span className="menu-heading">最近開いた項目</span>
+              {recentEntries.length === 0 ? (
+                <span className="menu-empty">履歴はありません</span>
+              ) : recentEntries.map((entry) => (
+                <button
+                  key={entry.relativePath}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                  onClick={() => runMenuAction(() => openComicEntry(entry))}
+                >
+                  {entryDisplayName(entry)}
+                </button>
+              ))}
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
                 aria-keyshortcuts="F5"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
@@ -1691,6 +1736,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 onClick={() => runMenuAction(() => setPropertiesOpen(true), selectedPaths.length !== 1)}
               >
                 プロパティ
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => window.close())}
+              >
+                終了
+                <span className="menu-shortcut">Alt+F4</span>
               </button>
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">選択</span>
@@ -2098,6 +2154,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           →
         </button>
+        <label>
+          履歴
+          <select
+            aria-label="履歴ドロップダウン"
+            value=""
+            onChange={(event) => {
+              if (event.target.value !== "") navigate(event.target.value);
+            }}
+          >
+            <option value="">移動履歴</option>
+            {[...navigation.back].reverse().map((path, index) => (
+              <option key={`back-${path}-${index}`} value={path}>
+                戻る: {path || "ライブラリ"}
+              </option>
+            ))}
+            {navigation.forward.map((path, index) => (
+              <option key={`forward-${path}-${index}`} value={path}>
+                進む: {path || "ライブラリ"}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           disabled={up === null}
           onClick={() => up !== null && navigate(up)}
