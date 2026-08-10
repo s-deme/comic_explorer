@@ -704,6 +704,7 @@ fn add_supported_entry(listing: &mut ArchiveListing, path: RelativePath) {
     match classify_file_name(path.as_str()) {
         FileKind::Image => listing.pages.push(path),
         FileKind::Archive => listing.archives.push(path),
+        FileKind::Pdf => {}
         _ => {}
     }
 }

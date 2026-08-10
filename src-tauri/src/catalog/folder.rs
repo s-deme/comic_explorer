@@ -114,6 +114,7 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
                 }
                 FileKind::Archive => ItemKind::Unsupported,
                 FileKind::Image => ItemKind::Page,
+                FileKind::Pdf => ItemKind::Pdf,
                 FileKind::Unsupported => ItemKind::Unsupported,
             }
         };
@@ -289,6 +290,7 @@ mod tests {
         fs::write(comic.join("6.TIFF"), b"test").unwrap();
         fs::write(comic.join("7.ico"), b"test").unwrap();
         fs::write(comic.join("8.SVG"), b"test").unwrap();
+        fs::write(comic.join("9.pdf"), b"%PDF-1.7").unwrap();
         fs::write(comic.join("chapter/3.jpeg"), b"test").unwrap();
         fs::write(comic.join("chapter/notes.txt"), b"test").unwrap();
         fs::write(comic.join(".hidden.png"), b"test").unwrap();
@@ -343,6 +345,7 @@ mod tests {
         fs::write(root.join("book.7z"), b"7z").unwrap();
         fs::write(root.join("book.cb7"), b"cb7").unwrap();
         fs::write(root.join("book.lzh"), b"lzh").unwrap();
+        fs::write(root.join("book.PDF"), b"pdf").unwrap();
 
         let entries = enumerate_folder(&root, &root).unwrap();
         let folder = entries
@@ -381,6 +384,10 @@ mod tests {
             .iter()
             .find(|entry| entry.relative_path.as_str() == "book.lzh")
             .unwrap();
+        let pdf = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.PDF")
+            .unwrap();
 
         assert_eq!(folder.byte_size, None);
         assert!(folder.modified_ms.is_some());
@@ -392,6 +399,7 @@ mod tests {
         assert_eq!(seven_zip.kind, ItemKind::Archive);
         assert_eq!(cb7.kind, ItemKind::Archive);
         assert_eq!(lzh.kind, ItemKind::Archive);
+        assert_eq!(pdf.kind, ItemKind::Pdf);
         assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
         assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
         assert_eq!(epub.archive_kind, Some(ArchiveKind::Epub));
@@ -400,6 +408,7 @@ mod tests {
         assert_eq!(seven_zip.archive_kind, Some(ArchiveKind::SevenZip));
         assert_eq!(cb7.archive_kind, Some(ArchiveKind::Cb7));
         assert_eq!(lzh.archive_kind, Some(ArchiveKind::Lzh));
+        assert_eq!(pdf.archive_kind, None);
         fs::remove_dir_all(root).unwrap();
     }
 }

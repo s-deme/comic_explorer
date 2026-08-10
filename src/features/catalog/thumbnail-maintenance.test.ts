@@ -103,14 +103,20 @@ describe("thumbnail maintenance", () => {
     expect(merged.rejected).toEqual(["book.cbz: JPEGまたはサイズが不正です"]);
   });
 
-  it("matches only JPEG filenames to visible archive or comic-folder targets", () => {
+  it("matches only JPEG filenames to visible archive, comic-folder, or PDF targets", () => {
     const files = [
       new File(["a"], "book.jpg", { type: "image/jpeg" }),
+      new File(["d"], "document.jpg", { type: "image/jpeg" }),
       new File(["b"], "missing.jpg", { type: "image/jpeg" }),
       new File(["c"], "other.png", { type: "image/jpeg" }),
     ];
-    const result = resolveImportTargets(files, [entry("book.cbz"), entry("book", "comicFolder")]);
-    expect(result.accepted).toHaveLength(0);
+    const result = resolveImportTargets(files, [
+      entry("book.cbz"),
+      entry("book", "comicFolder"),
+      entry("document.pdf", "pdf"),
+    ]);
+    expect(result.accepted).toHaveLength(1);
+    expect(result.accepted[0].itemRelativePath).toBe("document.pdf");
     expect(result.rejected).toHaveLength(3);
     expect(result.rejected[0]).toContain("一意");
     expect(result.rejected[2]).toContain("JPEGのみ");

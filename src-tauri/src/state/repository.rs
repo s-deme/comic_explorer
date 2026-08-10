@@ -920,6 +920,7 @@ fn item_kind_storage(kind: ItemKind) -> &'static str {
         ItemKind::Folder => "folder",
         ItemKind::ComicFolder => "comicFolder",
         ItemKind::Archive => "archive",
+        ItemKind::Pdf => "pdf",
         ItemKind::Page => "page",
         ItemKind::Unsupported => "unsupported",
     }
@@ -930,6 +931,7 @@ fn item_kind_from_storage(value: &str) -> Result<ItemKind, AppError> {
         "folder" => Ok(ItemKind::Folder),
         "comicFolder" => Ok(ItemKind::ComicFolder),
         "archive" => Ok(ItemKind::Archive),
+        "pdf" => Ok(ItemKind::Pdf),
         "page" => Ok(ItemKind::Page),
         "unsupported" => Ok(ItemKind::Unsupported),
         _ => Err(AppError {

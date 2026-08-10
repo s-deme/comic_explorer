@@ -33,7 +33,11 @@ windows = { version = "0.62", features = [
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Ole",
   "Win32_System_Variant",
+  "Win32_System_WinRT",
   "Win32_UI_Shell",
+  "Data_Pdf",
+  "Storage",
+  "Storage_Streams",
 ] }
 zip = { version = "6", default-features = false, features = ["deflate"] }
 

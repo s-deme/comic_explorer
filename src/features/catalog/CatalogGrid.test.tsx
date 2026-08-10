@@ -129,12 +129,16 @@ describe("CatalogGrid", () => {
       relativePath: "cover.jpg" as never,
       kind: "page",
     };
+    const pdf: CatalogEntry = {
+      relativePath: "document.PDF" as never,
+      kind: "pdf",
+    };
     const onSelect = vi.fn();
     const onNavigate = vi.fn();
     const onRead = vi.fn();
     render(
       <CatalogGrid
-        entries={[folder, comicFolder, archive, image]}
+        entries={[folder, comicFolder, archive, image, pdf]}
         selectedPath={null}
         onSelect={onSelect}
         onNavigate={onNavigate}
@@ -146,18 +150,21 @@ describe("CatalogGrid", () => {
     expect(screen.getByText("漫画フォルダ")).toBeInTheDocument();
     expect(screen.getByText("ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH")).toBeInTheDocument();
     expect(screen.getByText("画像")).toBeInTheDocument();
+    expect(screen.getAllByText("PDF").length).toBeGreaterThanOrEqual(1);
 
     fireEvent.doubleClick(screen.getByRole("button", { name: /^library、フォルダ/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^series、漫画フォルダ/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^volume\.cbz、ZIP \/ CBZ/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^cover\.jpg、画像/ }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^document\.PDF、PDF/ }));
 
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith(folder);
-    expect(onRead).toHaveBeenCalledTimes(3);
+    expect(onRead).toHaveBeenCalledTimes(4);
     expect(onRead).toHaveBeenNthCalledWith(1, comicFolder);
     expect(onRead).toHaveBeenNthCalledWith(2, archive);
     expect(onRead).toHaveBeenNthCalledWith(3, image);
+    expect(onRead).toHaveBeenNthCalledWith(4, pdf);
     expect(screen.queryByText("読む")).not.toBeInTheDocument();
   });
 

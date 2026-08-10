@@ -1,7 +1,7 @@
 use crate::api::{MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 use crate::domain::{AppError, ErrorCode, FileKind, ImageFormat, RelativePath, classify_file_name};
 use std::io::{BufReader, Cursor};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub const THUMBNAIL_LONG_EDGE: u32 = 384;
 pub const THUMBNAIL_JPEG_QUALITY: f32 = 0.82;
@@ -14,8 +14,26 @@ pub struct CoverBytes {
 }
 
 pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppError> {
-    let item_path = root.join(item.as_str());
-    if classify_file_name(item.as_str()) == FileKind::Archive {
+    let (root, item_path) = contained_thumbnail_item(root, item)?;
+    if classify_file_name(item.as_str()) == FileKind::Pdf {
+        let pages = super::enumerate_pdf_pages(&item_path)?;
+        let cover = pages.first().ok_or_else(|| {
+            thumbnail_error(ErrorCode::NotFound, "PDF has no supported cover page.")
+        })?;
+        let bytes = super::render_pdf_page(&item_path, cover)?;
+        validate_rendered_pdf_cover(&bytes)?;
+        let metadata = item_path.metadata().map_err(thumbnail_io_error)?;
+        Ok(CoverBytes {
+            bytes,
+            source_key: format!("pdf:{}#{}", item.as_str(), cover.as_str()),
+            fingerprint_detail: format!(
+                "size:{}:modified:{:?}:page:{}",
+                metadata.len(),
+                metadata.modified().ok(),
+                cover.as_str()
+            ),
+        })
+    } else if classify_file_name(item.as_str()) == FileKind::Archive {
         let pages = super::enumerate_archive_pages(&item_path)?;
         let cover = pages.first().ok_or_else(|| {
             thumbnail_error(ErrorCode::NotFound, "Archive has no supported cover.")
@@ -29,7 +47,7 @@ pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppErr
             fingerprint_detail: entry.fingerprint_detail,
         })
     } else {
-        let pages = super::enumerate_folder_pages(root, &item_path)?;
+        let pages = super::enumerate_folder_pages(&root, &item_path)?;
         let cover = pages.first().ok_or_else(|| {
             thumbnail_error(ErrorCode::NotFound, "Folder has no supported cover.")
         })?;
@@ -53,6 +71,55 @@ pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppErr
             ),
         })
     }
+}
+
+fn contained_thumbnail_item(
+    root: &Path,
+    item: &RelativePath,
+) -> Result<(PathBuf, PathBuf), AppError> {
+    let canonical_root = root.canonicalize().map_err(thumbnail_path_error)?;
+    let canonical_item = root
+        .join(item.as_str())
+        .canonicalize()
+        .map_err(thumbnail_path_error)?;
+    ensure_thumbnail_contained(&canonical_root, &canonical_item)?;
+    Ok((canonical_root, canonical_item))
+}
+
+fn ensure_thumbnail_contained(root: &Path, item: &Path) -> Result<(), AppError> {
+    if item.starts_with(root) {
+        Ok(())
+    } else {
+        Err(thumbnail_error(
+            ErrorCode::OutsideLibraryRoot,
+            "Thumbnail source is outside the library root.",
+        ))
+    }
+}
+
+fn thumbnail_path_error(error: std::io::Error) -> AppError {
+    let (code, retryable) = match error.kind() {
+        std::io::ErrorKind::NotFound => (ErrorCode::NotFound, true),
+        std::io::ErrorKind::PermissionDenied => (ErrorCode::AccessDenied, true),
+        _ => (ErrorCode::InvalidPath, false),
+    };
+    AppError {
+        code,
+        message: format!("Cannot resolve thumbnail source: {error}"),
+        target: None,
+        retryable,
+    }
+}
+
+fn validate_rendered_pdf_cover(bytes: &[u8]) -> Result<(), AppError> {
+    let metadata = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?;
+    if metadata.format != ImageFormat::Png {
+        return Err(thumbnail_error(
+            ErrorCode::CorruptImage,
+            "The PDF cover did not render as a PNG image.",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_cover_format(cover: &RelativePath, bytes: &[u8]) -> Result<(), AppError> {
@@ -590,6 +657,20 @@ fn thumbnail_io_error(error: impl std::fmt::Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn thumbnail_source_must_remain_inside_the_canonical_library_root() {
+        assert!(
+            ensure_thumbnail_contained(Path::new("/library"), Path::new("/library/book.pdf"))
+                .is_ok()
+        );
+        assert_eq!(
+            ensure_thumbnail_contained(Path::new("/library"), Path::new("/outside/book.pdf"))
+                .unwrap_err()
+                .code,
+            ErrorCode::OutsideLibraryRoot
+        );
+    }
 
     fn animated_gif() -> Vec<u8> {
         let mut bytes = b"GIF89a\x01\0\x01\0\x80\0\0\0\0\0\xff\xff\xff".to_vec();

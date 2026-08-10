@@ -10,6 +10,7 @@ import {
 
 const entries: CatalogEntry[] = [
   { relativePath: "01.jpg" as never, kind: "page", byteSize: 10 },
+  { relativePath: "document.pdf" as never, kind: "pdf", byteSize: 15 },
   { relativePath: "Book A" as never, kind: "comicFolder" },
   { relativePath: "volume.cbz" as never, kind: "archive", byteSize: 20 },
 ];
@@ -17,7 +18,11 @@ const entries: CatalogEntry[] = [
 describe("catalog commands", () => {
   it("selects by kind and supports toggle/range selection", () => {
     expect(selectEntriesByKind(entries, "image")).toEqual(["01.jpg"]);
-    expect(selectEntriesByKind(entries, "file")).toEqual(["01.jpg", "volume.cbz"]);
+    expect(selectEntriesByKind(entries, "file")).toEqual([
+      "01.jpg",
+      "document.pdf",
+      "volume.cbz",
+    ]);
     expect(toggleEntrySelection(["01.jpg"], "01.jpg")).toEqual([]);
     expect(rangeSelection(entries, "01.jpg", "volume.cbz")).toEqual(
       entries.map((entry) => entry.relativePath),
@@ -25,8 +30,8 @@ describe("catalog commands", () => {
   });
 
   it("FT-B16-001 matches case-insensitive masks, multiple patterns, and empty segments", () => {
-    expect(matchesMask(entries[1], "book ?")).toBe(true);
-    expect(matchesMask(entries[2], "*.jpg;*.cbz")).toBe(true);
+    expect(matchesMask(entries[2], "book ?")).toBe(true);
+    expect(matchesMask(entries[3], "*.jpg;*.cbz")).toBe(true);
     expect(matchesMask(entries[0], "*.png")).toBe(false);
     expect(matchesMask(entries[0], "; ;;; ")).toBe(true);
   });

@@ -10,6 +10,8 @@ export const CONTRACT_LIMITS = Object.freeze({
   channelItems: 512,
   imageBytes: 256 * 1024 * 1024,
   imagePixels: 120_000_000,
+  pdfBytes: 1024 * 1024 * 1024,
+  pdfPages: 10_000,
   archiveEntries: 100_000,
   archiveEntryBytes: 512 * 1024 * 1024,
   archiveTotalBytes: 8 * 1024 * 1024 * 1024,

@@ -298,7 +298,7 @@ function fileName(value: string): string {
 
 function catalogAliases(entry: CatalogEntry): string[] {
   const base = fileName(entry.relativePath).toLocaleLowerCase();
-  const stem = base.replace(/\.(?:zip|cbz|epub|rar|cbr|7z|cb7|lzh)$/i, "");
+  const stem = base.replace(/\.(?:zip|cbz|epub|rar|cbr|7z|cb7|lzh|pdf)$/i, "");
   return [base, stem];
 }
 
@@ -310,7 +310,9 @@ export function resolveImportTargets(
   files: File[],
   entries: CatalogEntry[],
 ): { accepted: Array<{ file: File; itemRelativePath: string }>; rejected: string[] } {
-  const eligible = entries.filter((entry) => entry.kind === "archive" || entry.kind === "comicFolder");
+  const eligible = entries.filter(
+    (entry) => entry.kind === "archive" || entry.kind === "comicFolder" || entry.kind === "pdf",
+  );
   const accepted: Array<{ file: File; itemRelativePath: string }> = [];
   const rejected: string[] = [];
   const used = new Set<string>();

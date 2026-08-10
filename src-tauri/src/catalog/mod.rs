@@ -2,6 +2,7 @@ mod archive;
 mod folder;
 mod image_metadata;
 mod image_render;
+mod pdf;
 mod thumbnail;
 
 pub(crate) use archive::read_archive_entry;
@@ -9,6 +10,7 @@ pub use archive::{ArchiveAdapterKind, archive_adapter_kind, enumerate_archive_pa
 pub use folder::{ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages};
 pub use image_metadata::{ImageMetadata, inspect_image};
 pub(crate) use image_render::{raster_delivery_png, render_svg_png};
+pub use pdf::{enumerate_pdf_pages, pdf_page_index, render_pdf_page};
 #[cfg(target_os = "windows")]
 pub use thumbnail::encode_wic_jpeg;
 pub use thumbnail::{

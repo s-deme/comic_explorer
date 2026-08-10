@@ -20,6 +20,8 @@ function kindLabel(favorite: FavoriteEntry): string {
       return "漫画フォルダ";
     case "archive":
       return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
+    case "pdf":
+      return "PDF";
     default:
       return "不明";
   }

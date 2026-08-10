@@ -61,7 +61,8 @@ function kindRank(entry: CatalogEntry): number {
   if (entry.kind === "archive" && entry.archiveKind === "sevenZip") return 7;
   if (entry.kind === "archive" && entry.archiveKind === "cb7") return 8;
   if (entry.kind === "archive" && entry.archiveKind === "lzh") return 9;
-  return 10;
+  if (entry.kind === "pdf") return 10;
+  return 11;
 }
 
 function optionalNumberCompare(
@@ -119,5 +120,7 @@ export function nextComicEntry(
   if (current < 0) return undefined;
   return entries
     .slice(current + 1)
-    .find((entry) => entry.kind === "comicFolder" || entry.kind === "archive");
+    .find(
+      (entry) => entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf",
+    );
 }

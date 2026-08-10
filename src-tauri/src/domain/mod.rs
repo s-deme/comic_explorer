@@ -20,6 +20,7 @@ pub enum ItemKind {
     Folder,
     ComicFolder,
     Archive,
+    Pdf,
     Page,
     Unsupported,
 }

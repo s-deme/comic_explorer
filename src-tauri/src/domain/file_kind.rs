@@ -2,6 +2,7 @@
 pub enum FileKind {
     Image,
     Archive,
+    Pdf,
     Unsupported,
 }
 
@@ -15,6 +16,7 @@ pub fn classify_file_name(name: &str) -> FileKind {
         Some("zip" | "cbz" | "epub" | "rar" | "cbr" | "7z" | "cb7" | "lzh" | "lha") => {
             FileKind::Archive
         }
+        Some("pdf") => FileKind::Pdf,
         _ => FileKind::Unsupported,
     }
 }
@@ -44,7 +46,10 @@ mod tests {
         ] {
             assert_eq!(classify_file_name(name), FileKind::Archive);
         }
-        for name in ["book.pdf", "image.wic", "no-extension"] {
+        for name in ["book.PdF"] {
+            assert_eq!(classify_file_name(name), FileKind::Pdf);
+        }
+        for name in ["image.wic", "no-extension"] {
             assert_eq!(classify_file_name(name), FileKind::Unsupported);
         }
     }

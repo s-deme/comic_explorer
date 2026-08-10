@@ -426,6 +426,7 @@ fn kind_key(kind: ItemKind) -> String {
         ItemKind::Folder => "folder",
         ItemKind::ComicFolder => "comicFolder",
         ItemKind::Archive => "archive",
+        ItemKind::Pdf => "pdf",
         ItemKind::Page => "page",
         ItemKind::Unsupported => "unsupported",
     }

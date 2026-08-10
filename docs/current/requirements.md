@@ -22,7 +22,7 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 
 対象は、登録したlibrary root内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
 利用者metadata、app-local設定/cache、Windows配布である。BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、
-ICO、SVG、静止WebP、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを実装済み範囲とする。WICは画像形式ではなく、
+ICO、SVG、静止WebP、PDF、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを実装済み範囲とする。WICは画像形式ではなく、
 Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFには実装済みの安全な
 分類・拒否境界があるが、製品decodeの受入は未完了である。
 
@@ -61,6 +61,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。 |
 | REQ-MVP-018 | 外部通信、telemetry、crash upload、書誌取得、cloud同期を行わない。 |
 | REQ-MVP-019 | 項目単位のaccess、missing、corrupt、unsupported errorから別操作へ復帰できる。 |
+| REQ-MVP-020 | standalone PDF（`.pdf`）をcatalogの独立したPDF種別から1冊として開き、Windows標準PDF APIで各pageを上限付き画像へ変換して既存viewerの単page・見開き・読書位置・thumbnail・favorite・巻末遷移へ接続する。PDF本体は1 GiB、page数は10,000、renderは最大辺16,384 pxかつ120,000,000 pixelsを上限とし、library root外へ展開・変換保存しない。非対応の暗号化PDF、破損PDF、空PDF、root外symlinkは分類した局所errorとする。 |
 
 ## MVP非機能要件
 
@@ -123,3 +124,9 @@ Git履歴から参照する。
 | Partial | FUT-C-006, FUT-C-007, FUT-C-008 | AVIFはunsupported/parser境界だけ実装済み。完全decodeを推定しない。 |
 
 FR-B04とFR-B09は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。
+
+## PDF対応の受入条件
+
+| Feature | 要件ID | 現行契約 |
+|---|---|---|
+| FR-B21 PDF viewer | REQ-MVP-020, REQ-FR-B21-001, REQ-FR-B21-002, REQ-FR-B21-003 | `.pdf`をcatalogの`pdf`種別で表示し、standalone documentのpage数を列挙する。各pageは寸法を検証してからWindows.Data.Pdfへboundedな出力寸法を指定してPNG renderし、既存viewer、thumbnail、favorite、巻末遷移、読書位置を利用する。PDFは書庫内entryや書庫として再帰解釈せず、暗号化・破損・0 page・過大source/render・root外symlinkを分類して拒否する。 |

@@ -206,6 +206,8 @@ function entryKindLabel(entry: CatalogEntry): string {
       return "漫画フォルダ";
     case "archive":
       return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
+    case "pdf":
+      return "PDF";
     case "page":
       return "画像";
     default: {
@@ -978,7 +980,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const entry = sortedEntries.find((candidate) => candidate.relativePath === selectedPath);
     if (entry === undefined) return;
     if (entry.kind === "folder") navigate(entry.relativePath);
-    else if (entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "page") {
+    else if (
+      entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf"
+      || entry.kind === "page"
+    ) {
       openComicEntry(entry);
     }
   }
@@ -1167,7 +1172,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       navigate(favorite.resolvedPath);
       return;
     }
-    if (favorite.kind === "comicFolder" || favorite.kind === "archive") {
+    if (
+      favorite.kind === "comicFolder" || favorite.kind === "archive" || favorite.kind === "pdf"
+    ) {
       openComicEntry({
         relativePath: favorite.resolvedPath,
         kind: favorite.kind,
@@ -1828,7 +1835,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const sidePaneVisible = treeVisible || searchPaneOpen;
   const selectedThumbnailDataUrl = selectedPath === null
     ? undefined
-    : selected?.kind === "archive" || selected?.kind === "comicFolder"
+    : selected?.kind === "archive" || selected?.kind === "comicFolder" || selected?.kind === "pdf"
       ? managedThumbnailFor(managedThumbnails, selectedPath)?.dataUrl
         ?? (thumbnails[selectedPath]?.status === "ready" ? thumbnails[selectedPath].mediaUri : undefined)
       : undefined;

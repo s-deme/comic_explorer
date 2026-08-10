@@ -20,7 +20,7 @@ codd:
 | frontend | React 19、TypeScript、Vite、TanStack Virtual、HTML/CSS |
 | backend | Rust 2024 edition、Tokio、typed Tauri commands |
 | catalog/archive | read-only filesystem adapter、`zip`（Stored/Deflate）、`unrar`（RAR4/RAR5）、`sevenz-rust`（Copy/LZMA/LZMA2）、`delharc`（LHA/LZH）、上限付き多重圧縮、自然順 |
-| image/thumbnail | WIC thumbnail pipeline、`image` raster validation/PNG conversion、`resvg` static SVG rasterize、静止WebPは`image-webp`によるpure-Rust decode |
+| image/thumbnail | WIC thumbnail pipeline、`image` raster validation/PNG conversion、`resvg` static SVG rasterize、静止WebPは`image-webp`によるpure-Rust decode、PDFはWindows.Data.PdfからPNGへrender |
 | persistence | app-local SQLite WAL（`rusqlite` bundled）、local settings/collections、file cache |
 | verification | Vitest/Testing Library、Python unittest、Cargo test、Windows release product harness、CoDD |
 
@@ -49,7 +49,7 @@ stale responseを構造的に区別する。
 ## catalogとnavigation
 
 登録rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
-comic folder、画像、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
+comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。
 
@@ -68,6 +68,11 @@ entry数・展開後entry size・展開後合計size上限超過は読取前ま�
 512 MiBを上限とする。通常pageの相対keyは維持し、入れ子pageだけbackend専用の衝突しないopaque keyで
 書庫entry chainを表す。内側書庫はlibrary root外のOS tempへ寿命付きfileとして展開し、読取後に削除する。
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
+standalone PDFはWindows.Data.Pdfのread-only `PdfDocument`としてpage countを列挙し、選択pageのDIP寸法から最大辺と
+pixel上限内の出力寸法を先に算出して`PdfPageRenderOptions`へ指定し、boundedなPNGをviewerへ渡す。PDF page keyはbackend専用の
+opaque keyとし、PDF本体をlibraryへ展開・変換保存しない。sourceはcanonicalizeしてroot包含を検証し、1 GiBを超えるfileは
+WinRTへ渡さない。暗号化PDF、0 page、破損PDF、render size/pixel上限超過は分類したcatalogまたはpage単位errorで拒否する。書庫内PDFは現行契約の
+対応entryではなくunsupportedとして扱う。
 BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
 解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。
 JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIMEをopaque media URLから渡す。
@@ -90,6 +95,8 @@ BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止Web
 pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
 animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、
 過大dimensionは局所errorまたはplaceholderとし、他項目の操作を止めない。
+PDFは先頭pageをWindows.Data.PdfでPNG renderしてから既存WIC JPEG encoderへ渡す。PDFのfingerprintは本体の
+size/mtimeとpage keyを含め、生成物は既存thumbnail cacheだけへ保存する。
 
 source fingerprintはfile size/mtimeと必要なarchive metadataを含む。生成物はtemp write後にatomic renameし、
 DB transactionでindexを更新する。cache rootは`%LOCALAPPDATA%\ComicExplorer\cache`、自動生成thumbnailは

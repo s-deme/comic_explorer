@@ -18,6 +18,7 @@ use tokio_util::sync::CancellationToken;
 use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::catalog::{
     CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages,
+    enumerate_pdf_pages, render_pdf_page,
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
@@ -2011,6 +2012,22 @@ fn read_page_bytes(
     grant: &MediaGrant,
     target: &RelativePath,
 ) -> Result<(&'static str, Vec<u8>), AppError> {
+    if grant.mime_type == "application/pdf" {
+        let PageSource::File(path) = &grant.source else {
+            return Err(AppError {
+                code: ErrorCode::InvalidRequest,
+                message: "PDF pages must be backed by a local PDF file.".into(),
+                target: Some(target.clone()),
+                retryable: false,
+            });
+        };
+        return render_pdf_page(path, target)
+            .map(|bytes| ("image/png", bytes))
+            .map_err(|mut error| {
+                error.target = Some(target.clone());
+                error
+            });
+    }
     let result = read_grant_bytes(grant).and_then(|bytes| {
         let metadata = crate::catalog::inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)?;
         match metadata.format {
@@ -2086,7 +2103,7 @@ fn favorite_target(root: &Path, relative_path: &RelativePath) -> Result<Favorite
 fn favorite_kind(kind: ItemKind) -> bool {
     matches!(
         kind,
-        ItemKind::Folder | ItemKind::ComicFolder | ItemKind::Archive
+        ItemKind::Folder | ItemKind::ComicFolder | ItemKind::Archive | ItemKind::Pdf
     )
 }
 
@@ -2318,6 +2335,7 @@ enum OpenItemKind {
     Folder,
     Archive,
     Image,
+    Pdf,
 }
 
 fn contained_library_path(root: &Path, relative: &RelativePath) -> Result<PathBuf, AppError> {
@@ -2371,6 +2389,7 @@ fn open_item_kind(path: &Path, relative: &RelativePath) -> Result<OpenItemKind, 
     match classify_file_name(relative.as_str()) {
         FileKind::Archive => Ok(OpenItemKind::Archive),
         FileKind::Image => Ok(OpenItemKind::Image),
+        FileKind::Pdf => Ok(OpenItemKind::Pdf),
         FileKind::Unsupported => Err(AppError {
             code: ErrorCode::UnsupportedFormat,
             message: "The selected file format is not supported by the viewer.".into(),
@@ -2419,6 +2438,7 @@ fn enumerate_pages_port(
             })?;
             Ok(vec![item_relative.clone()])
         }
+        OpenItemKind::Pdf => enumerate_pdf_pages(item),
     };
     if cancellation.is_cancelled() {
         Err(AppError::cancelled())
@@ -2794,6 +2814,7 @@ pub async fn load_page(
         .clone()
         .ok_or_else(|| "library root is not configured".to_string())?;
     let is_archive = classify_file_name(item.as_str()) == FileKind::Archive;
+    let is_pdf = classify_file_name(item.as_str()) == FileKind::Pdf;
     let source = if is_archive {
         let archive = match contained_library_path(&root, &item) {
             Ok(path) if path.is_file() => path,
@@ -2810,12 +2831,20 @@ pub async fn load_page(
             entry: page.as_str().into(),
         }
     } else {
-        let file = match contained_library_path(&root, &page) {
+        let source_path = if is_pdf { &item } else { &page };
+        let file = match contained_library_path(&root, source_path) {
             Ok(path) if path.is_file() => path,
             Ok(_) => {
                 return Ok(error_response(
                     &context,
-                    request_error(ErrorCode::InvalidPath, "Page path is not a file."),
+                    request_error(
+                        ErrorCode::InvalidPath,
+                        if is_pdf {
+                            "PDF path is not a file."
+                        } else {
+                            "Page path is not a file."
+                        },
+                    ),
                 ));
             }
             Err(error) => return Ok(error_response(&context, error)),
@@ -2823,7 +2852,11 @@ pub async fn load_page(
         PageSource::File(file)
     };
     let page_id = page_id_for(item.as_str(), page.as_str());
-    let mime_type = page_mime_type(&page);
+    let mime_type = if is_pdf {
+        "application/pdf"
+    } else {
+        page_mime_type(&page)
+    };
     let cancellation = state
         .viewer
         .lock()

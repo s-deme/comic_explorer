@@ -24,16 +24,16 @@ codd:
 
 ## 機能集計
 
-現行台帳はMVP 25件（REQ 19、NFR 6）とMVP後/将来71件の計96件である。
+現行台帳はMVP 26件（REQ 20、NFR 6）とMVP後/将来71件の計97件である。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 66 |
-| Implemented | BLOCKED | 7 |
+| Implemented | BLOCKED | 8 |
 | Partial | BLOCKED | 9 |
 | Candidate | NOT TESTED | 10 |
 | Rejected | NOT TESTED | 4 |
-| **合計** |  | **96** |
+| **合計** |  | **97** |
 
 ## MVP状態
 
@@ -42,6 +42,7 @@ codd:
 | REQ-MVP-001〜007, 009〜017, 019 | Implemented / PASS | catalog、viewer、読書位置、原本非破壊、error回復を直接観測済み。 |
 | REQ-MVP-008 | Implemented / BLOCKED | BMP/JPEG/GIF/TIFF/PNG/ICO/SVG/WebPの列挙、実decode、安全なviewer配信とWIC thumbnailはWindows testでPASS。release WebView2上のanimated GIF直接観測は未完了。 |
 | REQ-MVP-018 | Partial / BLOCKED | code上はlocal-onlyだが、隔離VM外部からのDNS/TCP/UDP監視が未実施。 |
+| REQ-MVP-020 | Implemented / BLOCKED | PDFの独立種別、Windows.Data.Pdfによるpage列挙・上限付きPNG render、thumbnail、favorite、巻末遷移、source/root/error境界はWindows Rust canonicalとfrontend testでPASS。release WebView2上のPDF viewer・thumbnail直接観測は未完了。 |
 | NFR-MVP-001〜003 | Partial / BLOCKED | 規模・性能・UIA/screen reader/high contrast/DPIの製品実測待ち。 |
 | NFR-MVP-004 | Implemented / PASS | lock inventory、SBOM、notice、license auditの受入証跡あり。 |
 | NFR-MVP-005〜006 | Partial / BLOCKED | clean VM配布、Windows製品性能・環境matrixが未完了。 |
@@ -70,6 +71,7 @@ codd:
 | FR-B18 / P6 | workspace・tray | Implemented / BLOCKED | notification area、native hide/show/focus、lifecycle未測定。 |
 | FR-B19 / P7 | settings・help | Implemented / PASS | — |
 | FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
+| FR-B21 | standalone PDF | Implemented / BLOCKED | Windows.Data.Pdfの実renderと上限・分類・root containmentはPASS。release WebView2のviewer・thumbnailは未測定。 |
 
 ## CandidateとRejected
 
@@ -91,7 +93,7 @@ codd:
 - 基準PCでのcold TTI、10,000項目、scroll/FPS、input/page latency、working set、cache測定。
 - Windows UIA、Narrator/NVDA、high contrast、100/150/200% DPI。
 - WebView2 custom protocolの実Origin/Referer header統合。
-- animated GIFのrelease WebView2直接観測とcorrupt fallback、AVIFの製品decode。
+- animated GIFのrelease WebView2直接観測とcorrupt fallback、AVIFの製品decode、PDF viewer・thumbnailの製品直接観測。
 - tray notification area、P5 visual/DPI、thumbnail file pickerと実disk I/Oの製品gate。
 
 これらが残るため、製品全体を「すべてのrelease gateがPASS」とは判定しない。

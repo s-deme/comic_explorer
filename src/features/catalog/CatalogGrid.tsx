@@ -36,6 +36,10 @@ function displayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
 }
 
+function isPdfEntry(entry: CatalogEntry): boolean {
+  return entry.kind === "pdf";
+}
+
 function kindLabel(entry: CatalogEntry): string {
   switch (entry.kind) {
     case "folder":
@@ -44,6 +48,8 @@ function kindLabel(entry: CatalogEntry): string {
       return "漫画フォルダ";
     case "archive":
       return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
+    case "pdf":
+      return "PDF";
     case "page":
       return "画像";
     default: {
@@ -189,9 +195,11 @@ export function CatalogGrid({
                   const modified = formatModified(entry.modifiedMs);
                   const canNavigate = entry.kind === "folder";
                   const canRead =
-                    entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "page";
+                    entry.kind === "comicFolder" || entry.kind === "archive"
+                    || entry.kind === "pdf" || entry.kind === "page";
                   const canFavorite =
-                    entry.kind === "folder" || entry.kind === "comicFolder" || entry.kind === "archive";
+                    entry.kind === "folder" || entry.kind === "comicFolder"
+                    || entry.kind === "archive" || entry.kind === "pdf";
                   const favorite = canFavorite && isFavorite(entry);
                   const hasActions = canFavorite;
                   const thumbnail = (
@@ -337,7 +345,7 @@ function Thumbnail({
   state: ThumbnailViewState;
   onNeeded: (entry: CatalogEntry) => void;
 }) {
-  const eligible = entry.kind === "archive" || entry.kind === "comicFolder";
+  const eligible = entry.kind === "archive" || entry.kind === "comicFolder" || isPdfEntry(entry);
   useEffect(() => {
     if (eligible && state.status === "loading") onNeeded(entry);
   }, [eligible, entry, onNeeded, state.status]);
@@ -355,7 +363,7 @@ function Thumbnail({
       aria-hidden="true"
       data-thumbnail-state={eligible ? state.status : "placeholder"}
     >
-      {entry.kind === "archive" ? "▣" : "▤"}
+      {entry.kind === "archive" ? "▣" : isPdfEntry(entry) ? "PDF" : "▤"}
     </span>
   );
 }

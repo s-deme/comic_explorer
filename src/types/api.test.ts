@@ -25,6 +25,8 @@ describe("UI/backend contract", () => {
       channelItems: 512,
       imageBytes: 268_435_456,
       imagePixels: 120_000_000,
+      pdfBytes: 1_073_741_824,
+      pdfPages: 10_000,
       archiveEntries: 100_000,
       archiveEntryBytes: 536_870_912,
       archiveTotalBytes: 8_589_934_592,

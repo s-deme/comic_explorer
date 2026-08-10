@@ -36,7 +36,7 @@ export type EndOfVolumeDecision =
   | { kind: "stop"; reason: "policy" | "no_next" | "current_not_found" };
 
 function isReadableComic(entry: CatalogEntry): boolean {
-  return entry.kind === "comicFolder" || entry.kind === "archive";
+  return entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf";
 }
 
 /** Resolve one end-of-volume action from the already sorted catalog snapshot. */

@@ -60,15 +60,16 @@ describe("catalog sorting", () => {
       entry("book.zip"),
       entry("comic", { kind: "comicFolder", archiveKind: undefined }),
       entry("folder", { kind: "folder", archiveKind: undefined }),
+      entry("document.pdf", { kind: "pdf", archiveKind: undefined }),
     ];
     expect(sortCatalogEntries(values, "kind", "ascending").map((item) => item.relativePath))
       .toEqual([
         "folder", "comic", "book.zip", "book.cbz", "book.epub", "book.rar",
-        "book.cbr", "book.7z", "book.cb7", "book.lzh",
+        "book.cbr", "book.7z", "book.cb7", "book.lzh", "document.pdf",
       ]);
     expect(sortCatalogEntries(values, "kind", "descending").map((item) => item.relativePath))
       .toEqual([
-        "book.lzh", "book.cb7", "book.7z", "book.cbr", "book.rar", "book.epub",
+        "document.pdf", "book.lzh", "book.cb7", "book.7z", "book.cbr", "book.rar", "book.epub",
         "book.cbz", "book.zip", "comic", "folder",
       ]);
   });
@@ -77,10 +78,11 @@ describe("catalog sorting", () => {
     const values = [
       entry("current.cbz", { archiveKind: "cbz" }),
       entry("plain-folder", { kind: "folder", archiveKind: undefined }),
+      entry("next.pdf", { kind: "pdf", archiveKind: undefined }),
       entry("next-comic", { kind: "comicFolder", archiveKind: undefined }),
       entry("later.zip"),
     ];
-    expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("next-comic");
+    expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("next.pdf");
     expect(nextComicEntry(values, "later.zip")).toBeUndefined();
     expect(nextComicEntry(values, "missing.cbz")).toBeUndefined();
   });

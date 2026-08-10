@@ -8,6 +8,7 @@ export type ItemKind =
   | "folder"
   | "comicFolder"
   | "archive"
+  | "pdf"
   | "page"
   | "unsupported";
 

@@ -92,4 +92,18 @@ describe("FR-B02 end-of-volume policy resolver", () => {
       "auto_next" satisfies EndOfVolumePolicy,
     );
   });
+
+  it("treats a standalone PDF as a readable volume", () => {
+    const values = [entry("01-first.cbz", "archive"), entry("02-second.pdf", "pdf")];
+    expect(resolveEndOfVolume(values, "01-first.cbz", "auto_next")).toEqual({
+      kind: "open",
+      entry: values[1],
+      reason: "next",
+    });
+    expect(resolveEndOfVolume(values, "02-second.pdf", "loop")).toEqual({
+      kind: "open",
+      entry: values[0],
+      reason: "loop",
+    });
+  });
 });

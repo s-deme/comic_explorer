@@ -132,12 +132,13 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
                     .get(8..12)
                     .is_some_and(|brand| brand == b"avif" || brand == b"avis")
         }
+        "application/pdf" => bytes.starts_with(b"%PDF-"),
         _ => false,
     };
     if !signature_valid {
         return Err(AppError {
             code: ErrorCode::CorruptImage,
-            message: "Image signature does not match its media type.".into(),
+            message: "Media signature does not match its media type.".into(),
             target: None,
             retryable: false,
         });
@@ -369,6 +370,26 @@ mod tests {
                 ErrorCode::CorruptImage
             );
         }
+    }
+
+    #[test]
+    fn pdf_media_grants_require_the_pdf_signature() {
+        let grant = MediaGrant {
+            page_id: PageId::parse("pdf-page").unwrap(),
+            mime_type: "application/pdf",
+            max_bytes: 1024,
+            source: PageSource::Memory(b"%PDF-1.7\nbody".to_vec()),
+        };
+        assert!(read_grant_bytes(&grant).is_ok());
+        assert_eq!(
+            read_grant_bytes(&MediaGrant {
+                source: PageSource::Memory(b"not a pdf".to_vec()),
+                ..grant
+            })
+            .unwrap_err()
+            .code,
+            ErrorCode::CorruptImage
+        );
     }
 
     #[test]
