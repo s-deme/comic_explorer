@@ -40,8 +40,8 @@ codd:
 | `Blocked` | 明示された依存、環境、ライセンス、安全設計、または採否判断が未解決。未着手の候補を先行割当しない。 |
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
-FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B04、B09、B11は既存の未解消gateを
-`Blocked`として保持する。2026-08-10のP1〜P10実測同期では、FR-B13〜B16とFR-B19を
+FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B11は既存の未解消gateを`Blocked`として
+保持する。2026-08-10のP1〜P10実測同期では、FR-B13〜B16とFR-B19を
 `Done`、FR-B17とFR-B20を`Implemented / Partial`、FR-B18を`Partial / BLOCKED`、
 FR-B08を`Partial / BLOCKED_UNMEASURED`、FR-B12を`Partial / BLOCKED`とする。実装済みの
 focused/component証跡は各testing文書を正本とし、release WebView2や実機を要する未実測の
@@ -69,12 +69,6 @@ product gateを代替しない。優先度再検討では、Leeyes代替とし�
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Partial / BLOCKED`（adapter license・fixture未承認） |
 | P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Implemented / Partial`（製品実保存・一括読込未測定） |
 | Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
-| Hold | `FR-S06` | — | 仕様・architecture未決定 | `FUT-C-043`, `FUT-C-059`, `FUT-C-064`, `FUT-C-048`, `FUT-C-070` | `Blocked`（product・security判断待ち） |
-| Hold | `FR-S01` | — | 独立reader・media | `FUT-C-003`, `FUT-C-004`, `FUT-C-009` | `Blocked`（別設計・license確認待ち） |
-| Hold | `FR-S03` | — | 性能・実測 | `FUT-D-001`, `FUT-D-003` | `Blocked`（基準Windows環境待ち） |
-| Hold | `FR-S04` | — | 未決定機能 | `FUT-D-002`, `FUT-D-004`, `FUT-D-005` | `Blocked`（採否・受入範囲待ち） |
-| Hold | `FR-B04` | 4 | 閲覧画面modeの受入 | `FUT-C-015`〜`FUT-C-017` | `Blocked`（既存canonical aggregate gate） |
-| Hold | `FR-B09` | 9 | library診断の受入 | `FUT-C-030`〜`FUT-C-032` | `Partial / BLOCKED`（Windows product gate等） |
 | Hold | `FR-B11` | 11 | touch・gamepad実測 | `FUT-R-006`, `FUT-R-007` | `Partial / BLOCKED`（実機待ち） |
 | Rejected | `FR-S05` | — | 恒久非採用 | `FUT-R-001`〜`FUT-R-003`, `FUT-R-008` | `Rejected`（local-only・原本非破壊方針） |
 | Done | `FR-B01` | 1 | 表示倍率 | `FUT-C-018`, `FUT-C-033`〜`FUT-C-037` | `Done` |
@@ -183,46 +177,6 @@ product gateを代替しない。優先度再検討では、Leeyes代替とし�
 - **非破壊境界:** `catalogViewMode`はlibrary root外のapp-local SQLite settingsへ保存し、
   原本・書庫・library管理fileの新規作成0、外部通信0を維持する。B05〜B12は未着手のまま保持する。
 
-### FR-B04 — 閲覧画面 mode（Batch 4）
-
-- **状態:** `Blocked`。`FUT-C-015`〜017のfocused connected evidenceは通過し、
-  `FUT-C-017`のWindows WebView2 product gateもPASSしたが、canonical aggregateは
-  既存のspread history回帰で未達のためbatch末尾gateを保留する。
-- **対象 feature ID:** `FUT-C-015`, `FUT-C-016`, `FUT-C-017`。
-- **user outcome:** 読者が縦スクロール、横スクロール、full-screen を選び、現在ページ、
-  読み方向、focus を保ったまま閲覧できる。
-- **共通基盤:** viewer layout mode、navigation/input adapter、画面状態と OS window 状態の
-  復元、B01 の scale/fit 契約との境界。
-- **依存:** `REQ-MVP-011`〜`REQ-MVP-014`、B01 が定める scale 状態との整合。full-screen の
-  OS 差は実機確認が必要で、未確認を PASS にしない。
-- **実装順:** (1) viewer mode state、(2) 縦/横 layout、(3) full-screen lifecycle、
-  (4) 読み方向・page anchor・focus の復元、(5) error/escape 復帰。
-- **focused test 範囲:** `FT-B04-001` enum/default・設定保存、`FT-B04-002` 縦横layoutと
-  page anchor、`FT-B04-003` 読み方向・keyboard navigation・native wheel・Esc、
-  `FT-B04-004` full-screen enter/exit/error、`FT-B04-005` 設定復元と非永続window state。
-- **batch末尾 gate:** focused testはSKIP 0で通過したが、CoDD verify内のcanonical
-  `scripts/run-tests.sh`がexit 1となり未達。同一task内のaggregate再実行は禁止し、新redoで
-  失敗出力を保存してRCAする。
-
-#### FR-B04 実装・直接観測証跡
-
-- **採用要件:** [FR-B04 閲覧画面 mode要件](../requirements/viewer-layout-requirements.md)。
-- **実装根拠:** `src/features/viewer/model.ts`、`src/features/viewer/Viewer.tsx`、
-  `src/features/viewer/fullscreen.ts`、`src/App.tsx`、`src/features/library/client.ts`、
-  `src/styles.css`、`src-tauri/src/application/mod.rs`、`src-tauri/src/state/repository.rs`、
-  `src-tauri/capabilities/default.json`。
-- **直接観測:** [FR-B04 focused test結果](../testing/fr-b04-results.md)。FT-B04-001〜005は
-  selector、App→Viewer→DOM、page anchor/focus、読み方向・wheel・Esc、adapter lifecycle、
-  persistenceを接続境界で直接観測し、FT-B04-006はrelease WebView2のOS boundsとEsc復帰を
-  直接観測した。focused scopeはPASSしたが、canonical aggregateが未達のためbatch完了根拠には
-  昇格していない。
-- **保存・非永続境界:** `layoutMode`だけを既存app-local SQLiteへ保存し、fullscreenはOS
-  window stateへ委譲して保存しない。旧値・未知値は`paged`へ戻し、B01のview/scale/fit/
-  loupe/reading positionを独立に保全する。原本・書庫・library root配下への書込みと外部通信は0。
-- **環境境界:** Windows WebView2でのOS fullscreen製品実機測定は`FT-B04-006`でPASSした。
-  canonical aggregateのspread history回帰は別の未解消gateとして保持し、未完了部分をPASSへ
-  昇格しない。
-
 ### FR-B05 — 名前検索（Batch 5）
 
 - **状態:** `Done`。IMP-012で`FUT-C-010`のrelease WebView2 `FT-B05-006`、focused exact5、
@@ -233,7 +187,7 @@ product gateを代替しない。優先度再検討では、Leeyes代替とし�
 - **共通基盤:** catalog の normalized name/query model、Unicode/大小文字規則、結果から
   path へ戻る navigation、空結果と error の表示。
 - **依存:** `REQ-MVP-001`、`REQ-MVP-002`、`REQ-MVP-005` の catalog/path 契約。検索性能の
-  10,000項目実測は `FR-S03` に分離し、本バッチの機能完了条件へ混ぜない。
+  10,000項目実測は別の性能トラックに分離し、本バッチの機能完了条件へ混ぜない。
 - **実装順:** (1) 検索範囲と query 規則、(2) catalog index/query、(3) result UI と path
   navigation、(4) empty/error/clear、(5) 再スキャン時の index 更新。
 - **focused test 範囲:** `FT-B05-001` exact/partial と大小文字・Unicode、`FT-B05-002`
@@ -242,7 +196,7 @@ product gateを代替しない。優先度再検討では、Leeyes代替とし�
   empty/clear、explicit rescan、source tree差分0。性能閾値は含めない。
 - **batch末尾 gate:** selected focused exact5をSKIP 0で実測し、Windows WebView2 `FT-B05-006`、
   外部通信0・原本差分0、canonical aggregateを確認して`Done`。10,000項目/1秒の性能PASSは
-  `FR-S03`の実測証跡まで`FUT-D-001`へ分離したまま、FR-B05を阻害しない。
+  性能トラックの実測証跡まで`FUT-D-001`へ分離したまま、FR-B05を阻害しない。
 
 ### FR-B06 — お気に入り（Batch 6）
 
@@ -406,55 +360,6 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   media grant、format mismatchはbackend境界で確認済みである。未実測のrelease WebView2 product gateは
   [FR-B08結果](../testing/fr-b08-results.md)の判定を正本とし、backend証跡からPASSを推定しない。
 
-### FR-B09 — library 診断（Batch 9）
-
-- **状態:** `Partial / BLOCKED`。機能semantic gateは受理済みだが、CoDD構造gateとWindows
-  WebView2 native product UIが未完了・未測定である。
-- **対象 feature ID:** `FUT-C-030`, `FUT-C-031`, `FUT-C-032`（変更検出、重複作品検出、
-  壊れた書庫検出）。
-- **実装path:** `src/App.tsx`; `src/features/library/client.ts`;
-  `src-tauri/src/application/mod.rs`; `src-tauri/src/diagnostics/mod.rs`。
-- **user outcome:** library 内の変更、重複、壊れた書庫を read-only の診断結果として把握し、
-  原本を変えずに次の対応を選べる。
-- **共通基盤:** read-only scanner、stable identity/hash policy、diagnostic result model、
-  severity、再実行可能な report と error boundary。
-- **依存:** `REQ-MVP-001`、`REQ-MVP-002`、`REQ-MVP-009`、`REQ-MVP-017`。既存 ZIP/CBZ の
-  parser を利用し、将来の追加書庫は B12 の adapter 契約を通して拡張する。
-- **実装順:** (1) scanner/result schema、(2) 変更検出、(3) 重複判定、(4) 壊れた書庫判定、
-  (5) report UI と再実行/キャンセル。
-- **focused test 範囲:** `FT-B09-001` added/changed/missing、`FT-B09-002` duplicate identity、
-  `FT-B09-003` corrupt archive、`FT-B09-004` mixed result/severity、`FT-B09-005` cancel/retry と
-  snapshot/hash 不変。
-- **最終受入:** `FT-B09-001`〜`FT-B09-005` は 5 PASS / 0 FAIL / 0 SKIP のfocused exact5、
-  App回帰は39 PASS / 0 FAIL / 0 SKIP、Windows offline Rustは74 unit + 1 process PASS /
-  failed 0 / ignored 0 / SKIP 0、typecheck/buildはPASS・SKIP0である。FT-B09-005はcancelled
-  response、loading=false、cancel notice、stale=0、新generation retryに加え、real folderと
-  ZIP/CBZのpath、bytes、SHA、entry setのcancel/retry前後exact equalityを含む。
-- **accepted evidence:** frontend exact5・typecheck・buildは
-  `queue/reports/evidence/cmd_400/fr_b09_callback_typing_final_resume/`、App回帰は
-  `queue/reports/evidence/cmd_400/fr_b09_ft005_normal_workflow_repair/`、Windows fullは
-  `queue/reports/evidence/cmd_400/fr_b09_diagnostics_rustfmt_resume/` に保存された不変rawを参照する。
-  最終focused source SHAは
-  `6701c3465e24a481e899a07d1aa5e41b8dd30881962c8f9ab68dead99626c0fe`。
-- **raw SHA ledger:** focused manifest/stdout/stderrは
-  `88d8dd15f3fd1c81be344fbc6fcebeaba0af407c527b9b4a6f9f612f59c40587` /
-  `768f6a0a53adc17991a10330344683aa616a3d1a56be03b192f97219c4189bfe` /
-  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`、App回帰は
-  `b48e8bcc41b56a78eccd17c7a9f98c392639d3d9778487aed34709354a021f05` /
-  `6d5de88aacf157bcddd42d42666130742ca20aea91a8b87dad45ee10b18f844a` /
-  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`、Windows fullは
-  `b7a5d353a0cfd2f644abd34149a981eb375229362e78d1c94ec674456c1218b3` /
-  `ab2ac9e49fd58008d826665914faf8b7f21dd256dd6edb55469c1ca77d80ef6d` /
-  `c3b80068c26dca16ac167f6e78bd7e8f233c03f70973b4c47145e54a5e50beab` である。
-  typecheck/buildとCoDD structural exceptionの全SHAは [FR-B09結果](../testing/fr-b09-results.md) と
-  [FR-B09要件](../requirements/library-diagnostics-requirements.md) の最終ledgerに固定する。
-- **境界と履歴:** CoDDは `3 PASS / 0 red FAIL / 1 amber WARN / 3 SKIP / 1 VACUOUS`、verification
-  tests 0の `INCOMPLETE / NOT APPLICABLE` でありPASSへ加算しない。Windows WebView2 native product
-  UIは `BLOCKED_UNMEASURED`、OS syscallは `UNMEASURED / BLOCKED`。Feature Lane fallback、wrapper
-  起動失敗、typing failure、canonical resume停止の旧rawは履歴のみで、受入証跡には再利用しない。
-- **batch末尾 gate:** 上記のaccepted rawを不変参照し、今回の同期ではfunctional、Rust、typecheck、
-  build、CoDDの再実行・commit・pushを行わない。
-
 ### FR-B10 — tag 管理（Batch 10）
 
 - **状態:** `Done`。既存のconnected semantic gateに加え、IMP-005でWindows release製品を使う
@@ -565,7 +470,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 - **状態:** `Partial / BLOCKED`。RAR/CBR/7zの分類と既存archive adapterのunsupported境界を
   実装・実測した。完全readerは依存crateのlicense/SBOM、Windows build、実fixtureの承認待ちであり、
-  対象行を`Done`へ上げない。PDF/EPUB/video はこのバッチへ混ぜず、`FR-S01` で別判断する。
+  対象行を`Done`へ上げない。PDF/EPUB/video はこのバッチへ混ぜず、別途判断する。
 - **対象 feature ID:** `FUT-C-001`, `FUT-C-002`（RAR/CBR、7z）。2原子機能だが、同じ
   archive backend adapter と license gate を共有するため一つの縦切りに固定する。
 - **user outcome:** RAR/CBR と 7z の画像書庫を、既存 ZIP/CBZ と同じく展開物を残さず、
@@ -761,7 +666,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 |---|---|
 | `FUT-C-011` / `FUT-C-021` | `FUT-C-011` はお気に入り・quick access の利用体験、`FUT-C-021` は永続保存の原子機能。FR-B06で一つの縦切りとして実装し、quick-access UI と metadata persistence を別々の重複機能として作らない。 |
 | `FUT-C-020` / `FUT-C-038`〜`FUT-C-041` | `FUT-C-020` は巻末動作設定の umbrella、後四つは確認、一覧復帰、停止、loop の原子 option。FR-B02の共通 policy と option mapping に集約し、umbrella 自体へ別実装を作らない。既存 `REQ-MVP-016` の固定既定動作は維持する。 |
-| `FUT-C-010` / `FUT-D-001` | `FUT-C-010` は名前検索の機能/UI umbrella。`FUT-D-001` は10,000項目・1秒以内の性能受入であり、同じ検索 UI の二重機能ではない。FR-B05の機能テストと FR-S03 の性能実測を分離する。 |
+| `FUT-C-010` / `FUT-D-001` | `FUT-C-010` は名前検索の機能/UI umbrella。`FUT-D-001` は10,000項目・1秒以内の性能受入であり、同じ検索 UI の二重機能ではない。FR-B05の機能テストと性能実測を分離する。 |
 | `REQ-MVP-015` / 読書情報 | MVPの reading position は既存の保存・復元機能であり、FR-B07の memo/history/rating や未決定の読書状態ラベルへ再実装しない。 |
 | `REQ-MVP-015` / `FUT-C-045`, `FUT-C-046` | reading positionは最後に読んだ位置の自動保存、page bookmarkは利用者が明示した複数位置の保存・移動。永続化基盤は共有しても意味とUIを混同しない。 |
 | `FUT-C-011`, `FUT-C-021` / `FUT-C-047` | favorite/quick accessと本棚が同じcollection semanticsなら新しい保存modelを作らない。別collectionを採用する場合だけ差分要件を先に固定する。 |
@@ -770,20 +675,12 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 | `FUT-C-012`〜`FUT-C-014`, `REQ-MVP-005`, `REQ-MVP-006` / `FUT-C-067` | 既存view mode、catalog state、thumbnail取得を維持し、参照型tileはvisual・interaction差分だけを実装する。 |
 | `REQ-MVP-006` / `FUT-C-073`〜`FUT-C-075` | 既存の内部cache生成・上限制御と、利用者向け管理・保存・一括読込を分離する。後者の採用で既存cacheを暗黙の永続user dataへ変えない。 |
 | `FR-B13`〜`FR-B16` / `FR-B17` | menu/toolbarは先行batchのcommandを呼ぶ情報設計・presentation層。B17内に同じ処理を再実装しない。 |
-| 追加書庫 / PDF・EPUB・video | FR-B12は画像書庫の RAR/CBR・7z だけを対象にする。PDF、EPUB、video は reader/codec/license の別境界であり、FR-S01へ隔離する。 |
+| 追加書庫 / PDF・EPUB・video | FR-B12は画像書庫の RAR/CBR・7z だけを対象にする。PDF、EPUB、video は reader/codec/license の別境界であり、別のreader trackへ隔離する。 |
 
 ## 通常 Feature Lane から分離するトラック
 
 分離トラックは、通常batchへ未承認のまま割り当てない。状態はロードマップ上の
 `Blocked` または採用対象外として記録し、前提が解消されたら新しい task/cmd で再評価する。
-
-### FR-S01 — PDF / EPUB / video reader
-
-- **対象:** `FUT-C-003`（PDF）、`FUT-C-004`（EPUB）、`FUT-C-009`（video）。台帳上は
-  `Candidate / NOT TESTED`。
-- **分離理由:** 画像書庫と異なる reader/codec、ライセンス、再生ライフサイクル、error/
-  seek 契約が必要。FR-B08/B12へ混ぜず、採用承認、技術調査、license/SBOM、専用E2Eを先に行う。
-- **状態:** `Blocked`（別設計・別Feature Lane待ち）。未実装を `Done` としない。
 
 ### FR-S02 — file mutation・undo
 
@@ -799,39 +696,12 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **状態:** `Blocked`（安全設計・採用判断待ち）。このロードマップのバッチは file operation
   を発行しない。
 
-### FR-S03 — 性能・実測 gate
-
-- **対象:** `FUT-D-001`（名前検索性能）、`FUT-D-003`（性能計測条件の適用）。関連する
-  `TC-PERF-001`〜`TC-PERF-006`、NFR-MVP-001/002 の Windows 基準環境実測もここで扱う。
-  台帳上は `Deferred / NOT TESTED`。
-- **分離理由:** FR-B05 の機能検索は結果の正しさを扱い、10,000項目・時間・memory・p95 の
-  empirical evidence は独立した測定計画と環境証跡を必要とする。推定値やLinux結果でPASS化しない。
-- **依存と状態:** 基準Windows環境、測定条件、fixture、結果保存が揃うまで `Blocked`。
-  `FUT-C-010`のUI実装を不必要に止めないが、性能受入だけは本トラックの完了条件とする。
-
-### FR-S04 — 未決定機能
-
-- **対象:** `FUT-D-002`（最大 file size）、`FUT-D-004`（作品別表示設定）、
-  `FUT-D-005`（読書状態ラベル）。台帳上は `Deferred / NOT TESTED`。
-- **分離理由:** 優先度、採否、受入範囲が未決定であり、FR-B03、FR-B04、FR-B07へ先行混入させない。
-- **状態:** `Blocked`（Lord/プロダクト判断と一次根拠待ち）。承認されるまで実装順へ入れない。
-
 ### FR-S05 — 恒久方針による非採用
 
 - **対象:** `FUT-R-001`, `FUT-R-002`, `FUT-R-003`, `FUT-R-008`。台帳上は `Rejected / NOT TESTED`。
 - **取り扱い:** cloud sync、外部書誌、外部送信、閲覧時の原本自動変更は、local-only・
   外部送信禁止・原本非破壊の恒久方針により本ロードマップへ入れない。方針変更と新しい根拠が
   ない限り `Planned` や `Done` へ変更しない。
-
-### FR-S06 — 仕様・architecture境界未決定
-
-- **対象:** `FUT-C-043`（指定動作で開く）、`FUT-C-059`（file表示の切替）、
-  `FUT-C-064`（OS全体folder tree）、`FUT-C-048`（media表示）、`FUT-C-070`（plugin設定）。
-  台帳上は`Candidate / NOT TESTED`。
-- **分離理由:** screenshotだけではcommand semanticsまたは対象dataが確定せず、OS namespace、
-  登録root外access、plugin runtime・trust・distributionは現行architectureとsecurity境界を変え得る。
-- **状態:** `Blocked`（product semantics、採用範囲、architecture/security決定待ち）。設定UIだけを
-  runtimeより先に作らず、決定後に通常batchを新設または既存batchへ明示統合する。
 
 ## 共通の実装・検証運用
 
