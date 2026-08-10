@@ -2995,18 +2995,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
-                data-product-id="shortcut-help-menu-item"
                 tabIndex={0}
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
-                onClick={() => runMenuAction(openSettingsDialog)}
-              >
-                ショートカット設定…
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
                 onClick={() => runMenuAction(() => setHelpOpen(true))}
@@ -3928,15 +3917,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   </div>
                 ))}
               </dl>
-              <button
-                type="button"
-                onClick={() => {
-                  closeHelp();
-                  openSettingsDialog();
-                }}
-              >
-                ショートカット設定を開く
-              </button>
             </section>
             <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
           </div>

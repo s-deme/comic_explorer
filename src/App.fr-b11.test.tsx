@@ -3,12 +3,23 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
-function openHelpMenuItem() {
-  fireEvent.click(screen.getByRole("menuitem", { name: "ヘルプ" }));
+function openSettingsMenuItem() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
   fireEvent.click(
-    within(screen.getByRole("menu", { name: "ヘルプ" })).getByRole("menuitem", {
-      name: "ショートカット設定…",
+    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
+      name: "統合設定…",
     }),
+  );
+}
+
+function openGeneralHelp() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "ヘルプ" }));
+  const menu = screen.getByRole("menu", { name: "ヘルプ" });
+  expect(
+    within(menu).queryByRole("menuitem", { name: "ショートカット設定…" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(menu).getByRole("menuitem", { name: "一般ヘルプとバージョン…" }),
   );
 }
 import {
@@ -228,7 +239,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
   it("FT-B11-001 remaps, rejects conflicts, and resets the production command mapping", async () => {
     render(<App />);
     await registerTestLibrary([]);
-    openHelpMenuItem();
+    openSettingsMenuItem();
 
     const dialog = screen.getByRole("dialog", {
       name: "統合設定",
@@ -267,7 +278,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     );
     expect(dialog).not.toBeInTheDocument();
 
-    openHelpMenuItem();
+    openSettingsMenuItem();
     const resetDialog = screen.getByRole("dialog", {
       name: "統合設定",
     });
@@ -327,13 +338,13 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     expect(openMock).toHaveBeenCalledTimes(1);
   });
 
-  it("FT-B11-005 persists across restart and exposes accessible help/name with safe default recovery", async () => {
+  it("FT-B11-005 persists across restart and keeps help read-only with safe default recovery", async () => {
     settingsMock.mockResolvedValue(
       settingsResponse({ nextPage: "N", previousPage: "N" }),
     );
     render(<App />);
     await registerTestLibrary([]);
-    openHelpMenuItem();
+    openSettingsMenuItem();
     expect(
       await screen.findByRole("dialog", { name: "統合設定" }),
     ).toBeInTheDocument();
@@ -348,12 +359,26 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     settingsMock.mockResolvedValue(settingsResponse({ nextPage: "N" }));
     render(<App />);
     await registerTestLibrary([]);
-    openHelpMenuItem();
+    openSettingsMenuItem();
     expect(
       await screen.findByRole("textbox", { name: "次ページショートカット" }),
     ).toHaveValue("N");
     expect(
       screen.getByRole("textbox", { name: "次ページショートカット" }),
     ).toHaveAccessibleName("次ページショートカット");
+
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "統合設定" })).getByRole(
+        "button",
+        { name: "キャンセル" },
+      ),
+    );
+    openGeneralHelp();
+    const help = screen.getByRole("dialog", { name: "キー操作とショートカット" });
+    expect(within(help).getByRole("heading", { name: "現在のショートカット" }))
+      .toBeInTheDocument();
+    expect(
+      within(help).queryByRole("button", { name: "ショートカット設定を開く" }),
+    ).not.toBeInTheDocument();
   });
 });
