@@ -2414,6 +2414,52 @@ fn enumerate_pages_port(
     }
 }
 
+fn viewer_item_for_opened_image(
+    item: PathBuf,
+    item_relative: RelativePath,
+    kind: OpenItemKind,
+) -> Result<(PathBuf, RelativePath, OpenItemKind, Option<RelativePath>), AppError> {
+    if kind != OpenItemKind::Image {
+        return Ok((item, item_relative, kind, None));
+    }
+    let parent = item
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| AppError {
+            code: ErrorCode::InvalidPath,
+            message: "The selected image has no readable parent folder.".into(),
+            target: Some(item_relative.clone()),
+            retryable: false,
+        })?;
+    let parent_relative = item_relative
+        .as_str()
+        .rsplit_once('/')
+        .map(|(parent, _)| parent)
+        .unwrap_or("");
+    Ok((
+        parent,
+        RelativePath::parse(parent_relative).map_err(|_| AppError {
+            code: ErrorCode::InvalidPath,
+            message: "The selected image parent folder is invalid.".into(),
+            target: Some(item_relative.clone()),
+            retryable: false,
+        })?,
+        OpenItemKind::Folder,
+        Some(item_relative),
+    ))
+}
+
+fn viewer_start_index(
+    requested_page: Option<&RelativePath>,
+    saved_position: Option<&crate::state::ReadingPosition>,
+    pages: &[RelativePath],
+) -> usize {
+    requested_page
+        .and_then(|requested| pages.iter().position(|page| page == requested))
+        .or_else(|| crate::state::resolve_reading_position(saved_position, pages))
+        .unwrap_or(0)
+}
+
 fn port_response<T>(
     context: RequestContext,
     result: Result<T, AppError>,
@@ -2611,6 +2657,11 @@ pub async fn open_comic(
         Ok(kind) => kind,
         Err(error) => return Ok(error_response(&context, error)),
     };
+    let (item_path, item_relative, item_kind, requested_page) =
+        match viewer_item_for_opened_image(item_path, item_relative, item_kind) {
+            Ok(target) => target,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
     let worker_root = root.clone();
     let worker_item = item_path.clone();
     let worker_relative = item_relative.clone();
@@ -2656,6 +2707,23 @@ pub async fn open_comic(
             .map_err(|error| error.message)?;
     }
 
+    let saved_position = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| {
+            store
+                .reading_position(item_relative.as_str())
+                .ok()
+                .flatten()
+        });
+    let start_index = viewer_start_index(
+        requested_page.as_ref(),
+        saved_position.as_ref(),
+        &page_paths,
+    );
+
     let mut registry = state.media.lock().map_err(|_| "state poisoned")?;
     registry.revoke_all();
     let pages = page_paths
@@ -2671,33 +2739,16 @@ pub async fn open_comic(
         .collect::<Vec<_>>();
     drop(registry);
 
-    let start_index = state
-        .store
-        .lock()
-        .map_err(|_| "state poisoned")?
-        .as_ref()
-        .and_then(|store| {
-            store
-                .reading_position(item_relative.as_str())
-                .ok()
-                .flatten()
-        })
-        .and_then(|saved| {
-            crate::state::resolve_reading_position(
-                Some(&saved),
-                &pages
-                    .iter()
-                    .map(|page| page.relative_path.clone())
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .unwrap_or(0);
-    let display_name = item_relative
-        .as_str()
-        .rsplit('/')
-        .next()
-        .unwrap_or(item_relative.as_str())
-        .into();
+    let display_name = if item_relative.as_str().is_empty() {
+        "画像フォルダ".into()
+    } else {
+        item_relative
+            .as_str()
+            .rsplit('/')
+            .next()
+            .unwrap_or(item_relative.as_str())
+            .into()
+    };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
@@ -2987,36 +3038,44 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn fr_b14_single_image_is_a_valid_one_page_viewer_item() {
+    fn opened_image_uses_its_parent_folder_as_the_viewer_item() {
         let root = std::env::temp_dir().join(format!(
-            "comic-explorer-single-image-{}-{}",
+            "comic-explorer-image-folder-{}-{}",
             std::process::id(),
             unix_millis()
         ));
-        std::fs::create_dir_all(&root).unwrap();
+        let folder = root.join("volume");
+        std::fs::create_dir_all(&folder).unwrap();
         let mut jpeg = vec![
             0xff, 0xd8, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x00, 0x01, 0x00, 0x01,
         ];
         jpeg.resize(24, 0);
-        std::fs::write(root.join("cover.jpg"), jpeg).unwrap();
-        let relative = RelativePath::parse("cover.jpg").unwrap();
+        std::fs::write(folder.join("1.jpg"), &jpeg).unwrap();
+        std::fs::write(folder.join("2.jpg"), jpeg).unwrap();
+        let relative = RelativePath::parse("volume/2.jpg").unwrap();
         let item = contained_library_path(&root, &relative).unwrap();
+        let kind = open_item_kind(&item, &relative).unwrap();
+        let (viewer_item, viewer_relative, viewer_kind, requested_page) =
+            viewer_item_for_opened_image(item, relative.clone(), kind).unwrap();
+        let pages = enumerate_pages_port(
+            &root,
+            &viewer_item,
+            &viewer_relative,
+            viewer_kind,
+            &CancellationToken::new(),
+        )
+        .unwrap();
 
+        assert_eq!(viewer_relative, RelativePath::parse("volume").unwrap());
+        assert_eq!(viewer_kind, OpenItemKind::Folder);
         assert_eq!(
-            open_item_kind(&item, &relative).unwrap(),
-            OpenItemKind::Image
+            pages,
+            vec![
+                RelativePath::parse("volume/1.jpg").unwrap(),
+                RelativePath::parse("volume/2.jpg").unwrap(),
+            ]
         );
-        assert_eq!(
-            enumerate_pages_port(
-                &root,
-                &item,
-                &relative,
-                OpenItemKind::Image,
-                &CancellationToken::new(),
-            )
-            .unwrap(),
-            vec![relative]
-        );
+        assert_eq!(viewer_start_index(requested_page.as_ref(), None, &pages), 1);
 
         std::fs::remove_dir_all(root).unwrap();
     }

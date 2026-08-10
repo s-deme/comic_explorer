@@ -45,12 +45,12 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
 | REQ-MVP-003 | folder treeの展開・選択と現在folderを同期する。 |
 | REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動をroot内で行う。 |
-| REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示する。 |
+| REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。 |
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | toolbar buttonから並べ替え、昇降順、巻末動作、一覧形式のmenuを操作し、設定を保存する。 |
-| REQ-MVP-008 | 画像folder内のJPEG/JPG/PNGを相対pathの自然順で読む。 |
+| REQ-MVP-008 | 画像folder内のJPEG/JPG/PNGを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。 |
 | REQ-MVP-009 | ZIP/CBZを隣接展開せず、Deflate entryを検証して自然順で読む。 |
-| REQ-MVP-010 | catalog項目をviewerで開き、終了後にcatalogの文脈を復元する。 |
+| REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |

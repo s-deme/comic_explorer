@@ -483,10 +483,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .catalog-cell--detail_list .catalog-actions {
   padding-inline: 0 4px;
 }
-.read-action {
-  min-width: 40px;
-  padding: 1px 7px;
-}
 .favorite-toggle {
   min-width: 30px;
   min-height: 30px;

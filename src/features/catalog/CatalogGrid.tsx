@@ -46,8 +46,13 @@ function kindLabel(entry: CatalogEntry): string {
       return "ZIP / CBZ";
     case "page":
       return "画像";
-    default:
-      return "未対応";
+    default: {
+      const name = displayName(entry);
+      const separator = name.lastIndexOf(".");
+      return separator > 0 && separator < name.length - 1
+        ? name.slice(separator)
+        : "拡張子なし";
+    }
   }
 }
 
@@ -182,14 +187,13 @@ export function CatalogGrid({
                   const kind = kindLabel(entry);
                   const size = formatSize(entry.byteSize);
                   const modified = formatModified(entry.modifiedMs);
-                  const canNavigate =
-                    entry.kind === "folder" || entry.kind === "comicFolder";
+                  const canNavigate = entry.kind === "folder";
                   const canRead =
                     entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "page";
                   const canFavorite =
                     entry.kind === "folder" || entry.kind === "comicFolder" || entry.kind === "archive";
                   const favorite = canFavorite && isFavorite(entry);
-                  const hasActions = canFavorite || canNavigate || canRead;
+                  const hasActions = canFavorite;
                   const thumbnail = (
                     <Thumbnail
                       entry={entry}
@@ -308,20 +312,6 @@ export function CatalogGrid({
                               onKeyDown={(event) => event.stopPropagation()}
                             >
                               {favorite ? "★" : "☆"}
-                            </button>
-                          )}
-                          {(canNavigate || canRead) && (
-                            <button
-                              type="button"
-                              className="read-action"
-                              onClick={() =>
-                                entry.kind === "folder"
-                                  ? onNavigate(entry)
-                                  : onRead(entry)
-                              }
-                              aria-label={`${kind}の項目${itemIndex + 1}を${entry.kind === "folder" ? "開く" : "読む"}`}
-                            >
-                              {entry.kind === "folder" ? "開く" : "読む"}
                             </button>
                           )}
                         </div>

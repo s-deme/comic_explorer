@@ -111,7 +111,7 @@ describe("CatalogGrid", () => {
     );
   });
 
-  it("shows a visible action for each supported kind and invokes its existing callback", () => {
+  it("opens supported kinds from the card without duplicate read buttons", () => {
     const folder: CatalogEntry = {
       relativePath: "library" as never,
       kind: "folder",
@@ -147,18 +147,10 @@ describe("CatalogGrid", () => {
     expect(screen.getByText("ZIP / CBZ")).toBeInTheDocument();
     expect(screen.getByText("画像")).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "フォルダの項目1を開く" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "漫画フォルダの項目2を読む" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "ZIP / CBZの項目3を読む" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "画像の項目4を読む" }),
-    );
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^library、フォルダ/ }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^series、漫画フォルダ/ }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^volume\.cbz、ZIP \/ CBZ/ }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^cover\.jpg、画像/ }));
 
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith(folder);
@@ -166,7 +158,7 @@ describe("CatalogGrid", () => {
     expect(onRead).toHaveBeenNthCalledWith(1, comicFolder);
     expect(onRead).toHaveBeenNthCalledWith(2, archive);
     expect(onRead).toHaveBeenNthCalledWith(3, image);
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByText("読む")).not.toBeInTheDocument();
   });
 
   it("keeps long labels and card actions in separate layout regions", () => {
@@ -197,13 +189,13 @@ describe("CatalogGrid", () => {
     expect(item).not.toContainElement(actions);
     expect(within(actions).getByRole("button", { name: "お気に入りに追加" }))
       .toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: "ZIP / CBZの項目1を読む" }))
-      .toBeInTheDocument();
+    expect(within(actions).queryByRole("button", { name: /読む/ }))
+      .not.toBeInTheDocument();
   });
 
-  it("keeps unavailable RAR/7z entries visibly unsupported and out of read/favorite actions", () => {
+  it("shows an unsupported file's original extension and no read/favorite actions", () => {
     const unsupported: CatalogEntry = {
-      relativePath: "future.rar" as never,
+      relativePath: "future.RAR" as never,
       kind: "unsupported",
       archiveKind: "rar",
     };
@@ -220,7 +212,7 @@ describe("CatalogGrid", () => {
       />,
     );
 
-    expect(screen.getByText("未対応")).toBeInTheDocument();
+    expect(screen.getByText(".RAR")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /読む/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /お気に入り/ })).not.toBeInTheDocument();
     expect(document.querySelector(".thumbnail")).toHaveAttribute("data-thumbnail-state", "placeholder");

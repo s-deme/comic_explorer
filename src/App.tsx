@@ -193,8 +193,13 @@ function entryKindLabel(entry: CatalogEntry): string {
       return "ZIP / CBZ";
     case "page":
       return "画像";
-    default:
-      return "未対応";
+    default: {
+      const name = entryDisplayName(entry);
+      const separator = name.lastIndexOf(".");
+      return separator > 0 && separator < name.length - 1
+        ? name.slice(separator)
+        : "拡張子なし";
+    }
   }
 }
 

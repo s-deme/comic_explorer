@@ -60,6 +60,7 @@ root namespaceを再利用する。OS全体のfile managerには拡張しない�
 ## viewerとmedia
 
 folder pageはread-only file stream、ZIP/CBZ pageは必要entryだけをinflateし、libraryへ展開しない。
+catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
 
@@ -111,7 +112,8 @@ viewerはsingle/spread、direction、scale、loading/page error/end stateを区�
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutはdialogまたはmenuから開く。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
-pointerのどちらからも同じcommandへ到達する。stale responseは現在画面を置換せず、局所error後もretry、
+pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。
+stale responseは現在画面を置換せず、局所error後もretry、
 前後移動、別項目open、catalog復帰を可能にする。
 
 ## errorと回復
