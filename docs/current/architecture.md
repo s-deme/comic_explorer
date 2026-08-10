@@ -146,6 +146,7 @@ rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
 dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。
+巻末動作は閲覧している作品の文脈でviewer toolbarから変更し、app-local設定へ保存する。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。

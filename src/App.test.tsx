@@ -325,8 +325,8 @@ function chooseAppMenuItem(
 }
 
 function chooseToolbarMenuItem(
-  triggerName: "並べ替え条件" | "巻末動作" | "一覧表示形式",
-  menuName: "並べ替え候補" | "巻末動作候補" | "一覧表示形式候補",
+  triggerName: "並べ替え条件" | "一覧表示形式",
+  menuName: "並べ替え候補" | "一覧表示形式候補",
   itemName: string,
 ) {
   fireEvent.click(screen.getByRole("button", { name: triggerName }));
@@ -845,9 +845,7 @@ describe("application shell", () => {
     chooseToolbarMenuItem("並べ替え条件", "並べ替え候補", "サイズ");
     expect(sortButton).toHaveAttribute("data-sort-field", "size");
 
-    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "巻末で停止");
-    expect(screen.getByRole("button", { name: "巻末動作" }))
-      .toHaveAttribute("data-end-of-volume-policy", "stop");
+    expect(screen.queryByRole("button", { name: "巻末動作" })).not.toBeInTheDocument();
 
     chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "小サムネイル");
     expect(screen.getByRole("button", { name: "一覧表示形式" }))
@@ -1028,28 +1026,15 @@ describe("application shell", () => {
   });
 
   it("persists the selected end-of-volume policy without changing the catalog sort", async () => {
-    registerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-1" as never,
-      generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
-    });
-    listMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-2" as never,
-      generation: 2 as never,
-      data: [],
-    });
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    const entry = testEntry("policy.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry]);
+    await openTestComic(entry.relativePath);
 
-    const policy = await screen.findByLabelText("巻末動作");
-    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "先頭へループ");
+    const policy = await screen.findByRole("combobox", { name: "巻末動作" });
+    fireEvent.change(policy, { target: { value: "loop" } });
 
-    expect(policy).toHaveAttribute("data-end-of-volume-policy", "loop");
+    expect(policy).toHaveValue("loop");
     expect(saveEndPolicyMock).toHaveBeenCalledWith("loop", expect.any(Number));
     expect(screen.getByLabelText("並べ替え条件"))
       .toHaveAttribute("data-sort-field", "name");
@@ -1118,18 +1103,14 @@ describe("application shell", () => {
       target: { value: "C:\\Comics" },
     });
     fireEvent.click(screen.getByRole("button", { name: "登録" }));
-    await screen.findByLabelText("巻末動作");
-    chooseToolbarMenuItem(
-      "巻末動作",
-      "巻末動作候補",
-      "確認してから次の巻を開く",
-    );
-
     fireEvent.keyDown(
       await screen.findByRole("button", { name: /01-first/ }),
       { key: "Enter" },
     );
     expect(await screen.findByLabelText("01-first.cbz ビューワ")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "巻末動作" }), {
+      target: { value: "confirm_next" },
+    });
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("02-second.cbz");
@@ -1183,15 +1164,11 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
-    await screen.findByLabelText("巻末動作");
-    chooseToolbarMenuItem(
-      "巻末動作",
-      "巻末動作候補",
-      "巻末でライブラリへ戻る",
-    );
+    await openTestComic(first.relativePath);
+    const policy = await screen.findByRole("combobox", { name: "巻末動作" });
+    fireEvent.change(policy, { target: { value: "return_library" } });
     await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作"))
-        .toHaveAttribute("data-end-of-volume-policy", "return_library"),
+      expect(policy).toHaveValue("return_library"),
     );
     releaseSettings({
       status: "ok",
@@ -1203,10 +1180,9 @@ describe("application shell", () => {
       },
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作"))
-        .toHaveAttribute("data-end-of-volume-policy", "return_library"),
+      expect(screen.getByRole("combobox", { name: "巻末動作" }))
+        .toHaveValue("return_library"),
     );
-    await openTestComic(first.relativePath);
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     await waitFor(() =>
@@ -1226,9 +1202,10 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
-    await screen.findByLabelText("巻末動作");
-    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "巻末で停止");
     await openTestComic(first.relativePath);
+    fireEvent.change(screen.getByRole("combobox", { name: "巻末動作" }), {
+      target: { value: "stop" },
+    });
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     const notice = await screen.findByText("巻末動作が停止に設定されています。");
@@ -1273,9 +1250,10 @@ describe("application shell", () => {
       .mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([last, first]);
-    await screen.findByLabelText("巻末動作");
-    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "先頭へループ");
     await openTestComic(last.relativePath);
+    fireEvent.change(screen.getByRole("combobox", { name: "巻末動作" }), {
+      target: { value: "loop" },
+    });
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(
@@ -1303,11 +1281,11 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
-    await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作"))
-        .toHaveAttribute("data-end-of-volume-policy", "stop"),
-    );
     await openTestComic(first.relativePath);
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "巻末動作" }))
+        .toHaveValue("stop"),
+    );
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(

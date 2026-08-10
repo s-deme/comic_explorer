@@ -36,12 +36,19 @@ import {
 } from "../input/shortcuts";
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import type { MouseGestureBindings } from "../settings/profile";
+import {
+  END_OF_VOLUME_POLICY_LABELS,
+  normalizeEndOfVolumePolicy,
+  type EndOfVolumePolicy,
+} from "../catalog/end-of-volume";
 
 interface ViewerProps {
   session: ViewerSession;
   generation: number;
   onClose: () => void;
   onNextItem?: () => void;
+  endOfVolumePolicy?: EndOfVolumePolicy;
+  onEndOfVolumePolicyChange?: (policy: EndOfVolumePolicy) => void;
   initialMode: ViewMode;
   initialLayoutMode?: ViewerLayoutMode;
   initialDirection: ReadingDirection;
@@ -79,6 +86,8 @@ export function Viewer({
   generation,
   onClose,
   onNextItem,
+  endOfVolumePolicy = "auto_next",
+  onEndOfVolumePolicyChange,
   initialMode,
   initialLayoutMode = "paged",
   initialDirection,
@@ -474,6 +483,26 @@ export function Viewer({
             ))}
           </select>
         </label>
+        {onEndOfVolumePolicyChange !== undefined && (
+          <label className="viewer-end-of-volume-control">
+            巻末動作
+            <select
+              aria-label="巻末動作"
+              value={endOfVolumePolicy}
+              onChange={(event) =>
+                onEndOfVolumePolicyChange(
+                  normalizeEndOfVolumePolicy(event.target.value),
+                )
+              }
+            >
+              {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
+                <option key={policy} value={policy}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="viewer-scale-control">
           倍率
           <select

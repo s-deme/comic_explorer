@@ -37,6 +37,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
+    def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
+        self.assert_rule_contains(
+            ".viewer-end-of-volume-control", "display: inline-flex"
+        )
+        self.assert_rule_contains(
+            ".viewer-end-of-volume-control", "white-space: nowrap"
+        )
+
     def test_catalog_cards_reserve_a_separate_action_region(self) -> None:
         self.assert_rule_contains(".catalog-actions", "display: flex")
         self.assert_rule_contains(

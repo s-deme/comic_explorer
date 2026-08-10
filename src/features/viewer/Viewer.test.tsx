@@ -103,6 +103,27 @@ describe("Viewer settings", () => {
     expect(close).not.toHaveTextContent("一覧へ戻る");
   });
 
+  it("lets the viewer toolbar change the end-of-volume policy", () => {
+    const onEndOfVolumePolicyChange = vi.fn();
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        endOfVolumePolicy="auto_next"
+        onEndOfVolumePolicyChange={onEndOfVolumePolicyChange}
+      />,
+    );
+
+    const policy = screen.getByRole("combobox", { name: "巻末動作" });
+    expect(policy).toHaveValue("auto_next");
+    fireEvent.change(policy, { target: { value: "stop" } });
+    expect(onEndOfVolumePolicyChange).toHaveBeenCalledWith("stop");
+  });
+
   it("flushes the confirmed position before closing or advancing", async () => {
     const calls: string[] = [];
     vi.mocked(saveReadingPosition).mockImplementation(async () => {

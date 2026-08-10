@@ -1040,6 +1040,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .viewer-toolbar > span,
 .viewer-layout-control,
+.viewer-end-of-volume-control,
 .viewer-scale-control {
   flex: 0 0 auto;
 }
@@ -1051,13 +1052,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 2px 6px;
   place-items: center;
 }
-.viewer-scale-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.viewer-layout-control {
+.viewer-scale-control,
+.viewer-layout-control,
+.viewer-end-of-volume-control {
   display: inline-flex;
   align-items: center;
   gap: 5px;

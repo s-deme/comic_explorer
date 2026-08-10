@@ -195,7 +195,7 @@ interface AppProps {
 }
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
-type ToolbarMenuId = "sort" | "endOfVolume" | "catalogView";
+type ToolbarMenuId = "sort" | "catalogView";
 type ViewerLaunchMode = "normal" | "fullscreen" | "slideshow";
 
 interface CatalogContextMenuState {
@@ -303,12 +303,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const pendingToolbarMenuFocus = useRef<"first" | "last">("first");
   const toolbarMenuTriggerRefs = useRef<Record<ToolbarMenuId, HTMLButtonElement | null>>({
     sort: null,
-    endOfVolume: null,
     catalogView: null,
   });
   const toolbarMenuPopupRefs = useRef<Record<ToolbarMenuId, HTMLDivElement | null>>({
     sort: null,
-    endOfVolume: null,
     catalogView: null,
   });
   const [rootInput, setRootInput] = useState("");
@@ -2584,6 +2582,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
           onClose={closeViewer}
           onNextItem={handleEndOfVolume}
+          endOfVolumePolicy={endOfVolumePolicy}
+          onEndOfVolumePolicyChange={changeEndOfVolumePolicy}
           bookmarks={bookmarks}
           onPageChange={() => undefined}
           mouseGestures={mouseGestures}
@@ -3522,52 +3522,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           <span aria-hidden="true">{sortDescending ? "▼" : "▲"}</span>
         </button>
-        <div className="toolbar-control-menu">
-          <button
-            ref={(node) => {
-              toolbarMenuTriggerRefs.current.endOfVolume = node;
-            }}
-            type="button"
-            aria-label="巻末動作"
-            title="巻末に到達したときの動作を選択"
-            data-end-of-volume-policy={endOfVolumePolicy}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarMenu === "endOfVolume"}
-            aria-controls="toolbar-end-of-volume-menu"
-            onClick={() => toggleToolbarMenu("endOfVolume")}
-            onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("endOfVolume", event)}
-          >
-            巻末動作: {END_OF_VOLUME_POLICY_LABELS[endOfVolumePolicy]} <span aria-hidden="true">▾</span>
-          </button>
-          {activeToolbarMenu === "endOfVolume" && (
-            <div
-              ref={(node) => {
-                toolbarMenuPopupRefs.current.endOfVolume = node;
-              }}
-              id="toolbar-end-of-volume-menu"
-              className="menu-popup toolbar-popup"
-              role="menu"
-              aria-label="巻末動作候補"
-            >
-              {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
-                <button
-                  key={policy}
-                  type="button"
-                  role="menuitemradio"
-                  tabIndex={-1}
-                  aria-checked={endOfVolumePolicy === policy}
-                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                  onKeyDown={(event) => handleToolbarMenuItemKeyDown("endOfVolume", event)}
-                  onClick={() => runToolbarMenuAction(() =>
-                    changeEndOfVolumePolicy(normalizeEndOfVolumePolicy(policy))
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
         <div className="toolbar-control-menu">
           <button
             ref={(node) => {
