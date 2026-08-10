@@ -168,6 +168,7 @@ interface AppProps {
 }
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
+type ToolbarMenuId = "sort" | "endOfVolume" | "catalogView";
 
 const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
 const MENU_MNEMONICS: Record<string, MenuId> = {
@@ -241,6 +242,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const menuBarRef = useRef<HTMLElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const menuTriggerRefs = useRef<Record<MenuId, HTMLButtonElement | null>>({
     file: null,
     edit: null,
@@ -256,6 +258,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     help: null,
   });
   const pendingMenuFocus = useRef<"first" | "last">("first");
+  const pendingToolbarMenuFocus = useRef<"first" | "last">("first");
+  const toolbarMenuTriggerRefs = useRef<Record<ToolbarMenuId, HTMLButtonElement | null>>({
+    sort: null,
+    endOfVolume: null,
+    catalogView: null,
+  });
+  const toolbarMenuPopupRefs = useRef<Record<ToolbarMenuId, HTMLDivElement | null>>({
+    sort: null,
+    endOfVolume: null,
+    catalogView: null,
+  });
   const [rootInput, setRootInput] = useState("");
   const [libraryRoot, setLibraryRoot] = useState<string | null>(null);
   const [navigation, dispatch] = useReducer(navigationReducer, {
@@ -320,6 +333,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     ...DEFAULT_MOUSE_GESTURES,
   }));
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
+  const [activeToolbarMenu, setActiveToolbarMenu] = useState<ToolbarMenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(240);
   const [treeVisible, setTreeVisible] = useState(true);
@@ -486,6 +500,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }, [activeMenu]);
 
   useEffect(() => {
+    if (activeToolbarMenu === null) return;
+    const frame = requestAnimationFrame(() => {
+      const items = getToolbarMenuItems(activeToolbarMenu);
+      focusToolbarMenuItem(
+        activeToolbarMenu,
+        pendingToolbarMenuFocus.current === "last" ? items.length - 1 : 0,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeToolbarMenu]);
+
+  useEffect(() => {
     function handleMnemonic(event: KeyboardEvent) {
       if (event.key === "F5" && libraryRoot !== null && viewerSession === null) {
         event.preventDefault();
@@ -499,6 +525,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         if (target !== undefined) {
           event.preventDefault();
           setActiveMenu(null);
+          setActiveToolbarMenu(null);
           navigate(target, "back");
         }
         return;
@@ -508,6 +535,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         if (target !== undefined) {
           event.preventDefault();
           setActiveMenu(null);
+          setActiveToolbarMenu(null);
           navigate(target, "forward");
         }
         return;
@@ -517,6 +545,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         if (target !== null) {
           event.preventDefault();
           setActiveMenu(null);
+          setActiveToolbarMenu(null);
           navigate(target);
         }
         return;
@@ -524,6 +553,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       const menuId = MENU_MNEMONICS[event.key.toLowerCase()];
       if (menuId === undefined) return;
       event.preventDefault();
+      setActiveToolbarMenu(null);
       pendingMenuFocus.current = "first";
       setMenuTabStop(menuId);
       setActiveMenu(menuId);
@@ -538,6 +568,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       ) {
         setActiveMenu(null);
       }
+      if (
+        activeToolbarMenu !== null &&
+        event.target instanceof Node &&
+        !toolbarRef.current?.contains(event.target)
+      ) {
+        setActiveToolbarMenu(null);
+      }
     }
 
     window.addEventListener("keydown", handleMnemonic);
@@ -546,7 +583,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, libraryRoot, navigation, selectedPath, viewerSession]);
+  }, [activeMenu, activeToolbarMenu, libraryRoot, navigation, selectedPath, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -1801,6 +1838,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function toggleMenu(menuId: MenuId, focus: "first" | "last" = "first") {
     pendingMenuFocus.current = focus;
+    setActiveToolbarMenu(null);
     setActiveMenu((current) => (current === menuId ? null : menuId));
   }
 
@@ -1816,6 +1854,76 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (disabled) return;
     setActiveMenu(null);
     action();
+  }
+
+  function getToolbarMenuItems(menuId: ToolbarMenuId): HTMLButtonElement[] {
+    const menu = toolbarMenuPopupRefs.current[menuId];
+    return menu === null
+      ? []
+      : Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
+  }
+
+  function focusToolbarMenuItem(menuId: ToolbarMenuId, index: number) {
+    const items = getToolbarMenuItems(menuId);
+    if (items.length === 0) return;
+    const normalizedIndex = (index + items.length) % items.length;
+    items[normalizedIndex].focus();
+  }
+
+  function toggleToolbarMenu(menuId: ToolbarMenuId) {
+    setActiveMenu(null);
+    pendingToolbarMenuFocus.current = "first";
+    setActiveToolbarMenu((current) => (current === menuId ? null : menuId));
+  }
+
+  function runToolbarMenuAction(action: () => void) {
+    setActiveToolbarMenu(null);
+    action();
+  }
+
+  function handleToolbarMenuTriggerKeyDown(
+    menuId: ToolbarMenuId,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveMenu(null);
+      pendingToolbarMenuFocus.current = event.key === "ArrowUp" ? "last" : "first";
+      setActiveToolbarMenu(menuId);
+      return;
+    }
+    if (event.key === "Escape" && activeToolbarMenu !== null) {
+      event.preventDefault();
+      setActiveToolbarMenu(null);
+    }
+  }
+
+  function handleToolbarMenuItemKeyDown(
+    menuId: ToolbarMenuId,
+    event: React.KeyboardEvent<HTMLButtonElement>,
+  ) {
+    const items = getToolbarMenuItems(menuId);
+    const currentIndex = items.indexOf(event.currentTarget);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      focusToolbarMenuItem(menuId, currentIndex + (event.key === "ArrowDown" ? 1 : -1));
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      focusToolbarMenuItem(menuId, event.key === "Home" ? 0 : items.length - 1);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setActiveToolbarMenu(null);
+      requestAnimationFrame(() => toolbarMenuTriggerRefs.current[menuId]?.focus());
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.currentTarget.click();
+    }
   }
 
   function handleMenuTriggerKeyDown(
@@ -2354,6 +2462,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="task-tray-toggle"
+                aria-disabled={!trayApiAvailable}
+                title={trayApiAvailable
+                  ? "アプリをタスクトレイへ収納"
+                  : trayStatus?.reason ?? "task trayの状態を確認しています"}
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => void storeInTray(), !trayApiAvailable)}
+              >
+                タスクトレイへ収納
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
@@ -2604,6 +2728,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               </button>
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">ワークスペース</span>
+              <button
+                type="button"
+                role="menuitem"
+                data-product-id="workspace-restore-controls"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => {
+                  const restored = restoreWorkspaceDisplay();
+                  setTreeVisible(restored.treeVisible);
+                  setToolbarVisible(restored.toolbarVisible);
+                  setMenuBarVisible(restored.menuBarVisible);
+                })}
+              >
+                UIを表示
+              </button>
               <button
                 type="button"
                 role="menuitemcheckbox"
@@ -2863,8 +3003,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           )}
         </div>
       </nav>}
-      {toolbarVisible && <div className="toolbar" aria-label="ナビゲーション">
+      {toolbarVisible && <div ref={toolbarRef} className="toolbar" aria-label="ナビゲーション">
         <button
+          type="button"
+          aria-label="戻る"
           disabled={navigation.back.length === 0}
           onClick={() => {
             const target = navigation.back.at(-1);
@@ -2875,6 +3017,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           ←
         </button>
         <button
+          type="button"
+          aria-label="進む"
           disabled={navigation.forward.length === 0}
           onClick={() => {
             const target = navigation.forward[0];
@@ -2885,6 +3029,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           →
         </button>
         <button
+          type="button"
+          aria-label="上のフォルダへ"
           disabled={up === null}
           onClick={() => up !== null && navigate(up)}
           title="上へ"
@@ -2892,13 +3038,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           ↑
         </button>
         <div className="icon-command-toolbar" aria-label="コマンドツールバー">
-          <button type="button" aria-label="現在場所を更新" data-product-id="toolbar-refresh" onClick={refreshCatalog}>⟳</button>
-          <button type="button" aria-label="選択パスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}>⧉</button>
-          <button type="button" aria-label="選択項目のプロパティ" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}>ⓘ</button>
-          <button type="button" aria-label="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}>▤</button>
+          <button type="button" aria-label="現在場所を更新" title="現在のフォルダを再読み込み" data-product-id="toolbar-refresh" onClick={refreshCatalog}>⟳</button>
+          <button type="button" aria-label="選択パスをコピー" title="選択した項目のパスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}>⧉</button>
+          <button type="button" aria-label="選択項目のプロパティ" title="選択した項目のプロパティを表示" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}>ⓘ</button>
+          <button type="button" aria-label="本棚を表示" title="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}>▤</button>
           <button
             type="button"
             aria-label="参照型タイル"
+            title="参照型タイル表示を切り替え"
             aria-pressed={catalogViewMode === "reference_tile"}
             data-product-id="toolbar-reference-tile"
             onClick={() => changeCatalogViewMode(catalogViewMode === "reference_tile" ? "cover_list" : "reference_tile")}
@@ -2906,67 +3053,159 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             ▦
           </button>
         </div>
-        <label>
-          並べ替え
-          <select
+        <div className="toolbar-control-menu toolbar-control-menu--leading">
+          <button
+            ref={(node) => {
+              toolbarMenuTriggerRefs.current.sort = node;
+            }}
+            type="button"
             aria-label="並べ替え条件"
+            title="一覧の並べ替え条件を選択"
             data-sort-field={sortField}
-            value={sortField}
-            onChange={(event) =>
-              changeSort(event.target.value as SortField, sortDescending)
-            }
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarMenu === "sort"}
+            aria-controls="toolbar-sort-menu"
+            onClick={() => toggleToolbarMenu("sort")}
+            onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("sort", event)}
           >
-            <option value="name">名前</option>
-            <option value="modified">更新日時</option>
-            <option value="size">サイズ</option>
-            <option value="kind">種類</option>
-          </select>
-        </label>
-        <label>
-          巻末動作
-          <select
-            aria-label="巻末動作"
-            value={endOfVolumePolicy}
-            onChange={(event) =>
-              changeEndOfVolumePolicy(
-                normalizeEndOfVolumePolicy(event.target.value),
-              )
-            }
-          >
-            {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
-              <option key={policy} value={policy}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          一覧形式
-          <select
-            aria-label="一覧表示形式"
-            data-catalog-view-mode={catalogViewMode}
-            value={catalogViewMode}
-            onChange={(event) =>
-              changeCatalogViewMode(
-                normalizeCatalogViewMode(event.target.value),
-              )
-            }
-          >
-              {CATALOG_VIEW_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {CATALOG_VIEW_MODE_LABELS[mode]}
-              </option>
-            ))}
-          </select>
-        </label>
+            並べ替え: {({
+              name: "名前",
+              modified: "更新日時",
+              size: "サイズ",
+              kind: "種類",
+            } satisfies Record<SortField, string>)[sortField]} <span aria-hidden="true">▾</span>
+          </button>
+          {activeToolbarMenu === "sort" && (
+            <div
+              ref={(node) => {
+                toolbarMenuPopupRefs.current.sort = node;
+              }}
+              id="toolbar-sort-menu"
+              className="menu-popup toolbar-popup"
+              role="menu"
+              aria-label="並べ替え候補"
+            >
+              {([
+                ["name", "名前"],
+                ["modified", "更新日時"],
+                ["size", "サイズ"],
+                ["kind", "種類"],
+              ] as const).map(([field, label]) => (
+                <button
+                  key={field}
+                  type="button"
+                  role="menuitemradio"
+                  tabIndex={-1}
+                  aria-checked={sortField === field}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleToolbarMenuItemKeyDown("sort", event)}
+                  onClick={() => runToolbarMenuAction(() => changeSort(field, sortDescending))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
+          type="button"
+          aria-label={`並び順: ${sortDescending ? "降順" : "昇順"}`}
+          title={sortDescending ? "降順を昇順へ変更" : "昇順を降順へ変更"}
           data-sort-descending={sortDescending}
-          onClick={() => {
-            changeSort(sortField, !sortDescending);
-          }}
+          onClick={() => changeSort(sortField, !sortDescending)}
         >
-          {sortDescending ? "降順 ▼" : "昇順 ▲"}
+          <span aria-hidden="true">{sortDescending ? "▼" : "▲"}</span>
         </button>
+        <div className="toolbar-control-menu">
+          <button
+            ref={(node) => {
+              toolbarMenuTriggerRefs.current.endOfVolume = node;
+            }}
+            type="button"
+            aria-label="巻末動作"
+            title="巻末に到達したときの動作を選択"
+            data-end-of-volume-policy={endOfVolumePolicy}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarMenu === "endOfVolume"}
+            aria-controls="toolbar-end-of-volume-menu"
+            onClick={() => toggleToolbarMenu("endOfVolume")}
+            onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("endOfVolume", event)}
+          >
+            巻末動作: {END_OF_VOLUME_POLICY_LABELS[endOfVolumePolicy]} <span aria-hidden="true">▾</span>
+          </button>
+          {activeToolbarMenu === "endOfVolume" && (
+            <div
+              ref={(node) => {
+                toolbarMenuPopupRefs.current.endOfVolume = node;
+              }}
+              id="toolbar-end-of-volume-menu"
+              className="menu-popup toolbar-popup"
+              role="menu"
+              aria-label="巻末動作候補"
+            >
+              {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
+                <button
+                  key={policy}
+                  type="button"
+                  role="menuitemradio"
+                  tabIndex={-1}
+                  aria-checked={endOfVolumePolicy === policy}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleToolbarMenuItemKeyDown("endOfVolume", event)}
+                  onClick={() => runToolbarMenuAction(() =>
+                    changeEndOfVolumePolicy(normalizeEndOfVolumePolicy(policy))
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="toolbar-control-menu">
+          <button
+            ref={(node) => {
+              toolbarMenuTriggerRefs.current.catalogView = node;
+            }}
+            type="button"
+            aria-label="一覧表示形式"
+            title="一覧の表示形式を選択"
+            data-catalog-view-mode={catalogViewMode}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarMenu === "catalogView"}
+            aria-controls="toolbar-catalog-view-menu"
+            onClick={() => toggleToolbarMenu("catalogView")}
+            onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("catalogView", event)}
+          >
+            一覧形式: {CATALOG_VIEW_MODE_LABELS[catalogViewMode]} <span aria-hidden="true">▾</span>
+          </button>
+          {activeToolbarMenu === "catalogView" && (
+            <div
+              ref={(node) => {
+                toolbarMenuPopupRefs.current.catalogView = node;
+              }}
+              id="toolbar-catalog-view-menu"
+              className="menu-popup toolbar-popup"
+              role="menu"
+              aria-label="一覧表示形式候補"
+            >
+              {CATALOG_VIEW_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="menuitemradio"
+                  tabIndex={-1}
+                  aria-checked={catalogViewMode === mode}
+                  onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                  onKeyDown={(event) => handleToolbarMenuItemKeyDown("catalogView", event)}
+                  onClick={() => runToolbarMenuAction(() => changeCatalogViewMode(mode))}
+                >
+                  {CATALOG_VIEW_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>}
       {(diagnosticsOpen || diagnosticsLoading || diagnosticNotice !== null) && (
         <div className="dialog-backdrop">
@@ -3077,27 +3316,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             if (event.key === "Escape") setAddressInput(absoluteAddress);
           }}
         />
-        <button type="submit">移動</button>
         <button
-          type="button"
-          data-product-id="workspace-restore-controls"
-          onClick={() => {
-            const restored = restoreWorkspaceDisplay();
-            setTreeVisible(restored.treeVisible);
-            setToolbarVisible(restored.toolbarVisible);
-            setMenuBarVisible(restored.menuBarVisible);
-          }}
+          type="submit"
+          aria-label="アドレスへ移動"
+          title="入力したアドレスへ移動"
         >
-          UIを表示
-        </button>
-        <button
-          type="button"
-          data-product-id="task-tray-toggle"
-          disabled={!trayApiAvailable}
-          title={trayApiAvailable ? "タスクトレイへ収納" : trayStatus?.reason ?? "task trayの状態を確認しています"}
-          onClick={() => void storeInTray()}
-        >
-          タスクトレイへ収納
+          <span aria-hidden="true">➜</span>
         </button>
       </form>
       <form className="search-bar" aria-label="名前検索フォーム" onSubmit={submitSearch}>
@@ -3109,9 +3333,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="ファイル名・フォルダ名"
         />
-        <button type="submit">検索</button>
+        <button type="submit" aria-label="検索" title="名前で検索">
+          <span aria-hidden="true">⌕</span>
+        </button>
         {searchState.status !== "idle" && (
-          <button type="button" onClick={clearSearch}>
+          <button type="button" title="検索結果をクリア" onClick={clearSearch}>
             クリア
           </button>
         )}
@@ -3129,7 +3355,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           onChange={(event) => setFileMask(event.target.value)}
           placeholder="*.jpg;*.cbz"
         />
-        <button type="button" onClick={() => setFileMask("")}>全件</button>
+        <button
+          type="button"
+          aria-label="全件"
+          title="ファイルマスクを解除して全件表示"
+          onClick={() => setFileMask("")}
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
       </form>
       <div
         className="workspace"

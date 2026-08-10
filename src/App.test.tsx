@@ -282,6 +282,16 @@ function chooseAppMenuItem(
   fireEvent.click(within(menu).getByRole("menuitem", { name: itemName }));
 }
 
+function chooseToolbarMenuItem(
+  triggerName: "並べ替え条件" | "巻末動作" | "一覧表示形式",
+  menuName: "並べ替え候補" | "巻末動作候補" | "一覧表示形式候補",
+  itemName: string,
+) {
+  fireEvent.click(screen.getByRole("button", { name: triggerName }));
+  const menu = screen.getByRole("menu", { name: menuName });
+  fireEvent.click(within(menu).getByRole("menuitemradio", { name: itemName }));
+}
+
 describe("application shell", () => {
   afterEach(cleanup);
 
@@ -731,12 +741,13 @@ describe("application shell", () => {
       { sortField: "modified", sortDescending: false },
       expect.any(Number),
     );
-    expect(screen.getByLabelText("並べ替え条件")).toHaveValue("modified");
+    expect(screen.getByLabelText("並べ替え条件"))
+      .toHaveAttribute("data-sort-field", "modified");
 
     viewMenu = openAppMenu("表示");
     fireEvent.click(within(viewMenu).getByRole("menuitemradio", { name: "降順" }));
     expect(saveSortMock).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("降順 ▼")).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "並び順: 降順" })).toHaveAttribute(
       "data-sort-descending",
       "true",
     );
@@ -746,7 +757,55 @@ describe("application shell", () => {
       within(viewMenu).getByRole("menuitemradio", { name: "詳細リスト" }),
     );
     expect(saveCatalogViewModeMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("detail_list");
+    expect(screen.getByLabelText("一覧表示形式"))
+      .toHaveAttribute("data-catalog-view-mode", "detail_list");
+  });
+
+  it("opens toolbar choice menus and keeps icon-only commands explained", async () => {
+    await registerTestLibrary([]);
+
+    const sortButton = screen.getByRole("button", { name: "並べ替え条件" });
+    expect(sortButton).toHaveAttribute("title", "一覧の並べ替え条件を選択");
+    expect(screen.queryByRole("combobox", { name: "並べ替え条件" }))
+      .not.toBeInTheDocument();
+    chooseToolbarMenuItem("並べ替え条件", "並べ替え候補", "サイズ");
+    expect(sortButton).toHaveAttribute("data-sort-field", "size");
+
+    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "巻末で停止");
+    expect(screen.getByRole("button", { name: "巻末動作" }))
+      .toHaveAttribute("data-end-of-volume-policy", "stop");
+
+    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "小サムネイル");
+    expect(screen.getByRole("button", { name: "一覧表示形式" }))
+      .toHaveAttribute("data-catalog-view-mode", "small_thumbnail");
+
+    const direction = screen.getByRole("button", { name: "並び順: 昇順" });
+    expect(direction).toHaveTextContent("▲");
+    expect(direction).not.toHaveTextContent("昇順");
+    expect(direction).toHaveAttribute("title", "昇順を降順へ変更");
+
+    const addressForm = screen.getByLabelText("アドレス").closest("form")!;
+    const move = within(addressForm).getByRole("button", { name: "アドレスへ移動" });
+    expect(move).toHaveTextContent("➜");
+    expect(move).not.toHaveTextContent("移動");
+    expect(move).toHaveAttribute("title", "入力したアドレスへ移動");
+    expect(within(addressForm).queryByRole("button", { name: "UIを表示" }))
+      .not.toBeInTheDocument();
+    expect(within(addressForm).queryByRole("button", { name: "タスクトレイへ収納" }))
+      .not.toBeInTheDocument();
+
+    const search = screen.getByRole("button", { name: "検索" });
+    expect(search).toHaveTextContent("⌕");
+    expect(search).not.toHaveTextContent("検索");
+    expect(search).toHaveAttribute("title", "名前で検索");
+    const showAll = screen.getByRole("button", { name: "全件" });
+    expect(showAll).toHaveTextContent("✕");
+    expect(showAll).not.toHaveTextContent("全件");
+    expect(showAll).toHaveAttribute("title", "ファイルマスクを解除して全件表示");
+
+    const viewMenu = openAppMenu("表示");
+    expect(within(viewMenu).getByRole("menuitem", { name: "UIを表示" }))
+      .toBeInTheDocument();
   });
 
   it("supports mnemonic, item traversal, cross-menu arrows and Escape focus return", async () => {
@@ -891,11 +950,12 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "登録" }));
 
     const policy = await screen.findByLabelText("巻末動作");
-    fireEvent.change(policy, { target: { value: "loop" } });
+    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "先頭へループ");
 
-    expect(policy).toHaveValue("loop");
+    expect(policy).toHaveAttribute("data-end-of-volume-policy", "loop");
     expect(saveEndPolicyMock).toHaveBeenCalledWith("loop", expect.any(Number));
-    expect(screen.getByLabelText("並べ替え条件")).toHaveValue("name");
+    expect(screen.getByLabelText("並べ替え条件"))
+      .toHaveAttribute("data-sort-field", "name");
   });
 
   it("shows confirm_next at the volume boundary and opens only after approval", async () => {
@@ -961,8 +1021,12 @@ describe("application shell", () => {
       target: { value: "C:\\Comics" },
     });
     fireEvent.click(screen.getByRole("button", { name: "登録" }));
-    const policy = await screen.findByLabelText("巻末動作");
-    fireEvent.change(policy, { target: { value: "confirm_next" } });
+    await screen.findByLabelText("巻末動作");
+    chooseToolbarMenuItem(
+      "巻末動作",
+      "巻末動作候補",
+      "確認してから次の巻を開く",
+    );
 
     fireEvent.keyDown(
       await screen.findByRole("button", { name: /01-first/ }),
@@ -1022,11 +1086,15 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
-    fireEvent.change(await screen.findByLabelText("巻末動作"), {
-      target: { value: "return_library" },
-    });
+    await screen.findByLabelText("巻末動作");
+    chooseToolbarMenuItem(
+      "巻末動作",
+      "巻末動作候補",
+      "巻末でライブラリへ戻る",
+    );
     await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
+      expect(screen.getByLabelText("巻末動作"))
+        .toHaveAttribute("data-end-of-volume-policy", "return_library"),
     );
     releaseSettings({
       status: "ok",
@@ -1038,7 +1106,8 @@ describe("application shell", () => {
       },
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
+      expect(screen.getByLabelText("巻末動作"))
+        .toHaveAttribute("data-end-of-volume-policy", "return_library"),
     );
     await openTestComic(first.relativePath);
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
@@ -1060,9 +1129,8 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([first, second]);
-    fireEvent.change(await screen.findByLabelText("巻末動作"), {
-      target: { value: "stop" },
-    });
+    await screen.findByLabelText("巻末動作");
+    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "巻末で停止");
     await openTestComic(first.relativePath);
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
@@ -1108,9 +1176,8 @@ describe("application shell", () => {
       .mockResolvedValueOnce(viewerResponse(first.relativePath));
 
     await registerTestLibrary([last, first]);
-    fireEvent.change(await screen.findByLabelText("巻末動作"), {
-      target: { value: "loop" },
-    });
+    await screen.findByLabelText("巻末動作");
+    chooseToolbarMenuItem("巻末動作", "巻末動作候補", "先頭へループ");
     await openTestComic(last.relativePath);
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
@@ -1140,7 +1207,8 @@ describe("application shell", () => {
 
     await registerTestLibrary([first, second]);
     await waitFor(() =>
-      expect(screen.getByLabelText("巻末動作")).toHaveValue("stop"),
+      expect(screen.getByLabelText("巻末動作"))
+        .toHaveAttribute("data-end-of-volume-policy", "stop"),
     );
     await openTestComic(first.relativePath);
     fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
@@ -1305,13 +1373,17 @@ describe("application shell", () => {
 
     const selector = await screen.findByLabelText("一覧表示形式");
     const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
-    expect(selector).toHaveValue("cover_list");
+    expect(selector).toHaveAttribute("data-catalog-view-mode", "cover_list");
     expect(grid).toHaveAttribute("data-catalog-view-mode", "cover_list");
 
-    for (const mode of ["small_thumbnail", "detail_list", "cover_list"] as const) {
-      fireEvent.change(selector, { target: { value: mode } });
+    for (const [mode, label] of [
+      ["small_thumbnail", "小サムネイル"],
+      ["detail_list", "詳細リスト"],
+      ["cover_list", "表紙付きリスト"],
+    ] as const) {
+      chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
       await waitFor(() => {
-        expect(selector).toHaveValue(mode);
+        expect(selector).toHaveAttribute("data-catalog-view-mode", mode);
         expect(grid).toHaveAttribute("data-catalog-view-mode", mode);
       });
     }
@@ -1347,11 +1419,15 @@ describe("application shell", () => {
     ];
 
     await registerTestLibrary(entries);
-    const selector = await screen.findByLabelText("一覧表示形式");
+    await screen.findByLabelText("一覧表示形式");
     const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
 
-    for (const mode of ["cover_list", "small_thumbnail", "detail_list"] as const) {
-      fireEvent.change(selector, { target: { value: mode } });
+    for (const [mode, label] of [
+      ["cover_list", "表紙付きリスト"],
+      ["small_thumbnail", "小サムネイル"],
+      ["detail_list", "詳細リスト"],
+    ] as const) {
+      chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
       await waitFor(() =>
         expect(grid).toHaveAttribute("data-catalog-view-mode", mode),
       );
@@ -1375,8 +1451,8 @@ describe("application shell", () => {
     }));
 
     await registerTestLibrary(entries);
-    const selector = await screen.findByLabelText("一覧表示形式");
-    fireEvent.change(selector, { target: { value: "detail_list" } });
+    await screen.findByLabelText("一覧表示形式");
+    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "詳細リスト");
     const first = await screen.findByRole("button", { name: /book-00/ });
     fireEvent.keyDown(first, { key: "ArrowDown" });
 
@@ -1385,9 +1461,7 @@ describe("application shell", () => {
       expect(screen.getByText("選択: book-01.cbz")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("並べ替え条件"), {
-      target: { value: "size" },
-    });
+    chooseToolbarMenuItem("並べ替え条件", "並べ替え候補", "サイズ");
     expect(screen.getByRole("grid")).toHaveAttribute(
       "data-catalog-view-mode",
       "detail_list",
@@ -1409,12 +1483,12 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("restored.cbz")]);
 
     const selector = await screen.findByLabelText("一覧表示形式");
-    expect(selector).toHaveValue("detail_list");
+    expect(selector).toHaveAttribute("data-catalog-view-mode", "detail_list");
     expect(screen.getByRole("grid")).toHaveAttribute(
       "data-catalog-view-mode",
       "detail_list",
     );
-    fireEvent.change(selector, { target: { value: "small_thumbnail" } });
+    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "小サムネイル");
     expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
       "small_thumbnail",
       expect.any(Number),
@@ -1435,9 +1509,11 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     const selector = screen.getByLabelText("一覧表示形式");
 
-    fireEvent.change(selector, { target: { value: "reference_tile" } });
+    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "参照型タイル");
 
-    await waitFor(() => expect(selector).toHaveValue("cover_list"));
+    await waitFor(() =>
+      expect(selector).toHaveAttribute("data-catalog-view-mode", "cover_list"),
+    );
     expect(screen.getByText(/アクセスできません/)).toBeInTheDocument();
     expect(screen.getByRole("grid")).toHaveAttribute(
       "data-catalog-view-mode",
@@ -1946,7 +2022,8 @@ describe("application shell", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
-    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+    expect(screen.getByLabelText("一覧表示形式"))
+      .toHaveAttribute("data-catalog-view-mode", "cover_list");
     expect(screen.getByRole("complementary", { name: "フォルダツリー" })).toBeInTheDocument();
     expect(saveSettingsProfileMock).not.toHaveBeenCalled();
 
@@ -1964,7 +2041,8 @@ describe("application shell", () => {
       expect.objectContaining({ catalogViewMode: "reference_tile", treeVisible: false }),
       expect.any(Number),
     );
-    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("reference_tile");
+    expect(screen.getByLabelText("一覧表示形式"))
+      .toHaveAttribute("data-catalog-view-mode", "reference_tile");
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   });
 
@@ -2003,7 +2081,8 @@ describe("application shell", () => {
       expect(await within(dialog).findByText(/設定profileを読み込みました/)).toBeInTheDocument();
       expect(within(dialog).getByLabelText("profile一覧形式")).toHaveValue("reference_tile");
       expect(within(dialog).getByLabelText("profile並べ替え")).toHaveValue("size");
-      expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+      expect(screen.getByLabelText("一覧表示形式"))
+        .toHaveAttribute("data-catalog-view-mode", "cover_list");
       expect(saveSettingsProfileMock).not.toHaveBeenCalled();
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     } finally {
@@ -2035,14 +2114,18 @@ describe("application shell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     expect(await within(dialog).findByText(/アクセスできません/)).toBeInTheDocument();
-    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+    expect(screen.getByLabelText("一覧表示形式"))
+      .toHaveAttribute("data-catalog-view-mode", "cover_list");
     expect(screen.getByRole("dialog", { name: "統合設定" })).toBeInTheDocument();
   });
 
   it("FT-B18-004 calls native tray storage without replacing the React shell and keeps Quit separate", async () => {
     await registerTestLibrary([]);
-    const trayButton = screen.getByRole("button", { name: "タスクトレイへ収納" });
-    await waitFor(() => expect(trayButton).toBeEnabled());
+    const fileMenu = openAppMenu("ファイル");
+    const trayButton = within(fileMenu).getByRole("menuitem", {
+      name: "タスクトレイへ収納",
+    });
+    await waitFor(() => expect(trayButton).toHaveAttribute("aria-disabled", "false"));
     fireEvent.click(trayButton);
     await waitFor(() => expect(storeMainWindowInTrayMock).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("main")).toHaveClass("app-shell");

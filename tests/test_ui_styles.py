@@ -31,6 +31,9 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".folder-tree", "color: #1f2328")
         self.assert_rule_contains(".tree-node", "color: #1f2328")
 
+    def test_icon_toolbar_buttons_have_visible_spacing(self) -> None:
+        self.assert_rule_contains(".icon-command-toolbar", "gap: 6px")
+
 
 if __name__ == "__main__":
     unittest.main()
