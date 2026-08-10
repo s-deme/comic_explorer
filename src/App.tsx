@@ -2482,7 +2482,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
   ) {
-    setViewerLaunchMode(launchMode);
+    const resolvedLaunchMode = launchMode === "normal" && entry.kind === "archive"
+      ? "fullscreen"
+      : launchMode;
+    setViewerLaunchMode(resolvedLaunchMode);
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setLoadState({ status: "loading", path: entry.relativePath });

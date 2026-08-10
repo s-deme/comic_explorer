@@ -87,6 +87,7 @@ BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証し
 JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIMEをopaque media URLから渡す。
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
+通常のopenで対応archiveを選択した場合はviewerを全画面で開始し、明示した全画面・slideshow起動モードはそのまま優先する。
 
 media URLにはhost pathを含めず、server-sideのsession/pageへ結び付いたopaque tokenを使う。
 Windowsは`http://comic.localhost/<token>`へplatform-mapし、query/fragment、traversal、absolute/drive/UNC、

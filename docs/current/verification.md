@@ -32,7 +32,7 @@ codd:
 | Rust canonical | PASS | 2026-08-11、lib 150件 + shutdown process 1件、FAIL 0。検索のscope・種別・size・更新日時・固定場所の条件適用、catalogへ直接表示する画像自身のthumbnail生成を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
-| TypeScript/frontend | PASS | 2026-08-11、24 files / 204 tests PASS、FAIL 0。対応書庫の項目別形式表示、検索条件のrequest変換・検索結果保持、一般ヘルプとバージョン情報の分離、診断のread-only説明と実行中indicator、catalogの利用可能幅に応じたcard列数・virtual行の縮退、サムネイル系cardの種別非表示と画像・長いファイル名のlayout分離、folder内に直接表示する画像のthumbnail要求、viewer toolbarからの巻末動作変更、TypeScript typecheckもexit 0。 |
+| TypeScript/frontend | PASS | 2026-08-11、24 files / 205 tests PASS、FAIL 0。対応書庫の項目別形式表示、検索条件のrequest変換・検索結果保持、一般ヘルプとバージョン情報の分離、診断のread-only説明と実行中indicator、catalogの利用可能幅に応じたcard列数・virtual行の縮退、サムネイル系cardの種別非表示と画像・長いファイル名のlayout分離、folder内に直接表示する画像のthumbnail要求、viewer toolbarからの巻末動作変更、対応archiveの通常open時の全画面開始、TypeScript typecheckもexit 0。 |
 | Python | PASS | 2026-08-11、43 tests PASS、FAIL 0。menu/addressのcompact寸法、tree文字色、固定page幅を持たないcatalog縮退、検索条件・診断indicator、viewer toolbar内の巻末動作controlのstyle contract、現行status/verification間の5値consistencyもPASS。 |
 | standalone PDF | PASS / 製品観測BLOCKED | Windows.Data.Pdfで実PDFのpage列挙とPNG renderを直接検証。1 GiB source、10,000 pages、最大辺16,384 px、120,000,000 pixelsをrender前に制限し、暗号化・破損・access・missingのerror分類、root外symlink拒否、独立した`pdf`種別と画像選択境界をRust canonicalとfrontend testで検証した。release WebView2のviewer・thumbnail表示は未観測。 |
 | file manager | PASS / 製品観測BLOCKED | Windows Rust canonicalでrename、folder作成、copy、move、完全delete、CF_HDROPのcopy/cut round trip、root containment、reparse point・同名衝突・子孫destination拒否を実filesystem上で検証。frontend testで右click/keyboard menu、rename・delete接続、確認dialog、全画面・slideshow起動を検証した。release製品のnative folder picker、ごみ箱、Explorer、アプリ選択は未観測。 |
@@ -113,7 +113,7 @@ check時間は同一環境の単回実測で18.73秒（約61%）短縮した。�
 
 2026-08-11の最終Windows-native `verify`はexit 0。DAGはred PASS 4 / red FAIL 0 /
 amber PASS 1 / amber WARN 3 / VACUOUS 1、artifact contractはopt-inのためSKIP、CoDD verification-node集計は0件である。
-一方、設定されたproject test commandはPython 43件とfrontend 204件を実行して全件PASSし、typecheckを実行、source integrityを確認した。
+一方、設定されたproject test commandはPython 43件とfrontend 205件を実行して全件PASSし、typecheckを実行、source integrityを確認した。
 SKIP、VACUOUS、0件のverification-node集計を機能PASSへ読み替えない。
 
 `scan`出力は`Frontmatter: 4 documents in docs\current`であり、他の資料をCoDD対象に含めない。

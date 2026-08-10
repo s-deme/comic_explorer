@@ -1368,7 +1368,7 @@ describe("application shell", () => {
     );
   });
 
-  it("FT-B04-004 observes the App-to-window adapter fullscreen lifecycle and Esc exit", async () => {
+  it("FT-B04-004 starts archives fullscreen and exits with Esc", async () => {
     const adapter: FullscreenAdapter = {
       enter: vi.fn().mockResolvedValue(undefined),
       exit: vi.fn().mockResolvedValue(undefined),
@@ -1379,7 +1379,6 @@ describe("application shell", () => {
     await registerTestLibrary([entry], adapter);
     await openTestComic(entry.relativePath);
 
-    fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
     await waitFor(() =>
       expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` })).toHaveAttribute(
         "data-fullscreen",
@@ -1396,6 +1395,25 @@ describe("application shell", () => {
     );
     expect(adapter.exit).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText(`${entry.relativePath} ビューワ`)).toBeInTheDocument();
+  });
+
+  it("keeps directly opened images in windowed mode", async () => {
+    const adapter: FullscreenAdapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    const entry: CatalogEntry = {
+      relativePath: "001.jpg" as never,
+      kind: "page",
+    };
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry], adapter);
+    await openTestComic(entry.relativePath);
+
+    expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` }))
+      .toHaveAttribute("data-fullscreen", "false");
+    expect(adapter.enter).not.toHaveBeenCalled();
   });
 
   it("FT-B04-005 restores layout from App settings while leaving fullscreen as window state", async () => {
