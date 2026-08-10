@@ -37,6 +37,16 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
+    def test_fullscreen_viewer_hides_toolbar_without_reserving_space(self) -> None:
+        self.assert_rule_contains(
+            '.viewer[data-fullscreen="true"][data-toolbar-visible="false"]',
+            "grid-template-rows: 0 minmax(0, 1fr)",
+        )
+        self.assert_rule_contains(
+            '.viewer[data-fullscreen="true"][data-toolbar-visible="false"] .viewer-toolbar',
+            "pointer-events: none",
+        )
+
     def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
         self.assert_rule_contains(
             ".viewer-end-of-volume-control", "display: inline-flex"

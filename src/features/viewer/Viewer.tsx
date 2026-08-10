@@ -42,6 +42,8 @@ import {
   type EndOfVolumePolicy,
 } from "../catalog/end-of-volume";
 
+const FULLSCREEN_TOOLBAR_REVEAL_HEIGHT = 32;
+
 interface ViewerProps {
   session: ViewerSession;
   generation: number;
@@ -126,6 +128,7 @@ export function Viewer({
   const [layoutMode, setLayoutMode] =
     useState<ViewerLayoutMode>(initialLayoutMode);
   const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
@@ -202,8 +205,10 @@ export function Viewer({
     try {
       if (next) await fullscreenAdapter.enter();
       else await fullscreenAdapter.exit();
+      if (next) fullscreenButtonRef.current?.blur();
+      setFullscreenToolbarVisible(!next);
       setFullscreen(next);
-      requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
+      if (!next) requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
       return true;
     } catch {
       setFullscreenError("全画面表示を切り替えられません。もう一度お試しください。");
@@ -302,6 +307,10 @@ export function Viewer({
       mounted = false;
     };
   }, [fullscreenAdapter]);
+
+  useEffect(() => {
+    setFullscreenToolbarVisible(!fullscreen);
+  }, [fullscreen]);
 
   useEffect(() => {
     if (!initialFullscreen || initialFullscreenRequested.current) return;
@@ -460,9 +469,30 @@ export function Viewer({
       aria-label={`${session.displayName} ビューワ`}
       data-layout-mode={layoutMode}
       data-fullscreen={fullscreen}
+      data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
       data-slideshow={slideshowIntervalMs !== undefined}
+      onPointerMove={(event) => {
+        if (
+          fullscreen
+          && !fullscreenToolbarVisible
+          && event.clientY <= FULLSCREEN_TOOLBAR_REVEAL_HEIGHT
+        ) {
+          setFullscreenToolbarVisible(true);
+        }
+      }}
     >
-      <header className="viewer-toolbar">
+      <header
+        className="viewer-toolbar"
+        onPointerLeave={(event) => {
+          if (
+            fullscreen
+            && !(event.relatedTarget instanceof Node
+              && event.currentTarget.contains(event.relatedTarget))
+          ) {
+            setFullscreenToolbarVisible(false);
+          }
+        }}
+      >
         <strong>{session.displayName}</strong>
         <span>{state.mode === "single" ? "単ページ" : "見開き"}</span>
         <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>

@@ -356,7 +356,7 @@ describe("Viewer settings", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("FT-B04-004 connects fullscreen enter, exit and Escape without closing the Viewer", async () => {
+  it("FT-B04-004 hides the fullscreen toolbar until the pointer reaches the top edge", async () => {
     const adapter = {
       enter: vi.fn().mockResolvedValue(undefined),
       exit: vi.fn().mockResolvedValue(undefined),
@@ -375,20 +375,31 @@ describe("Viewer settings", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
+    const viewer = screen.getByRole("region", { name: "Book ビューワ" });
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "全画面表示を終了" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      ),
+      expect(viewer).toHaveAttribute("data-toolbar-visible", "false"),
     );
     expect(adapter.enter).toHaveBeenCalledTimes(1);
 
+    fireEvent.pointerMove(viewer, { clientY: 0 });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-toolbar-visible", "true"),
+    );
+    expect(screen.getByRole("button", { name: "全画面表示を終了" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
+    expect(toolbar).not.toBeNull();
+    fireEvent.pointerLeave(toolbar!);
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-toolbar-visible", "false"),
+    );
+
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "全画面表示" })).toHaveAttribute(
-        "aria-pressed",
-        "false",
-      ),
+      expect(viewer).toHaveAttribute("data-fullscreen", "false"),
     );
     expect(adapter.exit).toHaveBeenCalledTimes(1);
   });

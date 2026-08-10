@@ -998,6 +998,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 
 .viewer {
+  position: relative;
   display: grid;
   grid-template-rows: 40px minmax(0, 1fr);
   width: 100vw;
@@ -1030,6 +1031,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: .86rem;
   background: #262b31;
   box-shadow: 0 1px 0 #ffffff18;
+}
+.viewer[data-fullscreen="true"][data-toolbar-visible="false"] {
+  grid-template-rows: 0 minmax(0, 1fr);
+}
+.viewer[data-fullscreen="true"][data-toolbar-visible="false"] .viewer-toolbar {
+  height: 0;
+  min-height: 0;
+  padding-block: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-100%);
+  visibility: hidden;
 }
 .viewer-toolbar strong {
   max-width: 22vw;
