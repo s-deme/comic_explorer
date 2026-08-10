@@ -2269,6 +2269,50 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 選択項目を開く
                 <span className="menu-shortcut">Enter</span>
               </button>
+              <div className="menu-separator" role="separator" />
+              <span className="menu-heading">履歴</span>
+              {navigation.back.length === 0 && navigation.forward.length === 0 ? (
+                <span className="menu-empty">移動履歴はありません</span>
+              ) : (
+                <>
+                  {[...navigation.back].reverse().map((path, reverseIndex) => {
+                    const index = navigation.back.length - 1 - reverseIndex;
+                    return (
+                      <button
+                        key={`history-back-${path}-${index}`}
+                        type="button"
+                        role="menuitem"
+                        tabIndex={-1}
+                        onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                        onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                        onClick={() => runMenuAction(() => navigate(
+                          path,
+                          { type: "jumpBack", index },
+                        ))}
+                      >
+                        戻る: {path || "ライブラリ"}
+                      </button>
+                    );
+                  })}
+                  {navigation.forward.map((path, index) => (
+                    <button
+                      key={`history-forward-${path}-${index}`}
+                      type="button"
+                      role="menuitem"
+                      tabIndex={-1}
+                      onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                      onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                      onClick={() => runMenuAction(() => navigate(
+                        path,
+                        { type: "jumpForward", index },
+                      ))}
+                    >
+                      進む: {path || "ライブラリ"}
+                    </button>
+                  ))}
+                </>
+              )}
+              <div className="menu-separator" role="separator" />
               <span className="menu-heading">最近開いた項目</span>
               {recentEntries.length === 0 ? (
                 <span className="menu-empty">履歴はありません</span>
@@ -2840,40 +2884,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           →
         </button>
-        <label>
-          履歴
-          <select
-            aria-label="履歴ドロップダウン"
-            value=""
-            onChange={(event) => {
-              const [direction, rawIndex] = event.target.value.split(":");
-              const index = Number(rawIndex);
-              if (!Number.isInteger(index)) return;
-              if (direction === "back") {
-                const target = navigation.back[index];
-                if (target !== undefined) navigate(target, { type: "jumpBack", index });
-              } else if (direction === "forward") {
-                const target = navigation.forward[index];
-                if (target !== undefined) navigate(target, { type: "jumpForward", index });
-              }
-            }}
-          >
-            <option value="">移動履歴</option>
-            {[...navigation.back].reverse().map((path, index) => (
-              <option
-                key={`back-${path}-${index}`}
-                value={`back:${navigation.back.length - 1 - index}`}
-              >
-                戻る: {path || "ライブラリ"}
-              </option>
-            ))}
-            {navigation.forward.map((path, index) => (
-              <option key={`forward-${path}-${index}`} value={`forward:${index}`}>
-                進む: {path || "ライブラリ"}
-              </option>
-            ))}
-          </select>
-        </label>
         <button
           disabled={up === null}
           onClick={() => up !== null && navigate(up)}

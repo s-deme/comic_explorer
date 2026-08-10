@@ -44,7 +44,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-001 | 読取可能なlibrary rootを登録し、app-local設定から復元する。 |
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
 | REQ-MVP-003 | folder treeの展開・選択と現在folderを同期する。 |
-| REQ-MVP-004 | address入力、戻る、進む、上へ、履歴移動をroot内で行う。 |
+| REQ-MVP-004 | address入力、toolbarの戻る・進む・上へ、file menuの履歴移動をroot内で行う。 |
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示する。 |
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | 名前、更新日時、size、種類の昇降順を切替え、設定を保存する。 |

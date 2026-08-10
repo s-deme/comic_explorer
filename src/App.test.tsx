@@ -589,6 +589,49 @@ describe("application shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("moves navigation history from the toolbar into the File menu and supports history jumps", async () => {
+    await registerTestLibrary([]);
+
+    expect(screen.queryByLabelText("履歴ドロップダウン")).not.toBeInTheDocument();
+    let fileMenu = openAppMenu("ファイル");
+    expect(within(fileMenu).getByText("履歴")).toBeInTheDocument();
+    expect(within(fileMenu).getByText("移動履歴はありません")).toBeInTheDocument();
+    fireEvent.keyDown(
+      within(fileMenu).getByRole("menuitem", { name: "ライブラリを変更…" }),
+      { key: "Escape" },
+    );
+
+    fireEvent.change(screen.getByLabelText("アドレス"), {
+      target: { value: "C:\\Comics\\Series" },
+    });
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    fireEvent.change(screen.getByLabelText("アドレス"), {
+      target: { value: "C:\\Comics\\Series\\Volume" },
+    });
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(3));
+
+    fileMenu = openAppMenu("ファイル");
+    expect(within(fileMenu).getByRole("menuitem", { name: "戻る: Series" }))
+      .toBeInTheDocument();
+    fireEvent.click(
+      within(fileMenu).getByRole("menuitem", { name: "戻る: ライブラリ" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"),
+    );
+
+    fileMenu = openAppMenu("ファイル");
+    fireEvent.click(
+      within(fileMenu).getByRole("menuitem", { name: "進む: Series/Volume" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス"))
+        .toHaveValue("C:\\Comics\\Series\\Volume"),
+    );
+  });
+
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
     await registerTestLibrary([]);
 
