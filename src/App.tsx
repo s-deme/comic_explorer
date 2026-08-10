@@ -409,6 +409,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     ...DEFAULT_SHORTCUTS,
   }));
   const [helpOpen, setHelpOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<SettingsProfile | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -1953,6 +1954,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
   }
 
+  function closeVersion() {
+    setVersionOpen(false);
+    setLicenseOpen(false);
+    requestAnimationFrame(() => helpTriggerRef.current?.focus());
+  }
+
   function currentSettingsProfile(): SettingsProfile {
     return {
       profileVersion: 1,
@@ -3405,7 +3412,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
                 onClick={() => runMenuAction(() => setHelpOpen(true))}
               >
-                一般ヘルプとバージョン…
+                一般ヘルプ…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
+                onClick={() => runMenuAction(() => setVersionOpen(true))}
+              >
+                バージョン情報…
               </button>
             </div>
           )}
@@ -4714,10 +4731,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <section aria-label="一般ヘルプ">
               <h3>一般ヘルプ</h3>
               <p>フォルダを登録し、フォルダ・漫画・単独画像をEnterで開きます。漫画はCtrl+Enterまたはダブルクリックでも読み始めます。</p>
-              <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: {runtimeLabel}</p>
-              <button type="button" onClick={() => setLicenseOpen(true)}>
-                third-party license noticeを開く
-              </button>
             </section>
             <p>Enter: 選択項目を開く / Ctrl+Enter: 漫画として読む</p>
             <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
@@ -4733,6 +4746,26 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               </dl>
             </section>
             <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
+          </div>
+        </div>
+      )}
+      {versionOpen && (
+        <div className="dialog-backdrop">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="version-title"
+            className="help-dialog"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeVersion();
+            }}
+          >
+            <h2 id="version-title">バージョン情報</h2>
+            <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: {runtimeLabel}</p>
+            <button type="button" onClick={() => setLicenseOpen(true)}>
+              third-party license noticeを開く
+            </button>
+            <button autoFocus type="button" onClick={closeVersion}>閉じる</button>
           </div>
         </div>
       )}

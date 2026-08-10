@@ -646,7 +646,7 @@ describe("application shell", () => {
     expect(splitter).toHaveAttribute("aria-valuenow", "230");
 
     const trigger = screen.getByRole("menuitem", { name: "ヘルプ" });
-    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
+    chooseAppMenuItem("ヘルプ", "一般ヘルプ…");
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(trigger).toHaveFocus());
   });
@@ -2296,23 +2296,27 @@ describe("application shell", () => {
 
   it("FT-B19-004 exposes offline general help from the Help menu", async () => {
     await registerTestLibrary([]);
-    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
+    chooseAppMenuItem("ヘルプ", "一般ヘルプ…");
 
     const help = screen.getByRole("dialog", { name: "キー操作とショートカット" });
     expect(within(help).getByRole("region", { name: "一般ヘルプ" })).toHaveTextContent(
       "フォルダ・漫画・単独画像をEnterで開きます",
     );
     expect(within(help).getByText(/Esc: アドレス編集を戻す/)).toBeInTheDocument();
+    expect(within(help).queryByText(new RegExp(`バージョン ${APP_VERSION}`))).not.toBeInTheDocument();
   });
 
-  it("FT-B19-005 exposes build version, runtime, and an offline license notice", async () => {
+  it("FT-B19-005 exposes version information and an offline license notice separately from help", async () => {
     await registerTestLibrary([]);
-    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
+    const helpMenu = openAppMenu("ヘルプ");
+    expect(within(helpMenu).getByRole("menuitem", { name: "一般ヘルプ…" })).toBeInTheDocument();
+    fireEvent.click(within(helpMenu).getByRole("menuitem", { name: "バージョン情報…" }));
 
-    await waitFor(() => expect(screen.getByText(
+    const version = await screen.findByRole("dialog", { name: "バージョン情報" });
+    await waitFor(() => expect(within(version).getByText(
       `バージョン ${APP_VERSION} / runtime: Tauri WebView2`,
     )).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "third-party license noticeを開く" }));
+    fireEvent.click(within(version).getByRole("button", { name: "third-party license noticeを開く" }));
     const notice = screen.getByRole("dialog", { name: "third-party license notice" });
     expect(notice.querySelector("pre")?.textContent.length).toBeGreaterThan(100);
   });

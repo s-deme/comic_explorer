@@ -19,7 +19,7 @@ function openGeneralHelp() {
     within(menu).queryByRole("menuitem", { name: "ショートカット設定…" }),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    within(menu).getByRole("menuitem", { name: "一般ヘルプとバージョン…" }),
+    within(menu).getByRole("menuitem", { name: "一般ヘルプ…" }),
   );
 }
 import {
