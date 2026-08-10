@@ -23,7 +23,7 @@ codd:
 - 対象: 上記commitの実装と、本ドキュメント統合差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
-未完了境界の要約であり、archiveの過去runを現在のPASSへ合算しない。
+未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
 ## 最新の受理済み結果
 
@@ -100,13 +100,13 @@ Linux runnerで代替せず、`BLOCKED`または`NOT RUN`として記録する�
 | Windows-native scan | 1.75秒 | 1.45秒 |
 | Windows-native check | 30.58秒 / red 0 / advisory 10 | 11.85秒 / red 0 / advisory 9 |
 
-check時間は同一環境の単回実測で18.73秒（約61%）短縮した。統合後のactive 4文書は459行、
-archiveを含む全履歴は削除せず保持している。移動前の`docs/`は49 Markdown / 8,459行、移動後は
-4 current + README + 49 archived（うち1件は旧`prompts/`から移動）である。
+check時間は同一環境の単回実測で18.73秒（約61%）短縮した。統合後のactive 4文書は459行である。
+移動前の`docs/`は49 Markdown / 8,459行、最小化後の作業ツリーは4 current + READMEの5文書だけとし、
+削除した詳細資料はGit履歴から参照・復元する。
 
 最終Windows-native `verify`はexit 0、38.44秒。DAGは3 PASS / red FAIL 0 / amber WARN 1 /
 SKIP 3 / VACUOUS 1、CoDD verification-node集計は0件である。一方、設定されたproject test commandは
 Python 33件とfrontend 179件を実行して全件PASSし、typecheckを実行、source integrity 13 filesを確認した。
 SKIP、VACUOUS、0件のverification-node集計を機能PASSへ読み替えない。
 
-`scan`出力は`Frontmatter: 4 documents in docs\current`であり、`docs/archive/`はCoDD対象に含まれない。
+`scan`出力は`Frontmatter: 4 documents in docs\current`であり、他の資料をCoDD対象に含めない。

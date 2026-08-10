@@ -15,7 +15,7 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 保守契約の正本であり、受入結果は[verification.md](verification.md)、現在状態は
 [status.md](status.md)、技術境界は[architecture.md](architecture.md)を正とする。
 
-統合前の詳細な受入条件と判断履歴は`docs/archive/`に保存する。変更時は本書の安定IDを
+統合前の詳細な受入条件と判断履歴はGit履歴から参照・復元できる。変更時は本書の安定IDを
 維持し、未測定項目を実装済みまたはPASSへ推定しない。
 
 ## 範囲
@@ -75,8 +75,8 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 
 ## 採用済みFeature要件
 
-各行の安定IDは統合前要件から継承する。詳細な過去の受入条件はarchiveにあり、本表は保守時の
-現行契約だけを示す。
+各行の安定IDは統合前要件から継承する。本表は保守時の現行契約だけを示し、過去の詳細は
+Git履歴から参照する。
 
 | Feature | 要件ID | 状態追跡ID | 現行契約 |
 |---|---|---|---|

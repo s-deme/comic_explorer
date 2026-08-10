@@ -123,6 +123,6 @@ item局所、page errorはviewer局所、root/DB起動errorだけをshell-level�
 ## 現在の設計判断
 
 Tauri/React/Rust、SQLite bundled、ZIP Deflate、opaque media token、bounded worker、app-local cacheを
-採用済みとする。比較検討と実装phaseは完了履歴として`docs/archive/`に保存した。Windows製品性能、
+採用済みとする。比較検討と実装phaseの完了履歴はGit履歴から参照する。Windows製品性能、
 clean VM、UIA/DPI、外部通信監視、GIF/AVIF decode、RAR/7z reader、tray/file pickerの実製品gateは
 設計未決ではなく検証未完了であり、[status.md](status.md)と[verification.md](verification.md)で追跡する。

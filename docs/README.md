@@ -9,9 +9,7 @@
 | [status.md](current/status.md) | 機能状態、未完了gate、候補・非採用 |
 | [verification.md](current/verification.md) | 最新検証結果、実行コマンド、未実測項目 |
 
-`archive/` は統合前の要件、設計、計画、テスト仕様、個別結果、完了プロンプトを
-元の分類を保って格納した履歴である。現在状態の判定には使わず、調査や過去の詳細証跡が
-必要な場合だけ参照する。
+統合前の要件、設計、計画、個別結果はGit履歴で参照・復元できるため、作業ツリーには置かない。
 
 CoDDは `docs/current/` だけを走査する。文書変更時はWindows-native runnerで
 `scan`、`impact`、`check`を実行し、実行可能コードまたはテストへ影響する場合に
