@@ -914,6 +914,49 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .help-dialog dt { color: #657287; }
 .properties-dialog dd,
 .help-dialog dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.diagnostic-panel { width: min(720px, calc(100vw - 32px)); }
+.diagnostic-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.diagnostic-panel-heading h2 { margin-right: auto; }
+.diagnostic-explanation {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #d9e3ef;
+  border-radius: 8px;
+  background: #f5f9fd;
+}
+.diagnostic-explanation h3 { margin-bottom: 6px; }
+.diagnostic-explanation p { margin: 5px 0; color: #405168; }
+.diagnostic-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #a9c8ea;
+  border-radius: 8px;
+  color: #213b59;
+  background: #edf6ff;
+}
+.diagnostic-activity-indicator {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 3px solid #8bb9e6;
+  border-top-color: #1769c2;
+  border-radius: 50%;
+  animation: diagnostic-activity-spin .8s linear infinite;
+}
+.diagnostic-progress-copy { display: grid; min-width: 0; gap: 2px; }
+.diagnostic-progress-copy span { color: #4b627d; font-size: .84rem; }
+.diagnostic-progress button { margin-left: auto; white-space: nowrap; }
+@keyframes diagnostic-activity-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .diagnostic-activity-indicator { animation: none; }
+}
 .tag-manager-dialog form { display: flex; align-items: end; gap: 8px; margin: 14px 0; }
 .tag-manager-dialog form label { display: grid; gap: 5px; }
 .tag-manager-dialog form input { flex: 1; }

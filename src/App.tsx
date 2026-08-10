@@ -3666,9 +3666,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               閉じる
             </button>
           </div>
+          <section className="diagnostic-explanation" aria-labelledby="diagnostic-purpose-title">
+            <h3 id="diagnostic-purpose-title">何をする機能ですか？</h3>
+            <p>
+              ライブラリ内を読み取り専用で確認し、前回の診断結果からの追加・変更・欠落、重複した項目、
+              開けない対応書庫を一覧します。
+            </p>
+            <p>
+              作品ファイルは変更・削除せず、外部へ送信しません。初回は比較用の基準を作るため、項目が
+              「追加」と表示されることがあります。
+            </p>
+          </section>
           {diagnosticsLoading && (
-            <div role="status" data-diagnostic-loading="true">
-              ライブラリを読み取り中です。
+            <div
+              className="diagnostic-progress"
+              role="status"
+              aria-live="polite"
+              data-diagnostic-loading="true"
+            >
+              <span className="diagnostic-activity-indicator" data-diagnostic-activity="indeterminate" aria-hidden="true" />
+              <div className="diagnostic-progress-copy">
+                <strong>診断を実行中です</strong>
+                <span>ライブラリの構成と対応書庫を確認しています。完了までこの表示が動き続けます。</span>
+              </div>
               <button type="button" onClick={cancelDiagnostics}>
                 診断をキャンセル
               </button>

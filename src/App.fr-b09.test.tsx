@@ -232,6 +232,20 @@ describe("FR-B09 connected library diagnostics", () => {
     expect(panel.querySelectorAll('[data-diagnostic-severity="error"]')).toHaveLength(1);
   });
 
+  it("explains the read-only check and shows an active indicator while diagnostics run", async () => {
+    diagnoseMock.mockImplementationOnce(() => new Promise<never>(() => undefined));
+    await registerLibrary();
+    openDiagnosticsMenuItem();
+
+    const panel = await screen.findByRole("dialog", { name: "ライブラリ診断" });
+    expect(within(panel).getByRole("heading", { name: "何をする機能ですか？" })).toBeInTheDocument();
+    expect(within(panel).getByText(/作品ファイルは変更・削除せず、外部へ送信しません/)).toBeInTheDocument();
+    const progress = within(panel).getByRole("status");
+    expect(progress).toHaveTextContent("診断を実行中です");
+    expect(progress).toHaveTextContent("ライブラリの構成と対応書庫を確認しています");
+    expect(progress.querySelector('[data-diagnostic-activity="indeterminate"]')).toBeInTheDocument();
+  });
+
   it("FT-B09-005 renders production cancellation and suppresses late stale retry results", async () => {
     diagnoseMock.mockResolvedValueOnce(response(report([]), "initial") as never);
     await registerLibrary();

@@ -58,6 +58,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".search-options-group", "min-width: 0")
         self.assert_rule_contains(".search-options-radios", "flex-wrap: wrap")
 
+    def test_diagnostics_explain_the_scan_and_show_an_activity_indicator(self) -> None:
+        self.assert_rule_contains(".diagnostic-explanation", "border: 1px solid #d9e3ef")
+        self.assert_rule_contains(".diagnostic-progress", "display: flex")
+        self.assert_rule_contains(
+            ".diagnostic-activity-indicator",
+            "animation: diagnostic-activity-spin .8s linear infinite",
+        )
+
     def test_dialogs_share_a_readable_visual_system(self) -> None:
         self.assert_rule_contains(
             '.dialog-backdrop > [role="dialog"]', "border-radius: 12px"

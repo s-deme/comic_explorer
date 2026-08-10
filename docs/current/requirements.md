@@ -90,6 +90,7 @@ Git履歴から参照する。
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
 | FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
+| FR-B09 ライブラリ診断 | REQ-FR-B09-001, REQ-FR-B09-002, REQ-FR-B09-003 | — | ライブラリをread-onlyで確認し、前回診断との追加・変更・欠落、重複、破損した対応書庫を表示する。作品を変更・削除・外部送信しないこと、初回は比較基準を作ることを説明する。実行中は割合を推定せず、確認対象と動作中を示すインジケータおよびcancel操作を表示する。 |
 | FR-B10 tag | REQ-FR-B10-001, REQ-FR-B10-002, REQ-FR-B10-003, REQ-FR-B10-004 | FUT-C-022 | normalized tagのassign/remove/query/rename/merge、invalid拒否、migration、再起動保存を保証する。 |
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | keyboard commandのremap、conflict拒否、reset、focus fallback、再起動保存を保証する。編集入口は統合設定だけに置き、helpは現在の割り当て表示だけを行う。touch/gamepadは候補のまま。 |
 | FR-B22 file manager | REQ-MVP-021, REQ-FR-B22-001, REQ-FR-B22-002, REQ-FR-B22-003, REQ-FR-B22-004 | FUT-C-024〜029, FUT-C-053 | 右click/keyboard context menu、Windows shell連携、選択項目のrename/move/copy/delete、現在folderへのcreate/paste、安全境界、成功後refreshを一貫して扱う。通常deleteはごみ箱、完全deleteは対象名を示す確認後だけ実行する。 |
@@ -126,7 +127,7 @@ Git履歴から参照する。
 | Rejected | FUT-R-001, FUT-R-002, FUT-R-003, FUT-R-008 | cloud同期、外部書誌、外部送信、閲覧時の原本自動変更。恒久安全原則を変更しない限り採用しない。 |
 | Partial | FUT-C-006, FUT-C-007, FUT-C-008 | AVIFはunsupported/parser境界だけ実装済み。完全decodeを推定しない。 |
 
-FR-B04とFR-B09は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。
+FR-B04は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。
 
 ## PDF対応の受入条件
 
