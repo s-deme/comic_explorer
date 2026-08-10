@@ -37,6 +37,13 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
+    def test_catalog_cards_reserve_a_separate_action_region(self) -> None:
+        self.assert_rule_contains(".catalog-actions", "display: flex")
+        self.assert_rule_contains(
+            ".catalog-cell--detail_list",
+            "grid-template-columns: minmax(0, 1fr) auto",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

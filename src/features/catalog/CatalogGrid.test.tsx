@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
 import { CatalogGrid } from "./CatalogGrid";
@@ -167,6 +167,38 @@ describe("CatalogGrid", () => {
     expect(onRead).toHaveBeenNthCalledWith(2, archive);
     expect(onRead).toHaveBeenNthCalledWith(3, image);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("keeps long labels and card actions in separate layout regions", () => {
+    const archive: CatalogEntry = {
+      relativePath: "Ginga FUJISAN Ryu vol 01 with a very long title.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+    };
+    render(
+      <CatalogGrid
+        entries={[archive]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onToggleFavorite={() => undefined}
+        viewMode="small_thumbnail"
+      />,
+    );
+
+    const item = screen.getByRole("button", { name: /^Ginga FUJISAN/ });
+    const cell = item.closest(".catalog-cell");
+    expect(cell).not.toBeNull();
+    expect(cell).toHaveClass("catalog-cell--small_thumbnail");
+    const actions = within(cell as HTMLElement).getByRole("group", {
+      name: `${archive.relativePath}の操作`,
+    });
+    expect(item).not.toContainElement(actions);
+    expect(within(actions).getByRole("button", { name: "お気に入りに追加" }))
+      .toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: "ZIP / CBZの項目1を読む" }))
+      .toBeInTheDocument();
   });
 
   it("keeps unavailable RAR/7z entries visibly unsupported and out of read/favorite actions", () => {

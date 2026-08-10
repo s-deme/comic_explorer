@@ -26,10 +26,10 @@ const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
   { columnCount: number; rowHeight: number }
 > = {
-  small_thumbnail: { columnCount: 8, rowHeight: 116 },
+  small_thumbnail: { columnCount: 8, rowHeight: 142 },
   detail_list: { columnCount: 1, rowHeight: 62 },
-  cover_list: { columnCount: 5, rowHeight: 258 },
-  reference_tile: { columnCount: 6, rowHeight: 218 },
+  cover_list: { columnCount: 5, rowHeight: 288 },
+  reference_tile: { columnCount: 6, rowHeight: 248 },
 };
 
 function displayName(entry: CatalogEntry): string {
@@ -160,6 +160,7 @@ export function CatalogGrid({
               <span>種別</span>
               <span>サイズ</span>
               <span>更新日時</span>
+              <span>操作</span>
             </div>
           )}
           <div
@@ -188,6 +189,7 @@ export function CatalogGrid({
                   const canFavorite =
                     entry.kind === "folder" || entry.kind === "comicFolder" || entry.kind === "archive";
                   const favorite = canFavorite && isFavorite(entry);
+                  const hasActions = canFavorite || canNavigate || canRead;
                   const thumbnail = (
                     <Thumbnail
                       entry={entry}
@@ -199,7 +201,8 @@ export function CatalogGrid({
                     <div
                       role="gridcell"
                       aria-selected={selectedPaths?.includes(entry.relativePath) ?? selectedPath === entry.relativePath}
-                      className="catalog-cell"
+                      className={`catalog-cell catalog-cell--${viewMode}`}
+                      data-has-actions={hasActions}
                       key={entry.relativePath}
                     >
                       <button
@@ -284,36 +287,44 @@ export function CatalogGrid({
                           </>
                         )}
                       </button>
-                      {canFavorite && (
-                        <button
-                          type="button"
-                          className="favorite-toggle"
-                          aria-label={favorite ? "お気に入りから解除" : "お気に入りに追加"}
-                          aria-pressed={favorite}
-                          data-favorite={favorite}
-                          data-product-id="favorite-toggle"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleFavorite(entry);
-                          }}
-                          onKeyDown={(event) => event.stopPropagation()}
+                      {hasActions && (
+                        <div
+                          className="catalog-actions"
+                          role="group"
+                          aria-label={`${name}の操作`}
                         >
-                          {favorite ? "★" : "☆"}
-                        </button>
-                      )}
-                      {(canNavigate || canRead) && (
-                        <button
-                          type="button"
-                          className="read-action"
-                          onClick={() =>
-                            entry.kind === "folder"
-                              ? onNavigate(entry)
-                              : onRead(entry)
-                          }
-                          aria-label={`${kind}の項目${itemIndex + 1}を${entry.kind === "folder" ? "開く" : "読む"}`}
-                        >
-                          {entry.kind === "folder" ? "開く" : "読む"}
-                        </button>
+                          {canFavorite && (
+                            <button
+                              type="button"
+                              className="favorite-toggle"
+                              aria-label={favorite ? "お気に入りから解除" : "お気に入りに追加"}
+                              aria-pressed={favorite}
+                              data-favorite={favorite}
+                              data-product-id="favorite-toggle"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleFavorite(entry);
+                              }}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              {favorite ? "★" : "☆"}
+                            </button>
+                          )}
+                          {(canNavigate || canRead) && (
+                            <button
+                              type="button"
+                              className="read-action"
+                              onClick={() =>
+                                entry.kind === "folder"
+                                  ? onNavigate(entry)
+                                  : onRead(entry)
+                              }
+                              aria-label={`${kind}の項目${itemIndex + 1}を${entry.kind === "folder" ? "開く" : "読む"}`}
+                            >
+                              {entry.kind === "folder" ? "開く" : "読む"}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
