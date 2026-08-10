@@ -835,7 +835,8 @@ try {
 })()
 "@ | Out-Null
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('$expectedRootEntryCount') && " +
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('$expectedRootEntryCount')) && " +
         "document.querySelector('#address').value.endsWith('\\library') && " +
         "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
         "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
@@ -929,7 +930,8 @@ try {
         $cold = $null
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('$expectedRootEntryCount')"
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('$expectedRootEntryCount'))"
         ) "webp thumbnail cache restart catalog"
         Wait-Evaluate (
             "(() => { const paths = $webpPathsJson; return paths.every((path) => " +
@@ -1270,7 +1272,8 @@ try {
         $cold = $null
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127'))"
         ) "favorite persistence restart catalog"
         Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
             Out-Null
@@ -1511,7 +1514,8 @@ try {
         Stop-Product $cold
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127'))"
         ) "memo restart catalog"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -1613,7 +1617,8 @@ try {
         Stop-Product $cold
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127')) && " +
             "document.querySelectorAll('.catalog-item').length > 0"
         ) "history restart catalog"
         Invoke-Evaluate "document.querySelector('[aria-controls=library-menu]')?.click(); true" |
@@ -1681,7 +1686,8 @@ try {
         Stop-Product $cold
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127')) && " +
             "document.querySelectorAll('.catalog-item').length > 0"
         ) "rating restart catalog"
         Invoke-Evaluate (
@@ -1858,7 +1864,8 @@ try {
         Stop-Product $cold
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127'))"
         ) "tag restart catalog"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -1946,22 +1953,24 @@ try {
             "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('#shortcut-nextPage').value === 'N' && " +
-            "document.querySelector('[data-shortcut-save-status=saved]') !== null"
-        ) "shortcut remap backend save completion"
+            "document.querySelector('#shortcut-nextPage').value === 'N'"
+        ) "shortcut remap draft"
         Invoke-Evaluate (
             "document.querySelector('#shortcut-previousPage').dispatchEvent(" +
             "new KeyboardEvent('keydown', {key:'N', bubbles:true})); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('[role=alert]')?.textContent.includes(" +
+            "document.querySelector('[data-product-id=shortcut-dialog] [role=status]')?.textContent.includes(" +
             "'\u6b21\u30da\u30fc\u30b8') && " +
             "document.querySelector('#shortcut-previousPage').value === 'PageUp'"
         ) "shortcut conflict rejection"
         Invoke-Evaluate (
-            "document.querySelector('[data-product-id=shortcut-dialog-close]').click(); true"
+            "document.querySelector('[data-product-id=shortcut-apply]').click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('[data-product-id=shortcut-dialog]') === null" "shortcut dialog close"
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=shortcut-dialog]') === null && " +
+            "document.querySelector('[data-shortcut-save-status=saved]') !== null"
+        ) "shortcut remap backend save completion"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
             ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
@@ -1986,7 +1995,8 @@ try {
         $port = Get-FreeTcpPort
         $cold = Start-Product
         Wait-Evaluate (
-            "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+            "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+            "node.textContent.startsWith('127'))"
         ) "shortcut restart catalog"
         Invoke-Evaluate (
             "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"
@@ -2003,13 +2013,15 @@ try {
             ".find((node) => node.textContent === '\u3059\u3079\u3066\u65e2\u5b9a\u306b\u623b\u3059').click(); true"
         ) | Out-Null
         Wait-Evaluate (
-            "document.querySelector('#shortcut-nextPage').value === 'PageDown' && " +
+            "document.querySelector('#shortcut-nextPage').value === 'PageDown'"
+        ) "shortcut reset draft"
+        Invoke-Evaluate (
+            "document.querySelector('[data-product-id=shortcut-apply]').click(); true"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('[data-product-id=shortcut-dialog]') === null && " +
             "document.querySelector('[data-shortcut-save-status=saved]') !== null"
         ) "shortcut reset backend save completion"
-        Invoke-Evaluate (
-            "document.querySelector('[data-product-id=shortcut-dialog-close]').click(); true"
-        ) | Out-Null
-        Wait-Evaluate "document.querySelector('[data-product-id=shortcut-dialog]') === null" "reset dialog close"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
             ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
@@ -2278,7 +2290,8 @@ try {
 
     $warm = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127'))"
     ) "restored catalog"
     Wait-Evaluate (
         "document.querySelector('.toolbar select').value === 'kind' && " +
@@ -2498,7 +2511,8 @@ try {
 
     $viewerRestart = Start-Product
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127'))"
     ) "viewer-settings restart catalog"
     Wait-Evaluate (
         "document.querySelectorAll('.thumbnail[data-cache-hit=true] img').length === 4 && " +
@@ -2518,7 +2532,8 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('#address').value.endsWith('\\library') && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127'))"
     ) "comic-folder keyboard navigation return"
     Invoke-Evaluate (
         "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
@@ -2604,7 +2619,8 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('[role=alert]') === null && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127')"
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127'))"
     ) "corrupt archive list recovery"
     Stop-Product $viewerRestart
     $viewerRestart = $null
@@ -2620,7 +2636,8 @@ try {
         Out-Null
     Wait-Evaluate (
         "document.querySelector('.error-panel') === null && " +
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127')) && " +
         "document.querySelector('#address').value.endsWith('\\library')"
     ) "stored root retry recovery"
     Stop-Product $rootRecovery
@@ -2658,7 +2675,8 @@ try {
     ) "keyboard submit focus"
     Invoke-OsKeys $keyboardProduct "{ENTER}"
     Wait-Evaluate (
-        "document.querySelector('.status-bar span')?.textContent.startsWith('127') && " +
+        "[...document.querySelectorAll('.status-bar span')].some((node) => " +
+        "node.textContent.startsWith('127')) && " +
         "document.querySelector('#address').value.endsWith('\\library')"
     ) "keyboard root registration"
     $keyboardLibraryRoot = Invoke-Evaluate "document.querySelector('#address').value"

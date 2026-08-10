@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 function openTagsMenuItem() {
-  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
   fireEvent.click(
-    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
       name: "タグ管理",
     }),
   );
@@ -77,7 +77,11 @@ vi.mock("./features/library/client", () => ({
   saveEndOfVolumePolicy: vi.fn(),
   saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
+  saveSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
+  getTrayStatus: vi.fn(),
+  storeMainWindowInTray: vi.fn(),
+  quitApplication: vi.fn(),
   searchLibrary: vi.fn(),
   setItemRating: vi.fn(),
   takeRecoveryNotice: vi.fn(),
@@ -161,6 +165,11 @@ describe("FR-B10 connected tag management", () => {
         scaleMode: "fit",
         scale: 1,
         loupeEnabled: false,
+        treeVisible: true,
+        menuBarVisible: true,
+        toolbarVisible: true,
+        shortcuts: {},
+        mouseGestures: {},
       }, "settings") as never,
     );
     takeRecoveryNoticeMock.mockResolvedValue(response(false, "recovery") as never);

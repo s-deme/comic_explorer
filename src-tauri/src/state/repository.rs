@@ -39,6 +39,17 @@ fn default_shortcut_bindings() -> BTreeMap<String, String> {
     .collect()
 }
 
+fn default_mouse_gesture_bindings() -> BTreeMap<String, String> {
+    [
+        ("swipeLeft", "nextPage"),
+        ("swipeRight", "previousPage"),
+        ("doubleClick", "none"),
+    ]
+    .into_iter()
+    .map(|(gesture, action)| (gesture.to_owned(), action.to_owned()))
+    .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub library_root: Option<PathBuf>,
@@ -52,7 +63,11 @@ pub struct Settings {
     pub scale_mode: String,
     pub scale: String,
     pub loupe_enabled: bool,
+    pub tree_visible: bool,
+    pub menu_bar_visible: bool,
+    pub toolbar_visible: bool,
     pub shortcut_bindings: BTreeMap<String, String>,
+    pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,7 +94,11 @@ impl Default for Settings {
             scale_mode: "fit".into(),
             scale: "1".into(),
             loupe_enabled: false,
+            tree_visible: true,
+            menu_bar_visible: true,
+            toolbar_visible: true,
             shortcut_bindings: default_shortcut_bindings(),
+            mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
     }
 }
@@ -151,9 +170,17 @@ impl StateStore {
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
                 "loupeEnabled" => settings.loupe_enabled = value == "true",
+                "treeVisible" => settings.tree_visible = value == "true",
+                "menuBarVisible" => settings.menu_bar_visible = value == "true",
+                "toolbarVisible" => settings.toolbar_visible = value == "true",
                 "shortcutBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.shortcut_bindings = bindings;
+                    }
+                }
+                "mouseGestureBindings" => {
+                    if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
+                        settings.mouse_gesture_bindings = bindings;
                     }
                 }
                 _ => {}
@@ -171,6 +198,13 @@ impl StateStore {
                 target: None,
                 retryable: false,
             })?;
+        let mouse_gesture_bindings = serde_json::to_string(&settings.mouse_gesture_bindings)
+            .map_err(|error| AppError {
+                code: ErrorCode::Internal,
+                message: format!("Mouse gesture settings could not be encoded: {error}"),
+                target: None,
+                retryable: false,
+            })?;
         let mut values = vec![
             ("sortField", settings.sort_field.clone()),
             ("sortDescending", settings.sort_descending.to_string()),
@@ -182,7 +216,11 @@ impl StateStore {
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
             ("loupeEnabled", settings.loupe_enabled.to_string()),
+            ("treeVisible", settings.tree_visible.to_string()),
+            ("menuBarVisible", settings.menu_bar_visible.to_string()),
+            ("toolbarVisible", settings.toolbar_visible.to_string()),
             ("shortcutBindings", shortcut_bindings),
+            ("mouseGestureBindings", mouse_gesture_bindings),
         ];
         if let Some(root) = &settings.library_root {
             values.push(("libraryRoot", root.to_string_lossy().into_owned()));
@@ -1022,7 +1060,7 @@ mod tests {
     }
 
     #[test]
-    fn settings_and_reading_position_survive_reopen() {
+    fn fr_b17_reference_tile_and_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1032,13 +1070,16 @@ mod tests {
                 sort_field: "modified".into(),
                 sort_descending: true,
                 end_of_volume_policy: "loop".into(),
-                catalog_view_mode: "detail_list".into(),
+                catalog_view_mode: "reference_tile".into(),
                 view_mode: "spread".into(),
                 layout_mode: "vertical_scroll".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
                 loupe_enabled: true,
+                tree_visible: false,
+                menu_bar_visible: false,
+                toolbar_visible: true,
                 shortcut_bindings: [
                     ("nextPage".into(), "N".into()),
                     ("previousPage".into(), "P".into()),
@@ -1048,6 +1089,13 @@ mod tests {
                     ("toggleDirection".into(), "R".into()),
                     ("zoomIn".into(), "+".into()),
                     ("zoomOut".into(), "-".into()),
+                ]
+                .into_iter()
+                .collect(),
+                mouse_gesture_bindings: [
+                    ("swipeLeft".into(), "previousPage".into()),
+                    ("swipeRight".into(), "nextPage".into()),
+                    ("doubleClick".into(), "closeViewer".into()),
                 ]
                 .into_iter()
                 .collect(),
@@ -1086,10 +1134,17 @@ mod tests {
         assert_eq!(restored.scale_mode, "custom");
         assert_eq!(restored.scale, "1.7");
         assert_eq!(restored.end_of_volume_policy, "loop");
-        assert_eq!(restored.catalog_view_mode, "detail_list");
+        assert_eq!(restored.catalog_view_mode, "reference_tile");
         assert_eq!(restored.layout_mode, "vertical_scroll");
         assert!(restored.loupe_enabled);
+        assert!(!restored.tree_visible);
+        assert!(!restored.menu_bar_visible);
+        assert!(restored.toolbar_visible);
         assert_eq!(restored.shortcut_bindings["nextPage"], "N");
+        assert_eq!(
+            restored.mouse_gesture_bindings["doubleClick"],
+            "closeViewer"
+        );
         assert_eq!(
             store.reading_position("item-1").unwrap().unwrap().page_key,
             RelativePath::parse("page7.png").unwrap()

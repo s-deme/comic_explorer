@@ -217,7 +217,31 @@ pub struct CatalogSettings {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub tree_visible: bool,
+    pub menu_bar_visible: bool,
+    pub toolbar_visible: bool,
     pub shortcuts: BTreeMap<String, String>,
+    pub mouse_gestures: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsProfileInput {
+    pub sort_field: String,
+    pub sort_descending: bool,
+    pub end_of_volume_policy: String,
+    pub catalog_view_mode: String,
+    pub view_mode: String,
+    pub layout_mode: String,
+    pub reading_direction: String,
+    pub scale_mode: String,
+    pub scale: f64,
+    pub loupe_enabled: bool,
+    pub tree_visible: bool,
+    pub menu_bar_visible: bool,
+    pub toolbar_visible: bool,
+    pub shortcuts: BTreeMap<String, String>,
+    pub mouse_gestures: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +276,9 @@ const SHORTCUT_COMMANDS: [&str; 8] = [
     "zoomIn",
     "zoomOut",
 ];
+
+const MOUSE_GESTURE_NAMES: [&str; 3] = ["swipeLeft", "swipeRight", "doubleClick"];
+const MOUSE_GESTURE_ACTIONS: [&str; 4] = ["none", "nextPage", "previousPage", "closeViewer"];
 
 fn default_shortcuts() -> BTreeMap<String, String> {
     [
@@ -342,6 +369,41 @@ fn normalize_shortcuts(shortcuts: &BTreeMap<String, String>) -> Option<BTreeMap<
     Some(shortcuts.clone())
 }
 
+fn default_mouse_gestures() -> BTreeMap<String, String> {
+    [
+        ("swipeLeft", "nextPage"),
+        ("swipeRight", "previousPage"),
+        ("doubleClick", "none"),
+    ]
+    .into_iter()
+    .map(|(gesture, action)| (gesture.to_owned(), action.to_owned()))
+    .collect()
+}
+
+fn normalize_mouse_gestures(
+    gestures: &BTreeMap<String, String>,
+) -> Option<BTreeMap<String, String>> {
+    if gestures.len() != MOUSE_GESTURE_NAMES.len()
+        || gestures
+            .keys()
+            .any(|gesture| !MOUSE_GESTURE_NAMES.contains(&gesture.as_str()))
+        || gestures
+            .values()
+            .any(|action| !MOUSE_GESTURE_ACTIONS.contains(&action.as_str()))
+    {
+        return None;
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    if gestures
+        .values()
+        .filter(|action| action.as_str() != "none")
+        .any(|action| !seen.insert(action.clone()))
+    {
+        return None;
+    }
+    Some(gestures.clone())
+}
+
 fn shortcuts_for_settings(settings: &crate::state::Settings) -> BTreeMap<String, String> {
     normalize_shortcuts(&settings.shortcut_bindings).unwrap_or_else(default_shortcuts)
 }
@@ -381,7 +443,7 @@ fn end_of_volume_policy(settings: &crate::state::Settings) -> String {
 fn catalog_view_mode(settings: &crate::state::Settings) -> String {
     if matches!(
         settings.catalog_view_mode.as_str(),
-        "small_thumbnail" | "detail_list" | "cover_list"
+        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
     ) {
         settings.catalog_view_mode.clone()
     } else {
@@ -407,6 +469,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let catalog_view_mode = catalog_view_mode(&settings);
     let layout_mode = viewer_layout_mode(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
+    let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
+        .unwrap_or_else(default_mouse_gestures);
     CatalogSettings {
         sort_field: settings.sort_field,
         sort_descending: settings.sort_descending,
@@ -418,7 +482,11 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         scale_mode,
         scale,
         loupe_enabled: settings.loupe_enabled,
+        tree_visible: settings.tree_visible,
+        menu_bar_visible: settings.menu_bar_visible,
+        toolbar_visible: settings.toolbar_visible,
         shortcuts,
+        mouse_gestures,
     }
 }
 
@@ -1243,7 +1311,7 @@ pub fn set_catalog_view_mode(
     }
     if !matches!(
         catalog_view_mode.as_str(),
-        "small_thumbnail" | "detail_list" | "cover_list"
+        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
     ) {
         return Ok(error_response(
             &context,
@@ -1251,18 +1319,34 @@ pub fn set_catalog_view_mode(
         ));
     }
     let settings = {
-        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
-        let mut settings = stores
-            .as_ref()
-            .map(|store| store.load_settings())
-            .transpose()
-            .map_err(|error| error.message)?
-            .unwrap_or_default();
+        let mut stores = match state.store.lock() {
+            Ok(stores) => stores,
+            Err(_) => {
+                return Ok(error_response(
+                    &context,
+                    request_error(
+                        ErrorCode::Internal,
+                        "Local settings storage is unavailable.",
+                    ),
+                ));
+            }
+        };
+        let Some(store) = stores.as_mut() else {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is not initialized.",
+                ),
+            ));
+        };
+        let mut settings = match store.load_settings() {
+            Ok(settings) => settings,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
         settings.catalog_view_mode = catalog_view_mode;
-        if let Some(store) = stores.as_mut() {
-            store
-                .save_settings(&settings)
-                .map_err(|error| error.message)?;
+        if let Err(error) = store.save_settings(&settings) {
+            return Ok(error_response(&context, error));
         }
         settings
     };
@@ -1292,18 +1376,34 @@ pub fn set_shortcut_bindings(
         ));
     };
     let settings = {
-        let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
-        let mut settings = stores
-            .as_ref()
-            .map(|store| store.load_settings())
-            .transpose()
-            .map_err(|error| error.message)?
-            .unwrap_or_default();
+        let mut stores = match state.store.lock() {
+            Ok(stores) => stores,
+            Err(_) => {
+                return Ok(error_response(
+                    &context,
+                    request_error(
+                        ErrorCode::Internal,
+                        "Local settings storage is unavailable.",
+                    ),
+                ));
+            }
+        };
+        let Some(store) = stores.as_mut() else {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is not initialized.",
+                ),
+            ));
+        };
+        let mut settings = match store.load_settings() {
+            Ok(settings) => settings,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
         settings.shortcut_bindings = normalized.clone();
-        if let Some(store) = stores.as_mut() {
-            store
-                .save_settings(&settings)
-                .map_err(|error| error.message)?;
+        if let Err(error) = store.save_settings(&settings) {
+            return Ok(error_response(&context, error));
         }
         settings
     };
@@ -1365,6 +1465,120 @@ pub fn set_viewer_settings(
             store
                 .save_settings(&settings)
                 .map_err(|error| error.message)?;
+        }
+        settings
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: catalog_settings(settings),
+    })
+}
+
+fn validate_settings_profile(
+    profile: &SettingsProfileInput,
+) -> Result<(BTreeMap<String, String>, BTreeMap<String, String>), AppError> {
+    let shortcuts = normalize_shortcuts(&profile.shortcuts).ok_or_else(|| {
+        request_error(
+            ErrorCode::InvalidRequest,
+            "Shortcut bindings are invalid or conflicting.",
+        )
+    })?;
+    let mouse_gestures = normalize_mouse_gestures(&profile.mouse_gestures).ok_or_else(|| {
+        request_error(
+            ErrorCode::InvalidRequest,
+            "Mouse gesture bindings are invalid or conflicting.",
+        )
+    })?;
+    if !matches!(
+        profile.sort_field.as_str(),
+        "name" | "modified" | "size" | "kind"
+    ) || !matches!(
+        profile.end_of_volume_policy.as_str(),
+        "auto_next" | "confirm_next" | "return_library" | "stop" | "loop"
+    ) || !matches!(
+        profile.catalog_view_mode.as_str(),
+        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
+    ) || !matches!(profile.view_mode.as_str(), "single" | "spread")
+        || !matches!(
+            profile.layout_mode.as_str(),
+            "paged" | "vertical_scroll" | "horizontal_scroll"
+        )
+        || !matches!(
+            profile.reading_direction.as_str(),
+            "rightToLeft" | "leftToRight"
+        )
+        || !matches!(
+            profile.scale_mode.as_str(),
+            "fit" | "width" | "height" | "original" | "custom"
+        )
+        || !profile.scale.is_finite()
+        || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&profile.scale)
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Settings profile contains an invalid value.",
+        ));
+    }
+    Ok((shortcuts, mouse_gestures))
+}
+
+#[tauri::command]
+pub fn set_settings_profile(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    profile: SettingsProfileInput,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let (shortcuts, mouse_gestures) = match validate_settings_profile(&profile) {
+        Ok(bindings) => bindings,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let settings = {
+        let mut stores = match state.store.lock() {
+            Ok(stores) => stores,
+            Err(_) => {
+                return Ok(error_response(
+                    &context,
+                    request_error(
+                        ErrorCode::Internal,
+                        "Local settings storage is unavailable.",
+                    ),
+                ));
+            }
+        };
+        let Some(store) = stores.as_mut() else {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is not initialized.",
+                ),
+            ));
+        };
+        let mut settings = match store.load_settings() {
+            Ok(settings) => settings,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
+        settings.sort_field = profile.sort_field;
+        settings.sort_descending = profile.sort_descending;
+        settings.end_of_volume_policy = profile.end_of_volume_policy;
+        settings.catalog_view_mode = profile.catalog_view_mode;
+        settings.view_mode = profile.view_mode;
+        settings.layout_mode = profile.layout_mode;
+        settings.reading_direction = profile.reading_direction;
+        settings.scale_mode = profile.scale_mode;
+        settings.scale = profile.scale.to_string();
+        settings.loupe_enabled = profile.loupe_enabled;
+        settings.tree_visible = profile.tree_visible;
+        settings.menu_bar_visible = profile.menu_bar_visible;
+        settings.toolbar_visible = profile.toolbar_visible;
+        settings.shortcut_bindings = shortcuts;
+        settings.mouse_gesture_bindings = mouse_gestures;
+        if let Err(error) = store.save_settings(&settings) {
+            return Ok(error_response(&context, error));
         }
         settings
     };
@@ -2086,19 +2300,112 @@ fn normalize_search_text(value: &str) -> String {
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpenItemKind {
+    Folder,
+    Archive,
+    Image,
+}
+
+fn contained_library_path(root: &Path, relative: &RelativePath) -> Result<PathBuf, AppError> {
+    let safe_error = |code, message: &str, retryable| AppError {
+        code,
+        message: message.into(),
+        target: Some(relative.clone()),
+        retryable,
+    };
+    let canonical_root = root.canonicalize().map_err(|error| {
+        let code = if error.kind() == std::io::ErrorKind::NotFound {
+            ErrorCode::NotFound
+        } else {
+            ErrorCode::AccessDenied
+        };
+        safe_error(code, "The library root is unavailable.", true)
+    })?;
+    let candidate = root.join(relative.as_str());
+    let canonical = candidate.canonicalize().map_err(|error| {
+        let code = if error.kind() == std::io::ErrorKind::NotFound {
+            ErrorCode::NotFound
+        } else if error.kind() == std::io::ErrorKind::PermissionDenied {
+            ErrorCode::AccessDenied
+        } else {
+            ErrorCode::InvalidPath
+        };
+        safe_error(code, "The requested library item is unavailable.", true)
+    })?;
+    if !canonical.starts_with(&canonical_root) {
+        return Err(safe_error(
+            ErrorCode::OutsideLibraryRoot,
+            "The requested item is outside the registered library root.",
+            false,
+        ));
+    }
+    Ok(canonical)
+}
+
+fn open_item_kind(path: &Path, relative: &RelativePath) -> Result<OpenItemKind, AppError> {
+    if path.is_dir() {
+        return Ok(OpenItemKind::Folder);
+    }
+    if !path.is_file() {
+        return Err(AppError {
+            code: ErrorCode::InvalidPath,
+            message: "The requested library item is not a file or folder.".into(),
+            target: Some(relative.clone()),
+            retryable: false,
+        });
+    }
+    match classify_file_name(relative.as_str()) {
+        FileKind::Archive => Ok(OpenItemKind::Archive),
+        FileKind::Image => Ok(OpenItemKind::Image),
+        FileKind::Unsupported => Err(AppError {
+            code: ErrorCode::UnsupportedFormat,
+            message: "The selected file format is not supported by the viewer.".into(),
+            target: Some(relative.clone()),
+            retryable: false,
+        }),
+    }
+}
+
 fn enumerate_pages_port(
     root: &std::path::Path,
     item: &std::path::Path,
-    is_archive: bool,
+    item_relative: &RelativePath,
+    kind: OpenItemKind,
     cancellation: &CancellationToken,
 ) -> Result<Vec<RelativePath>, AppError> {
     if cancellation.is_cancelled() {
         return Err(AppError::cancelled());
     }
-    let result = if is_archive {
-        enumerate_archive_pages(item)
-    } else {
-        enumerate_folder_pages(root, item)
+    let result = match kind {
+        OpenItemKind::Archive => enumerate_archive_pages(item),
+        OpenItemKind::Folder => enumerate_folder_pages(root, item),
+        OpenItemKind::Image => {
+            let mut file = std::fs::File::open(item).map_err(|error| AppError {
+                code: if error.kind() == std::io::ErrorKind::NotFound {
+                    ErrorCode::NotFound
+                } else {
+                    ErrorCode::AccessDenied
+                },
+                message: "The selected image could not be opened.".into(),
+                target: Some(item_relative.clone()),
+                retryable: true,
+            })?;
+            let byte_size = file
+                .metadata()
+                .map_err(|_| AppError {
+                    code: ErrorCode::AccessDenied,
+                    message: "The selected image metadata could not be read.".into(),
+                    target: Some(item_relative.clone()),
+                    retryable: true,
+                })?
+                .len();
+            crate::catalog::inspect_image(&mut file, byte_size).map_err(|mut error| {
+                error.target = Some(item_relative.clone());
+                error
+            })?;
+            Ok(vec![item_relative.clone()])
+        }
     };
     if cancellation.is_cancelled() {
         Err(AppError::cancelled())
@@ -2296,12 +2603,25 @@ pub async fn open_comic(
             ));
         }
     };
-    let item_path = root.join(item_relative.as_str());
+    let item_path = match contained_library_path(&root, &item_relative) {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let item_kind = match open_item_kind(&item_path, &item_relative) {
+        Ok(kind) => kind,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
     let worker_root = root.clone();
     let worker_item = item_path.clone();
-    let is_archive = classify_file_name(item_relative.as_str()) == FileKind::Archive;
+    let worker_relative = item_relative.clone();
     let page_paths = tauri::async_runtime::spawn_blocking(move || {
-        enumerate_pages_port(&worker_root, &worker_item, is_archive, &viewer_cancellation)
+        enumerate_pages_port(
+            &worker_root,
+            &worker_item,
+            &worker_relative,
+            item_kind,
+            &viewer_cancellation,
+        )
     })
     .await
     .map_err(|error| format!("page enumeration worker failed: {error}"))?;
@@ -2411,12 +2731,32 @@ pub async fn load_page(
         .ok_or_else(|| "library root is not configured".to_string())?;
     let is_archive = classify_file_name(item.as_str()) == FileKind::Archive;
     let source = if is_archive {
+        let archive = match contained_library_path(&root, &item) {
+            Ok(path) if path.is_file() => path,
+            Ok(_) => {
+                return Ok(error_response(
+                    &context,
+                    request_error(ErrorCode::InvalidPath, "Archive path is not a file."),
+                ));
+            }
+            Err(error) => return Ok(error_response(&context, error)),
+        };
         PageSource::ArchiveEntry {
-            archive: root.join(item.as_str()),
+            archive,
             entry: page.as_str().into(),
         }
     } else {
-        PageSource::File(root.join(page.as_str()))
+        let file = match contained_library_path(&root, &page) {
+            Ok(path) if path.is_file() => path,
+            Ok(_) => {
+                return Ok(error_response(
+                    &context,
+                    request_error(ErrorCode::InvalidPath, "Page path is not a file."),
+                ));
+            }
+            Err(error) => return Ok(error_response(&context, error)),
+        };
+        PageSource::File(file)
     };
     let page_id = page_id_for(item.as_str(), page.as_str());
     let mime_type = page_mime_type(&page);
@@ -2607,8 +2947,78 @@ mod shutdown_tests {
         settings.catalog_view_mode = "detail_list".into();
         assert_eq!(catalog_view_mode(&settings), "detail_list");
 
+        settings.catalog_view_mode = "reference_tile".into();
+        assert_eq!(catalog_view_mode(&settings), "reference_tile");
+
         settings.catalog_view_mode = "not-a-mode".into();
         assert_eq!(catalog_view_mode(&settings), "cover_list");
+    }
+
+    #[test]
+    fn fr_b19_settings_profile_validates_all_atomic_bindings() {
+        let mut profile = SettingsProfileInput {
+            sort_field: "name".into(),
+            sort_descending: false,
+            end_of_volume_policy: "auto_next".into(),
+            catalog_view_mode: "reference_tile".into(),
+            view_mode: "single".into(),
+            layout_mode: "paged".into(),
+            reading_direction: "rightToLeft".into(),
+            scale_mode: "fit".into(),
+            scale: 1.0,
+            loupe_enabled: false,
+            tree_visible: false,
+            menu_bar_visible: true,
+            toolbar_visible: false,
+            shortcuts: default_shortcuts(),
+            mouse_gestures: default_mouse_gestures(),
+        };
+        let (shortcuts, gestures) = validate_settings_profile(&profile).unwrap();
+        assert_eq!(shortcuts, profile.shortcuts);
+        assert_eq!(gestures, profile.mouse_gestures);
+
+        profile
+            .mouse_gestures
+            .insert("doubleClick".into(), "nextPage".into());
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+    }
+
+    #[test]
+    fn fr_b14_single_image_is_a_valid_one_page_viewer_item() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-single-image-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut jpeg = vec![
+            0xff, 0xd8, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x00, 0x01, 0x00, 0x01,
+        ];
+        jpeg.resize(24, 0);
+        std::fs::write(root.join("cover.jpg"), jpeg).unwrap();
+        let relative = RelativePath::parse("cover.jpg").unwrap();
+        let item = contained_library_path(&root, &relative).unwrap();
+
+        assert_eq!(
+            open_item_kind(&item, &relative).unwrap(),
+            OpenItemKind::Image
+        );
+        assert_eq!(
+            enumerate_pages_port(
+                &root,
+                &item,
+                &relative,
+                OpenItemKind::Image,
+                &CancellationToken::new(),
+            )
+            .unwrap(),
+            vec![relative]
+        );
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -2822,9 +3232,15 @@ mod shutdown_tests {
                 .code,
             ErrorCode::NotFound
         );
-        let pages =
-            enumerate_pages_port(&root, &root.join("FIX-ZIP-001/standard.cbz"), true, &active)
-                .unwrap();
+        let archive_relative = RelativePath::parse("FIX-ZIP-001/standard.cbz").unwrap();
+        let pages = enumerate_pages_port(
+            &root,
+            &root.join(archive_relative.as_str()),
+            &archive_relative,
+            OpenItemKind::Archive,
+            &active,
+        )
+        .unwrap();
         assert!(!pages.is_empty());
 
         let cancelled = CancellationToken::new();
@@ -2839,7 +3255,8 @@ mod shutdown_tests {
             enumerate_pages_port(
                 &root,
                 &root.join("FIX-ZIP-001/standard.cbz"),
-                true,
+                &archive_relative,
+                OpenItemKind::Archive,
                 &cancelled,
             )
             .unwrap_err()

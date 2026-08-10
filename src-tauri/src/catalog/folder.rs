@@ -28,6 +28,27 @@ pub enum ArchiveKind {
     SevenZip,
 }
 
+impl ArchiveKind {
+    fn reader_available(self) -> bool {
+        matches!(self, Self::Zip | Self::Cbz)
+    }
+}
+
+fn archive_kind_for_name(name: &str) -> Option<ArchiveKind> {
+    match name
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("zip") => Some(ArchiveKind::Zip),
+        Some("cbz") => Some(ArchiveKind::Cbz),
+        Some("rar") => Some(ArchiveKind::Rar),
+        Some("cbr") => Some(ArchiveKind::Cbr),
+        Some("7z") => Some(ArchiveKind::SevenZip),
+        _ => None,
+    }
+}
+
 pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntry>, AppError> {
     let root = canonical_directory(root)?;
     let directory = canonical_directory(directory)?;
@@ -64,11 +85,18 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
             RelativePath::parse(relative.as_ref()).map_err(|_| outside_error(&path))?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
+        let archive_kind = metadata
+            .is_file()
+            .then(|| archive_kind_for_name(&name))
+            .flatten();
         let kind = if metadata.is_dir() {
             directory_kind(contains_supported_image(&root, &path))
         } else {
             match classify_file_name(&name) {
-                FileKind::Archive => ItemKind::Archive,
+                FileKind::Archive if archive_kind.is_some_and(ArchiveKind::reader_available) => {
+                    ItemKind::Archive
+                }
+                FileKind::Archive => ItemKind::Unsupported,
                 FileKind::Image => ItemKind::Page,
                 FileKind::Unsupported => ItemKind::Unsupported,
             }
@@ -82,19 +110,7 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
                 .ok()
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .and_then(|value| u64::try_from(value.as_millis()).ok()),
-            archive_kind: (kind == ItemKind::Archive).then(|| {
-                match name
-                    .rsplit_once('.')
-                    .map(|(_, extension)| extension.to_ascii_lowercase())
-                    .as_deref()
-                {
-                    Some("cbz") => ArchiveKind::Cbz,
-                    Some("rar") => ArchiveKind::Rar,
-                    Some("cbr") => ArchiveKind::Cbr,
-                    Some("7z") => ArchiveKind::SevenZip,
-                    _ => ArchiveKind::Zip,
-                }
-            }),
+            archive_kind,
         });
     }
     entries.sort_by(|left, right| {
@@ -281,11 +297,14 @@ mod tests {
     }
 
     #[test]
-    fn catalog_metadata_distinguishes_zip_and_cbz_and_omits_folder_size() {
+    fn fr_b12_catalog_separates_available_and_unavailable_archive_kinds() {
         let root = temporary_root("catalog-metadata");
         fs::create_dir_all(root.join("folder")).unwrap();
         fs::write(root.join("book.zip"), b"zip").unwrap();
         fs::write(root.join("book.cbz"), b"cbz").unwrap();
+        fs::write(root.join("book.rar"), b"rar").unwrap();
+        fs::write(root.join("book.cbr"), b"cbr").unwrap();
+        fs::write(root.join("book.7z"), b"7z").unwrap();
 
         let entries = enumerate_folder(&root, &root).unwrap();
         let folder = entries
@@ -300,11 +319,33 @@ mod tests {
             .iter()
             .find(|entry| entry.relative_path.as_str() == "book.cbz")
             .unwrap();
+        let rar = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.rar")
+            .unwrap();
+        let cbr = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.cbr")
+            .unwrap();
+        let seven_zip = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.7z")
+            .unwrap();
 
         assert_eq!(folder.byte_size, None);
         assert!(folder.modified_ms.is_some());
+        assert_eq!(zip.kind, ItemKind::Archive);
+        assert_eq!(cbz.kind, ItemKind::Archive);
         assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
         assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
+        for (entry, archive_kind) in [
+            (rar, ArchiveKind::Rar),
+            (cbr, ArchiveKind::Cbr),
+            (seven_zip, ArchiveKind::SevenZip),
+        ] {
+            assert_eq!(entry.kind, ItemKind::Unsupported);
+            assert_eq!(entry.archive_kind, Some(archive_kind));
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }

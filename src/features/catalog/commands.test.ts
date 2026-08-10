@@ -17,23 +17,28 @@ const entries: CatalogEntry[] = [
 describe("catalog commands", () => {
   it("selects by kind and supports toggle/range selection", () => {
     expect(selectEntriesByKind(entries, "image")).toEqual(["01.jpg"]);
+    expect(selectEntriesByKind(entries, "file")).toEqual(["01.jpg", "volume.cbz"]);
     expect(toggleEntrySelection(["01.jpg"], "01.jpg")).toEqual([]);
     expect(rangeSelection(entries, "01.jpg", "volume.cbz")).toEqual(
       entries.map((entry) => entry.relativePath),
     );
   });
 
-  it("matches case-insensitive masks and multiple patterns", () => {
+  it("FT-B16-001 matches case-insensitive masks, multiple patterns, and empty segments", () => {
     expect(matchesMask(entries[1], "book ?")).toBe(true);
     expect(matchesMask(entries[2], "*.jpg;*.cbz")).toBe(true);
     expect(matchesMask(entries[0], "*.png")).toBe(false);
+    expect(matchesMask(entries[0], "; ;;; ")).toBe(true);
   });
 
   it("exports stable metadata columns with CSV escaping", () => {
     const csv = catalogCsv([
       { ...entries[0], relativePath: "a,b.jpg" as never },
+      { ...entries[0], relativePath: "=HYPERLINK(\"https://example.invalid\")" as never },
     ]);
     expect(csv).toContain("name,kind,relativePath,size,modified");
     expect(csv).toContain('"a,b.jpg",page,"a,b.jpg",10,');
+    expect(csv).toContain('"\'=HYPERLINK(""https://example.invalid"")"');
+    expect(csv).not.toContain('\n"=HYPERLINK');
   });
 });

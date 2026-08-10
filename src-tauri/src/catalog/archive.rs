@@ -38,7 +38,7 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
     let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
     let mut archive = ZipArchive::new(file).map_err(|source| AppError {
         code: ErrorCode::CorruptArchive,
-        message: format!("Cannot parse {}: {source}", path.display()),
+        message: format!("Cannot parse archive: {source}"),
         target: None,
         retryable: false,
     })?;
@@ -51,7 +51,7 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
     for index in 0..archive.len() {
         let entry = archive.by_index_raw(index).map_err(|source| AppError {
             code: ErrorCode::CorruptArchive,
-            message: format!("Cannot read {} entry {index}: {source}", path.display()),
+            message: format!("Cannot read archive entry {index}: {source}"),
             target: None,
             retryable: false,
         })?;
@@ -108,7 +108,7 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
     Ok(pages)
 }
 
-fn unsupported_adapter_error(path: &Path, adapter: ArchiveAdapterKind) -> AppError {
+fn unsupported_adapter_error(_path: &Path, adapter: ArchiveAdapterKind) -> AppError {
     let name = match adapter {
         ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => "RAR/CBR",
         ArchiveAdapterKind::SevenZip => "7z",
@@ -116,23 +116,20 @@ fn unsupported_adapter_error(path: &Path, adapter: ArchiveAdapterKind) -> AppErr
     };
     AppError {
         code: ErrorCode::UnsupportedFormat,
-        message: format!(
-            "{name} archive adapter is unavailable for {}.",
-            path.display()
-        ),
+        message: format!("{name} archive adapter is unavailable."),
         target: None,
         retryable: false,
     }
 }
 
-fn archive_io_error(path: &Path, source: std::io::Error) -> AppError {
+fn archive_io_error(_path: &Path, source: std::io::Error) -> AppError {
     AppError {
         code: match source.kind() {
             std::io::ErrorKind::NotFound => ErrorCode::NotFound,
             std::io::ErrorKind::PermissionDenied => ErrorCode::AccessDenied,
             _ => ErrorCode::CorruptArchive,
         },
-        message: format!("Cannot open {}: {source}", path.display()),
+        message: format!("Cannot open archive: {source}"),
         target: None,
         retryable: true,
     }
@@ -232,6 +229,7 @@ mod tests {
         );
         for (extension, signature) in [
             ("rar", b"Rar!\x1a\x07\x00".as_slice()),
+            ("cbr", b"Rar!\x1a\x07\x00".as_slice()),
             ("7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
         ] {
             let mut path = temporary_archive(&format!("unsupported-{extension}"));
@@ -241,6 +239,8 @@ mod tests {
             let error = enumerate_archive_pages(&path).unwrap_err();
             assert_eq!(error.code, ErrorCode::UnsupportedFormat);
             assert!(error.message.contains("adapter is unavailable"));
+            assert!(!error.message.contains(path.to_string_lossy().as_ref()));
+            assert!(!error.message.contains("comic-explorer-unsupported"));
             fs::remove_file(path).unwrap();
         }
     }

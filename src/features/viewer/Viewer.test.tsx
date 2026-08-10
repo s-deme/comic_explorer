@@ -369,4 +369,82 @@ describe("Viewer settings", () => {
       "false",
     );
   });
+
+  it("FT-B15-001 resolves stale bookmark ordinals by pageKey and opens them from the list", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        bookmarks={[{
+          itemKey: multiPageSession.itemKey,
+          pageIndex: 0,
+          pageKey: "2.png",
+          createdAt: 1,
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "しおり一覧" }));
+    const dialog = screen.getByRole("dialog", { name: "しおり一覧" });
+    fireEvent.click(screen.getByRole("button", { name: "2ページ: 2.png" }));
+    expect(dialog).not.toBeInTheDocument();
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+  });
+
+  it("FT-B18-003 closes a detached viewer with one Escape instead of only toggling its shell", async () => {
+    const onClose = vi.fn();
+    const onToggleDetached = vi.fn();
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={onClose}
+        detached
+        onToggleDetached={onToggleDetached}
+      />,
+    );
+
+    const detachButton = screen.getByRole("button", { name: "画像表示を統合" });
+    detachButton.focus();
+    fireEvent.keyDown(detachButton, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onToggleDetached).not.toHaveBeenCalled();
+  });
+
+  it("FT-B19-003 connects configured gestures to page movement and close", async () => {
+    const onClose = vi.fn();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={onClose}
+        mouseGestures={{
+          swipeLeft: "nextPage",
+          swipeRight: "previousPage",
+          doubleClick: "closeViewer",
+        }}
+      />,
+    );
+
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    expect(stage).not.toBeNull();
+    fireEvent.pointerDown(stage!, { clientX: 100 });
+    fireEvent.pointerUp(stage!, { clientX: 0 });
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    fireEvent.pointerDown(stage!, { clientX: 0 });
+    fireEvent.pointerUp(stage!, { clientX: 100 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    fireEvent.doubleClick(stage!);
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  });
 });

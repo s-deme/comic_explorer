@@ -31,17 +31,24 @@ import {
   saveEndOfVolumePolicy,
   saveItemMemo,
   saveReadingPosition,
+  saveSettingsProfile,
   saveViewerSettings,
+  getTrayStatus,
+  storeMainWindowInTray,
+  quitApplication,
   setItemRating,
   searchLibrary,
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
+  type CatalogSettings,
   type FavoriteEntry,
   type ItemMetadata,
   type ReadingHistoryEntry,
 } from "./features/library/client";
 import type { CatalogEntry, ImageFormat } from "./types/domain";
+import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
+import { APP_VERSION, DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -63,7 +70,11 @@ vi.mock("./features/library/client", () => ({
   saveEndOfVolumePolicy: vi.fn(),
   saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
+  saveSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
+  getTrayStatus: vi.fn(),
+  storeMainWindowInTray: vi.fn(),
+  quitApplication: vi.fn(),
   setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
   diagnoseLibrary: vi.fn(),
@@ -91,12 +102,34 @@ const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
 const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
 const saveMemoMock = vi.mocked(saveItemMemo);
 const saveReadingMock = vi.mocked(saveReadingPosition);
+const saveSettingsProfileMock = vi.mocked(saveSettingsProfile);
 const saveViewerMock = vi.mocked(saveViewerSettings);
+const getTrayStatusMock = vi.mocked(getTrayStatus);
+const storeMainWindowInTrayMock = vi.mocked(storeMainWindowInTray);
+const quitApplicationMock = vi.mocked(quitApplication);
 const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
 const diagnoseMock = vi.mocked(diagnoseLibrary);
+
+const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
+  sortField: "name",
+  sortDescending: false,
+  endOfVolumePolicy: "auto_next",
+  catalogViewMode: "cover_list",
+  viewMode: "single",
+  layoutMode: "paged",
+  readingDirection: "rightToLeft",
+  scaleMode: "fit",
+  scale: 1,
+  loupeEnabled: false,
+  treeVisible: true,
+  menuBarVisible: true,
+  toolbarVisible: true,
+  shortcuts: { ...DEFAULT_SHORTCUTS },
+  mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
+};
 
 function testEntry(relativePath: string): CatalogEntry {
   return {
@@ -236,13 +269,13 @@ async function openTestComic(relativePath: string) {
   await screen.findByLabelText(`${relativePath} ビューワ`);
 }
 
-function openAppMenu(name: "ファイル" | "移動" | "表示" | "ライブラリ" | "ヘルプ") {
+function openAppMenu(name: "ファイル" | "編集" | "表示" | "オプション" | "ヘルプ") {
   fireEvent.click(screen.getByRole("menuitem", { name }));
   return screen.getByRole("menu", { name });
 }
 
 function chooseAppMenuItem(
-  menuName: "ファイル" | "移動" | "表示" | "ライブラリ" | "ヘルプ",
+  menuName: "ファイル" | "編集" | "表示" | "オプション" | "ヘルプ",
   itemName: string | RegExp,
 ) {
   const menu = openAppMenu(menuName);
@@ -272,7 +305,11 @@ describe("application shell", () => {
     saveEndPolicyMock.mockReset();
     saveMemoMock.mockReset();
     saveReadingMock.mockReset();
+    saveSettingsProfileMock.mockReset();
     saveViewerMock.mockReset();
+    getTrayStatusMock.mockReset();
+    storeMainWindowInTrayMock.mockReset();
+    quitApplicationMock.mockReset();
     setRatingMock.mockReset();
     searchMock.mockReset();
     recoveryNoticeMock.mockReset();
@@ -300,52 +337,45 @@ describe("application shell", () => {
       status: "ok",
       requestId: "settings" as never,
       generation: 1 as never,
-      data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
-      },
+      data: { ...DEFAULT_CATALOG_SETTINGS },
     });
+    getTrayStatusMock.mockResolvedValue({
+      status: "ok",
+      requestId: "tray-status" as never,
+      generation: 1 as never,
+      data: { available: true, stored: false, reason: null },
+    });
+    storeMainWindowInTrayMock.mockResolvedValue({
+      status: "ok",
+      requestId: "tray-store" as never,
+      generation: 1 as never,
+      data: { available: true, stored: true, reason: null },
+    });
+    quitApplicationMock.mockResolvedValue({
+      status: "ok",
+      requestId: "quit" as never,
+      generation: 1 as never,
+      data: undefined,
+    });
+    saveSettingsProfileMock.mockImplementation(async (profile) => ({
+      status: "ok",
+      requestId: "save-profile" as never,
+      generation: 1 as never,
+      data: {
+        ...profile,
+      },
+    }));
     saveSortMock.mockResolvedValue({
       status: "ok",
       requestId: "save-sort" as never,
       generation: 1 as never,
-      data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
-      },
+      data: { ...DEFAULT_CATALOG_SETTINGS },
     });
     saveEndPolicyMock.mockResolvedValue({
       status: "ok",
       requestId: "save-end-policy" as never,
       generation: 1 as never,
-      data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
-      },
+      data: { ...DEFAULT_CATALOG_SETTINGS },
     });
     saveReadingMock.mockResolvedValue({
       status: "ok",
@@ -353,39 +383,17 @@ describe("application shell", () => {
       generation: 1 as never,
       data: undefined,
     });
-    saveCatalogViewModeMock.mockResolvedValue({
+    saveCatalogViewModeMock.mockImplementation(async (mode) => ({
       status: "ok",
       requestId: "save-catalog-view-mode" as never,
       generation: 1 as never,
-      data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
-      },
-    });
+      data: { ...DEFAULT_CATALOG_SETTINGS, catalogViewMode: mode },
+    }));
     saveViewerMock.mockResolvedValue({
       status: "ok",
       requestId: "save-viewer" as never,
       generation: 1 as never,
-      data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
-      },
+      data: { ...DEFAULT_CATALOG_SETTINGS },
     });
     restoreMock.mockResolvedValue({
       status: "ok",
@@ -554,18 +562,18 @@ describe("application shell", () => {
     expect(splitter).toHaveAttribute("aria-valuenow", "230");
 
     const trigger = screen.getByRole("menuitem", { name: "ヘルプ" });
-    chooseAppMenuItem("ヘルプ", "キー操作とショートカット…");
+    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
-  it("opens five top-level menus without firing their actions and runs File exactly once", async () => {
+  it("FT-B17-001 opens the required five top-level menus and runs File exactly once", async () => {
     await registerTestLibrary([]);
 
     const menubar = screen.getByRole("menubar", { name: "メニューバー" });
     expect(
       within(menubar).getAllByRole("menuitem").map((item) => item.getAttribute("aria-label")),
-    ).toEqual(["ファイル", "移動", "表示", "ライブラリ", "ヘルプ"]);
+    ).toEqual(["ファイル", "編集", "表示", "オプション", "ヘルプ"]);
     const fileTrigger = within(menubar).getByRole("menuitem", { name: "ファイル" });
     expect(fileTrigger).toHaveAttribute("aria-keyshortcuts", "Alt+F");
 
@@ -595,15 +603,15 @@ describe("application shell", () => {
     );
 
     fireEvent.keyDown(viewTrigger, { key: "ArrowRight" });
-    const libraryTrigger = within(menubar).getByRole("menuitem", {
-      name: "ライブラリ",
+    const optionsTrigger = within(menubar).getByRole("menuitem", {
+      name: "オプション",
     });
     await waitFor(() => {
-      expect(libraryTrigger).toHaveFocus();
+      expect(optionsTrigger).toHaveFocus();
       expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([-1, -1, -1, 0, -1]);
     });
 
-    fireEvent.keyDown(libraryTrigger, { key: "ArrowLeft" });
+    fireEvent.keyDown(optionsTrigger, { key: "ArrowLeft" });
     await waitFor(() => {
       expect(viewTrigger).toHaveFocus();
       expect(triggers.map((trigger) => trigger.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
@@ -655,7 +663,7 @@ describe("application shell", () => {
     expect(screen.queryByRole("menu", { name: "ファイル" })).not.toBeInTheDocument();
   });
 
-  it("shares View radio state with the toolbar and invokes each existing callback once", async () => {
+  it("FT-B17-002 exposes accessible toolbar commands and invokes each callback once", async () => {
     await registerTestLibrary([]);
 
     let viewMenu = openAppMenu("表示");
@@ -701,10 +709,10 @@ describe("application shell", () => {
   it("supports mnemonic, item traversal, cross-menu arrows and Escape focus return", async () => {
     await registerTestLibrary([]);
 
-    fireEvent.keyDown(window, { key: "n", altKey: true });
-    const navigationMenu = await screen.findByRole("menu", { name: "移動" });
-    const back = within(navigationMenu).getByRole("menuitem", { name: /戻る/ });
-    const up = within(navigationMenu).getByRole("menuitem", {
+    fireEvent.keyDown(window, { key: "v", altKey: true });
+    const viewMenu = await screen.findByRole("menu", { name: "表示" });
+    const back = within(viewMenu).getByRole("menuitem", { name: /戻る/ });
+    const up = within(viewMenu).getByRole("menuitem", {
       name: /上のフォルダへ/,
     });
     await waitFor(() => expect(back).toHaveFocus());
@@ -714,26 +722,19 @@ describe("application shell", () => {
     expect(listMock).toHaveBeenCalledTimes(1);
 
     fireEvent.keyDown(back, { key: "End" });
-    expect(up).toHaveFocus();
+    const lastViewItem = within(viewMenu).getByRole("menuitemradio", { name: "参照型タイル" });
+    expect(lastViewItem).toHaveFocus();
+    fireEvent.keyDown(lastViewItem, { key: "Home" });
+    expect(back).toHaveFocus();
     fireEvent.keyDown(up, { key: "ArrowRight" });
-    const viewMenu = await screen.findByRole("menu", { name: "表示" });
-    const firstViewItem = within(viewMenu).getByRole("menuitemradio", {
-      name: "名前で並べ替え",
-    });
-    await waitFor(() => expect(firstViewItem).toHaveFocus());
-    fireEvent.keyDown(firstViewItem, { key: "End" });
-    expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }))
-      .toHaveFocus();
-    fireEvent.keyDown(
-      within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }),
-      { key: "Home" },
-    );
-    expect(firstViewItem).toHaveFocus();
-    fireEvent.keyDown(firstViewItem, { key: "Escape" });
+    const optionsMenu = await screen.findByRole("menu", { name: "オプション" });
+    const settingsItem = within(optionsMenu).getByRole("menuitem", { name: "統合設定…" });
+    await waitFor(() => expect(settingsItem).toHaveFocus());
+    fireEvent.keyDown(settingsItem, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.getByRole("menuitem", { name: "表示" })).toHaveFocus(),
+      expect(screen.getByRole("menuitem", { name: "オプション" })).toHaveFocus(),
     );
-    expect(screen.queryByRole("menu", { name: "表示" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "オプション" })).not.toBeInTheDocument();
   });
 
   it("connects Navigation history and prevents diagnostics re-entry while busy", async () => {
@@ -748,7 +749,7 @@ describe("application shell", () => {
       expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
     );
 
-    let navigationMenu = openAppMenu("移動");
+    let navigationMenu = openAppMenu("表示");
     expect(within(navigationMenu).getByRole("menuitem", { name: /戻る/ }))
       .toHaveAttribute("aria-disabled", "false");
     expect(within(navigationMenu).getByRole("menuitem", { name: /進む/ }))
@@ -758,7 +759,7 @@ describe("application shell", () => {
     fireEvent.click(within(navigationMenu).getByRole("menuitem", { name: /戻る/ }));
     await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
 
-    navigationMenu = openAppMenu("移動");
+    navigationMenu = openAppMenu("表示");
     expect(within(navigationMenu).getByRole("menuitem", { name: /進む/ }))
       .toHaveAttribute("aria-disabled", "false");
     fireEvent.keyDown(
@@ -777,7 +778,7 @@ describe("application shell", () => {
     fireEvent.keyDown(window, { key: "ArrowUp", altKey: true });
     await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
 
-    let libraryMenu = openAppMenu("ライブラリ");
+    let libraryMenu = openAppMenu("オプション");
     const diagnostics = within(libraryMenu).getByRole("menuitem", {
       name: "ライブラリ診断…",
     });
@@ -785,7 +786,7 @@ describe("application shell", () => {
     fireEvent.click(diagnostics);
     expect(diagnoseMock).toHaveBeenCalledTimes(1);
 
-    libraryMenu = openAppMenu("ライブラリ");
+    libraryMenu = openAppMenu("オプション");
     const busyDiagnostics = within(libraryMenu).getByRole("menuitem", {
       name: "ライブラリ診断…",
     });
@@ -925,7 +926,7 @@ describe("application shell", () => {
       { key: "Enter" },
     );
     expect(await screen.findByLabelText("01-first.cbz ビューワ")).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("02-second.cbz");
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -989,23 +990,15 @@ describe("application shell", () => {
       requestId: "stale-settings" as never,
       generation: 1 as never,
       data: {
-        sortField: "name",
-        sortDescending: false,
+        ...DEFAULT_CATALOG_SETTINGS,
         endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
       },
     });
     await waitFor(() =>
       expect(screen.getByLabelText("巻末動作")).toHaveValue("return_library"),
     );
     await openTestComic(first.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     await waitFor(() =>
       expect(
@@ -1028,7 +1021,7 @@ describe("application shell", () => {
       target: { value: "stop" },
     });
     await openTestComic(first.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     const notice = await screen.findByText("巻末動作が停止に設定されています。");
     expect(notice).toHaveAttribute("role", "status");
@@ -1051,7 +1044,7 @@ describe("application shell", () => {
           addEventListenerSpy.mock.calls.some(([type]) => type === "keydown"),
         ).toBe(true),
       );
-      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
       const notice = await screen.findByText("巻末です。次の漫画はありません。");
       expect(notice).toHaveAttribute("role", "status");
@@ -1076,7 +1069,7 @@ describe("application shell", () => {
       target: { value: "loop" },
     });
     await openTestComic(last.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(
       await screen.findByLabelText(`${first.relativePath} ビューワ`),
@@ -1094,16 +1087,8 @@ describe("application shell", () => {
       requestId: "restored-settings" as never,
       generation: 1 as never,
       data: {
-        sortField: "name",
-        sortDescending: false,
+        ...DEFAULT_CATALOG_SETTINGS,
         endOfVolumePolicy: "stop",
-        catalogViewMode: "cover_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
       },
     });
     const first = testEntry("01-first.cbz");
@@ -1115,7 +1100,7 @@ describe("application shell", () => {
       expect(screen.getByLabelText("巻末動作")).toHaveValue("stop"),
     );
     await openTestComic(first.relativePath);
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
 
     expect(
       await screen.findByText("巻末動作が停止に設定されています。"),
@@ -1233,10 +1218,7 @@ describe("application shell", () => {
       requestId: "restored-layout" as never,
       generation: 1 as never,
       data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
-        catalogViewMode: "cover_list",
+        ...DEFAULT_CATALOG_SETTINGS,
         viewMode: "spread",
         layoutMode: "horizontal_scroll",
         readingDirection: "leftToRight",
@@ -1376,16 +1358,8 @@ describe("application shell", () => {
       requestId: "restored-catalog-settings" as never,
       generation: 1 as never,
       data: {
-        sortField: "name",
-        sortDescending: false,
-        endOfVolumePolicy: "auto_next",
+        ...DEFAULT_CATALOG_SETTINGS,
         catalogViewMode: "detail_list",
-        viewMode: "single",
-        layoutMode: "paged",
-        readingDirection: "rightToLeft",
-        scaleMode: "fit",
-        scale: 1,
-        loupeEnabled: false,
       },
     });
 
@@ -1401,6 +1375,30 @@ describe("application shell", () => {
     expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
       "small_thumbnail",
       expect.any(Number),
+    );
+  });
+
+  it("FT-B17-003 rolls back a catalog view mode that the backend cannot persist", async () => {
+    saveCatalogViewModeMock.mockResolvedValueOnce({
+      status: "error",
+      requestId: "catalog-view-error" as never,
+      generation: 1 as never,
+      error: {
+        code: "ACCESS_DENIED",
+        message: "settings database unavailable",
+        retryable: true,
+      },
+    });
+    await registerTestLibrary([testEntry("book.cbz")]);
+    const selector = screen.getByLabelText("一覧表示形式");
+
+    fireEvent.change(selector, { target: { value: "reference_tile" } });
+
+    await waitFor(() => expect(selector).toHaveValue("cover_list"));
+    expect(screen.getByText(/アクセスできません/)).toBeInTheDocument();
+    expect(screen.getByRole("grid")).toHaveAttribute(
+      "data-catalog-view-mode",
+      "cover_list",
     );
   });
 
@@ -1668,7 +1666,7 @@ describe("application shell", () => {
           resolveStaleFavorites = resolve;
         }),
     );
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     const dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     expect(within(dialog).getByRole("button", { name: "確認中…" })).toBeDisabled();
     fireEvent.click(within(dialog).getByRole("button", { name: "解除" }));
@@ -1690,13 +1688,13 @@ describe("application shell", () => {
     openMock.mockResolvedValueOnce(viewerResponse(comic.relativePath));
     await registerTestLibrary([folder, comic]);
 
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     let dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[0]);
     await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"));
     expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
 
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[1]);
     expect(await screen.findByLabelText("Series/01.cbz ビューワ")).toBeInTheDocument();
@@ -1708,11 +1706,11 @@ describe("application shell", () => {
     listFavoritesMock.mockResolvedValue(favoritesResponse([favorite]));
     await registerTestLibrary([{ relativePath: "Series" as never, kind: "folder" }]);
 
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     const firstDialog = await screen.findByRole("dialog", { name: "お気に入り" });
     expect(within(firstDialog).getByText("Series")).toBeInTheDocument();
     fireEvent.click(within(firstDialog).getByRole("button", { name: "閉じる" }));
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     const secondDialog = await screen.findByRole("dialog", { name: "お気に入り" });
     expect(within(secondDialog).getByText("Series")).toBeInTheDocument();
     expect(listFavoritesMock).toHaveBeenCalledTimes(2);
@@ -1746,7 +1744,7 @@ describe("application shell", () => {
     removeFavoriteMock.mockResolvedValue(favoritesResponse([missing]));
     await registerTestLibrary([testEntry("root.cbz")]);
 
-    chooseAppMenuItem("ライブラリ", "お気に入り");
+    chooseAppMenuItem("オプション", "お気に入り");
     const dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     const movedRow = dialog.querySelector('[data-favorite-id="favorite-moved"]') as HTMLElement;
     const missingRow = dialog.querySelector('[data-favorite-id="favorite-missing"]') as HTMLElement;
@@ -1780,6 +1778,258 @@ describe("application shell", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "お気に入りに追加" })[0]);
     expect(addFavoriteMock).toHaveBeenCalledWith("book.cbz", expect.any(Number));
     expect(addFavoriteMock.mock.calls[0][0]).not.toMatch(/^[A-Za-z]:[\\/]/);
+  });
+
+  it("FT-B14-001 opens a catalog image as a one-page viewer item", async () => {
+    const image: CatalogEntry = { relativePath: "cover.jpg" as never, kind: "page" };
+    openMock.mockResolvedValueOnce(viewerResponse(image.relativePath));
+    await registerTestLibrary([image]);
+
+    const imageButton = screen.getByRole("button", { name: /^cover\.jpg、画像/ });
+    fireEvent.keyDown(imageButton, { key: "Enter" });
+
+    expect(await screen.findByLabelText("cover.jpg ビューワ")).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledWith("cover.jpg", expect.any(Number));
+  });
+
+  it("FT-B13-001 restores every surviving selection after F5 and drops only missing entries", async () => {
+    const first = testEntry("01.cbz");
+    const second = testEntry("02.cbz");
+    const third = testEntry("03.cbz");
+    await registerTestLibrary([first, second, third]);
+    const firstButton = screen.getByRole("button", { name: /^01\.cbz/ });
+    const secondButton = screen.getByRole("button", { name: /^02\.cbz/ });
+    fireEvent.click(firstButton);
+    fireEvent.click(secondButton, { ctrlKey: true });
+    expect(screen.getByText("2件選択")).toBeInTheDocument();
+
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "refresh" as never,
+      generation: 3 as never,
+      data: [second, third],
+    });
+    fireEvent.keyDown(window, { key: "F5" });
+
+    await waitFor(() => expect(screen.getByText("1件選択")).toBeInTheDocument());
+    expect(screen.getByRole("gridcell", { name: /02\.cbz/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("button", { name: /^01\.cbz/ })).not.toBeInTheDocument();
+  });
+
+  it("FT-B13-002 extends a keyboard range from the original anchor", async () => {
+    await registerTestLibrary([
+      testEntry("01.cbz"),
+      testEntry("02.cbz"),
+      testEntry("03.cbz"),
+      testEntry("04.cbz"),
+    ]);
+    const first = screen.getByRole("button", { name: /^01\.cbz/ });
+    fireEvent.click(first);
+    fireEvent.keyDown(first, { key: "ArrowRight", shiftKey: true });
+    const second = screen.getByRole("button", { name: /^02\.cbz/ });
+    fireEvent.keyDown(second, { key: "ArrowRight", shiftKey: true });
+
+    expect(screen.getByText("3件選択")).toBeInTheDocument();
+    for (const name of ["01.cbz", "02.cbz", "03.cbz"]) {
+      expect(screen.getByRole("gridcell", { name: new RegExp(name.replace(".", "\\.")) }))
+        .toHaveAttribute("aria-selected", "true");
+    }
+  });
+
+  it("FT-B16-002 reports CSV download setup failure without claiming success", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: () => {
+        throw new Error("download blocked");
+      },
+    });
+    try {
+      await registerTestLibrary([testEntry("book.cbz")]);
+      chooseAppMenuItem("ファイル", "CSVで出力");
+
+      expect(screen.getByText("CSVを出力できませんでした。保存機能を確認してください。"))
+        .toBeInTheDocument();
+      expect(screen.queryByText(/件をCSVへ出力しました/)).not.toBeInTheDocument();
+    } finally {
+      if (descriptor === undefined) delete (URL as { createObjectURL?: unknown }).createObjectURL;
+      else Object.defineProperty(URL, "createObjectURL", descriptor);
+    }
+  });
+
+  it("FT-B14-002 discards an in-flight open when the library root changes", async () => {
+    let resolveOpen!: (value: ReturnType<typeof viewerResponse>) => void;
+    openMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveOpen = resolve;
+    }));
+    await registerTestLibrary([testEntry("old.cbz")]);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^old\.cbz/ }), { key: "Enter" });
+
+    chooseAppMenuItem("ファイル", "ライブラリを変更…");
+    registerMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "register-new-root" as never,
+      generation: 4 as never,
+      data: { absolutePath: "D:\\New Comics" },
+    });
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "list-new-root" as never,
+      generation: 5 as never,
+      data: [testEntry("new.cbz")],
+    });
+    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+      target: { value: "D:\\New Comics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    await screen.findByRole("button", { name: /^new\.cbz/ });
+
+    await act(async () => resolveOpen(viewerResponse("old.cbz")));
+    expect(screen.queryByLabelText("old.cbz ビューワ")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^new\.cbz/ })).toBeInTheDocument();
+  });
+
+  it("FT-B19-001 keeps integrated settings as a draft until one atomic Apply", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    let dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
+      target: { value: "reference_tile" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    fireEvent.keyDown(within(dialog).getByLabelText("次ページショートカット"), {
+      key: "j",
+      ctrlKey: true,
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+
+    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+    expect(screen.getByRole("complementary", { name: "フォルダツリー" })).toBeInTheDocument();
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+
+    chooseAppMenuItem("オプション", "統合設定…");
+    dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
+      target: { value: "reference_tile" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
+    expect(saveSettingsProfileMock).toHaveBeenCalledTimes(1);
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ catalogViewMode: "reference_tile", treeVisible: false }),
+      expect.any(Number),
+    );
+    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("reference_tile");
+    expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
+  });
+
+  it("FT-B19-002 exports a safe profile and imports it only into the settings draft", async () => {
+    const createDescriptor = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+    const revokeDescriptor = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:settings-profile"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    try {
+      await registerTestLibrary([]);
+      chooseAppMenuItem("オプション", "統合設定…");
+      const dialog = screen.getByRole("dialog", { name: "統合設定" });
+      fireEvent.click(within(dialog).getByRole("button", { name: "profileを書き出す" }));
+      expect(click).toHaveBeenCalledOnce();
+      expect(within(dialog).getByText(/設定profileのダウンロードを開始しました/))
+        .toBeInTheDocument();
+
+      const importedProfile = {
+        profileVersion: 1,
+        ...DEFAULT_CATALOG_SETTINGS,
+        catalogViewMode: "reference_tile",
+        sortField: "size",
+      };
+      const file = { text: vi.fn(async () => JSON.stringify(importedProfile)) };
+      fireEvent.change(within(dialog).getByLabelText("profileを読み込む"), {
+        target: { files: [file] },
+      });
+
+      expect(await within(dialog).findByText(/設定profileを読み込みました/)).toBeInTheDocument();
+      expect(within(dialog).getByLabelText("profile一覧形式")).toHaveValue("reference_tile");
+      expect(within(dialog).getByLabelText("profile並べ替え")).toHaveValue("size");
+      expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+      expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    } finally {
+      click.mockRestore();
+      if (createDescriptor === undefined) delete (URL as { createObjectURL?: unknown }).createObjectURL;
+      else Object.defineProperty(URL, "createObjectURL", createDescriptor);
+      if (revokeDescriptor === undefined) delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
+      else Object.defineProperty(URL, "revokeObjectURL", revokeDescriptor);
+    }
+  });
+
+  it("leaves active settings unchanged when atomic persistence fails", async () => {
+    saveSettingsProfileMock.mockResolvedValueOnce({
+      status: "error",
+      requestId: "save-profile-error" as never,
+      generation: 1 as never,
+      error: {
+        code: "ACCESS_DENIED",
+        message: "database unavailable",
+        retryable: true,
+      },
+    });
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
+      target: { value: "reference_tile" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    expect(await within(dialog).findByText(/アクセスできません/)).toBeInTheDocument();
+    expect(screen.getByLabelText("一覧表示形式")).toHaveValue("cover_list");
+    expect(screen.getByRole("dialog", { name: "統合設定" })).toBeInTheDocument();
+  });
+
+  it("FT-B18-004 calls native tray storage without replacing the React shell and keeps Quit separate", async () => {
+    await registerTestLibrary([]);
+    const trayButton = screen.getByRole("button", { name: "タスクトレイへ収納" });
+    await waitFor(() => expect(trayButton).toBeEnabled());
+    fireEvent.click(trayButton);
+    await waitFor(() => expect(storeMainWindowInTrayMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("main")).toHaveClass("app-shell");
+    expect(screen.queryByLabelText("タスクトレイ収納")).not.toBeInTheDocument();
+
+    chooseAppMenuItem("ファイル", /終了/);
+    expect(quitApplicationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("FT-B19-004 exposes offline general help from the Help menu", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
+
+    const help = screen.getByRole("dialog", { name: "キー操作とショートカット" });
+    expect(within(help).getByRole("region", { name: "一般ヘルプ" })).toHaveTextContent(
+      "フォルダ・漫画・単独画像をEnterで開きます",
+    );
+    expect(within(help).getByText(/Esc: アドレス編集を戻す/)).toBeInTheDocument();
+  });
+
+  it("FT-B19-005 exposes build version, runtime, and an offline license notice", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("ヘルプ", "一般ヘルプとバージョン…");
+
+    await waitFor(() => expect(screen.getByText(
+      `バージョン ${APP_VERSION} / runtime: Tauri WebView2`,
+    )).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "third-party license noticeを開く" }));
+    const notice = screen.getByRole("dialog", { name: "third-party license notice" });
+    expect(notice.querySelector("pre")?.textContent.length).toBeGreaterThan(100);
   });
 
 });

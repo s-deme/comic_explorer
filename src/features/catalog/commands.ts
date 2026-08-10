@@ -1,13 +1,22 @@
 import type { CatalogEntry } from "../../types/domain";
 
 export type SelectionAction = "replace" | "toggle" | "range";
+export type CatalogSelectionKind = CatalogEntry["kind"] | "file" | "image";
+
+export function isCatalogFile(entry: CatalogEntry): boolean {
+  return entry.kind !== "folder" && entry.kind !== "comicFolder";
+}
 
 export function selectEntriesByKind(
   entries: CatalogEntry[],
-  kind: CatalogEntry["kind"] | "image",
+  kind: CatalogSelectionKind,
 ): string[] {
   return entries
-    .filter((entry) => kind === "image" ? entry.kind === "page" : entry.kind === kind)
+    .filter((entry) => {
+      if (kind === "file") return isCatalogFile(entry);
+      if (kind === "image") return entry.kind === "page";
+      return entry.kind === kind;
+    })
     .map((entry) => entry.relativePath);
 }
 
@@ -34,7 +43,10 @@ export function rangeSelection(
 }
 
 export function csvEscape(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+  const safeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(safeValue)
+    ? `"${safeValue.replaceAll('"', '""')}"`
+    : safeValue;
 }
 
 export function catalogCsv(entries: CatalogEntry[]): string {
@@ -68,5 +80,8 @@ export function matchesMask(entry: CatalogEntry, mask: string): boolean {
   const normalized = mask.trim();
   if (normalized === "") return true;
   const name = entry.relativePath.split("/").at(-1) ?? entry.relativePath;
-  return normalized.split(";").some((part) => part.trim() !== "" && globMatch(name, part.trim()));
+  const patterns = normalized.split(";")
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
+  return patterns.length === 0 || patterns.some((pattern) => globMatch(name, pattern));
 }

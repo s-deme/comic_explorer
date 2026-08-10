@@ -110,27 +110,27 @@ codd:
 | 41 | P3-2 / FR-B15 | `IMP-041` | `FUT-C-046` | 次のしおりへ移動 | Implemented / PASS | Done | next bookmarkと末尾wrapを実装・実測 |
 | 42 | P3-3 / FR-B15 | `IMP-042` | `FUT-C-047` | 本棚表示・追加 | Implemented / PASS | Done | favoriteと分離したbookshelfを実装・実測 |
 | 53 | P4-1 / FR-B16 | `IMP-053` | `FUT-C-058` | ファイルマスク | Implemented / PASS | Done | basename glob mask、current-session scope、status同期を実装・実測 |
-| 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Implemented / PASS | Done | filtered rowのUTF-8 CSV exportとabsolute path除外を実装・実測 |
-| 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Implemented / PASS | Done | menuとtoolbarの共通command IAを実装・実測 |
-| 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Implemented / PASS | Done | accessible icon command toolbarを実装・実測 |
-| 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Implemented / PASS | Done | reference_tile view modeを実装・実測 |
-| 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Implemented / PASS | Done | folder treeのcurrent-session表示切替と復帰導線を実装・実測 |
-| 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Implemented / PASS | Done | menu/toolbarの表示切替と復帰導線を実装・実測。永続化はB19へ送る |
-| 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Implemented / PASS | Done | viewerのcurrent-session分離表示、Esc復帰を実装・実測 |
-| 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Implemented / PASS | Done | tray API可否の安全なdisabled境界と収納状態UIを実装・実測 |
-| 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Implemented / PASS | Done | catalog/viewer/巻末/gesture/shortcutをapply/cancel付きdialogへ統合 |
-| 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Implemented / PASS | Done | versioned JSON export/importと安全な除外項目を実装・実測 |
-| 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Implemented / PASS | Done | swipe/double-clickとcommand conflict拒否を実装・実測 |
-| 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Implemented / PASS | Done | offlineの操作説明を既存helpへ統合・実測 |
-| 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Implemented / PASS | Done | version/runtime/license noticeを表示・実測 |
-| 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Implemented / PASS | Done | GIF metadata/signature/alphaを既存page pipelineへ接続・実測 |
-| 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Implemented / PASS | Done | AVIF ftyp/ispe metadata、MIME、grantを接続・実測 |
-| 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Implemented / PASS | Done | WebView2へanimation GIFを渡しframeを永続化しない境界を実測 |
-| 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
-| 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Partial / BLOCKED | Blocked | archive分類とUnsupportedFormat境界を実装・実測。完全readerはlibrary、license、fixture確認待ち |
-| 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Implemented / PASS | Done | app-local JPEG管理dialogで件数、bytes、削除、原本非破壊を実装・実測 |
-| 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Implemented / PASS | Done | generated/imported thumbnailを明示的なJPEG downloadとして保存 |
-| 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Implemented / PASS | Done | JPEGを一覧対象へ一意に対応付け、容量・形式・重複を検証してapp-localへ読込 |
+| 45 | P4-2 / FR-B16 | `IMP-045` | `FUT-C-050` | CSV形式で出力 | Implemented / PASS | Done | UTF-8 CSV escaping、formula injection neutralization、absolute path除外を実装・実測 |
+| 60 | P5-1 / FR-B17 | `IMP-060` | `FUT-C-065` | 参照メニュー構成 | Implemented / PARTIAL | Partial | menu/toolbar共通IAのcomponent境界はPASS。release DPI/product UIは未測定 |
+| 61 | P5-2 / FR-B17 | `IMP-061` | `FUT-C-066` | アイコンコマンドツールバー | Implemented / PARTIAL | Partial | accessible icon commandのcomponent境界はPASS。release DPI/product UIは未測定 |
+| 62 | P5-3 / FR-B17 | `IMP-062` | `FUT-C-067` | 参照型サムネイルタイル | Implemented / PARTIAL | Partial | `reference_tile`とrepository reopen回帰はPASS。release DPI/product UIは未測定 |
+| 57 | P6-1 / FR-B18 | `IMP-057` | `FUT-C-062` | ペイン表示切替 | Implemented / BLOCKED | Blocked | current-session切替境界は実装。P6 release notification-area/product gate待ち |
+| 58 | P6-2 / FR-B18 | `IMP-058` | `FUT-C-063` | バー・メニュー表示切替 | Implemented / BLOCKED | Blocked | menu/toolbar可逆切替は実装。P6 release notification-area/product gate待ち |
+| 55 | P6-3 / FR-B18 | `IMP-055` | `FUT-C-060` | 画像表示領域の分離 | Implemented / BLOCKED | Blocked | viewer分離とEsc復帰のcomponent境界はPASS。P6 product gate待ち |
+| 56 | P6-4 / FR-B18 | `IMP-056` | `FUT-C-061` | タスクトレイ収納 | Implemented / BLOCKED | Blocked | native mock境界はPASS。release notification areaのhide/show/focus/終了分離は未測定 |
+| 64 | P7-1 / FR-B19 | `IMP-064` | `FUT-C-069` | 統合設定画面 | Implemented / PASS | Done | `FT-B19-001`でdraft、Cancel、atomic Applyを直接観測 |
+| 66 | P7-2 / FR-B19 | `IMP-066` | `FUT-C-071` | 設定プロファイル | Implemented / PASS | Done | `FT-B19-002`でknown-version importと未知field除外を直接観測 |
+| 67 | P7-3 / FR-B19 | `IMP-067` | `FUT-C-072` | マウスジェスチャ設定 | Implemented / PASS | Done | `FT-B19-003`でswipe/double-clickとviewer command接続を直接観測 |
+| 71 | P7-4 / FR-B19 | `IMP-071` | `FUT-C-076` | 一般ヘルプ | Implemented / PASS | Done | `FT-B19-004`でoffline一般helpのUI導線を直接観測 |
+| 72 | P7-5 / FR-B19 | `IMP-072` | `FUT-C-077` | バージョン情報 | Implemented / PASS | Done | `FT-B19-005`でversion/runtime/license notice導線を直接観測（exact 5 / SKIP 0） |
+| 16 | P8-1 / FR-B08 | `IMP-016` | `FUT-C-006` | 静止GIF表示 | Partial / BLOCKED | Blocked | parser/MIME境界はPASS。release WebView2のstatic GIF decodeは未測定 |
+| 18 | P8-2 / FR-B08 | `IMP-018` | `FUT-C-008` | AVIFページ表示 | Partial / BLOCKED | Blocked | primary-item AVIF parser/MIME境界はPASS。release WebView2 decodeは未測定 |
+| 17 | P8-3 / FR-B08 | `IMP-017` | `FUT-C-007` | アニメーションGIF表示 | Partial / BLOCKED | Blocked | frame検出とdisk thumbnail拒否はPASS。release WebView2 animationは未測定 |
+| 19 | P9-1 / FR-B12 | `IMP-019` | `FUT-C-001` | RAR・CBR書庫閲覧 | Partial / BLOCKED | Blocked | `Unsupported`と`archiveKind`保持を実測。完全readerはlibrary、license、fixture確認待ち |
+| 20 | P9-2 / FR-B12 | `IMP-020` | `FUT-C-002` | 7z書庫閲覧 | Partial / BLOCKED | Blocked | `Unsupported`と`archiveKind`保持を実測。完全readerはlibrary、license、fixture確認待ち |
+| 68 | P10-1 / FR-B20 | `IMP-068` | `FUT-C-073` | サムネイル管理 | Implemented / PARTIAL | Partial | 件数/bytes、root名前空間、削除stateはutility/typecheck PASS。製品dialogは未測定 |
+| 69 | P10-2 / FR-B20 | `IMP-069` | `FUT-C-074` | 表示中サムネイルの保存 | Implemented / PARTIAL | Partial | picker write/close・取消helperはPASS。製品WebView2の実disk保存は未測定 |
+| 70 | P10-3 / FR-B20 | `IMP-070` | `FUT-C-075` | サムネイルの一括読込 | Implemented / PARTIAL | Partial | JPEG bytes/decode/容量/重複境界はutility PASS。製品file picker操作は未測定 |
 | 27 | Hold / FR-S02 | `IMP-027` | `FUT-C-027` | 新規フォルダ | Candidate / NOT TESTED | Candidate | file mutationの安全設計と明示承認後に権限・失敗回復を要件化 |
 | 26 | Hold / FR-S02 | `IMP-026` | `FUT-C-026` | コピー | Candidate / NOT TESTED | Candidate | root/path、上書き確認、途中失敗・rollbackを要件化 |
 | 24 | Hold / FR-S02 | `IMP-024` | `FUT-C-024` | 名前変更 | Candidate / NOT TESTED | Candidate | identity、cache・読書情報移行、undo境界を要件化 |

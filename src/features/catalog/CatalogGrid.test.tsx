@@ -33,6 +33,30 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("extends the pointer-compatible range with Shift+Arrow", () => {
+    const onSelect = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(20)}
+        selectedPath={"book-3" as never}
+        selectedPaths={["book-3"]}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /book-3/ }), {
+      key: "ArrowRight",
+      shiftKey: true,
+    });
+
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "book-4" }),
+      "range",
+    );
+  });
+
   it("keeps the mounted DOM bounded for 10,000 catalog entries", () => {
     render(
       <CatalogGrid
@@ -101,12 +125,16 @@ describe("CatalogGrid", () => {
       kind: "archive",
       archiveKind: "cbz",
     };
+    const image: CatalogEntry = {
+      relativePath: "cover.jpg" as never,
+      kind: "page",
+    };
     const onSelect = vi.fn();
     const onNavigate = vi.fn();
     const onRead = vi.fn();
     render(
       <CatalogGrid
-        entries={[folder, comicFolder, archive]}
+        entries={[folder, comicFolder, archive, image]}
         selectedPath={null}
         onSelect={onSelect}
         onNavigate={onNavigate}
@@ -117,6 +145,7 @@ describe("CatalogGrid", () => {
     expect(screen.getByText("フォルダ")).toBeInTheDocument();
     expect(screen.getByText("漫画フォルダ")).toBeInTheDocument();
     expect(screen.getByText("ZIP / CBZ")).toBeInTheDocument();
+    expect(screen.getByText("画像")).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "フォルダの項目1を開く" }),
@@ -127,13 +156,44 @@ describe("CatalogGrid", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "ZIP / CBZの項目3を読む" }),
     );
+    fireEvent.click(
+      screen.getByRole("button", { name: "画像の項目4を読む" }),
+    );
 
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith(folder);
-    expect(onRead).toHaveBeenCalledTimes(2);
+    expect(onRead).toHaveBeenCalledTimes(3);
     expect(onRead).toHaveBeenNthCalledWith(1, comicFolder);
     expect(onRead).toHaveBeenNthCalledWith(2, archive);
+    expect(onRead).toHaveBeenNthCalledWith(3, image);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("keeps unavailable RAR/7z entries visibly unsupported and out of read/favorite actions", () => {
+    const unsupported: CatalogEntry = {
+      relativePath: "future.rar" as never,
+      kind: "unsupported",
+      archiveKind: "rar",
+    };
+    const onRead = vi.fn();
+    const onToggleFavorite = vi.fn();
+    render(
+      <CatalogGrid
+        entries={[unsupported]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={onRead}
+        onToggleFavorite={onToggleFavorite}
+      />,
+    );
+
+    expect(screen.getByText("未対応")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /読む/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /お気に入り/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".thumbnail")).toHaveAttribute("data-thumbnail-state", "placeholder");
+    expect(onRead).not.toHaveBeenCalled();
+    expect(onToggleFavorite).not.toHaveBeenCalled();
   });
 
   it("keeps the thumbnail slot stable while loading and displays the generated image", async () => {

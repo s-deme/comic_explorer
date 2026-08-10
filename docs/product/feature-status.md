@@ -71,9 +71,9 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-003 | PDF閲覧 | PDF対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | MVP後に再検討 |
 | FUT-C-004 | EPUB閲覧 | EPUB対応 | Candidate | NOT TESTED | 将来 | 将来 | Q3-1 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | MVP後に再検討 |
 | FUT-C-005 | WebPページ表示 | static WebPをfolder/ZIP/CBZのpage・viewer・thumbnailへ接続 | Implemented | PASS | 希望 | FR-B08 | [FR-B08 static WebP要件](../requirements/webp-requirements.md#fr-b08-静止-webp-要件); Q3-2 [questionnaire](../requirements/product-questionnaire.md) | `src-tauri/src/catalog/thumbnail.rs`; `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/catalog/`; `src-tauri/src/media/`; `src/App.tsx`; `src/features/viewer/Viewer.tsx`; `scripts/run-product-ui-harness.ps1`; `scripts/verify-feature-windows.ps1` | [FR-B08結果](../testing/fr-b08-results.md)（FT-B08-001 exact1、Rust `fr_b08_webp_`、Windows WebView2 `FT-B08-006`、canonical aggregate PASS） | static lossy/lossless/alpha、WebView2 viewer、pure-Rust thumbnail decode/cache、corrupt/animated local recovery、source tree差分0を直接観測。image-webp 0.2.4 lock/SBOM/noticeのunknown/prohibited licenseは0。CoDD advisoryは生値のみでPASSへ加算しない。 |
-| FUT-C-006 | 静止GIF表示 | 静止GIF対応 | Implemented | PASS | 希望 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/domain/file_kind.rs`; `src-tauri/src/application/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md)（FT-B08-007） | GIF signature/dimensions/alphaをcatalog/page pipelineへ接続 |
-| FUT-C-007 | アニメーションGIF表示 | アニメGIF対応 | Implemented | PASS | 希望 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/domain/file_kind.rs`; `src-tauri/src/media/mod.rs`; `src-tauri/src/application/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md)（FT-B08-008） | GIFをWebView2へ渡し、frameをアプリ側で永続化しない |
-| FUT-C-008 | AVIFページ表示 | AVIF対応 | Implemented | PASS | 将来 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/domain/file_kind.rs`; `src-tauri/src/media/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md)（FT-B08-009） | AVIF ftyp/ispe検証、MIME、media grantを接続 |
+| FUT-C-006 | 静止GIF表示 | 静止GIF対応 | Partial | BLOCKED | 希望 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/domain/file_kind.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/media/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md) | GIF block、image data、trailer、frame数、transparencyを構造testで確認。release WebView2のstatic decode/corrupt fallbackは`BLOCKED_UNMEASURED` |
+| FUT-C-007 | アニメーションGIF表示 | アニメGIF対応 | Partial | BLOCKED | 希望 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/catalog/thumbnail.rs`; `src-tauri/src/media/mod.rs`; `src-tauri/src/application/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md) | animated metadataとapp-local disk thumbnail拒否はPASS。release WebView2の複数frame再生・非永続化は`BLOCKED_UNMEASURED` |
+| FUT-C-008 | AVIFページ表示 | AVIF対応 | Partial | BLOCKED | 将来 | FR-B08 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p8-追加画像形式) | `src-tauri/src/catalog/image_metadata.rs`; `src-tauri/src/domain/file_kind.rs`; `src-tauri/src/application/mod.rs`; `src-tauri/src/media/mod.rs` | [FR-B08 P8結果](../testing/fr-b08-p8-results.md) | BMFF box size、compatible brand、box-scoped `ispe`、全dimension上限、MIME/media grantを構造testで確認。release WebView2 decodeは`BLOCKED_UNMEASURED` |
 | FUT-C-009 | 動画対応 | 動画ファイル閲覧 | Candidate | NOT TESTED | 将来 | 将来 | Q3-2 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | — |
 | FUT-C-010 | 名前検索 | ファイル名・フォルダ名検索 | Implemented | PASS | 希望 | FR-B05 | [FR-B05要件](../requirements/catalog-search-requirements.md#fr-b05-名前検索要件); Q4-1/Q4-4 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/App.test.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `scripts/run-product-ui-harness.ps1`; `scripts/verify-feature-windows.ps1` | [FR-B05結果](../testing/fr-b05-results.md)（FT-B05-001〜005 exact5、`search_port_` Rust、Windows WebView2 `FT-B05-006`、canonical aggregate PASS） | release製品でnormalized mixed-kind、result navigation、empty/clear、明示rescan、source tree差分0を直接観測。Windows-native CoDD scan/check/verify exit 0・red 0。構造advisoryは生値を開示し、機能PASSへ加算しない。10,000項目/1秒のFUT-D-001はFR-S03へ分離し未実測のまま。 |
 | FUT-C-011 | お気に入り・クイックアクセス | 任意項目への短縮アクセス | Implemented | PASS | 希望 | FR-B06 | [FR-B06要件](../requirements/favorites-requirements.md#fr-b06-お気に入り要件); Q4-1 [questionnaire](../requirements/product-questionnaire.md) | `src/App.tsx`; `src/App.test.tsx`; `src/features/catalog/QuickAccess.tsx`; `src/features/library/client.ts`; `src-tauri/src/application/mod.rs`; `src-tauri/src/state/repository.rs`; `scripts/run-product-ui-harness.ps1`; `scripts/verify-feature-windows.ps1` | [FR-B06結果](../testing/fr-b06-results.md)（FT-B06-001/002 exact2、Rust favorite target境界、Windows WebView2 `FT-B06-006`、canonical aggregate PASS） | release製品でcurrent-session add/remove、available rows、folder navigation、comicFolder/archive viewer、source tree差分0を直接観測。restart/migration/missing/moved/re-resolveはFUT-C-021へ分離。構造advisoryは生値を開示し、機能PASSへ加算しない。 |
@@ -115,7 +115,7 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-047 | 本棚表示・追加 | 専用の本棚contextを表示し、選択項目を登録する | Implemented | PASS | 将来 | FR-B15 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p3-しおり本棚) | `src/features/reading/collections.ts`; `src/App.tsx` | [FR-B15結果](../testing/fr-b15-results.md)（FT-B15-003） | favoriteとは別のapp-local bookshelfを表示・追加・除去 |
 | FUT-C-048 | メディア表示 | フォルダ・本棚とは別のメディアcontextを表示する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 対象媒体、登録方法、永続化の有無は参照画面だけでは確定できず未決定 |
 | FUT-C-049 | 項目プロパティ | 選択ファイル・フォルダのproperty dialogを表示する | Implemented | PASS | 将来 | FR-B13 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p1-catalog-command基盤) | `src/App.tsx`; `src/features/catalog/CatalogGrid.tsx` | [FR-B13結果](../testing/fr-b13-results.md)（FT-B13-004） | 単一選択のname/kind/relative path/size/更新日時を表示。原本へ書き込まない |
-| FUT-C-050 | CSV形式で出力 | 現在の一覧または選択項目の情報をCSVへ保存する | Implemented | PASS | 将来 | FR-B16 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p4-filterexport) | `src/App.tsx`; `src/features/catalog/commands.ts` | [FR-B16結果](../testing/fr-b16-results.md)（FT-B16-002） | filtered catalogをname/kind/relativePath/size/modifiedのUTF-8 CSVへ出力。absolute pathなし |
+| FUT-C-050 | CSV形式で出力 | 現在の一覧または選択項目の情報をCSVへ保存する | Implemented | PASS | 将来 | FR-B16 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p4-filterexport) | `src/App.tsx`; `src/features/catalog/commands.ts` | [FR-B16結果](../testing/fr-b16-results.md)（FT-B16-002） | filtered catalogをname/kind/relativePath/size/modifiedのUTF-8 CSVへ出力。absolute pathを含めず、`=`/`+`/`-`/`@`/tab/CR先頭cellをapostropheで無害化 |
 | FUT-C-051 | 終了メニュー | ファイルメニューからアプリを明示終了する | Implemented | PASS | 将来 | FR-B14 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p2-opennavigation) | `src/App.tsx` | [FR-B14結果](../testing/fr-b14-results.md)（FT-B14-004） | ファイルメニューからwindow closeを明示要求し、暗黙のfile mutationはしない |
 | FUT-C-052 | 編集操作の元に戻す | 直前のundo可能な操作を`Ctrl+Z`で取り消す | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 参照画面では無効項目として観測。undo対象、履歴、安全境界は未決定 |
 | FUT-C-053 | クリップボードのファイル操作 | 切り取り・コピー・貼り付けをclipboard経由で行う | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | FUT-C-025/FUT-C-026の直接操作とはUI・clipboard境界が異なる。原本非破壊方針の再評価が必要 |
@@ -126,23 +126,23 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-C-058 | ファイルマスク | mask条件で一覧表示対象をfilterする | Implemented | PASS | 将来 | FR-B16 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p4-filterexport) | `src/App.tsx`; `src/features/catalog/commands.ts` | [FR-B16結果](../testing/fr-b16-results.md)（FT-B16-001） | current-sessionのbasename mask `*`/`?`/`;`で一覧とstatusをfilter |
 | FUT-C-059 | ファイル表示の切り替え | file表示領域または表示対象をcommandで切り替える | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 参照画面では無効項目として観測。切替対象は画面だけでは確定できず推論由来・仕様未決定 |
 | FUT-C-060 | 画像表示領域の分離 | viewerをcatalog shellから分離して独立表示する | Implemented | PASS | 将来 | FR-B18 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow) | `src/App.tsx`; `src/features/viewer/Viewer.tsx`; `src/styles.css` | [FR-B18結果](../testing/fr-b18-results.md)（FT-B18-003） | current-sessionの分離表示、ボタン復帰、Esc復帰を提供 |
-| FUT-C-061 | タスクトレイ収納 | windowを閉じずにnotification areaへ収納・復帰する | Implemented | PASS | 将来 | FR-B18 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow) | `src/App.tsx` | [FR-B18結果](../testing/fr-b18-results.md)（FT-B18-004） | tray APIがない環境では収納ボタンをdisabledにし、終了と混同しない |
+| FUT-C-061 | タスクトレイ収納 | windowを閉じずにnotification areaへ収納・復帰する | Implemented | BLOCKED | 将来 | FR-B18 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow) | `src/App.tsx`; `src-tauri/src/tray.rs`; `src-tauri/src/lib.rs` | [FR-B18結果](../testing/fr-b18-results.md)（FT-B18-004） | native tray初期化、hide/show/unminimize/focus、明示終了のmock境界はPASS。release製品のnotification areaとprocess lifecycleは未測定 |
 | FUT-C-062 | ペイン表示切替 | 対象paneを表示・非表示にする | Implemented | PASS | 将来 | FR-B18 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow) | `src/App.tsx`; `src/features/workspace/display.ts` | [FR-B18結果](../testing/fr-b18-results.md)（FT-B18-001） | folder treeをcurrent-sessionで切替し、UI復帰ボタンを提供 |
 | FUT-C-063 | バー・メニュー表示切替 | 対象barとmenu barを表示・非表示にする | Implemented | PASS | 将来 | FR-B18 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow) | `src/App.tsx`; `src/features/workspace/display.ts`; `src/styles.css` | [FR-B18結果](../testing/fr-b18-results.md)（FT-B18-002） | menu/toolbarのgrid rowをcurrent-sessionで切替し、UI復帰導線を提供 |
 | FUT-C-064 | OS全体フォルダツリー | desktop、PC、driveを含むOS namespaceから場所を選ぶ | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | 現行は登録library root配下に限定。権限、ネットワーク場所、原本非破壊境界を先に決定する |
-| FUT-C-065 | 参照メニュー構成 | `ファイル/編集/表示/オプション/ヘルプ`へcommand、shortcut、separator、有効状態を整理する | Implemented | PASS | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/App.tsx` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-001） | 既存menu commandを維持し、command toolbarとの共通IAを追加 |
-| FUT-C-066 | アイコンコマンドツールバー | open、更新、context切替、検索、表示形式等をicon buttonから実行する | Implemented | PASS | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/App.tsx`; `src/styles.css` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-002） | refresh/copy/properties/bookshelfをaccessible icon buttonで提供 |
-| FUT-C-067 | 参照型サムネイルタイル | folder iconと表紙を混在させた罫線付きtile、長名省略、密度を再現する | Implemented | PASS | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/features/catalog/view-mode.ts`; `src/features/catalog/CatalogGrid.tsx`; `src/styles.css` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-003） | `reference_tile` mode、long name、thumbnail、keyboard focusを既存gridへ接続 |
+| FUT-C-065 | 参照メニュー構成 | `ファイル/編集/表示/オプション/ヘルプ`へcommand、shortcut、separator、有効状態を整理する | Implemented | PASS | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/App.tsx` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-001） | top-level 5分類、Alt mnemonic、roving focusと既存command接続をfocused testで確認 |
+| FUT-C-066 | アイコンコマンドツールバー | open、更新、context切替、検索、表示形式等をicon buttonから実行する | Implemented | BLOCKED | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/App.tsx`; `src/styles.css` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-002） | accessible icon toolbarと既存callbackへの接続は確認済み。release製品UIのicon別表示・操作は未測定 |
+| FUT-C-067 | 参照型サムネイルタイル | folder iconと表紙を混在させた罫線付きtile、長名省略、密度を再現する | Implemented | BLOCKED | 将来 | FR-B17 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui) | `src/features/catalog/view-mode.ts`; `src/features/catalog/CatalogGrid.tsx`; `src/styles.css` | [FR-B17結果](../testing/fr-b17-results.md)（FT-B17-003） | `reference_tile` mode、long name、thumbnail、keyboard focusを接続。release DPI visualと製品再起動後の同mode復元は未測定 |
 | FUT-C-068 | 現在位置付きステータス | 選択情報に加えて現在位置と総file数を`n / total`形式で表示する | Implemented | PASS | 将来 | FR-B13 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p1-catalog-command基盤) | `src/App.tsx` | [FR-B13結果](../testing/fr-b13-results.md)（FT-B13-005） | 現在sort結果の選択index、件数、選択数をstatusへ表示 |
-| FUT-C-069 | 統合設定画面 | application設定を一か所で確認・変更する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-001） | catalog/viewer/巻末/gesture/shortcutをapply/cancel付きdialogへ統合 |
+| FUT-C-069 | 統合設定画面 | application設定を一か所で確認・変更する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-001） | exact5の一部として、catalog/viewer/巻末/gesture/shortcutのdraft、Cancel、atomic Applyと保存失敗rollbackを直接観測 |
 | FUT-C-070 | プラグイン設定 | pluginに関する設定dialogを提供する | Candidate | NOT TESTED | 将来 | 将来 | ユーザー提供Leeyes参照スクリーンショット（2026-08-09） | — | 未実装・未実測 | plugin方式自体が未採用。設定対象、互換性、安全・配布境界は未決定 |
-| FUT-C-071 | 設定プロファイル | 設定一式を保存・読み込み・複数profileから切り替える | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/features/settings/profile.ts`; `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-002） | JSON export/import、version normalization、秘密・machine固有値除外 |
-| FUT-C-072 | マウスジェスチャ設定 | mouse操作またはgestureへcommandを割り当てる | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/features/settings/profile.ts`; `src/features/viewer/Viewer.tsx`; `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-003） | swipe/double-clickをviewer commandへ接続し、重複actionを拒否 |
-| FUT-C-073 | サムネイル管理 | user向けのthumbnail管理dialogを提供する | Implemented | PASS | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/App.tsx`; `src/styles.css` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-001） | 利用者読込JPEGの件数・bytes表示と削除。自動生成cacheとは分離し、原本へ書き戻さない |
-| FUT-C-074 | 表示中サムネイルの保存 | 現在表示中のthumbnailを明示保存する | Implemented | PASS | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/App.tsx` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-002） | 表示中のgenerated/imported thumbnailを選択保存先へJPEG download |
-| FUT-C-075 | サムネイルの一括読込 | 複数対象のthumbnailを一括で読み込む | Implemented | PASS | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/features/catalog/thumbnail-maintenance.test.ts`; `src/App.tsx` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-003） | JPEGを現在一覧のarchive/comicFolderへ一意に対応付け、app-local管理へ読み込み |
-| FUT-C-076 | 一般ヘルプ | 操作体系と主要機能を説明するhelp contentsを表示する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-004） | offlineの操作説明をshortcut helpへ統合 |
-| FUT-C-077 | バージョン情報 | About情報を表示する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/App.tsx`; `src/features/settings/profile.ts` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-005） | version/runtime/license noticeをhelp dialogへ表示 |
+| FUT-C-071 | 設定プロファイル | 設定一式を保存・読み込み・複数profileから切り替える | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/features/settings/profile.ts`; `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-002） | exact5の一部として、`profileVersion === 1`、全enum/boolean/有限scale、必須workspace field、shortcut/gesture conflictをstrict validation |
+| FUT-C-072 | マウスジェスチャ設定 | mouse操作またはgestureへcommandを割り当てる | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/features/settings/profile.ts`; `src/features/viewer/Viewer.tsx`; `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-003） | exact5の一部として、設定したswipe/double-clickからviewer commandへの接続とcloseを直接観測 |
+| FUT-C-073 | サムネイル管理 | user向けのthumbnail管理dialogを提供する | Implemented | BLOCKED | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/App.tsx`; `src/styles.css` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-001） | 件数・bytes・削除とapp-local分離はfocused testで確認。製品dialog操作と再起動後の保持は未測定 |
+| FUT-C-074 | 表示中サムネイルの保存 | 現在表示中のthumbnailを明示保存する | Implemented | BLOCKED | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/App.tsx` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-002） | picker helperのwrite/close、取消、fallbackはPASS。製品WebView2から選択先への実JPEG保存は未測定 |
+| FUT-C-075 | サムネイルの一括読込 | 複数対象のthumbnailを一括で読み込む | Implemented | BLOCKED | 将来 | FR-B20 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p10-thumbnail保守) | `src/features/catalog/thumbnail-maintenance.ts`; `src/features/catalog/thumbnail-maintenance.test.ts`; `src/App.tsx` | [FR-B20結果](../testing/fr-b20-results.md)（FT-B20-003） | JPEG validation、一意対応、重複・容量境界はPASS。製品file pickerからの一括読込操作は未測定 |
+| FUT-C-076 | 一般ヘルプ | 操作体系と主要機能を説明するhelp contentsを表示する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `src/App.tsx` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-004） | exact5の一部として、Help menuからoffline一般help本文を表示する導線を直接観測 |
+| FUT-C-077 | バージョン情報 | About情報を表示する | Implemented | PASS | 将来 | FR-B19 | [P1〜P10要件](../requirements/roadmap-priorities-requirements.md#p7-help) | `package.json`; `src/App.tsx`; `src/features/settings/profile.ts` | [FR-B19結果](../testing/fr-b19-results.md)（FT-B19-005） | exact5の一部として、package正本のversion、runtime、offline license noticeを直接観測 |
 | FUT-D-001 | 名前検索性能 | 10,000項目を1秒以内に検索 | Deferred | NOT TESTED | Should | 将来 | [NFR](../requirements/mvp-requirements.md#nfr-mvp-002-性能目標); Q4-1/Q4-4 [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 検索UIがMVP対象外のため保留。機能候補FUT-C-010と分離 |
 | FUT-D-002 | 最大ファイルサイズ | 1冊あたりの上限条件 | Deferred | NOT TESTED | 未定 | TBD | Q8-1/TBD [questionnaire](../requirements/product-questionnaire.md) | — | 未実装・未実測 | 未定記入のため未決定性を保持 |
 | FUT-D-003 | 性能計測条件の適用 | 基準条件での性能測定を確定・実行 | Deferred | NOT TESTED | 未定 | TBD | Q8-2/TBD-006 [questionnaire](../requirements/product-questionnaire.md); [性能計画](../testing/performance-benchmark-plan.md) | — | 未実装・未実測 | TBD-006で計画は承認済み。Windows実測が未完了で、初期回答の未決定性も注記 |
@@ -157,57 +157,77 @@ PASSへ読み替えない。候補・保留・Rejectedの機能検証は `NOT TE
 | FUT-R-007 | ゲームパッド操作 | ゲームパッド入力 | Candidate | NOT TESTED | 未定 | FR-B11 | [FR-B11要件](../requirements/input-customization-requirements.md#fr-b11-入力拡張要件); Q5-5 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | [FR-B11結果](../testing/fr-b11-results.md)（FT-B11-003 `BLOCKED_UNMEASURED`） | gamepad実機がないため未測定。PASS/SKIPへ加算せず、候補を恒久Rejectedへ昇格しない。 |
 | FUT-R-008 | 閲覧時の原本自動変更 | 原本への自動書込み | Rejected | NOT TESTED | 非採用 | — | Q7-2/Q8-4 [questionnaire](../requirements/product-questionnaire.md); [MVP対象外](../requirements/mvp-requirements.md) | — | 未実装・未実測 | 読取専用・原本非破壊の恒久方針。方針変更時のみ再評価 |
 
+## P1〜P10 集約判定（2026-08-10）
+
+この集約表の受入判定`PARTIAL`と`BLOCKED_UNMEASURED`は、複数の原子機能をまとめた
+roadmap判定である。上の11列台帳にある原子機能の検証状態4値とは混在させず、未測定の製品gateを
+component testのPASSへ読み替えない。
+
+| 優先順位 | Batch | 対象ID | 実装集約 | 受入集約 | 根拠・未測定境界 |
+|---|---|---|---|---|---|
+| P1 | FR-B13 | FUT-C-057, 055, 054, 049, 068 | Implemented | PASS | FT-B13-001〜005を直接観測 |
+| P2 | FR-B14 | FUT-C-042, 044, 056, 051 | Implemented | PASS | FT-B14-001〜004を直接観測。仕様未決定のFUT-C-043はP2対象外 |
+| P3 | FR-B15 | FUT-C-045〜047 | Implemented | PASS | FT-B15-001〜003を直接観測 |
+| P4 | FR-B16 | FUT-C-058, 050 | Implemented | PASS | maskとCSVを直接観測。CSV formula-leading cellの無害化を含む |
+| P5 | FR-B17 | FUT-C-065〜067 | Implemented | PARTIAL | component/focused testはPASS。release DPI、製品UI、`reference_tile`の製品再起動復元は未測定 |
+| P6 | FR-B18 | FUT-C-062, 063, 060, 061 | Implemented | BLOCKED | workspace/viewerとnative tray実装・mockはPASS。release製品のnotification area、hide/show/focus、process lifecycleは未測定 |
+| P7 | FR-B19 | FUT-C-069, 071, 072, 076, 077 | Implemented | PASS | 現行のFT-B19-001〜005 exact5は5 PASS / 0 FAIL |
+| P8 | FR-B08 | FUT-C-006〜008 | Partial | BLOCKED_UNMEASURED | GIF/AVIF構造testとanimated GIF disk cache拒否はPASS。release WebView2 decode/animation/corrupt fallbackは未測定 |
+| P9 | FR-B12 | FUT-C-001, 002 | Partial | BLOCKED | 分類と安全なUnsupportedFormat境界はPASS。reader dependency/license/fixture承認待ち |
+| P10 | FR-B20 | FUT-C-073〜075 | Implemented | PARTIAL | utility/helper testはPASS。製品WebView2での実JPEG保存とfile picker一括読込は未測定 |
+
 ## Leeyes参照画面差分（2026-08-09）
 
 本節は、ユーザー提供のLeeyes参照スクリーンショット6枚を一次入力として、画面から直接
-読み取れる項目と現行Comic Explorerの差を登録した監査記録である。1枚目はmain window、
+読み取れる項目とComic Explorerの差を登録した監査記録である。1枚目はmain window、
 2〜6枚目は順にfile、edit、view、option、help menuを示す。開かれていないsubmenuの内容や、
-無効項目の発動条件は推測で確定せず、該当候補の備考に未決定性を残す。
+無効項目の発動条件は推測で確定しない。現行機能と差異の列はP1〜P10実装後の状態へ同期した。
 
 現行アプリは登録library root配下を非破壊で閲覧する構成であり、OS全体を対象にしたfile
-managerではない。menuは`ファイル/移動/表示/ライブラリ/ヘルプ`、catalog選択は単一、
-folder treeはlibrary内限定である（`src/App.tsx`、`src/features/catalog/CatalogGrid.tsx`、
-`src/features/navigation/FolderTree.tsx`）。したがって、原本を変更する候補は採用済み要件
-REQ-MVP-017を自動的に上書きせず、採用時に安全境界を明示して再評価する。
+managerではない。参照型5分類menu、複数・種別選択、library内folder treeの可逆表示を実装したが、
+OS namespaceを含むtreeと原本変更commandは提供しない（`src/App.tsx`、
+`src/features/catalog/CatalogGrid.tsx`、`src/features/navigation/FolderTree.tsx`）。したがって、
+原本を変更する候補は採用済み要件REQ-MVP-017を自動的に上書きせず、採用時に安全境界を明示して再評価する。
 
 ### 基準UIと現行UIの差
 
 | 参照画面での直接観測 | 現行機能 | 未実装または差異 | 追跡ID |
 |---|---|---|---|
-| `ファイル/編集/表示/オプション/ヘルプ`のmenu bar | `ファイル/移動/表示/ライブラリ/ヘルプ` | edit/optionsがなく、navigation/libraryの配置とcommand groupingが異なる | FUT-C-065 |
-| icon中心のtoolbar、戻る・進むのdropdown、folder/bookcase/media/search切替 | 戻る・進む・上へ、sort、view mode等の文字・記号control | 履歴の直接選択、context切替commandのicon、全体の配置がない | FUT-C-056, FUT-C-066 |
+| `ファイル/編集/表示/オプション/ヘルプ`のmenu bar | 同じtop-level 5分類へ既存commandを整理 | component/focused PASS。release DPIと製品UIの外観は未測定 | FUT-C-065 |
+| icon中心のtoolbar、戻る・進むのdropdown、folder/bookcase/media/search切替 | accessible icon toolbar、履歴dropdown、folder/bookshelf/search contextを実装 | media contextは仕様未決定。toolbarのrelease製品UIは未測定 | FUT-C-056, FUT-C-066, FUT-C-048 |
 | label、path入力、右端の実行buttonを持つaddress bar | path入力、`移動`実行button、履歴移動を実装済み | 基本機能はREQ-MVP-004で実装済み。buttonのicon、配置、toolbarとの統合が異なる | REQ-MVP-004, FUT-C-066 |
-| desktop、PC、driveを含むfolder treeとpane close button | 登録library内tree、splitterで幅変更 | OS namespaceとpane close/visibilityがない | REQ-MVP-003, FUT-C-062, FUT-C-064 |
-| folder iconと表紙を混在表示する罫線付きthumbnail grid | cover、小thumbnail、detailの3 mode | catalog/thumbnail機能は近似するがtile外観、密度、長名表示が異なる | REQ-MVP-005, REQ-MVP-006, FUT-C-012〜014, FUT-C-067 |
-| 選択情報と`現在位置 / 総file数`を示すstatus bar | 項目数、選択path、load状態 | sort/filter後の現在index表示がない | FUT-C-068 |
+| desktop、PC、driveを含むfolder treeとpane close button | 登録library内tree、splitter、可逆pane表示切替を実装 | OS namespaceは対象外。release製品UIのpane操作は未測定 | REQ-MVP-003, FUT-C-062, FUT-C-064 |
+| folder iconと表紙を混在表示する罫線付きthumbnail grid | `reference_tile`を既存catalog/thumbnailへ接続 | long name/focusのcomponent testはPASS。release DPI visualは未測定 | REQ-MVP-005, REQ-MVP-006, FUT-C-012〜014, FUT-C-067 |
+| 選択情報と`現在位置 / 総file数`を示すstatus bar | sort/filter後の選択index、総件数、選択数を表示 | P1のfocused testでPASS | FUT-C-068 |
 
 ### メニュー機能の対応差
 
 | 参照menu | 参照画面での直接観測 | 現行との差 | 追跡ID |
 |---|---|---|---|
-| ファイル | 開く、指定動作で開く、最近開いたfile | 一覧内openと閲覧履歴はあるが、picker、指定動作submenu、recent submenuはない | FUT-C-042〜044, FUT-R-004 |
-| ファイル | しおりを開く、次のしおり、しおりを保存 | 最終読書位置の自動保存のみで、明示的な複数page bookmarkはない | REQ-MVP-015, FUT-C-045, FUT-C-046 |
-| ファイル | 本棚に追加 | お気に入りはあるが、専用本棚contextと追加menuはない | FUT-C-011, FUT-C-021, FUT-C-047 |
+| ファイル | 開く、指定動作で開く、最近開いたfile | open commandとrecent menuは実装済み。指定動作submenuだけは仕様未決定 | FUT-C-042〜044, FUT-R-004 |
+| ファイル | しおりを開く、次のしおり、しおりを保存 | app-local page bookmarkの保存・一覧open・next/wrapを実装 | REQ-MVP-015, FUT-C-045, FUT-C-046 |
+| ファイル | 本棚に追加 | favoriteと分離したapp-local bookshelfの表示・追加・除去を実装 | FUT-C-011, FUT-C-021, FUT-C-047 |
 | ファイル | 削除、名前変更、folder作成 | 未実装候補として既に登録済み。削除がごみ箱か完全削除かは画面だけでは未確定 | FUT-C-024, FUT-C-027〜029 |
-| ファイル | property、CSV出力、終了 | 対応するaction/menuがない | FUT-C-049〜051 |
+| ファイル | property、CSV出力、終了 | property、相対path限定・formula無害化CSV、明示終了を実装 | FUT-C-049〜051 |
 | 編集 | undo、cut、copy、paste | move/copy候補はあるが、undoとOS clipboard操作はない | FUT-C-025, FUT-C-026, FUT-C-052, FUT-C-053 |
 | 編集 | folderへcopy、folderへmove | 既存の未実装候補に対応 | FUT-C-025, FUT-C-026 |
-| 編集 | pathをcopy、親folder pathをcopy | clipboardへのpath出力がない | FUT-C-054 |
-| 編集 | 全選択、fileのみ、imageのみ、選択反転、解除 | 現行catalogは単一選択のみ | FUT-C-055 |
-| 表示 | folder、本棚、media、検索context | folderと名前検索は実装済み。本棚はお気に入りのみ、media contextはない | REQ-MVP-002, FUT-C-010, FUT-C-047, FUT-C-048 |
-| 表示 | 移動、最新情報へ更新 | 一段の戻る・進む・上へはあるが履歴dropdownと常設F5 refreshはない | REQ-MVP-004, FUT-C-056, FUT-C-057 |
-| 表示 | file表示形式、並び順 | 3表示形式と4 fieldの昇降順を実装済み。menu階層とlabelは異なる | REQ-MVP-007, FUT-C-012〜014, FUT-C-065 |
-| 表示 | file mask、file表示切替 | 名前検索はあるがmaskはなく、無効表示された切替commandの意味は未確定 | FUT-C-010, FUT-C-058, FUT-C-059 |
-| 表示 | image表示分離、task tray収納 | catalog shellから独立した画像表示とtray常駐はない。分離方式は画面だけでは未確定 | FUT-C-060, FUT-C-061 |
-| 表示 | pane、bar、menuの表示切替 | tree幅変更以外のworkspace表示切替はない | FUT-C-062, FUT-C-063 |
-| オプション | 設定、plugin設定 | 個別設定の自動保存はあるが統合設定画面とplugin設定はない | FUT-C-069, FUT-C-070 |
-| オプション | 設定の保存、読込、切替 | user操作可能な設定profileはない | FUT-C-071 |
-| オプション | key customize、mouse gesture | viewer操作8種のkey割当は実装済みだがmenu配置が異なり、mouse割当はない。参照側のkey対象範囲は未確認 | FUT-C-019, FUT-C-065, FUT-C-072 |
-| オプション | thumbnail管理、表示中thumbnail保存、一括読込 | thumbnail生成/cacheは内部実装済みだがuser向け管理操作はない | REQ-MVP-006, FUT-C-073〜075 |
-| ヘルプ | 一般help、version情報 | shortcut help/editorのみで、一般helpとAbout dialogはない | FUT-C-076, FUT-C-077 |
+| 編集 | pathをcopy、親folder pathをcopy | library-root相対pathのclipboard出力を実装。OS absolute pathは出力しない | FUT-C-054 |
+| 編集 | 全選択、fileのみ、imageのみ、選択反転、解除 | 複数・範囲・種別・反転・解除を既存catalogへ接続 | FUT-C-055 |
+| 表示 | folder、本棚、media、検索context | folder、本棚、名前検索は実装済み。media contextは仕様未決定 | REQ-MVP-002, FUT-C-010, FUT-C-047, FUT-C-048 |
+| 表示 | 移動、最新情報へ更新 | 履歴dropdown移動とF5/manual refreshを実装 | REQ-MVP-004, FUT-C-056, FUT-C-057 |
+| 表示 | file表示形式、並び順 | 既存3形式に`reference_tile`を追加し、4 field昇降順と5分類menuへ接続 | REQ-MVP-007, FUT-C-012〜014, FUT-C-065, FUT-C-067 |
+| 表示 | file mask、file表示切替 | basename maskを実装。無効表示されたfile表示切替commandの意味は未確定 | FUT-C-010, FUT-C-058, FUT-C-059 |
+| 表示 | image表示分離、task tray収納 | viewer分離とnative tray commandを実装。実notification areaの製品gateは未測定 | FUT-C-060, FUT-C-061 |
+| 表示 | pane、bar、menuの表示切替 | tree、menu、toolbarのcurrent-session可逆切替を実装 | FUT-C-062, FUT-C-063 |
+| オプション | 設定、plugin設定 | atomic Apply/Cancel付き統合設定を実装。plugin方式は未採用 | FUT-C-069, FUT-C-070 |
+| オプション | 設定の保存、読込、切替 | strict schemaのJSON profile export/importと切替を実装 | FUT-C-071 |
+| オプション | key customize、mouse gesture | shortcutとmouse gestureを統合設定へ接続し、競合を拒否 | FUT-C-019, FUT-C-065, FUT-C-072 |
+| オプション | thumbnail管理、表示中thumbnail保存、一括読込 | user向け管理UIとhelperを実装。製品での実保存・一括読込は未測定 | REQ-MVP-006, FUT-C-073〜075 |
+| ヘルプ | 一般help、version情報 | offline一般helpとversion/runtime/license noticeを実装し、FT-B19-004/005でPASS | FUT-C-076, FUT-C-077 |
 
 上表の既存IDは重複登録せず、差分だけを`FUT-C-042`〜`FUT-C-077`へ原子化した。
-これらは代替アプリとしての候補範囲を記録するもので、優先順位、採用、詳細仕様を確定するものではない。
+その後に採用したP1〜P10の対象は実装・実測へ同期し、対象外のCandidateは未決定のまま保持する。
+現在の採用・検証判定は11列台帳とP1〜P10集約表を正本とする。
 
 ## FR-B07 受入証跡
 
@@ -222,8 +242,11 @@ IMP-006のmemo、IMP-007のhistory、IMP-008のratingをそれぞれWindows rele
 IMP-015で`FUT-C-005`を`Implemented / PASS`へ更新した。Windows release WebView2
 `FT-B08-006`はfolder、ZIP、CBZのstatic lossy/lossless/alpha WebPをenumerateし、thumbnail cacheと
 viewer decode、corrupt/animatedの局所errorから次page・他comicへの復帰、library source tree差分0を直接観測した。
-`FUT-C-006`〜`FUT-C-008`は未実装Candidateのため、FR-B08 aggregateは`Partial`を維持する。詳細なrun ID、
-release/SBOM binding、CoDD advisory、生の不採用runは[FR-B08結果](../testing/fr-b08-results.md)を正本とする。
+P8の`FUT-C-006`〜`FUT-C-008`はGIF/AVIFのclassification、MIME、構造parserをpage pipelineへ接続済みで、
+animated GIFはmetadataで識別してapp-local disk thumbnail cacheを拒否する。focused Rust testはPASSしたが、
+release WebView2のstatic GIF/animation GIF/AVIF decodeとcorrupt fallbackは未測定である。このためP8 aggregateは
+`Partial / BLOCKED_UNMEASURED`とする。static WebPのrun ID、release/SBOM binding、CoDD advisoryは
+[FR-B08結果](../testing/fr-b08-results.md)、P8の測定境界は[FR-B08 P8結果](../testing/fr-b08-p8-results.md)を正本とする。
 
 ### cmd_400 履歴
 

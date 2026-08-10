@@ -15,7 +15,7 @@ use std::time::UNIX_EPOCH;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
-use crate::catalog::{CatalogEntry, enumerate_archive_pages, enumerate_folder};
+use crate::catalog::{ArchiveKind, CatalogEntry, enumerate_archive_pages, enumerate_folder};
 use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 
 pub const DIAGNOSTIC_SCHEMA: &str = "fr-b09/v1";
@@ -180,7 +180,7 @@ fn scan_directory(
             hash
         } else {
             let hash = hash_file(&path, cancellation)?;
-            if entry.kind == ItemKind::Archive {
+            if entry.kind == ItemKind::Archive && archive_reader_available(&entry) {
                 state
                     .archive_problems
                     .extend(validate_archive(&path, &entry)?);
@@ -201,6 +201,13 @@ fn scan_directory(
     child_digests.sort();
     result.content_hash = hash_directory(&child_digests);
     Ok(result)
+}
+
+fn archive_reader_available(entry: &CatalogEntry) -> bool {
+    matches!(
+        entry.archive_kind,
+        Some(ArchiveKind::Zip | ArchiveKind::Cbz)
+    )
 }
 
 fn snapshot_entry(
@@ -667,6 +674,39 @@ mod tests {
                     == Some("FIX-ZIP-ERROR-001/corrupt.zip")
         }));
         assert_eq!(fs::read(corrupt).unwrap(), before);
+    }
+
+    #[test]
+    fn fr_b12_unavailable_archives_are_unsupported_and_not_reported_as_corrupt_zip() {
+        let root = temporary_root("unsupported-archives");
+        fs::create_dir_all(&root).unwrap();
+        for (name, bytes) in [
+            ("volume.rar", b"Rar!\x1a\x07\x00".as_slice()),
+            ("volume.cbr", b"Rar!\x1a\x07\x00".as_slice()),
+            ("volume.7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
+        ] {
+            fs::write(root.join(name), bytes).unwrap();
+        }
+        let before = source_state(&root);
+
+        let report = scan(&root, &[]);
+
+        for name in ["volume.rar", "volume.cbr", "volume.7z"] {
+            let snapshot = report
+                .snapshot
+                .iter()
+                .find(|entry| entry.relative_path.as_str() == name)
+                .unwrap();
+            assert_eq!(snapshot.kind, ItemKind::Unsupported);
+        }
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|finding| finding.status != DiagnosticStatus::Corrupt)
+        );
+        assert_eq!(source_state(&root), before);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

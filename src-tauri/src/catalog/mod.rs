@@ -183,7 +183,14 @@ mod fixture_tests {
         assert_eq!(by_name["comic-folder"], ItemKind::ComicFolder);
         assert_eq!(by_name["volume.zip"], ItemKind::Archive);
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
-        assert_eq!(by_name["future.rar"], ItemKind::Archive);
+        assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
+        assert_eq!(
+            entries
+                .iter()
+                .find(|entry| entry.relative_path.as_str().ends_with("future.rar"))
+                .and_then(|entry| entry.archive_kind),
+            Some(ArchiveKind::Rar)
+        );
         assert_eq!(entries.len(), by_name.len());
     }
 

@@ -5,7 +5,15 @@ export interface WorkspaceDisplayState {
 }
 
 export function shellGridRows(state: Pick<WorkspaceDisplayState, "menuBarVisible" | "toolbarVisible">): string {
-  return `${state.menuBarVisible ? "34px" : "0px"} ${state.toolbarVisible ? "42px" : "0px"} 40px 40px minmax(0, 1fr) 28px`;
+  return [
+    ...(state.menuBarVisible ? ["34px"] : []),
+    ...(state.toolbarVisible ? ["42px"] : []),
+    "40px",
+    "40px",
+    "40px",
+    "minmax(0, 1fr)",
+    "28px",
+  ].join(" ");
 }
 
 export function workspaceGridColumns(treeVisible: boolean, treeWidth: number): string {
@@ -16,6 +24,6 @@ export function restoreWorkspaceDisplay(): WorkspaceDisplayState {
   return { treeVisible: true, menuBarVisible: true, toolbarVisible: true };
 }
 
-export function trayRuntimeAvailable(runtime: unknown): boolean {
-  return typeof runtime === "object" && runtime !== null && "__TAURI_INTERNALS__" in runtime;
+export function trayStatusAvailable(status: { available: boolean } | null | undefined): boolean {
+  return status?.available === true;
 }

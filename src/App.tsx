@@ -20,7 +20,7 @@ import {
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveItemMemo,
-  saveShortcutBindings,
+  saveSettingsProfile,
   saveViewerSettings,
   assignTag,
   removeTag,
@@ -35,12 +35,16 @@ import {
   listFavorites,
   removeFavorite,
   resolveFavorite,
+  getTrayStatus,
+  storeMainWindowInTray,
+  quitApplication,
   type CatalogSettings,
   type DiagnosticReport,
   type FavoriteEntry,
   type ItemMetadata,
   type TagEntry,
   type ReadingHistoryEntry,
+  type TrayStatus,
   type ViewerSession,
 } from "./features/library/client";
 import {
@@ -92,11 +96,14 @@ import {
 } from "./features/catalog/view-mode";
 import {
   formatThumbnailBytes,
-  loadManagedThumbnails,
+  createManagedThumbnailMap,
+  hasLegacyManagedThumbnails,
+  loadManagedThumbnailsForLibrary,
+  managedThumbnailFor,
   mergeImportedThumbnails,
   readJpegFile,
   resolveImportTargets,
-  saveManagedThumbnails,
+  saveManagedThumbnailsForLibrary,
   saveThumbnailDataUrl,
   thumbnailDownloadName,
   thumbnailStats,
@@ -107,26 +114,27 @@ import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
   restoreWorkspaceDisplay,
   shellGridRows,
-  trayRuntimeAvailable,
+  trayStatusAvailable,
   workspaceGridColumns,
 } from "./features/workspace/display";
 import {
   APP_VERSION,
+  DEFAULT_MOUSE_GESTURES,
   MOUSE_GESTURE_ACTIONS,
   MOUSE_GESTURE_NAMES,
-  loadMouseGestures,
+  normalizeMouseGestures,
   normalizeSettingsProfile,
-  saveMouseGestures,
   type MouseGestureBindings,
   type SettingsProfile,
 } from "./features/settings/profile";
 import {
-  addBookshelfItem,
+  addBookshelfItemResult,
   listBookmarks,
   listBookshelf,
+  migrateLegacyCollections,
   nextBookmark,
-  removeBookshelfItem,
-  saveBookmark,
+  removeBookshelfItemResult,
+  saveBookmarkResult,
   type PageBookmark,
 } from "./features/reading/collections";
 import {
@@ -141,6 +149,7 @@ import {
   presentError,
   presentUnexpectedError,
 } from "./features/errors/presentation";
+import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
 
 type LoadState =
   | { status: "idle" }
@@ -158,14 +167,14 @@ interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
 }
 
-type MenuId = "file" | "navigation" | "view" | "library" | "help";
+type MenuId = "file" | "edit" | "view" | "options" | "help";
 
-const MENU_ORDER: MenuId[] = ["file", "navigation", "view", "library", "help"];
+const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
 const MENU_MNEMONICS: Record<string, MenuId> = {
   f: "file",
-  n: "navigation",
+  e: "edit",
   v: "view",
-  l: "library",
+  o: "options",
   h: "help",
 };
 
@@ -220,6 +229,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
+  const trayGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
   const metadataGeneration = useRef(0);
   const ratingSaveGeneration = useRef(0);
@@ -233,16 +243,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const menuBarRef = useRef<HTMLElement>(null);
   const menuTriggerRefs = useRef<Record<MenuId, HTMLButtonElement | null>>({
     file: null,
-    navigation: null,
+    edit: null,
     view: null,
-    library: null,
+    options: null,
     help: null,
   });
   const menuPopupRefs = useRef<Record<MenuId, HTMLDivElement | null>>({
     file: null,
-    navigation: null,
+    edit: null,
     view: null,
-    library: null,
+    options: null,
     help: null,
   });
   const pendingMenuFocus = useRef<"first" | "last">("first");
@@ -257,13 +267,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const addressInputDirty = useRef(false);
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
-  const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(() =>
-    loadManagedThumbnails(typeof window === "undefined" ? undefined : window.localStorage),
+  const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(
+    createManagedThumbnailMap,
   );
+  const managedThumbnailsRef = useRef(managedThumbnails);
+  const managedThumbnailRoot = useRef<string | null>(null);
   const [thumbnailManagerOpen, setThumbnailManagerOpen] = useState(false);
   const [thumbnailManagerNotice, setThumbnailManagerNotice] = useState<string | null>(null);
+  const [legacyThumbnailDataPresent, setLegacyThumbnailDataPresent] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const selectionAnchor = useRef<string | null>(null);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [fileMask, setFileMask] = useState("");
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -271,13 +285,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   const [bookshelfOpen, setBookshelfOpen] = useState(false);
-  const [bookshelfPaths, setBookshelfPaths] = useState<string[]>(() => listBookshelf());
+  const [bookshelfPaths, setBookshelfPaths] = useState<string[]>([]);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
   const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>(
     DEFAULT_CATALOG_VIEW_MODE,
   );
+  const persistedCatalogViewMode = useRef<CatalogViewMode>(DEFAULT_CATALOG_VIEW_MODE);
   const [endOfVolumePolicy, setEndOfVolumePolicy] =
     useState<EndOfVolumePolicy>("auto_next");
   const endOfVolumePolicyRef = useRef<EndOfVolumePolicy>("auto_next");
@@ -296,18 +311,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
-  const [shortcutNotice, setShortcutNotice] = useState<string | null>(null);
-  const [shortcutSaveState, setShortcutSaveState] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
-  const shortcutSaveRequest = useRef(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<SettingsProfile | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
-  const [mouseGestures, setMouseGestures] = useState<MouseGestureBindings>(() =>
-    loadMouseGestures(typeof window === "undefined" ? undefined : window.localStorage),
-  );
+  const [mouseGestures, setMouseGestures] = useState<MouseGestureBindings>(() => ({
+    ...DEFAULT_MOUSE_GESTURES,
+  }));
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(240);
@@ -315,7 +326,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [menuBarVisible, setMenuBarVisible] = useState(true);
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [viewerDetached, setViewerDetached] = useState(false);
-  const [trayStored, setTrayStored] = useState(false);
+  const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
+  const [trayNotice, setTrayNotice] = useState<string | null>(null);
+  const [runtimeLabel, setRuntimeLabel] = useState("確認中");
+  const [licenseOpen, setLicenseOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState(false);
@@ -352,28 +366,110 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
-  const trayApiAvailable =
-    trayRuntimeAvailable(typeof window === "undefined" ? undefined : window);
+  const trayApiAvailable = trayStatusAvailable(trayStatus);
 
   useEffect(() => {
     try {
-      saveManagedThumbnails(
+      if (libraryRoot === null || managedThumbnailRoot.current !== libraryRoot) return;
+      saveManagedThumbnailsForLibrary(
         typeof window === "undefined" ? undefined : window.localStorage,
+        libraryRoot,
         managedThumbnails,
       );
     } catch {
       setThumbnailManagerNotice("app-local thumbnailを保存できませんでした。容量を減らして再試行してください。");
     }
-  }, [managedThumbnails]);
+  }, [libraryRoot, managedThumbnails]);
+
+  useEffect(() => {
+    const requestGeneration = ++trayGeneration.current;
+    void Promise.resolve()
+      .then(() => getTrayStatus(requestGeneration))
+      .then((response) => {
+        if (requestGeneration !== trayGeneration.current) return;
+        setRuntimeLabel("Tauri WebView2");
+        if (response.status === "ok") {
+          setTrayStatus(response.data);
+          if (!response.data.available && response.data.reason !== null) {
+            setTrayNotice(response.data.reason);
+          }
+        } else if (response.status === "error") {
+          const message = response.error.message.trim() || presentError(response.error);
+          setTrayStatus({ available: false, stored: false, reason: message });
+          setTrayNotice(message);
+        }
+      })
+      .catch(() => {
+        if (requestGeneration !== trayGeneration.current) return;
+        setRuntimeLabel("ブラウザ");
+        setTrayStatus({
+          available: false,
+          stored: false,
+          reason: "この実行環境ではnative task trayを利用できません。",
+        });
+      });
+  }, []);
+
+  function browserStorage(): Storage | undefined {
+    try {
+      return typeof window === "undefined" ? undefined : window.localStorage;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function replaceManagedThumbnails(next: ManagedThumbnailMap) {
+    managedThumbnailsRef.current = next;
+    setManagedThumbnails(next);
+  }
+
+  function activateLibraryRoot(root: string) {
+    viewerGeneration.current += 1;
+    setViewerSession(null);
+    setLibraryRoot(root);
+    managedThumbnailRoot.current = root;
+    const storage = browserStorage();
+    replaceManagedThumbnails(loadManagedThumbnailsForLibrary(storage, root));
+    setLegacyThumbnailDataPresent(hasLegacyManagedThumbnails(storage));
+    setRecentEntries([]);
+    setBookmarks([]);
+    const migration = migrateLegacyCollections(root);
+    setBookshelfPaths(migration.ok ? migration.value.bookshelf : listBookshelf(root));
+    if (!migration.ok) {
+      setSelectionNotice("app-local collectionをこのlibraryへ移行できませんでした。");
+    }
+  }
+
+  function deactivateLibraryRoot() {
+    viewerGeneration.current += 1;
+    setViewerSession(null);
+    managedThumbnailRoot.current = null;
+    replaceManagedThumbnails(createManagedThumbnailMap());
+    setLegacyThumbnailDataPresent(false);
+    setBookshelfPaths([]);
+    setBookmarks([]);
+    setRecentEntries([]);
+    setLibraryRoot(null);
+  }
 
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
     const next = action === "toggle"
       ? toggleEntrySelection(selectedPaths, entry.relativePath)
       : action === "range"
-        ? rangeSelection(sortedEntries, selectedPath, entry.relativePath)
+        ? rangeSelection(
+            visibleEntries,
+            selectionAnchor.current ?? selectedPath,
+            entry.relativePath,
+          )
         : [entry.relativePath];
+    const active = action === "range"
+      ? entry.relativePath
+      : action === "toggle" && !next.includes(entry.relativePath)
+        ? next.at(-1) ?? null
+        : entry.relativePath;
+    if (action !== "range") selectionAnchor.current = active;
     setSelectedPaths(next);
-    setSelectedPath(next.at(-1) ?? null);
+    setSelectedPath(active);
     setSelectionNotice(null);
   }
 
@@ -462,9 +558,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         if (response.status === "ok") {
           setSortField(response.data.sortField);
           setSortDescending(response.data.sortDescending);
-          setCatalogViewMode(
-            normalizeCatalogViewMode(response.data.catalogViewMode),
-          );
+          const restoredCatalogViewMode = normalizeCatalogViewMode(response.data.catalogViewMode);
+          persistedCatalogViewMode.current = restoredCatalogViewMode;
+          setCatalogViewMode(restoredCatalogViewMode);
           if (
             !endOfVolumePolicyUserChanged.current &&
             policyRevisionAtRequest === endOfVolumePolicyRevision.current
@@ -481,7 +577,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
           setLoupeEnabled(response.data.loupeEnabled);
+          setTreeVisible(response.data.treeVisible);
+          setMenuBarVisible(response.data.menuBarVisible);
+          setToolbarVisible(response.data.toolbarVisible);
           setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
+          setMouseGestures(normalizeMouseGestures(response.data.mouseGestures));
         }
       })
       .catch(() => undefined);
@@ -499,7 +599,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           response.status === "ok" &&
           response.data
         ) {
-          setLibraryRoot(response.data.absolutePath);
+          activateLibraryRoot(response.data.absolutePath);
           dispatch({ type: "reset", path: "" });
           await load("");
         }
@@ -534,16 +634,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   );
 
   useEffect(() => {
-    if (selectedPath !== null && !visibleEntries.some((entry) => entry.relativePath === selectedPath)) {
-      clearSelection();
+    const visible = new Set<string>(visibleEntries.map((entry) => entry.relativePath));
+    const next = selectedPaths.filter((path) => visible.has(path));
+    const nextActive = selectedPath !== null && visible.has(selectedPath)
+      ? selectedPath
+      : next.at(-1) ?? null;
+    if (
+      next.length !== selectedPaths.length
+      || next.some((path, index) => path !== selectedPaths[index])
+    ) {
+      setSelectedPaths(next);
     }
-  }, [selectedPath, visibleEntries]);
+    if (nextActive !== selectedPath) setSelectedPath(nextActive);
+    if (selectionAnchor.current !== null && !visible.has(selectionAnchor.current)) {
+      selectionAnchor.current = nextActive;
+    }
+  }, [selectedPath, selectedPaths, visibleEntries]);
 
   useEffect(() => {
     const requestGeneration = generation.current;
     sortedEntries.forEach((entry, index) => {
       if (entry.kind !== "archive" && entry.kind !== "comicFolder") return;
-      if (managedThumbnails[entry.relativePath] !== undefined) return;
+      if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
       if (thumbnails[entry.relativePath] !== undefined) return;
       const priority =
         index < 15 ? "visible" : index < 40 ? "near" : "background";
@@ -551,11 +663,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     });
   }, [managedThumbnails, sortedEntries, thumbnails]);
 
-  async function load(relativePath: string, selectionPath: string | null = null) {
+  async function load(relativePath: string, selectionPathsToRestore: readonly string[] = []) {
     generation.current += 1;
     const requestGeneration = generation.current;
     setLoadState({ status: "loading", path: relativePath });
-    setSelectedPath(null);
     setThumbnails({});
     thumbnailRequests.current.clear();
     try {
@@ -563,11 +674,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
         setEntries(response.data);
-        const nextSelection = selectionPath !== null && response.data.some(
-          (entry) => entry.relativePath === selectionPath,
-        ) ? [selectionPath] : [];
+        const available = new Set<string>(response.data.map((entry) => entry.relativePath));
+        const nextSelection = selectionPathsToRestore.filter((path) => available.has(path));
         setSelectedPaths(nextSelection);
-        setSelectedPath(nextSelection.at(-1) ?? null);
+        const nextActive = nextSelection.at(-1) ?? null;
+        selectionAnchor.current = nextActive;
+        setSelectedPath(nextActive);
         setLoadState({ status: "ready" });
       } else if (response.status === "error") {
         setLoadState({
@@ -596,7 +708,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const response = await registerLibraryRoot(rootInput, generation.current);
     if (response.status === "ok") {
       addressInputDirty.current = false;
-      setLibraryRoot(response.data.absolutePath);
+      activateLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: "" });
       await load("");
     } else if (response.status === "error") {
@@ -606,20 +718,33 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function refreshCatalog() {
     setSelectionNotice(null);
-    void load(navigation.current, selectedPath);
+    const selection = selectedPaths.length > 0
+      ? selectedPaths
+      : selectedPath === null ? [] : [selectedPath];
+    void load(navigation.current, selection);
   }
 
   function selectAll() {
     const next = visibleEntries.map((entry) => entry.relativePath);
+    selectionAnchor.current = next.at(-1) ?? null;
     setSelectedPaths(next);
-    setSelectedPath(next.at(-1) ?? null);
+    setSelectedPath(selectionAnchor.current);
     setSelectionNotice(null);
   }
 
   function selectByKind(kind: CatalogEntry["kind"] | "image") {
     const next = selectEntriesByKind(visibleEntries, kind);
+    selectionAnchor.current = next.at(-1) ?? null;
     setSelectedPaths(next);
-    setSelectedPath(next.at(-1) ?? null);
+    setSelectedPath(selectionAnchor.current);
+    setSelectionNotice(null);
+  }
+
+  function selectFiles() {
+    const next = selectEntriesByKind(visibleEntries, "file");
+    selectionAnchor.current = next.at(-1) ?? null;
+    setSelectedPaths(next);
+    setSelectedPath(selectionAnchor.current);
     setSelectionNotice(null);
   }
 
@@ -628,26 +753,40 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const next = visibleEntries
       .filter((entry) => !selected.has(entry.relativePath))
       .map((entry) => entry.relativePath);
+    selectionAnchor.current = next.at(-1) ?? null;
     setSelectedPaths(next);
-    setSelectedPath(next.at(-1) ?? null);
+    setSelectedPath(selectionAnchor.current);
     setSelectionNotice(null);
   }
 
   function clearSelection() {
+    selectionAnchor.current = null;
     setSelectedPaths([]);
     setSelectedPath(null);
     setSelectionNotice(null);
   }
 
   function downloadCatalogCsv() {
-    const blob = new Blob([catalogCsv(visibleEntries)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "comic-explorer-catalog.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    setSelectionNotice(`${visibleEntries.length}件をCSVへ出力しました。`);
+    let url: string | null = null;
+    try {
+      if (typeof URL.createObjectURL !== "function") {
+        throw new Error("download unavailable");
+      }
+      const blob = new Blob([catalogCsv(visibleEntries)], { type: "text/csv;charset=utf-8" });
+      url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "comic-explorer-catalog.csv";
+      link.click();
+      setSelectionNotice("CSVのダウンロードを開始しました。保存完了はブラウザで確認してください。");
+    } catch {
+      setSelectionNotice("CSVを出力できませんでした。保存機能を確認してください。");
+    } finally {
+      if (url !== null) {
+        const downloadUrl = url;
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      }
+    }
   }
 
   async function saveDisplayedThumbnail() {
@@ -655,16 +794,42 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setThumbnailManagerNotice("一覧でthumbnail対象を選択してください。");
       return;
     }
-    const managed = managedThumbnails[selectedPath];
-    const generated = thumbnails[selectedPath];
-    const dataUrl = managed?.dataUrl ?? (generated?.status === "ready" ? generated.mediaUri : undefined);
+    const selectedEntry = entries.find((entry) => entry.relativePath === selectedPath);
+    if (selectedEntry?.kind !== "archive" && selectedEntry?.kind !== "comicFolder") {
+      setThumbnailManagerNotice("選択項目には保存できるthumbnailがありません。");
+      return;
+    }
+    const managed = managedThumbnailFor(managedThumbnails, selectedPath);
+    let dataUrl = managed?.dataUrl;
+    if (dataUrl === undefined) {
+      try {
+        const requestGeneration = generation.current;
+        const response = await getThumbnail(selectedPath, requestGeneration, true, "visible");
+        if (requestGeneration !== generation.current || response.status !== "ok") {
+          setThumbnailManagerNotice("表示中thumbnailの保存用データを更新できませんでした。");
+          return;
+        }
+        dataUrl = response.data.mediaUri;
+        setThumbnails((current) => ({
+          ...current,
+          [selectedPath]: { status: "ready", mediaUri: dataUrl!, cacheHit: response.data.cacheHit },
+        }));
+      } catch {
+        setThumbnailManagerNotice("表示中thumbnailの保存用データを更新できませんでした。");
+        return;
+      }
+    }
     if (dataUrl === undefined) {
       setThumbnailManagerNotice("表示中thumbnailがまだ準備できていません。");
       return;
     }
     try {
-      await saveThumbnailDataUrl(dataUrl, thumbnailDownloadName(selectedPath));
-      setThumbnailManagerNotice("表示中thumbnailをJPEGとして保存しました。");
+      const result = await saveThumbnailDataUrl(dataUrl, thumbnailDownloadName(selectedPath));
+      setThumbnailManagerNotice(
+        result === "saved"
+          ? "表示中thumbnailをJPEGとして保存しました。"
+          : "thumbnailのダウンロードを開始しました。保存完了はブラウザで確認してください。",
+      );
     } catch (error) {
       setThumbnailManagerNotice(
         error instanceof DOMException && error.name === "AbortError"
@@ -675,6 +840,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   async function importManagedThumbnails(event: React.ChangeEvent<HTMLInputElement>) {
+    const rootAtStart = libraryRoot;
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (files.length === 0) return;
@@ -689,23 +855,67 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         rejected.push(`${target.file.name}: ${error instanceof Error ? error.message : "読込失敗"}`);
       }
     }
-    const merged = mergeImportedThumbnails(managedThumbnails, imports);
-    setManagedThumbnails(merged.thumbnails);
+    if (rootAtStart === null || rootAtStart !== libraryRoot || managedThumbnailRoot.current !== rootAtStart) {
+      setThumbnailManagerNotice("libraryが変更されたためthumbnail読込を破棄しました。");
+      return;
+    }
+    const merged = mergeImportedThumbnails(managedThumbnailsRef.current, imports);
+    replaceManagedThumbnails(merged.thumbnails);
     setThumbnailManagerNotice(
       `${merged.accepted}件を読み込みました。${rejected.length + merged.rejected.length > 0 ? ` ${rejected.concat(merged.rejected).join(" / ")}` : ""}`,
     );
   }
 
   function clearManagedThumbnails() {
-    setManagedThumbnails({});
+    replaceManagedThumbnails(createManagedThumbnailMap());
     setThumbnailManagerNotice("利用者が読み込んだthumbnailを削除しました。原本は変更していません。");
+  }
+
+  async function storeInTray() {
+    const requestGeneration = ++trayGeneration.current;
+    setTrayNotice(null);
+    try {
+      const response = await storeMainWindowInTray(requestGeneration);
+      if (requestGeneration !== trayGeneration.current) return;
+      if (response.status === "ok") {
+        setTrayStatus(response.data);
+      } else if (response.status === "error") {
+        const message = response.error.message.trim() || presentError(response.error);
+        setTrayStatus((current) => ({
+          available: current?.available ?? false,
+          stored: false,
+          reason: message,
+        }));
+        setTrayNotice(message);
+      } else {
+        setTrayNotice("タスクトレイへの収納をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === trayGeneration.current) {
+        setTrayNotice("タスクトレイへ収納できませんでした。ウィンドウは表示したままです。");
+      }
+    }
+  }
+
+  async function exitApplication() {
+    const requestGeneration = ++trayGeneration.current;
+    setTrayNotice(null);
+    try {
+      const response = await quitApplication(requestGeneration);
+      if (response.status === "error") setTrayNotice(presentError(response.error));
+      else if (response.status === "cancelled") setTrayNotice("終了をキャンセルしました。");
+    } catch {
+      setTrayNotice("アプリケーションを終了できませんでした。");
+    }
   }
 
   function openSelectedEntry() {
     const entry = sortedEntries.find((candidate) => candidate.relativePath === selectedPath);
     if (entry === undefined) return;
     if (entry.kind === "folder") navigate(entry.relativePath);
-    else if (entry.kind === "comicFolder" || entry.kind === "archive") openComicEntry(entry);
+    else if (entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "page") {
+      openComicEntry(entry);
+    }
   }
 
   function rememberRecent(entry: CatalogEntry) {
@@ -716,7 +926,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   function refreshBookmarks(itemKey: string) {
-    setBookmarks(listBookmarks(itemKey));
+    setBookmarks(libraryRoot === null ? [] : listBookmarks(itemKey, libraryRoot));
     setBookmarkNotice(null);
   }
 
@@ -724,18 +934,37 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (viewerSession === null) return;
     const page = viewerSession.pages[index];
     if (page === undefined) return;
-    setBookmarks(saveBookmark({
+    if (libraryRoot === null) return;
+    const result = saveBookmarkResult({
       itemKey: viewerSession.itemKey,
       pageIndex: index,
       pageKey: page.relativePath,
       createdAt: Date.now(),
-    }));
-    setBookmarkNotice(`しおりを保存しました: ${index + 1}ページ`);
+    }, libraryRoot);
+    setBookmarks(result.value);
+    setBookmarkNotice(
+      result.ok
+        ? `しおりを保存しました: ${index + 1}ページ`
+        : "しおりを永続化できませんでした。保存先の空き容量を確認してください。",
+    );
   }
 
   function addSelectedToBookshelf() {
-    if (selectedPath === null) return;
-    setBookshelfPaths(addBookshelfItem(selectedPath));
+    if (selectedPath === null || libraryRoot === null) return;
+    const result = addBookshelfItemResult(selectedPath, libraryRoot);
+    setBookshelfPaths(result.value);
+    if (!result.ok) {
+      setSelectionNotice("本棚へ永続化できませんでした。保存先を確認してください。");
+    }
+  }
+
+  function removeFromBookshelf(path: string) {
+    if (libraryRoot === null) return;
+    const result = removeBookshelfItemResult(path, libraryRoot);
+    setBookshelfPaths(result.value);
+    if (!result.ok) {
+      setSelectionNotice("本棚からの削除を永続化できませんでした。");
+    }
   }
 
   async function copySelectedPaths() {
@@ -765,7 +994,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (response.status === "ok" && response.data) {
       addressInputDirty.current = false;
       setRootInput(response.data.absolutePath);
-      setLibraryRoot(response.data.absolutePath);
+      activateLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: "" });
       await load("");
     } else if (response.status === "error") {
@@ -779,14 +1008,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function navigate(
     path: string,
-    history: "push" | "back" | "forward" = "push",
+    history:
+      | "push"
+      | "back"
+      | "forward"
+      | { type: "jumpBack" | "jumpForward"; index: number } = "push",
     selectionPath: string | null = null,
   ) {
     addressInputDirty.current = false;
     setSearchState({ status: "idle" });
     if (history === "push") dispatch({ type: "navigate", path });
-    else dispatch({ type: history });
-    void load(path, selectionPath);
+    else if (typeof history === "string") dispatch({ type: history });
+    else dispatch(history);
+    void load(path, selectionPath === null ? [] : [selectionPath]);
   }
 
   function clearSearch() {
@@ -1228,6 +1462,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     generation.current += 1;
     const requestGeneration = generation.current;
     setSearchState({ status: "loading", query });
+    selectionAnchor.current = null;
+    setSelectedPaths([]);
     setSelectedPath(null);
     setThumbnails({});
     thumbnailRequests.current.clear();
@@ -1266,8 +1502,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function closeHelp() {
     setHelpOpen(false);
-    setShortcutNotice(null);
-    setShortcutSaveState("idle");
     requestAnimationFrame(() => helpTriggerRef.current?.focus());
   }
 
@@ -1284,6 +1518,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       scaleMode: viewerScaleMode,
       scale: viewerScale,
       loupeEnabled,
+      treeVisible,
+      menuBarVisible,
+      toolbarVisible,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -1295,48 +1532,79 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setSettingsOpen(true);
   }
 
-  function applySettingsProfile(profile: SettingsProfile) {
-    changeSort(profile.sortField, profile.sortDescending);
-    changeEndOfVolumePolicy(profile.endOfVolumePolicy);
-    changeCatalogViewMode(profile.catalogViewMode);
-    setViewMode(profile.viewMode);
-    setLayoutMode(profile.layoutMode);
-    setReadingDirection(profile.readingDirection);
-    setViewerScaleMode(profile.scaleMode);
-    setViewerScale(profile.scale);
-    setLoupeEnabled(profile.loupeEnabled);
-    void saveViewerSettings(
-      {
-        viewMode: profile.viewMode,
-        layoutMode: profile.layoutMode,
-        readingDirection: profile.readingDirection,
-        scaleMode: profile.scaleMode,
-        scale: profile.scale,
-        loupeEnabled: profile.loupeEnabled,
-      },
-      ++settingsGeneration.current,
-    ).catch(() => undefined);
-    persistShortcutBindings(profile.shortcuts);
-    setMouseGestures(profile.mouseGestures);
-    saveMouseGestures(
-      typeof window === "undefined" ? undefined : window.localStorage,
-      profile.mouseGestures,
-    );
-    setSettingsOpen(false);
-    setProfileNotice("設定profileを適用しました。");
+  async function applySettingsProfile(profile: SettingsProfile) {
+    if (settingsSaving) return;
+    const normalized = normalizeSettingsProfile(profile);
+    if (normalized === null) {
+      setProfileNotice("設定profileの形式が不正です。");
+      return;
+    }
+    setSettingsSaving(true);
+    setProfileNotice("設定を保存しています。");
+    const requestGeneration = ++settingsGeneration.current;
+    try {
+      const response = await saveSettingsProfile(normalized, requestGeneration);
+      if (requestGeneration !== settingsGeneration.current) return;
+      if (response.status !== "ok") {
+        setProfileNotice(
+          response.status === "error"
+            ? presentError(response.error)
+            : "設定の保存をキャンセルしました。",
+        );
+        return;
+      }
+      setSortField(normalized.sortField);
+      setSortDescending(normalized.sortDescending);
+      endOfVolumePolicyUserChanged.current = true;
+      endOfVolumePolicyRevision.current += 1;
+      endOfVolumePolicyRef.current = normalized.endOfVolumePolicy;
+      setEndOfVolumePolicy(normalized.endOfVolumePolicy);
+      setCatalogViewMode(normalized.catalogViewMode);
+      persistedCatalogViewMode.current = normalized.catalogViewMode;
+      setViewMode(normalized.viewMode);
+      setLayoutMode(normalized.layoutMode);
+      setReadingDirection(normalized.readingDirection);
+      setViewerScaleMode(normalized.scaleMode);
+      setViewerScale(normalized.scale);
+      setLoupeEnabled(normalized.loupeEnabled);
+      setTreeVisible(normalized.treeVisible);
+      setMenuBarVisible(normalized.menuBarVisible);
+      setToolbarVisible(normalized.toolbarVisible);
+      setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
+      setMouseGestures(normalized.mouseGestures);
+      setSettingsOpen(false);
+      setSettingsDraft(null);
+      setSelectionNotice("設定profileを適用しました。");
+    } catch {
+      if (requestGeneration === settingsGeneration.current) {
+        setProfileNotice("設定を保存できませんでした。変更は適用していません。");
+      }
+    } finally {
+      if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
+    }
   }
 
   function exportSettingsProfile() {
-    const blob = new Blob([JSON.stringify(currentSettingsProfile(), null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "comic-explorer-settings.json";
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    setProfileNotice("設定profileを書き出しました。");
+    let url: string | null = null;
+    try {
+      if (typeof URL.createObjectURL !== "function") throw new Error("download unavailable");
+      const blob = new Blob([JSON.stringify(currentSettingsProfile(), null, 2)], {
+        type: "application/json",
+      });
+      url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "comic-explorer-settings.json";
+      link.click();
+      setProfileNotice("設定profileのダウンロードを開始しました。保存完了はブラウザで確認してください。");
+    } catch {
+      setProfileNotice("設定profileを書き出せませんでした。保存機能を確認してください。");
+    } finally {
+      if (url !== null) {
+        const downloadUrl = url;
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      }
+    }
   }
 
   function importSettingsProfile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -1357,32 +1625,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       .catch(() => setProfileNotice("設定profileを読み込めませんでした。"));
   }
 
-  function persistShortcutBindings(next: ShortcutBindings) {
-    setShortcuts(next);
-    setShortcutNotice(null);
-    setShortcutSaveState("saving");
-    const saveRequest = shortcutSaveRequest.current + 1;
-    shortcutSaveRequest.current = saveRequest;
-    settingsGeneration.current += 1;
-    void saveShortcutBindings(next, settingsGeneration.current)
-      .then((response) => {
-        if (saveRequest !== shortcutSaveRequest.current) return;
-        if (response.status === "ok") {
-          setShortcuts(normalizeShortcutBindings(response.data));
-          setShortcutSaveState("saved");
-        } else {
-          setShortcutSaveState("error");
-          setShortcutNotice("ショートカットを保存できませんでした。");
-        }
-      })
-      .catch(() => {
-        if (saveRequest !== shortcutSaveRequest.current) return;
-        setShortcutSaveState("error");
-        setShortcutNotice("ショートカットを保存できませんでした。");
-      });
-  }
-
-  function captureShortcut(
+  function captureDraftShortcut(
     command: ShortcutCommand,
     event: React.KeyboardEvent<HTMLInputElement>,
   ) {
@@ -1390,38 +1633,44 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     event.stopPropagation();
     const pressed = eventShortcut(event.nativeEvent);
     if (pressed === null) {
-      setShortcutNotice("修飾キーだけでは割り当てできません。");
+      setProfileNotice("修飾キーだけでは割り当てできません。");
       return;
     }
-    const result = remapShortcut(shortcuts, command, pressed);
+    if (settingsDraft === null) return;
+    const result = remapShortcut(settingsDraft.shortcuts, command, pressed);
     if (!result.ok) {
-      setShortcutNotice(
+      setProfileNotice(
         result.reason === "conflict"
           ? `${SHORTCUT_LABELS[result.conflict ?? command]} と同じキーは割り当てできません。`
           : "このキーは割り当てできません。",
       );
       return;
     }
-    persistShortcutBindings(result.bindings);
+    setProfileNotice(null);
+    setSettingsDraft({ ...settingsDraft, shortcuts: result.bindings });
   }
 
-  function resetShortcut(command: ShortcutCommand) {
+  function resetDraftShortcut(command: ShortcutCommand) {
+    if (settingsDraft === null) return;
     const result = remapShortcut(
-      shortcuts,
+      settingsDraft.shortcuts,
       command,
       DEFAULT_SHORTCUTS[command],
     );
     if (!result.ok) {
-      setShortcutNotice(
+      setProfileNotice(
         `${SHORTCUT_LABELS[result.conflict ?? command]} を先に変更してください。`,
       );
       return;
     }
-    persistShortcutBindings(result.bindings);
+    setProfileNotice(null);
+    setSettingsDraft({ ...settingsDraft, shortcuts: result.bindings });
   }
 
-  function resetAllShortcuts() {
-    persistShortcutBindings(resetShortcutBindings());
+  function resetAllDraftShortcuts() {
+    if (settingsDraft === null) return;
+    setProfileNotice(null);
+    setSettingsDraft({ ...settingsDraft, shortcuts: resetShortcutBindings() });
   }
 
   function queueThumbnail(
@@ -1511,8 +1760,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const up = parentPath(navigation.current);
   const selectedThumbnailDataUrl = selectedPath === null
     ? undefined
-    : managedThumbnails[selectedPath]?.dataUrl
-      ?? (thumbnails[selectedPath]?.status === "ready" ? thumbnails[selectedPath].mediaUri : undefined);
+    : selected?.kind === "archive" || selected?.kind === "comicFolder"
+      ? managedThumbnailFor(managedThumbnails, selectedPath)?.dataUrl
+        ?? (thumbnails[selectedPath]?.status === "ready" ? thumbnails[selectedPath].mediaUri : undefined)
+      : undefined;
   const managedThumbnailStats = thumbnailStats(managedThumbnails);
 
   function getMenuItems(menuId: MenuId): HTMLButtonElement[] {
@@ -1664,10 +1915,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function changeCatalogViewMode(mode: CatalogViewMode) {
     setCatalogViewMode(mode);
-    settingsGeneration.current += 1;
-    void saveCatalogViewMode(mode, settingsGeneration.current).catch(
-      () => undefined,
-    );
+    const requestGeneration = ++settingsGeneration.current;
+    void saveCatalogViewMode(mode, requestGeneration)
+      .then((response) => {
+        if (requestGeneration !== settingsGeneration.current) return;
+        if (response.status === "ok") {
+          const persisted = normalizeCatalogViewMode(response.data.catalogViewMode);
+          persistedCatalogViewMode.current = persisted;
+          setCatalogViewMode(persisted);
+        } else {
+          setCatalogViewMode(persistedCatalogViewMode.current);
+          setSelectionNotice(
+            response.status === "error"
+              ? presentError(response.error)
+              : "一覧表示形式の保存をキャンセルしました。",
+          );
+        }
+      })
+      .catch(() => {
+        if (requestGeneration !== settingsGeneration.current) return;
+        setCatalogViewMode(persistedCatalogViewMode.current);
+        setSelectionNotice("一覧表示形式を保存できませんでした。");
+      });
   }
 
   function persistViewerSettings(
@@ -1695,6 +1964,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   }
 
   function closeViewer() {
+    viewerGeneration.current += 1;
+    setLoadState({ status: "ready" });
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setViewerSession(null);
@@ -1709,15 +1980,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setBookmarks([]);
     setBookmarkNotice(null);
     setViewerDetached(false);
+    setThumbnails({});
+    thumbnailRequests.current.clear();
   }
 
-  function openComicEntry(entry: CatalogEntry) {
+  async function openComicEntry(entry: CatalogEntry) {
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setLoadState({ status: "loading", path: entry.relativePath });
     viewerGeneration.current += 1;
     const requestGeneration = viewerGeneration.current;
-    void openComic(entry.relativePath, requestGeneration).then((response) => {
+    try {
+      const response = await openComic(entry.relativePath, requestGeneration);
+      if (requestGeneration !== viewerGeneration.current) return;
       if (response.status === "ok") {
         rememberRecent(entry);
         refreshBookmarks(response.data.itemKey);
@@ -1730,8 +2005,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           path: entry.relativePath,
           message: presentError(response.error),
         });
+      } else {
+        setLoadState({ status: "ready" });
+        setSelectionNotice("開く操作をキャンセルしました。");
       }
-    });
+    } catch {
+      if (requestGeneration === viewerGeneration.current) {
+        setLoadState({
+          status: "error",
+          path: entry.relativePath,
+          message: presentUnexpectedError(),
+        });
+      }
+    }
   }
 
   function handleEndOfVolume() {
@@ -1802,7 +2088,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           detached={viewerDetached}
           onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}
-          onNextBookmark={(index) => nextBookmark(bookmarks, index)?.pageIndex ?? null}
+          onNextBookmark={(index) => nextBookmark(
+            bookmarks,
+            viewerSession.pages.map((page) => page.relativePath),
+            index,
+          )?.pageIndex ?? null}
         />
         <section
           aria-label="作品メタデータ"
@@ -1903,18 +2193,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     );
   }
 
-  if (trayStored) {
-    return (
-      <main className="tray-shell" aria-label="タスクトレイ収納">
-        <h1>Comic Explorer</h1>
-        <p>アプリケーションをタスクトレイへ収納しました。</p>
-        <button type="button" onClick={() => setTrayStored(false)}>
-          アプリを復帰
-        </button>
-      </main>
-    );
-  }
-
   return (
     <main
       className="app-shell"
@@ -1975,7 +2253,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(() => setLibraryRoot(null))}
+                onClick={() => runMenuAction(deactivateLibraryRoot)}
               >
                 ライブラリを変更…
               </button>
@@ -2011,29 +2289,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
-                aria-keyshortcuts="F5"
-                tabIndex={-1}
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(refreshCatalog)}
-              >
-                現在場所を更新
-                <span className="menu-shortcut">F5</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                aria-disabled={selectedPaths.length === 0}
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(() => void copySelectedPaths(), selectedPaths.length === 0)}
-              >
-                パスをコピー
-              </button>
-              <button
-                type="button"
-                role="menuitem"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
@@ -2058,19 +2313,66 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(() => window.close())}
+                onClick={() => runMenuAction(() => void exitApplication())}
               >
                 終了
                 <span className="menu-shortcut">Alt+F4</span>
               </button>
+            </div>
+          )}
+        </div>
+
+        <div className="menu-group">
+          <button
+            ref={(node) => {
+              menuTriggerRefs.current.edit = node;
+            }}
+            className="menu-trigger"
+            type="button"
+            role="menuitem"
+            aria-label="編集"
+            aria-haspopup="menu"
+            aria-expanded={activeMenu === "edit"}
+            aria-controls="edit-menu"
+            aria-keyshortcuts="Alt+E"
+            tabIndex={menuTabStop === "edit" ? 0 : -1}
+            onFocus={() => setMenuTabStop("edit")}
+            onClick={() => {
+              setMenuTabStop("edit");
+              toggleMenu("edit");
+            }}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("edit", event)}
+          >
+            編集(E)
+          </button>
+          {activeMenu === "edit" && (
+            <div
+              ref={(node) => {
+                menuPopupRefs.current.edit = node;
+              }}
+              id="edit-menu"
+              className="menu-popup"
+              role="menu"
+              aria-label="編集"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                aria-disabled={selectedPaths.length === 0}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
+                onClick={() => runMenuAction(() => void copySelectedPaths(), selectedPaths.length === 0)}
+              >
+                パスをコピー
+              </button>
               <div className="menu-separator" role="separator" />
-              <span className="menu-heading">選択</span>
               <button
                 type="button"
                 role="menuitem"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
                 onClick={() => runMenuAction(selectAll)}
               >
                 すべて選択
@@ -2080,7 +2382,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 role="menuitem"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
+                onClick={() => runMenuAction(selectFiles)}
+              >
+                ファイルだけ選択
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
                 onClick={() => runMenuAction(() => selectByKind("page"))}
               >
                 画像だけ選択
@@ -2090,7 +2402,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 role="menuitem"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
                 onClick={() => runMenuAction(invertSelection)}
               >
                 選択を反転
@@ -2101,100 +2413,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 tabIndex={-1}
                 aria-disabled={selectedPaths.length === 0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
                 onClick={() => runMenuAction(clearSelection, selectedPaths.length === 0)}
               >
                 選択を解除
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="menu-group">
-          <button
-            ref={(node) => {
-              menuTriggerRefs.current.navigation = node;
-            }}
-            className="menu-trigger"
-            type="button"
-            role="menuitem"
-            aria-label="移動"
-            aria-haspopup="menu"
-            aria-expanded={activeMenu === "navigation"}
-            aria-controls="navigation-menu"
-            aria-keyshortcuts="Alt+N"
-            tabIndex={menuTabStop === "navigation" ? 0 : -1}
-            onFocus={() => setMenuTabStop("navigation")}
-            onClick={() => {
-              setMenuTabStop("navigation");
-              toggleMenu("navigation");
-            }}
-            onKeyDown={(event) => handleMenuTriggerKeyDown("navigation", event)}
-          >
-            移動(N)
-          </button>
-          {activeMenu === "navigation" && (
-            <div
-              ref={(node) => {
-                menuPopupRefs.current.navigation = node;
-              }}
-              id="navigation-menu"
-              className="menu-popup"
-              role="menu"
-              aria-label="移動"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={0}
-                aria-disabled={navigation.back.length === 0}
-                aria-keyshortcuts="Alt+ArrowLeft"
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
-                onClick={() =>
-                  runMenuAction(() => {
-                    const target = navigation.back.at(-1);
-                    if (target !== undefined) navigate(target, "back");
-                  }, navigation.back.length === 0)
-                }
-              >
-                戻る
-                <span className="menu-shortcut">Alt+←</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                aria-disabled={navigation.forward.length === 0}
-                aria-keyshortcuts="Alt+ArrowRight"
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
-                onClick={() =>
-                  runMenuAction(() => {
-                    const target = navigation.forward[0];
-                    if (target !== undefined) navigate(target, "forward");
-                  }, navigation.forward.length === 0)
-                }
-              >
-                進む
-                <span className="menu-shortcut">Alt+→</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                tabIndex={-1}
-                aria-disabled={up === null}
-                aria-keyshortcuts="Alt+ArrowUp"
-                onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("navigation", event)}
-                onClick={() =>
-                  runMenuAction(() => {
-                    if (up !== null) navigate(up);
-                  }, up === null)
-                }
-              >
-                上のフォルダへ
-                <span className="menu-shortcut">Alt+↑</span>
               </button>
             </div>
           )}
@@ -2233,6 +2455,63 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               role="menu"
               aria-label="表示"
             >
+              <span className="menu-heading">移動</span>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={0}
+                aria-disabled={navigation.back.length === 0}
+                aria-keyshortcuts="Alt+ArrowLeft"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => {
+                  const target = navigation.back.at(-1);
+                  if (target !== undefined) navigate(target, "back");
+                }, navigation.back.length === 0)}
+              >
+                戻る <span className="menu-shortcut">Alt+←</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={navigation.forward.length === 0}
+                aria-keyshortcuts="Alt+ArrowRight"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => {
+                  const target = navigation.forward[0];
+                  if (target !== undefined) navigate(target, "forward");
+                }, navigation.forward.length === 0)}
+              >
+                進む <span className="menu-shortcut">Alt+→</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-disabled={up === null}
+                aria-keyshortcuts="Alt+ArrowUp"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(() => {
+                  if (up !== null) navigate(up);
+                }, up === null)}
+              >
+                上のフォルダへ <span className="menu-shortcut">Alt+↑</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                aria-keyshortcuts="F5"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
+                onClick={() => runMenuAction(refreshCatalog)}
+              >
+                現在場所を更新 <span className="menu-shortcut">F5</span>
+              </button>
+              <div className="menu-separator" role="separator" />
               <span className="menu-heading">並べ替え条件</span>
               {([
                 ["name", "名前"],
@@ -2244,7 +2523,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   key={field}
                   type="button"
                   role="menuitemradio"
-                  tabIndex={index === 0 ? 0 : -1}
+                  tabIndex={-1}
                   aria-checked={sortField === field}
                   onFocus={(event) => markMenuItemActive(event.currentTarget)}
                   onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
@@ -2313,7 +2592,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               </button>
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">一覧形式</span>
-              {CATALOG_VIEW_MODES.filter((mode) => mode !== "reference_tile").map((mode) => (
+              {CATALOG_VIEW_MODES.map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -2336,43 +2615,55 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <div className="menu-group">
           <button
             ref={(node) => {
-              menuTriggerRefs.current.library = node;
+              menuTriggerRefs.current.options = node;
             }}
             className="menu-trigger"
             type="button"
             role="menuitem"
-            aria-label="ライブラリ"
+            aria-label="オプション"
             aria-haspopup="menu"
-            aria-expanded={activeMenu === "library"}
-            aria-controls="library-menu"
-            aria-keyshortcuts="Alt+L"
-            tabIndex={menuTabStop === "library" ? 0 : -1}
-            onFocus={() => setMenuTabStop("library")}
+            aria-expanded={activeMenu === "options"}
+            aria-controls="options-menu"
+            aria-keyshortcuts="Alt+O"
+            tabIndex={menuTabStop === "options" ? 0 : -1}
+            onFocus={() => setMenuTabStop("options")}
             onClick={() => {
-              setMenuTabStop("library");
-              toggleMenu("library");
+              setMenuTabStop("options");
+              toggleMenu("options");
             }}
-            onKeyDown={(event) => handleMenuTriggerKeyDown("library", event)}
+            onKeyDown={(event) => handleMenuTriggerKeyDown("options", event)}
           >
-            ライブラリ(L)
+            オプション(O)
           </button>
-          {activeMenu === "library" && (
+          {activeMenu === "options" && (
             <div
               ref={(node) => {
-                menuPopupRefs.current.library = node;
+                menuPopupRefs.current.options = node;
               }}
-              id="library-menu"
+              id="options-menu"
               className="menu-popup"
               role="menu"
-              aria-label="ライブラリ"
+              aria-label="オプション"
             >
               <button
                 type="button"
                 role="menuitem"
-                data-product-id="favorites-menu-item"
+                data-product-id="settings-menu-item"
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
+                onClick={() => runMenuAction(openSettingsDialog)}
+              >
+                統合設定…
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                data-product-id="favorites-menu-item"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() =>
                   runMenuAction(() => {
                     setFavoritesOpen(true);
@@ -2388,7 +2679,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 data-product-id="bookshelf-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() => runMenuAction(() => setBookshelfOpen(true))}
               >
                 本棚
@@ -2399,7 +2690,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 aria-disabled={selectedPath === null}
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() => runMenuAction(addSelectedToBookshelf, selectedPath === null)}
               >
                 本棚に追加
@@ -2410,7 +2701,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 data-product-id="thumbnail-manager-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() =>
                   runMenuAction(() => {
                     setThumbnailManagerNotice(null);
@@ -2426,7 +2717,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 data-product-id="history-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() =>
                   runMenuAction(() => {
                     setHistoryOpen(true);
@@ -2442,7 +2733,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 data-product-id="tag-manager-menu-item"
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() => runMenuAction(openTagsPanel)}
               >
                 タグ管理
@@ -2454,7 +2745,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 tabIndex={-1}
                 aria-disabled={diagnosticsLoading}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
-                onKeyDown={(event) => handleMenuItemKeyDown("library", event)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
                 onClick={() =>
                   runMenuAction(
                     () => void runDiagnostics(false),
@@ -2506,24 +2797,23 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               <button
                 type="button"
                 role="menuitem"
-                data-product-id="settings-menu-item"
+                data-product-id="shortcut-help-menu-item"
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
                 onClick={() => runMenuAction(openSettingsDialog)}
               >
-                統合設定…
+                ショートカット設定…
               </button>
               <button
                 type="button"
                 role="menuitem"
-                data-product-id="shortcut-help-menu-item"
-                tabIndex={0}
+                tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("help", event)}
                 onClick={() => runMenuAction(() => setHelpOpen(true))}
               >
-                キー操作とショートカット…
+                一般ヘルプとバージョン…
               </button>
             </div>
           )}
@@ -2556,17 +2846,29 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             aria-label="履歴ドロップダウン"
             value=""
             onChange={(event) => {
-              if (event.target.value !== "") navigate(event.target.value);
+              const [direction, rawIndex] = event.target.value.split(":");
+              const index = Number(rawIndex);
+              if (!Number.isInteger(index)) return;
+              if (direction === "back") {
+                const target = navigation.back[index];
+                if (target !== undefined) navigate(target, { type: "jumpBack", index });
+              } else if (direction === "forward") {
+                const target = navigation.forward[index];
+                if (target !== undefined) navigate(target, { type: "jumpForward", index });
+              }
             }}
           >
             <option value="">移動履歴</option>
             {[...navigation.back].reverse().map((path, index) => (
-              <option key={`back-${path}-${index}`} value={path}>
+              <option
+                key={`back-${path}-${index}`}
+                value={`back:${navigation.back.length - 1 - index}`}
+              >
                 戻る: {path || "ライブラリ"}
               </option>
             ))}
             {navigation.forward.map((path, index) => (
-              <option key={`forward-${path}-${index}`} value={path}>
+              <option key={`forward-${path}-${index}`} value={`forward:${index}`}>
                 進む: {path || "ライブラリ"}
               </option>
             ))}
@@ -2657,11 +2959,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         </button>
       </div>}
       {(diagnosticsOpen || diagnosticsLoading || diagnosticNotice !== null) && (
-        <section
-          className="diagnostic-panel"
-          aria-label="ライブラリ診断"
-          aria-busy={diagnosticsLoading}
-        >
+        <div className="dialog-backdrop">
+          <section
+            className="diagnostic-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="ライブラリ診断"
+            aria-busy={diagnosticsLoading}
+          >
           <div className="diagnostic-panel-heading">
             <h2>ライブラリ診断</h2>
             <button
@@ -2726,7 +3031,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           {diagnosticReport === null && !diagnosticsLoading && diagnosticNotice === null && (
             <p role="status">診断結果はまだありません。</p>
           )}
-        </section>
+          </section>
+        </div>
       )}
       <form
         className="address-bar"
@@ -2778,10 +3084,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           type="button"
           data-product-id="task-tray-toggle"
           disabled={!trayApiAvailable}
-          title={trayApiAvailable ? "タスクトレイへ収納" : "この実行環境ではタスクトレイAPIを利用できません"}
-          onClick={() => {
-            if (trayApiAvailable) setTrayStored(true);
-          }}
+          title={trayApiAvailable ? "タスクトレイへ収納" : trayStatus?.reason ?? "task trayの状態を確認しています"}
+          onClick={() => void storeInTray()}
         >
           タスクトレイへ収納
         </button>
@@ -2933,15 +3237,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
-              thumbnailFor={(entry) =>
-                managedThumbnails[entry.relativePath] !== undefined
-                  ? { status: "ready", mediaUri: managedThumbnails[entry.relativePath].dataUrl, cacheHit: false }
-                  : thumbnails[entry.relativePath] ?? { status: "loading" }
-              }
+              thumbnailFor={(entry) => {
+                const managed = entry.kind === "archive" || entry.kind === "comicFolder"
+                  ? managedThumbnailFor(managedThumbnails, entry.relativePath)
+                  : undefined;
+                return managed !== undefined
+                  ? { status: "ready", mediaUri: managed.dataUrl, cacheHit: false }
+                  : thumbnails[entry.relativePath] ?? { status: "loading" };
+              }}
               isFavorite={(entry) => favoriteForPath(entry.relativePath) !== undefined}
               onToggleFavorite={toggleFavorite}
               onThumbnailNeeded={(entry) => {
-                if (managedThumbnails[entry.relativePath] !== undefined) return;
+                if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
                 if (thumbnails[entry.relativePath]?.status === "ready") return;
                 queueThumbnail(entry, generation.current, "visible");
               }}
@@ -2957,7 +3264,15 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         <span>{selectedPaths.length}件選択</span>
         <span>{selected ? `選択: ${selected.relativePath}` : "選択なし"}</span>
         <span>{loadState.status === "loading" ? "読み込み中" : "準備完了"}</span>
-        {selectionNotice !== null && <span role="status">{selectionNotice}</span>}
+        {selectionNotice !== null && (
+          <span
+            role="status"
+            data-shortcut-save-status={selectionNotice === "設定profileを適用しました。" ? "saved" : undefined}
+          >
+            {selectionNotice}
+          </span>
+        )}
+        {trayNotice !== null && <span role="alert">{trayNotice}</span>}
       </footer>
       {settingsOpen && settingsDraft !== null && (
         <div className="dialog-backdrop">
@@ -2966,10 +3281,39 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             role="dialog"
             aria-modal="true"
             aria-label="統合設定"
+            data-product-id="shortcut-dialog"
           >
             <h2>統合設定</h2>
             <p>表示・操作設定だけを扱います。library path、秘密情報、machine固有値はprofileに含めません。</p>
             <div className="settings-grid">
+              <label>
+                並べ替え
+                <select
+                  aria-label="profile並べ替え"
+                  value={settingsDraft.sortField}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    sortField: event.target.value as SortField,
+                  })}
+                >
+                  <option value="name">名前</option>
+                  <option value="modified">更新日時</option>
+                  <option value="size">サイズ</option>
+                  <option value="kind">種類</option>
+                </select>
+              </label>
+              <label>
+                降順
+                <input
+                  type="checkbox"
+                  aria-label="profile降順"
+                  checked={settingsDraft.sortDescending}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    sortDescending: event.target.checked,
+                  })}
+                />
+              </label>
               <label>
                 一覧形式
                 <select
@@ -3049,7 +3393,84 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   })}
                 />
               </label>
+              <label>
+                倍率モード
+                <select
+                  aria-label="profile倍率モード"
+                  value={settingsDraft.scaleMode}
+                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                    ...current,
+                    scaleMode: event.target.value as ScaleMode,
+                  })}
+                >
+                  <option value="fit">全体フィット</option>
+                  <option value="width">横幅フィット</option>
+                  <option value="height">高さフィット</option>
+                  <option value="original">原寸</option>
+                  <option value="custom">任意倍率</option>
+                </select>
+              </label>
+              <label>
+                任意倍率
+                <input
+                  type="number"
+                  aria-label="profile任意倍率"
+                  min="0.25"
+                  max="4"
+                  step="0.1"
+                  value={settingsDraft.scale}
+                  onChange={(event) => {
+                    const scale = Number(event.target.value);
+                    if (Number.isFinite(scale)) {
+                      setSettingsDraft((current) => current === null ? current : { ...current, scale });
+                    }
+                  }}
+                />
+              </label>
+              {([
+                ["treeVisible", "フォルダツリー"],
+                ["menuBarVisible", "メニューバー"],
+                ["toolbarVisible", "ツールバー"],
+              ] as const).map(([field, label]) => (
+                <label key={field}>
+                  {label}
+                  <input
+                    type="checkbox"
+                    aria-label={`profile${label}`}
+                    checked={settingsDraft[field]}
+                    onChange={(event) => setSettingsDraft((current) => current === null ? current : {
+                      ...current,
+                      [field]: event.target.checked,
+                    })}
+                  />
+                </label>
+              ))}
             </div>
+            <section aria-label="ショートカット設定">
+              <h3>ショートカット</h3>
+              <p>キーを入力しても、適用するまでは現在の操作設定を変更しません。</p>
+              {SHORTCUT_COMMANDS.map((command) => (
+                <div key={command} data-shortcut-command={command}>
+                  <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
+                  <input
+                    id={`shortcut-${command}`}
+                    aria-label={`${SHORTCUT_LABELS[command]}ショートカット`}
+                    value={settingsDraft.shortcuts[command]}
+                    readOnly
+                    onKeyDown={(event) => captureDraftShortcut(command, event)}
+                  />
+                  <span>既定: {DEFAULT_SHORTCUTS[command]} / フォールバック: {SHORTCUT_FALLBACKS[command]}</span>
+                  <button
+                    type="button"
+                    aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`}
+                    onClick={() => resetDraftShortcut(command)}
+                  >
+                    既定に戻す
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={resetAllDraftShortcuts}>すべて既定に戻す</button>
+            </section>
             <section aria-label="マウスジェスチャー設定">
               <h3>マウスジェスチャー</h3>
               {MOUSE_GESTURE_NAMES.map((name) => (
@@ -3083,8 +3504,26 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 profileを読み込む
                 <input type="file" accept="application/json,.json" onChange={importSettingsProfile} />
               </label>
-              <button type="button" onClick={() => applySettingsProfile(settingsDraft)}>適用</button>
-              <button type="button" onClick={() => setSettingsOpen(false)}>キャンセル</button>
+              <button
+                type="button"
+                data-product-id="shortcut-apply"
+                disabled={settingsSaving}
+                onClick={() => void applySettingsProfile(settingsDraft)}
+              >
+                適用
+              </button>
+              <button
+                type="button"
+                data-product-id="shortcut-dialog-close"
+                disabled={settingsSaving}
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setSettingsDraft(null);
+                  setProfileNotice(null);
+                }}
+              >
+                キャンセル
+              </button>
             </div>
           </section>
         </div>
@@ -3105,6 +3544,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               利用者が読み込んだJPEGだけをapp-localに管理します。内部生成cacheは自動管理され、
               library原本や書庫には書き戻しません。
             </p>
+            {legacyThumbnailDataPresent && (
+              <p role="status">
+                旧形式のthumbnailはlibrary rootを識別できないため自動移行しません。
+                現在のlibraryでJPEGを一括読込してください。
+              </p>
+            )}
             <dl className="thumbnail-manager-stats">
               <div><dt>管理件数</dt><dd>{managedThumbnailStats.count}件</dd></div>
               <div><dt>管理容量</dt><dd>{formatThumbnailBytes(managedThumbnailStats.bytes)}</dd></div>
@@ -3145,7 +3590,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="help-title"
-            data-product-id="shortcut-dialog"
             className="help-dialog"
             onKeyDown={(event) => {
               if (event.key === "Escape") closeHelp();
@@ -3154,59 +3598,50 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <h2 id="help-title">キー操作とショートカット</h2>
             <section aria-label="一般ヘルプ">
               <h3>一般ヘルプ</h3>
-              <p>フォルダを登録し、項目をEnterで開きます。漫画はCtrl+Enterまたはダブルクリックで読み始めます。</p>
-              <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: Tauri WebView2またはブラウザ / license: THIRD-PARTY-NOTICES.md</p>
-            </section>
-            <p>Enter: フォルダを開く / Ctrl+Enter: 漫画として読む</p>
-            <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
-            <section aria-label="ショートカット設定">
-              <h3>ショートカット設定</h3>
-              <p>変更はこの端末のアプリデータだけに保存され、漫画ファイルや外部通信には影響しません。</p>
-              {SHORTCUT_COMMANDS.map((command) => (
-                <div key={command} data-shortcut-command={command}>
-                  <label htmlFor={`shortcut-${command}`}>
-                    {SHORTCUT_LABELS[command]}
-                  </label>
-                  <input
-                    id={`shortcut-${command}`}
-                    aria-label={`${SHORTCUT_LABELS[command]}ショートカット`}
-                    value={shortcuts[command]}
-                    readOnly
-                    onKeyDown={(event) => captureShortcut(command, event)}
-                  />
-                  <span>
-                    既定: {DEFAULT_SHORTCUTS[command]} / フォールバック:{" "}
-                    {SHORTCUT_FALLBACKS[command]}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`}
-                    onClick={() => resetShortcut(command)}
-                  >
-                    既定に戻す
-                  </button>
-                </div>
-              ))}
-              <button type="button" onClick={resetAllShortcuts}>
-                すべて既定に戻す
+              <p>フォルダを登録し、フォルダ・漫画・単独画像をEnterで開きます。漫画はCtrl+Enterまたはダブルクリックでも読み始めます。</p>
+              <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: {runtimeLabel}</p>
+              <button type="button" onClick={() => setLicenseOpen(true)}>
+                third-party license noticeを開く
               </button>
-              <p
-                role="status"
-                aria-live="polite"
-                data-shortcut-save-status={shortcutSaveState}
+            </section>
+            <p>Enter: 選択項目を開く / Ctrl+Enter: 漫画として読む</p>
+            <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
+            <section aria-label="現在のショートカット">
+              <h3>現在のショートカット</h3>
+              <dl>
+                {SHORTCUT_COMMANDS.map((command) => (
+                  <div key={command}>
+                    <dt>{SHORTCUT_LABELS[command]}</dt>
+                    <dd>{shortcuts[command]}</dd>
+                  </div>
+                ))}
+              </dl>
+              <button
+                type="button"
+                onClick={() => {
+                  closeHelp();
+                  openSettingsDialog();
+                }}
               >
-                {shortcutSaveState === "saving"
-                  ? "ショートカットを保存中です。"
-                  : shortcutSaveState === "saved"
-                    ? "ショートカットを保存しました。"
-                    : shortcutSaveState === "error"
-                      ? "ショートカットの保存に失敗しました。"
-                      : "ショートカットの変更はありません。"}
-              </p>
-              {shortcutNotice !== null && <p role="alert">{shortcutNotice}</p>}
+                ショートカット設定を開く
+              </button>
             </section>
             <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
           </div>
+        </div>
+      )}
+      {licenseOpen && (
+        <div className="dialog-backdrop">
+          <section
+            className="license-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="third-party license notice"
+          >
+            <h2>Third-Party Notices</h2>
+            <pre tabIndex={0}>{THIRD_PARTY_NOTICES}</pre>
+            <button type="button" onClick={() => setLicenseOpen(false)}>閉じる</button>
+          </section>
         </div>
       )}
       {propertiesOpen && selected !== undefined && (
@@ -3385,7 +3820,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                     <button
                       type="button"
                       aria-label={`${path}を本棚から除去`}
-                      onClick={() => setBookshelfPaths(removeBookshelfItem(path))}
+                      onClick={() => removeFromBookshelf(path)}
                     >
                       除去
                     </button>

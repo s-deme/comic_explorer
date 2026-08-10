@@ -5,6 +5,7 @@ pub mod diagnostics;
 pub mod domain;
 pub mod media;
 pub mod state;
+pub mod tray;
 
 use tauri::Manager;
 
@@ -12,6 +13,11 @@ use tauri::Manager;
 pub fn run() {
     let app = tauri::Builder::default()
         .manage(application::AppState::default())
+        .manage(tray::TrayState::default())
+        .setup(|app| {
+            tray::initialize(app);
+            Ok(())
+        })
         .register_uri_scheme_protocol("comic", |context, request| {
             let state = context.app_handle().state::<application::AppState>();
             state
@@ -51,6 +57,7 @@ pub fn run() {
             application::set_catalog_view_mode,
             application::set_shortcut_bindings,
             application::set_viewer_settings,
+            application::set_settings_profile,
             application::pick_library_root,
             application::set_library_root,
             application::list_folder,
@@ -62,7 +69,11 @@ pub fn run() {
             application::cancel_library_diagnostics,
             application::open_comic,
             application::load_page,
-            application::save_reading_position
+            application::save_reading_position,
+            tray::get_tray_status,
+            tray::store_main_window_in_tray,
+            tray::restore_main_window_from_tray,
+            tray::quit_application
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Comic Explorer");

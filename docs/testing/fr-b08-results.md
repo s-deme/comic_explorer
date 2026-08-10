@@ -20,7 +20,9 @@ IMP-015で`FUT-C-005`（static WebP）を`Implemented / PASS`とする。`FT-B08
 読み替えない。
 
 FR-B08 aggregateは`Partial`である。`FUT-C-006`（static GIF）、`FUT-C-007`（animation GIF）、
-`FUT-C-008`（AVIF）はCandidate / NOT TESTEDのまま残り、IMP-015のPASSをそれらへ波及させない。
+`FUT-C-008`（AVIF）には後続P8実装とcontainer-level focused testが追加されたが、release WebView2の
+decode・animation・corrupt fallbackは`BLOCKED_UNMEASURED`である。IMP-015のWebP product PASSを
+それらへ波及させない。現在の境界は[FR-B08 P8結果](fr-b08-p8-results.md)を参照する。
 
 ## IMP-015 Windows製品・canonical結果
 

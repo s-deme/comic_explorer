@@ -34,7 +34,7 @@ import {
   normalizeShortcutBindings,
   type ShortcutBindings,
 } from "../input/shortcuts";
-import type { PageBookmark } from "../reading/collections";
+import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import type { MouseGestureBindings } from "../settings/profile";
 
 interface ViewerProps {
@@ -114,6 +114,7 @@ export function Viewer({
     useState<ViewerLayoutMode>(initialLayoutMode);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
+  const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
   const activeShortcuts = useMemo(
     () => normalizeShortcutBindings(shortcuts),
@@ -124,9 +125,14 @@ export function Viewer({
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const pointerDownX = useRef<number | null>(null);
   const layoutInitialized = useRef(false);
+  const positionTimerRef = useRef<number | null>(null);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
     [landscape, session.pages.length, state],
+  );
+  const resolvedBookmarks = useMemo(
+    () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
+    [bookmarks, session.pages],
   );
 
   useEffect(() => {
@@ -152,9 +158,20 @@ export function Viewer({
     });
   }, [generation, imageErrors, layoutMode, mediaUris, session, state.index, visible]);
 
+  function cancelScheduledPositionSave() {
+    if (positionTimerRef.current === null) return;
+    window.clearTimeout(positionTimerRef.current);
+    positionTimerRef.current = null;
+  }
+
+  async function flushReadingPosition() {
+    cancelScheduledPositionSave();
+    await saveReadingPosition(session, state.index, generation);
+  }
+
   function next() {
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
-      void saveReadingPosition(session, state.index, generation).finally(() =>
+      void flushReadingPosition().finally(() =>
         onNextItem?.(),
       );
       return;
@@ -182,7 +199,7 @@ export function Viewer({
 
   async function close() {
     if (fullscreen && !(await requestFullscreen(false))) return;
-    await saveReadingPosition(session, state.index, generation);
+    await flushReadingPosition();
     onClose();
   }
 
@@ -287,10 +304,11 @@ export function Viewer({
   }, [layoutMode, state.index]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    positionTimerRef.current = window.setTimeout(() => {
+      positionTimerRef.current = null;
       void saveReadingPosition(session, state.index, generation);
     }, 250);
-    return () => window.clearTimeout(timer);
+    return cancelScheduledPositionSave;
   }, [generation, session, state.index]);
 
   useEffect(() => {
@@ -298,7 +316,9 @@ export function Viewer({
   }, [onPageChange, state.index]);
 
   function jumpToNextBookmark() {
-    const next = onNextBookmark?.(state.index);
+    const resolvedNext = resolvedBookmarks.find((bookmark) => bookmark.pageIndex > state.index)
+      ?? resolvedBookmarks[0];
+    const next = onNextBookmark?.(state.index) ?? resolvedNext?.pageIndex;
     if (next !== null && next !== undefined) dispatch({ type: "go", index: next });
   }
 
@@ -310,6 +330,12 @@ export function Viewer({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
+      if (detached && event.key === "Escape") {
+        event.preventDefault();
+        if (fullscreen) void requestFullscreen(false);
+        else void close();
+        return;
+      }
       const command =
         customShortcutCommand(event, activeShortcuts) ??
         fallbackShortcutCommand(event, state.direction);
@@ -318,7 +344,6 @@ export function Viewer({
       switch (command) {
         case "closeViewer":
           if (fullscreen) void requestFullscreen(false);
-          else if (detached) onToggleDetached?.();
           else void close();
           break;
         case "nextPage":
@@ -498,10 +523,18 @@ export function Viewer({
         <button
           type="button"
           aria-label="次のしおり"
-          disabled={bookmarks.length === 0}
+          disabled={resolvedBookmarks.length === 0}
           onClick={jumpToNextBookmark}
         >
           次のしおり
+        </button>
+        <button
+          type="button"
+          aria-label="しおり一覧"
+          disabled={bookmarks.length === 0}
+          onClick={() => setBookmarkListOpen(true)}
+        >
+          しおり一覧
         </button>
         <button
           type="button"
@@ -526,6 +559,48 @@ export function Viewer({
           </span>
         )}
       </header>
+      {bookmarkListOpen && (
+        <div className="dialog-backdrop">
+          <section
+            className="bookmark-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="しおり一覧"
+          >
+            <h2>しおり一覧</h2>
+            {bookmarks.length === 0 ? (
+              <p>保存済みのしおりはありません。</p>
+            ) : (
+              <ul>
+                {bookmarks.map((bookmark) => {
+                  const resolved = resolvedBookmarks.find(
+                    (candidate) => candidate.itemKey === bookmark.itemKey
+                      && candidate.pageKey === bookmark.pageKey,
+                  );
+                  return (
+                    <li key={`${bookmark.itemKey}:${bookmark.pageKey}`}>
+                      <button
+                        type="button"
+                        disabled={resolved === undefined}
+                        onClick={() => {
+                          if (resolved === undefined) return;
+                          dispatch({ type: "go", index: resolved.pageIndex });
+                          setBookmarkListOpen(false);
+                        }}
+                      >
+                        {resolved === undefined
+                          ? `${bookmark.pageKey}（現在の作品では見つかりません）`
+                          : `${resolved.pageIndex + 1}ページ: ${bookmark.pageKey}`}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <button type="button" onClick={() => setBookmarkListOpen(false)}>閉じる</button>
+          </section>
+        </div>
+      )}
       <div
         ref={stageRef}
         className="viewer-stage"

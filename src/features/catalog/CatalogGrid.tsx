@@ -112,14 +112,19 @@ export function CatalogGrid({
     },
   });
 
-  function moveFocus(currentIndex: number, offset: number) {
+  function moveFocus(
+    currentIndex: number,
+    offset: number,
+    action?: "range",
+  ) {
     const nextIndex = Math.max(
       0,
       Math.min(entries.length - 1, currentIndex + offset),
     );
     const next = entries[nextIndex];
     if (!next) return;
-    onSelect(next);
+    if (action === undefined) onSelect(next);
+    else onSelect(next, action);
     virtualizer.scrollToIndex(Math.floor(nextIndex / modeConfig.columnCount));
     requestAnimationFrame(() => itemRefs.current.get(next.relativePath)?.focus());
   }
@@ -179,7 +184,7 @@ export function CatalogGrid({
                   const canNavigate =
                     entry.kind === "folder" || entry.kind === "comicFolder";
                   const canRead =
-                    entry.kind === "comicFolder" || entry.kind === "archive";
+                    entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "page";
                   const canFavorite =
                     entry.kind === "folder" || entry.kind === "comicFolder" || entry.kind === "archive";
                   const favorite = canFavorite && isFavorite(entry);
@@ -241,7 +246,11 @@ export function CatalogGrid({
                           const offset = offsets[event.key];
                           if (offset !== undefined) {
                             event.preventDefault();
-                            moveFocus(itemIndex, offset);
+                            moveFocus(
+                              itemIndex,
+                              offset,
+                              event.shiftKey ? "range" : undefined,
+                            );
                             return;
                           }
                           if (event.key === "Enter") {

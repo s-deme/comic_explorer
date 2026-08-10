@@ -15,15 +15,22 @@ codd:
 
 # FR-B17 参照shell UI — 受入結果
 
-P5（FR-B17）は `Implemented / PASS` とする。先行commandを呼ぶaccessible icon toolbarと、既存の
-virtualized catalogへ`reference_tile` view modeを追加した。処理の二重実装、外部通信、原本書込みはない。
+P5（FR-B17）の実装状態は `Implemented / PARTIAL` とする。先行commandを呼ぶaccessible icon
+toolbarと、既存のvirtualized catalogへ`reference_tile` view modeを追加した。処理の二重実装、
+外部通信、原本書込みはない。正式な`FT-B17-001`〜`FT-B17-003`のApp test、frontend保存失敗時の
+rollback、backend validation、SQLiteへ保存した`reference_tile`の再openを観測済みである。
 
 | Test ID | 結果 | 直接観測 |
 |---|---|---|
-| FT-B17-001 | PASS | menu/toolbarが既存refresh/copy/properties/bookshelf commandへ接続 |
-| FT-B17-002 | PASS | toolbar icon buttonのaccessible labelとdisabled境界 |
-| FT-B17-003 | PASS | reference_tile enum、density、thumbnail、keyboard grid回帰 |
+| FT-B17-001 | PASS | top-level 5分類、accessible name、Alt mnemonic、roving focus、既存sort/view commandへの接続 |
+| FT-B17-002 | PASS | accessible name付きtoolbar command、menu/toolbarの共有state、既存sort/view callbackへの一回だけの接続 |
+| FT-B17-003 | PARTIAL | `reference_tile` enum、frontend保存失敗時rollback、backend allowlist、SQLite save/reopen。製品DPIは未測定 |
 
-view-mode focused 5 tests、CatalogGrid回帰6 tests、typecheckはPASS。Windows-native CoDD
-scan/check/verifyはexit 0、red 0。DPI/実機visual pixel測定は未実施のため、component evidenceを
-製品DPI gateへ読み替えない。
+2026-08-10のWindows-native再実測では、`view-mode.test.ts` 5 tests、`CatalogGrid.test.tsx`
+8 tests、`App.test.tsx` 52 tests、Rustのcatalog view-mode validation 1 test、
+`fr_b17_reference_tile_and_settings_survive_reopen` 1 test、typecheckがPASSした。`App.test.tsx`の正式な
+`FT-B17-003`は`reference_tile`保存error時にpersist済みmodeへ戻し、Rust repository testは
+`reference_tile`値をSQLiteへ保存してstore再open後に復元する。
+
+DPI/実機visual pixel測定は未実施のため、componentとrepositoryの機能証跡を製品DPI gateへ読み替えず、
+P5全体は`PARTIAL`を維持する。

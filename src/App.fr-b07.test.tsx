@@ -29,11 +29,13 @@ import {
   type ReadingHistoryEntry,
 } from "./features/library/client";
 import type { CatalogEntry } from "./types/domain";
+import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
+import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
 
 function openLibraryMenuItem(name: "閲覧履歴") {
-  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
   fireEvent.click(
-    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
       name,
     }),
   );
@@ -60,7 +62,11 @@ vi.mock("./features/library/client", () => ({
   saveEndOfVolumePolicy: vi.fn(),
   saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
+  saveSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
+  getTrayStatus: vi.fn(),
+  storeMainWindowInTray: vi.fn(),
+  quitApplication: vi.fn(),
   setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
   takeRecoveryNotice: vi.fn(),
@@ -159,6 +165,11 @@ const defaultSettings: CatalogSettings = {
   scaleMode: "fit",
   scale: 1,
   loupeEnabled: false,
+  treeVisible: true,
+  menuBarVisible: true,
+  toolbarVisible: true,
+  shortcuts: { ...DEFAULT_SHORTCUTS },
+  mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 
 function settingsResponse(requestId: string) {

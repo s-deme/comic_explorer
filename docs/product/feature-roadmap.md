@@ -41,11 +41,13 @@ codd:
 | `Done` | 対象範囲の実装根拠と直接観測 focused test が揃い、台帳側も正しい状態へ更新され、末尾ゲートを通過。 |
 
 FR-B01〜B03、B05〜B07、B10は完了済みである。FR-B04、B09、B11は既存の未解消gateを
-`Blocked`として保持する。FR-B08はWebP/GIF/AVIFまで完了した`Done`、FR-B12はadapterの
-依存・ライセンス・fixture確認待ちの`Partial / BLOCKED`である。2026-08-10の優先度再検討では、Leeyes代替としての利用価値、後続機能を
-解放する依存、原本非破壊、安全性、Windows製品での検証容易性を評価し、未実装候補を
-P1〜P10と分離trackへ再編した。これは優先順位案であり、台帳の`Candidate / NOT TESTED`を
-採用済みへ変更せず、`Next`または`In Progress`も自動設定しない。
+`Blocked`として保持する。2026-08-10のP1〜P10実測同期では、FR-B13〜B16とFR-B19を
+`Done`、FR-B17とFR-B20を`Implemented / Partial`、FR-B18を`Partial / BLOCKED`、
+FR-B08を`Partial / BLOCKED_UNMEASURED`、FR-B12を`Partial / BLOCKED`とする。実装済みの
+focused/component証跡は各testing文書を正本とし、release WebView2や実機を要する未実測の
+product gateを代替しない。優先度再検討では、Leeyes代替としての利用価値、後続機能を
+解放する依存、原本非破壊、安全性、Windows製品での検証容易性を評価し、候補をP1〜P10と
+分離trackへ再編した。
 
 ## 推奨実装順
 
@@ -60,12 +62,12 @@ P1〜P10と分離trackへ再編した。これは優先順位案であり、台�
 | P2 | `FR-B14` | 14 | open・navigation | `FUT-C-042`, `FUT-C-044`, `FUT-C-056`, `FUT-C-051` | `Done` |
 | P3 | `FR-B15` | 15 | しおり・本棚 | `FUT-C-045`, `FUT-C-046`, `FUT-C-047` | `Done` |
 | P4 | `FR-B16` | 16 | filter・export | `FUT-C-058`, `FUT-C-050` | `Done` |
-| P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Done` |
-| P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Done` |
+| P5 | `FR-B17` | 17 | 参照shell UI | `FUT-C-065`, `FUT-C-066`, `FUT-C-067` | `Implemented / Partial`（release DPI・product UI未測定） |
+| P6 | `FR-B18` | 18 | workspace・window | `FUT-C-062`, `FUT-C-063`, `FUT-C-060`, `FUT-C-061` | `Partial / BLOCKED`（native tray product gate未測定） |
 | P7 | `FR-B19` | 19 | 設定・help | `FUT-C-069`, `FUT-C-071`, `FUT-C-072`, `FUT-C-076`, `FUT-C-077` | `Done` |
-| P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Done` |
+| P8 | `FR-B08` | 8 | 追加画像形式の残件 | `FUT-C-006`, `FUT-C-008`, `FUT-C-007` | `Partial / BLOCKED_UNMEASURED`（release WebView2 product gate未測定） |
 | P9 | `FR-B12` | 12 | 追加書庫形式 | `FUT-C-001`, `FUT-C-002` | `Partial / BLOCKED`（adapter license・fixture未承認） |
-| P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Done` |
+| P10 | `FR-B20` | 20 | thumbnail保守 | `FUT-C-073`, `FUT-C-074`, `FUT-C-075` | `Implemented / Partial`（製品実保存・一括読込未測定） |
 | Hold | `FR-S02` | — | file mutation・undo | `FUT-C-027`, `FUT-C-026`, `FUT-C-024`, `FUT-C-025`, `FUT-C-028`, `FUT-C-053`, `FUT-C-052`, `FUT-C-029` | `Blocked`（安全設計・明示承認待ち） |
 | Hold | `FR-S06` | — | 仕様・architecture未決定 | `FUT-C-043`, `FUT-C-059`, `FUT-C-064`, `FUT-C-048`, `FUT-C-070` | `Blocked`（product・security判断待ち） |
 | Hold | `FR-S01` | — | 独立reader・media | `FUT-C-003`, `FUT-C-004`, `FUT-C-009` | `Blocked`（別設計・license確認待ち） |
@@ -370,8 +372,9 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 ### FR-B08 — 追加画像形式（Batch 8）
 
-- **状態:** `Done`。IMP-015のstatic WebPに加え、`FUT-C-006`〜`FUT-C-008`を既存page pipelineへ
-  接続し、形式別focused testとtypecheckを通過した。
+- **状態:** `Partial / BLOCKED_UNMEASURED`。IMP-015のstatic WebPは既存のrelease WebView2
+  product証跡を維持する。`FUT-C-006`〜`FUT-C-008`は既存page pipelineへ接続済みだが、GIF/AVIFの
+  release WebView2 decode・animation・破損fallbackを製品上で直接観測していないためP8を`Done`にしない。
 - **対象 feature ID:** `FUT-C-005`, `FUT-C-006`, `FUT-C-007`, `FUT-C-008`（WebP、静止GIF、
   animation GIF、AVIF）。
 - **user outcome:** 既存の画像 folder/書庫閲覧と同じ原本非破壊契約で、追加画像形式を表示し、
@@ -400,7 +403,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   `src-tauri/src/catalog/image_metadata.rs`、`src-tauri/src/catalog/thumbnail.rs`、
   `src-tauri/src/application/mod.rs`、`src-tauri/src/media/mod.rs`、`src/types/domain.ts`。
 - **直接観測:** [FR-B08 P8結果](../testing/fr-b08-p8-results.md)。GIF/AVIFのheader、dimensions、MIME、
-  media grant、format mismatchをfocused Rust testで確認した。
+  media grant、format mismatchはbackend境界で確認済みである。未実測のrelease WebView2 product gateは
+  [FR-B08結果](../testing/fr-b08-results.md)の判定を正本とし、backend証跡からPASSを推定しない。
 
 ### FR-B09 — library 診断（Batch 9）
 
@@ -582,15 +586,15 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 - **実装根拠:** `src-tauri/src/domain/file_kind.rs`、`src-tauri/src/catalog/folder.rs`、
   `src-tauri/src/catalog/archive.rs`、`src-tauri/src/media/mod.rs`。
-- **直接観測:** RAR/CBR/7zをarchiveとして分類し、展開処理へ進めず構造化`UnsupportedFormat`を返す。
-  既存ZIP/CBZの列挙・media grant経路は変更せず、P9 focused Rust test、canonical Rust、typecheck、
-  Windows-native CoDD scan/check/verifyを通過した。
+- **直接観測:** [FR-B12結果](../testing/fr-b12-results.md)。RAR/CBR/7zをarchiveとして分類し、
+  展開処理へ進めず構造化`UnsupportedFormat`を返す安全境界を確認した。既存ZIP/CBZの列挙・media
+  grant経路は維持するが、readerのproduct受入を完了した証跡ではない。
 - **未解消gate:** 完全なRAR/CBR/7z readerの依存crate、license/SBOM、Windows build、実fixtureは
   承認・確認前のため、FT-B12-001/002の完全列挙、FT-B12-004/005をPASS扱いしない。
 
 ### FR-B13 — catalog command基盤（Batch 13 / P1）
 
-- **状態:** `Done`。対象5行を採用要件化し、focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Done`。対象5行の実装とApp接続を確認し、catalog command基盤の受入を完了した。
 - **対象と実装順:** (1) `FUT-C-057` 現在場所の手動更新、(2) `FUT-C-055` 複数・種別選択、
   (3) `FUT-C-054` path copy、(4) `FUT-C-049`項目properties、(5) `FUT-C-068`現在位置付きstatus。
 - **優先理由:** 原本を変更せず、後続のexport、file operation、menu commandが共有する一覧の
@@ -604,12 +608,13 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p1-catalog-command基盤)。
 - **実装根拠:** `src/App.tsx`、`src/features/catalog/CatalogGrid.tsx`、
   `src/features/catalog/commands.ts`、`src/features/catalog/commands.test.ts`。
-- **直接観測:** [FR-B13 focused test結果](../testing/fr-b13-results.md)。FT-B13-001〜005相当を
-  focused testでSKIP 0として実測し、既存CatalogGrid回帰も通過した。
+- **直接観測:** [FR-B13 focused test結果](../testing/fr-b13-results.md)。複数選択を維持するF5更新、
+  visible順のShift range、file/imageの種別選択、path copy・properties・statusの接続を確認した。
 
 ### FR-B14 — open・navigation（Batch 14 / P2）
 
-- **状態:** `Done`。B13のcatalog stateを再利用し、focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Done`。B13のcatalog stateを再利用し、open・recent・history・quitをApp/Viewer/backendへ
+  接続して受入を完了した。
 - **対象と実装順:** (1) `FUT-C-042` file・folderを開く、(2) `FUT-C-044`最近開いたfile menu、
   (3) `FUT-C-056`履歴dropdown移動、(4) `FUT-C-051`終了menu。
 - **優先理由:** 参照アプリの主要導線を早期に満たし、既存のnavigation historyと`FUT-R-004`を
@@ -621,13 +626,15 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 #### FR-B14 実装・直接観測証跡
 
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p2-opennavigation)。
-- **実装根拠:** `src/App.tsx`、`src/features/navigation/navigation.ts`。
-- **直接観測:** [FR-B14 focused test結果](../testing/fr-b14-results.md)。既存navigation focusedと
-  App接続境界で、open/recent/history/quitの4契約を確認した。
+- **実装根拠:** `src/App.tsx`、`src/features/catalog/CatalogGrid.tsx`、
+  `src/features/navigation/navigation.ts`、`src/features/viewer/Viewer.tsx`、
+  `src-tauri/src/application/mod.rs`。
+- **直接観測:** [FR-B14 focused test結果](../testing/fr-b14-results.md)。file/folderと単独画像のopen、
+  recent root復元、履歴dropdown jump、stale応答抑止、明示quitの接続境界を確認した。
 
 ### FR-B15 — しおり・本棚（Batch 15 / P3）
 
-- **状態:** `Done`。対象3行を採用要件化し、focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Done`。対象3行の永続化・移動・App/Viewer接続を確認し、受入を完了した。
 - **対象と実装順:** (1) `FUT-C-045`ページしおり保存・一覧、(2) `FUT-C-046`次のしおりへ移動、
   (3) `FUT-C-047`本棚表示・追加。
 - **優先理由:** 読書の継続性に直結し、既存のreading position・favorite・永続metadataを活用できる。
@@ -640,12 +647,13 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p3-しおり本棚)。
 - **実装根拠:** `src/features/reading/collections.ts`、`src/features/reading/collections.test.ts`、
   `src/features/viewer/Viewer.tsx`、`src/App.tsx`。
-- **直接観測:** [FR-B15 focused test結果](../testing/fr-b15-results.md)。bookmarkのidentity/order/wrapと
-  bookshelfのunique/add/removeをSKIP 0で実測した。
+- **直接観測:** [FR-B15 focused test結果](../testing/fr-b15-results.md)。bookmarkの`pageKey` identity・
+  一覧・欠損解決・next/wrap、本棚のunique/add/remove、wrong-shape storage、書込失敗の明示、
+  root namespaceと旧データ移行境界を確認した。
 
 ### FR-B16 — filter・export（Batch 16 / P4）
 
-- **状態:** `Done`。2機能を原本非破壊で実装し、focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Done`。2機能を原本非破壊で実装し、maskとCSV exportの受入を完了した。
 - **対象と実装順:** (1) `FUT-C-058` file mask、(2) `FUT-C-050` CSV出力。
 - **優先理由:** B13の複数選択・件数stateを使い、表示対象の絞り込みと一覧情報の持ち出しを
   原本非破壊で提供できる。mask適用後のcurrent/totalとexport対象を同じquery modelへ揃える。
@@ -657,12 +665,13 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p4-filterexport)。
 - **実装根拠:** `src/App.tsx`、`src/features/catalog/commands.ts`、
   `src/features/catalog/commands.test.ts`。
-- **直接観測:** [FR-B16 focused test結果](../testing/fr-b16-results.md)。glob mask、empty mask、
-  CSV escaping/columnsをSKIP 0で実測した。
+- **直接観測:** [FR-B16 focused test結果](../testing/fr-b16-results.md)。semicolon区切りだけを複数maskとする
+  filter、empty mask、CSV列・escaping、spreadsheet formula injectionの無害化を確認した。
 
 ### FR-B17 — 参照shell UI（Batch 17 / P5）
 
-- **状態:** `Done`。B13〜B16のcommand/stateを再利用して実装し、focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Implemented / Partial`。B13〜B16のcommand/stateを再利用したmenu・toolbar・thumbnail tileは
+  実装済みである。release DPIとproduct UIの直接観測が残るため`Done`にしない。
 - **対象と実装順:** (1) `FUT-C-065`参照menu構成、(2) `FUT-C-066`icon command toolbar、
   (3) `FUT-C-067`参照型thumbnail tile。
 - **優先理由:** Leeyesとの差を縮めるが、先に外観だけを作るとdisabled commandやshortcutを
@@ -674,14 +683,16 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p5-参照shell-ui)。
 - **実装根拠:** `src/App.tsx`、`src/features/catalog/view-mode.ts`、
-  `src/features/catalog/CatalogGrid.tsx`、`src/styles.css`、`src/features/catalog/view-mode.test.ts`。
-- **直接観測:** [FR-B17 focused test結果](../testing/fr-b17-results.md)。enum/default、grid mount、
-  toolbar accessible labelsをSKIP 0で実測した。
+  `src/features/catalog/CatalogGrid.tsx`、`src/styles.css`、`src-tauri/src/application/mod.rs`、
+  `src-tauri/src/state/repository.rs`。
+- **直接観測:** [FR-B17 focused test結果](../testing/fr-b17-results.md)。menu/toolbar/tileのcomponent境界に加え、
+  `reference_tile`のbackend allowlist、SQLite reopen後の保持、保存失敗時のfrontend rollbackを確認した。
+  release DPI・long-name・実製品操作は未測定のまま保持する。
 
 ### FR-B18 — workspace・window（Batch 18 / P6）
 
-- **状態:** `Done`。表示surfaceの可逆切替、viewer分離、task tray APIの安全な利用可否表示を実装し、
-  focused test、typecheck、CoDD gateを通過した。
+- **状態:** `Partial / BLOCKED`。表示surfaceの可逆切替、viewer分離、native tray commandは実装済みだが、
+  release製品のnotification areaでhide/show/focus/quitを直接観測していないため完了を保留する。
 - **対象と実装順:** (1) `FUT-C-062` pane表示切替、(2) `FUT-C-063` bar・menu表示切替、
   (3) `FUT-C-060`画像表示領域の分離、(4) `FUT-C-061`task tray収納。
 - **優先理由:** 同一window内の可逆な表示切替を先に作り、別window・trayのfocus、復帰、fullscreen、
@@ -694,14 +705,16 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p6-workspacewindow)。
 - **実装根拠:** `src/App.tsx`、`src/features/workspace/display.ts`、
-  `src/features/workspace/display.test.ts`、`src/features/viewer/Viewer.tsx`、`src/styles.css`。
+  `src/features/workspace/display.test.ts`、`src/features/viewer/Viewer.tsx`、`src/styles.css`、
+  `src-tauri/src/tray.rs`、`src-tauri/src/lib.rs`。
 - **直接観測:** [FR-B18 focused test結果](../testing/fr-b18-results.md)。pane/bar/menuのcurrent-session切替、
-  viewer分離とEsc復帰、tray APIなし時のdisabled境界を確認した。
+  viewer分離とEsc復帰、tray API境界を確認した。native trayのproduct gateは`BLOCKED_UNMEASURED`であり、
+  component/mock証跡を製品PASSへ代替しない。
 
 ### FR-B19 — 設定・help（Batch 19 / P7）
 
 - **状態:** `Done`。先行priorityの表示・viewer・操作設定を統合dialogへ束ね、profile、mouse gesture、
-  offline help、version情報を実装し、focused test、typecheck、CoDD gateを通過した。
+  offline help、version情報を実装し、対象5契約の受入を完了した。
 - **対象と実装順:** (1) `FUT-C-069`統合設定画面、(2) `FUT-C-071`設定profile、
   (3) `FUT-C-072`mouse gesture設定、(4) `FUT-C-076`一般help、(5) `FUT-C-077`version情報。
 - **優先理由:** 個別設定を先に増殖させず、apply/cancel、migration、safe defaultを共有する。
@@ -712,16 +725,17 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 #### FR-B19 実装・直接観測証跡
 
 - **採用要件:** [P1〜P10実装要件](../requirements/roadmap-priorities-requirements.md#p7-help)。
-- **実装根拠:** `src/App.tsx`、`src/features/settings/profile.ts`、
-  `src/features/settings/profile.test.ts`、`src/features/viewer/Viewer.tsx`。
-- **直接観測:** [FR-B19 focused test結果](../testing/fr-b19-results.md)。profileの非機密境界、gesture conflict、
-  apply/cancel導線、一般help/version表示を確認した。
+- **実装根拠:** `src/App.tsx`、`src/App.test.tsx`、`src/features/settings/profile.ts`、
+  `src/features/settings/profile.test.ts`、`src/features/viewer/Viewer.tsx`、
+  `src/features/viewer/Viewer.test.tsx`。
+- **直接観測:** [FR-B19 focused test結果](../testing/fr-b19-results.md)。`FT-B19-001`〜`FT-B19-005`を
+  exact 5 PASSとして、apply/cancel、profileの非機密境界、gesture conflict、一般help、version表示を確認した。
 
 ### FR-B20 — thumbnail保守（Batch 20 / P10）
 
-- **状態:** `Done`。既存の自動生成thumbnail cacheとは分離した、利用者が読み込んだJPEGの
-  app-local管理層を追加した。件数・bytes表示、削除、表示中thumbnailのJPEG保存、一括読込を
-  原本非破壊で実装・実測した。
+- **状態:** `Implemented / Partial`。既存の自動生成thumbnail cacheとは分離した、利用者が読み込む
+  JPEGのapp-local管理層とUIを実装した。製品での実ディスク保存とpickerによる一括読込を直接観測して
+  いないため`Done`にしない。
 - **対象と実装順:** (1) `FUT-C-073` thumbnail管理、(2) `FUT-C-074`表示中thumbnailの保存、
   (3) `FUT-C-075` thumbnail一括読込。
 - **優先理由:** 日常閲覧の必須導線より専門性が高く、cache形式・容量・overwrite・互換性を
@@ -736,8 +750,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **実装根拠:** `src/features/catalog/thumbnail-maintenance.ts`、`src/features/catalog/thumbnail-maintenance.test.ts`、
   `src/App.tsx`、`src/styles.css`。
 - **直接観測:** [FR-B20 focused test結果](../testing/fr-b20-results.md)。管理件数/bytes/削除、表示中JPEG保存、
-  JPEG一括読込と重複・容量・形式エラー境界を確認した。frontend全体120 tests、typecheck、Windows-native
-  CoDD scan/check/verifyもPASS。
+  JPEG一括読込と重複・容量・形式エラーのutility/component境界を確認した。製品の実保存・一括読込は
+  未測定であり、この証跡からPASSを推定しない。
 
 ## 重複・umbrella 境界台帳
 

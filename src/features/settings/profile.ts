@@ -1,15 +1,26 @@
 import {
-  DEFAULT_SHORTCUTS,
-  normalizeShortcutBindings,
+  SHORTCUT_COMMANDS,
+  normalizeShortcut,
   type ShortcutBindings,
 } from "../input/shortcuts";
-import type { CatalogViewMode } from "../catalog/view-mode";
-import type { ScaleMode, ViewerLayoutMode, ViewMode } from "../viewer/model";
-import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
+import { CATALOG_VIEW_MODES, type CatalogViewMode } from "../catalog/view-mode";
+import {
+  MAX_SCALE,
+  MIN_SCALE,
+  VIEWER_LAYOUT_MODES,
+  type ScaleMode,
+  type ViewerLayoutMode,
+  type ViewMode,
+} from "../viewer/model";
+import {
+  END_OF_VOLUME_POLICIES,
+  type EndOfVolumePolicy,
+} from "../catalog/end-of-volume";
 import type { SortField } from "../catalog/sort";
+import packageMetadata from "../../../package.json";
 
 export const SETTINGS_PROFILE_VERSION = 1;
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = packageMetadata.version;
 
 export const MOUSE_GESTURE_ACTIONS = [
   "none",
@@ -40,6 +51,9 @@ export interface SettingsProfile {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  treeVisible: boolean;
+  menuBarVisible: boolean;
+  toolbarVisible: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -81,25 +95,95 @@ export function remapMouseGesture(
 export function normalizeSettingsProfile(value: unknown): SettingsProfile | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
-  const numberOr = (key: string, fallback: number) =>
-    typeof candidate[key] === "number" && Number.isFinite(candidate[key]) ? candidate[key] as number : fallback;
-  const stringOr = <T extends string>(key: string, fallback: T): T =>
-    typeof candidate[key] === "string" ? candidate[key] as T : fallback;
+  const sortField = enumValue(candidate.sortField, ["name", "modified", "size", "kind"] as const);
+  const endOfVolumePolicy = enumValue(candidate.endOfVolumePolicy, END_OF_VOLUME_POLICIES);
+  const catalogViewMode = enumValue(candidate.catalogViewMode, CATALOG_VIEW_MODES);
+  const viewMode = enumValue(candidate.viewMode, ["single", "spread"] as const);
+  const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
+  const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
+  const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);
+  const shortcuts = strictShortcutBindings(candidate.shortcuts);
+  const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
+  if (
+    candidate.profileVersion !== SETTINGS_PROFILE_VERSION ||
+    sortField === null ||
+    typeof candidate.sortDescending !== "boolean" ||
+    endOfVolumePolicy === null ||
+    catalogViewMode === null ||
+    viewMode === null ||
+    layoutMode === null ||
+    readingDirection === null ||
+    scaleMode === null ||
+    typeof candidate.scale !== "number" ||
+    !Number.isFinite(candidate.scale) ||
+    candidate.scale < MIN_SCALE ||
+    candidate.scale > MAX_SCALE ||
+    typeof candidate.loupeEnabled !== "boolean" ||
+    typeof candidate.treeVisible !== "boolean" ||
+    typeof candidate.menuBarVisible !== "boolean" ||
+    typeof candidate.toolbarVisible !== "boolean" ||
+    shortcuts === null ||
+    mouseGestures === null
+  ) {
+    return null;
+  }
   return {
     profileVersion: SETTINGS_PROFILE_VERSION,
-    sortField: stringOr("sortField", "name") as SortField,
-    sortDescending: candidate.sortDescending === true,
-    endOfVolumePolicy: stringOr("endOfVolumePolicy", "auto_next") as EndOfVolumePolicy,
-    catalogViewMode: stringOr("catalogViewMode", "cover_list") as CatalogViewMode,
-    viewMode: stringOr("viewMode", "single") as ViewMode,
-    layoutMode: stringOr("layoutMode", "paged") as ViewerLayoutMode,
-    readingDirection: stringOr("readingDirection", "rightToLeft") as SettingsProfile["readingDirection"],
-    scaleMode: stringOr("scaleMode", "fit") as ScaleMode,
-    scale: Math.min(4, Math.max(0.25, numberOr("scale", 1))),
-    loupeEnabled: candidate.loupeEnabled === true,
-    shortcuts: normalizeShortcutBindings(candidate.shortcuts ?? DEFAULT_SHORTCUTS),
-    mouseGestures: normalizeMouseGestures(candidate.mouseGestures),
+    sortField,
+    sortDescending: candidate.sortDescending,
+    endOfVolumePolicy,
+    catalogViewMode,
+    viewMode,
+    layoutMode,
+    readingDirection,
+    scaleMode,
+    scale: candidate.scale,
+    loupeEnabled: candidate.loupeEnabled,
+    treeVisible: candidate.treeVisible,
+    menuBarVisible: candidate.menuBarVisible,
+    toolbarVisible: candidate.toolbarVisible,
+    shortcuts,
+    mouseGestures,
   };
+}
+
+function enumValue<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | null {
+  return typeof value === "string" && allowed.includes(value as T)
+    ? value as T
+    : null;
+}
+
+function strictShortcutBindings(value: unknown): ShortcutBindings | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const result = {} as ShortcutBindings;
+  const seen = new Set<string>();
+  for (const command of SHORTCUT_COMMANDS) {
+    if (!Object.prototype.hasOwnProperty.call(candidate, command)) return null;
+    const shortcut = normalizeShortcut(candidate[command]);
+    if (shortcut === null || seen.has(shortcut)) return null;
+    result[command] = shortcut;
+    seen.add(shortcut);
+  }
+  return result;
+}
+
+function strictMouseGestureBindings(value: unknown): MouseGestureBindings | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const result = {} as MouseGestureBindings;
+  const seen = new Set<MouseGestureAction>();
+  for (const name of MOUSE_GESTURE_NAMES) {
+    if (!Object.prototype.hasOwnProperty.call(candidate, name)) return null;
+    const action = enumValue(candidate[name], MOUSE_GESTURE_ACTIONS);
+    if (action === null || (action !== "none" && seen.has(action))) return null;
+    result[name] = action;
+    if (action !== "none") seen.add(action);
+  }
+  return result;
 }
 
 export function loadMouseGestures(storage: Pick<Storage, "getItem"> | undefined): MouseGestureBindings {
@@ -114,10 +198,12 @@ export function loadMouseGestures(storage: Pick<Storage, "getItem"> | undefined)
 export function saveMouseGestures(
   storage: Pick<Storage, "setItem"> | undefined,
   bindings: MouseGestureBindings,
-): void {
+): boolean {
   try {
     storage?.setItem("comic-explorer.mouse-gestures", JSON.stringify(bindings));
+    return storage !== undefined;
   } catch {
     // Browser storage may be disabled; the current-session state remains usable.
+    return false;
   }
 }

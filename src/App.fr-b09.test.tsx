@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 function openDiagnosticsMenuItem() {
-  fireEvent.click(screen.getByRole("menuitem", { name: "ライブラリ" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
   fireEvent.click(
-    within(screen.getByRole("menu", { name: "ライブラリ" })).getByRole("menuitem", {
+    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
       name: "ライブラリ診断…",
     }),
   );
@@ -57,7 +57,11 @@ vi.mock("./features/library/client", () => ({
   saveEndOfVolumePolicy: vi.fn(),
   saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
+  saveSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
+  getTrayStatus: vi.fn(),
+  storeMainWindowInTray: vi.fn(),
+  quitApplication: vi.fn(),
   searchLibrary: vi.fn(),
   setItemRating: vi.fn(),
   takeRecoveryNotice: vi.fn(),
@@ -144,6 +148,11 @@ describe("FR-B09 connected library diagnostics", () => {
       scaleMode: "fit",
       scale: 1,
       loupeEnabled: false,
+      treeVisible: true,
+      menuBarVisible: true,
+      toolbarVisible: true,
+      shortcuts: {},
+      mouseGestures: {},
     }, "settings");
     vi.mocked(getCatalogSettings).mockResolvedValue(settings as never);
     vi.mocked(takeRecoveryNotice).mockResolvedValue(response(false, "recovery") as never);
@@ -217,7 +226,7 @@ describe("FR-B09 connected library diagnostics", () => {
     );
     await registerLibrary();
     openDiagnosticsMenuItem();
-    const panel = await screen.findByRole("region", { name: "ライブラリ診断" });
+    const panel = await screen.findByRole("dialog", { name: "ライブラリ診断" });
     expect(panel.querySelectorAll('[data-diagnostic-severity="info"]')).toHaveLength(1);
     expect(panel.querySelectorAll('[data-diagnostic-severity="warning"]')).toHaveLength(1);
     expect(panel.querySelectorAll('[data-diagnostic-severity="error"]')).toHaveLength(1);
@@ -272,7 +281,7 @@ describe("FR-B09 connected library diagnostics", () => {
     expect(cancelMock).toHaveBeenCalledTimes(1);
     await screen.findByText("ライブラリ診断をキャンセルしました。");
     expect(cancelledResponseGeneration).toBe(cancelAdapterGeneration);
-    expect(screen.getByRole("region", { name: "ライブラリ診断" })).toHaveAttribute(
+    expect(screen.getByRole("dialog", { name: "ライブラリ診断" })).toHaveAttribute(
       "aria-busy",
       "false",
     );

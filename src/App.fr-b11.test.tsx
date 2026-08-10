@@ -7,7 +7,7 @@ function openHelpMenuItem() {
   fireEvent.click(screen.getByRole("menuitem", { name: "ヘルプ" }));
   fireEvent.click(
     within(screen.getByRole("menu", { name: "ヘルプ" })).getByRole("menuitem", {
-      name: "キー操作とショートカット…",
+      name: "ショートカット設定…",
     }),
   );
 }
@@ -15,6 +15,7 @@ import {
   DEFAULT_SHORTCUTS,
   type ShortcutBindings,
 } from "./features/input/shortcuts";
+import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
 import {
   getCatalogSettings,
   getItemMetadata,
@@ -26,7 +27,7 @@ import {
   openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
-  saveShortcutBindings,
+  saveSettingsProfile,
   saveReadingPosition,
   takeRecoveryNotice,
   type CatalogSettings,
@@ -53,7 +54,7 @@ vi.mock("./features/library/client", () => ({
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),
   saveItemMemo: vi.fn(),
-  saveShortcutBindings: vi.fn(),
+  saveSettingsProfile: vi.fn(),
   saveReadingPosition: vi.fn(),
   saveViewerSettings: vi.fn(),
   setItemRating: vi.fn(),
@@ -72,7 +73,7 @@ const openMock = vi.mocked(openComic);
 const settingsMock = vi.mocked(getCatalogSettings);
 const metadataMock = vi.mocked(getItemMetadata);
 const thumbnailMock = vi.mocked(getThumbnail);
-const saveShortcutMock = vi.mocked(saveShortcutBindings);
+const saveSettingsMock = vi.mocked(saveSettingsProfile);
 const saveReadingMock = vi.mocked(saveReadingPosition);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 
@@ -92,17 +93,12 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       scaleMode: "fit" as const,
       scale: 1,
       loupeEnabled: false,
+      treeVisible: true,
+      menuBarVisible: true,
+      toolbarVisible: true,
       shortcuts: { ...DEFAULT_SHORTCUTS, ...shortcuts },
+      mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
     } satisfies CatalogSettings,
-  };
-}
-
-function shortcutResponse(shortcuts: ShortcutBindings) {
-  return {
-    status: "ok" as const,
-    requestId: "shortcut-save" as never,
-    generation: 1 as never,
-    data: shortcuts,
   };
 }
 
@@ -170,7 +166,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     settingsMock.mockReset();
     metadataMock.mockReset();
     thumbnailMock.mockReset();
-    saveShortcutMock.mockReset();
+    saveSettingsMock.mockReset();
     saveReadingMock.mockReset();
     recoveryNoticeMock.mockReset();
 
@@ -219,9 +215,14 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       generation: 1 as never,
       data: undefined,
     });
-    saveShortcutMock.mockImplementation(async (shortcuts) =>
-      shortcutResponse(shortcuts),
-    );
+    saveSettingsMock.mockImplementation(async (profile) => ({
+      status: "ok",
+      requestId: "settings-save" as never,
+      generation: 1 as never,
+      data: {
+        ...profile,
+      },
+    }));
   });
 
   it("FT-B11-001 remaps, rejects conflicts, and resets the production command mapping", async () => {
@@ -230,7 +231,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     openHelpMenuItem();
 
     const dialog = screen.getByRole("dialog", {
-      name: "キー操作とショートカット",
+      name: "統合設定",
     });
     const nextInput = screen.getByRole("textbox", {
       name: "次ページショートカット",
@@ -238,30 +239,60 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     expect(nextInput).toHaveValue("PageDown");
     fireEvent.keyDown(nextInput, { key: "N" });
     await waitFor(() => expect(nextInput).toHaveValue("N"));
-    await waitFor(() =>
-      expect(within(dialog).getByRole("status")).toHaveAttribute(
-        "data-shortcut-save-status",
-        "saved",
-      ),
-    );
-    expect(within(dialog).getByRole("status")).toHaveTextContent(
-      "ショートカットを保存しました。",
-    );
-    expect(saveShortcutMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ nextPage: "N" }),
-      expect.any(Number),
-    );
+    expect(saveSettingsMock).not.toHaveBeenCalled();
 
     const previousInput = screen.getByRole("textbox", {
       name: "前ページショートカット",
     });
     fireEvent.keyDown(previousInput, { key: "N" });
-    expect(await screen.findByRole("alert")).toHaveTextContent("次ページ");
+    expect(await within(dialog).findByRole("status")).toHaveTextContent("次ページ");
     expect(previousInput).toHaveValue("PageUp");
 
-    fireEvent.click(screen.getByRole("button", { name: "すべて既定に戻す" }));
-    await waitFor(() => expect(nextInput).toHaveValue("PageDown"));
-    expect(dialog).toHaveTextContent("外部通信には影響しません");
+    const apply = dialog.querySelector<HTMLButtonElement>(
+      '[data-product-id="shortcut-apply"]',
+    );
+    expect(apply).not.toBeNull();
+    fireEvent.click(apply as HTMLButtonElement);
+    await waitFor(() =>
+      expect(saveSettingsMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          shortcuts: expect.objectContaining({ nextPage: "N" }),
+        }),
+        expect.any(Number),
+      ),
+    );
+    expect(await screen.findByText("設定profileを適用しました。")).toHaveAttribute(
+      "role",
+      "status",
+    );
+    expect(dialog).not.toBeInTheDocument();
+
+    openHelpMenuItem();
+    const resetDialog = screen.getByRole("dialog", {
+      name: "統合設定",
+    });
+    const resetNextInput = screen.getByRole("textbox", {
+      name: "次ページショートカット",
+    });
+    expect(resetNextInput).toHaveValue("N");
+    fireEvent.click(
+      within(resetDialog).getByRole("button", { name: "すべて既定に戻す" }),
+    );
+    await waitFor(() => expect(resetNextInput).toHaveValue("PageDown"));
+    expect(saveSettingsMock).toHaveBeenCalledTimes(1);
+    expect(resetDialog).toHaveTextContent("表示・操作設定だけを扱います");
+
+    const resetApply = resetDialog.querySelector<HTMLButtonElement>(
+      '[data-product-id="shortcut-apply"]',
+    );
+    expect(resetApply).not.toBeNull();
+    fireEvent.click(resetApply as HTMLButtonElement);
+    await waitFor(() => expect(saveSettingsMock).toHaveBeenCalledTimes(2));
+    expect(saveSettingsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ shortcuts: DEFAULT_SHORTCUTS }),
+      expect.any(Number),
+    );
+    await waitFor(() => expect(resetDialog).not.toBeInTheDocument());
   });
 
   it("FT-B11-004 keeps keyboard fallback, suppresses focused input, and stops at the Viewer/navigation boundary", async () => {
@@ -304,7 +335,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     await registerTestLibrary([]);
     openHelpMenuItem();
     expect(
-      await screen.findByRole("dialog", { name: "キー操作とショートカット" }),
+      await screen.findByRole("dialog", { name: "統合設定" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "次ページショートカット" }),

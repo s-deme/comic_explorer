@@ -16,6 +16,7 @@ import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogViewMode } from "../catalog/view-mode";
 import type { ShortcutBindings } from "../input/shortcuts";
+import type { MouseGestureBindings, SettingsProfile } from "../settings/profile";
 
 let requestSequence = 0;
 
@@ -65,7 +66,11 @@ export interface CatalogSettings {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
-  shortcuts?: ShortcutBindings;
+  treeVisible: boolean;
+  menuBarVisible: boolean;
+  toolbarVisible: boolean;
+  shortcuts: ShortcutBindings;
+  mouseGestures: MouseGestureBindings;
 }
 
 export async function saveShortcutBindings(
@@ -99,6 +104,62 @@ export async function saveViewerSettings(
     scale: settings.scale,
     loupeEnabled: settings.loupeEnabled,
   });
+}
+
+export async function saveSettingsProfile(
+  profile: SettingsProfile,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("set_settings_profile", {
+    context: context(generation),
+    profile: {
+      sortField: profile.sortField,
+      sortDescending: profile.sortDescending,
+      endOfVolumePolicy: profile.endOfVolumePolicy,
+      catalogViewMode: profile.catalogViewMode,
+      viewMode: profile.viewMode,
+      layoutMode: profile.layoutMode,
+      readingDirection: profile.readingDirection,
+      scaleMode: profile.scaleMode,
+      scale: profile.scale,
+      loupeEnabled: profile.loupeEnabled,
+      treeVisible: profile.treeVisible,
+      menuBarVisible: profile.menuBarVisible,
+      toolbarVisible: profile.toolbarVisible,
+      shortcuts: profile.shortcuts,
+      mouseGestures: profile.mouseGestures,
+    },
+  });
+}
+
+export interface TrayStatus {
+  available: boolean;
+  stored: boolean;
+  reason: string | null;
+}
+
+export async function getTrayStatus(
+  generation: number,
+): Promise<ApiResponse<TrayStatus>> {
+  return invoke("get_tray_status", { context: context(generation) });
+}
+
+export async function storeMainWindowInTray(
+  generation: number,
+): Promise<ApiResponse<TrayStatus>> {
+  return invoke("store_main_window_in_tray", { context: context(generation) });
+}
+
+export async function restoreMainWindowFromTray(
+  generation: number,
+): Promise<ApiResponse<TrayStatus>> {
+  return invoke("restore_main_window_from_tray", { context: context(generation) });
+}
+
+export async function quitApplication(
+  generation: number,
+): Promise<ApiResponse<void>> {
+  return invoke("quit_application", { context: context(generation) });
 }
 
 export async function getCatalogSettings(

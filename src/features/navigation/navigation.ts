@@ -8,6 +8,8 @@ export type NavigationAction =
   | { type: "navigate"; path: string }
   | { type: "back" }
   | { type: "forward" }
+  | { type: "jumpBack"; index: number }
+  | { type: "jumpForward"; index: number }
   | { type: "reset"; path: string };
 
 export function navigationReducer(
@@ -38,6 +40,34 @@ export function navigationReducer(
         current: target,
         back: [...state.back, state.current],
         forward: rest,
+      };
+    }
+    case "jumpBack": {
+      if (!Number.isInteger(action.index) || action.index < 0) return state;
+      const target = state.back[action.index];
+      if (target === undefined) return state;
+      return {
+        current: target,
+        back: state.back.slice(0, action.index),
+        forward: [
+          ...state.back.slice(action.index + 1),
+          state.current,
+          ...state.forward,
+        ],
+      };
+    }
+    case "jumpForward": {
+      if (!Number.isInteger(action.index) || action.index < 0) return state;
+      const target = state.forward[action.index];
+      if (target === undefined) return state;
+      return {
+        current: target,
+        back: [
+          ...state.back,
+          state.current,
+          ...state.forward.slice(0, action.index),
+        ],
+        forward: state.forward.slice(action.index + 1),
       };
     }
     case "reset":

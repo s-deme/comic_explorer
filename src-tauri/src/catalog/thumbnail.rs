@@ -97,11 +97,17 @@ fn validate_cover_format(cover: &RelativePath, bytes: &[u8]) -> Result<(), AppEr
             ));
         }
     };
-    let actual = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?.format;
-    if actual != expected {
+    let metadata = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?;
+    if metadata.format != expected {
         return Err(thumbnail_error(
             ErrorCode::CorruptImage,
             "Cover extension does not match its image data.",
+        ));
+    }
+    if metadata.format == ImageFormat::Gif && metadata.animated {
+        return Err(thumbnail_error(
+            ErrorCode::UnsupportedFormat,
+            "Animated GIF covers are not persisted as thumbnails.",
         ));
     }
     Ok(())
@@ -597,6 +603,22 @@ fn thumbnail_io_error(error: impl std::fmt::Display) -> AppError {
 mod tests {
     use super::*;
 
+    fn animated_gif() -> Vec<u8> {
+        let mut bytes = b"GIF89a\x01\0\x01\0\x80\0\0\0\0\0\xff\xff\xff".to_vec();
+        bytes.extend_from_slice(&[
+            0x21, 0xff, 0x0b, b'N', b'E', b'T', b'S', b'C', b'A', b'P', b'E', b'2', b'.', b'0',
+            0x03, 0x01, 0, 0, 0,
+        ]);
+        for _ in 0..2 {
+            bytes.extend_from_slice(&[
+                0x21, 0xf9, 0x04, 0, 0, 0, 0, 0, 0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0x02, 0x02, 0x44,
+                0x01, 0,
+            ]);
+        }
+        bytes.push(0x3b);
+        bytes
+    }
+
     fn lossless_webp(width: u32, height: u32, pixels: &[u8], alpha: bool) -> Vec<u8> {
         let mut encoded = Vec::new();
         image_webp::WebPEncoder::new(&mut encoded)
@@ -619,6 +641,17 @@ mod tests {
         assert_eq!(output_dimensions(100, 200, 1).unwrap(), (100, 200));
         assert_eq!(output_dimensions(1200, 1800, 1).unwrap(), (256, 384));
         assert_eq!(output_dimensions(1200, 1800, 6).unwrap(), (384, 256));
+    }
+
+    #[test]
+    fn fr_b08_thumbnail_gate_rejects_animated_gif_frames_from_disk_cache() {
+        let bytes = animated_gif();
+        assert_eq!(
+            validate_cover_format(&RelativePath::parse("1.gif").unwrap(), &bytes)
+                .unwrap_err()
+                .code,
+            ErrorCode::UnsupportedFormat
+        );
     }
 
     #[test]
