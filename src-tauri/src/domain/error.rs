@@ -8,6 +8,7 @@ use super::RelativePath;
 pub enum ErrorCode {
     InvalidRequest,
     InvalidPath,
+    Conflict,
     OutsideLibraryRoot,
     NotFound,
     AccessDenied,

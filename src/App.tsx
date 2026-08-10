@@ -38,15 +38,32 @@ import {
   getTrayStatus,
   storeMainWindowInTray,
   quitApplication,
+  renameFileItem,
+  createFileFolder,
+  copyFileItemsToFolder,
+  moveFileItemsToFolder,
+  deleteFileItems,
+  setFileClipboard,
+  getFileClipboardStatus,
+  pasteFileItems,
+  revealFileItem,
+  openFileItemDefault,
+  openFileItemWith,
   type CatalogSettings,
   type DiagnosticReport,
   type FavoriteEntry,
+  type FileClipboardStatus,
+  type FileOperationResult,
   type ItemMetadata,
   type TagEntry,
   type ReadingHistoryEntry,
   type TrayStatus,
   type ViewerSession,
 } from "./features/library/client";
+import {
+  CatalogContextMenu,
+  type CatalogContextAction,
+} from "./features/catalog/CatalogContextMenu";
 import {
   sortCatalogEntries,
   type SortField,
@@ -86,6 +103,7 @@ import {
 } from "./features/input/shortcuts";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type { CatalogEntry } from "./types/domain";
+import type { ApiResponse } from "./types/api";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
 import {
   CATALOG_VIEW_MODE_LABELS,
@@ -169,6 +187,25 @@ interface AppProps {
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
 type ToolbarMenuId = "sort" | "endOfVolume" | "catalogView";
+type ViewerLaunchMode = "normal" | "fullscreen" | "slideshow";
+
+interface CatalogContextMenuState {
+  entry: CatalogEntry | null;
+  x: number;
+  y: number;
+}
+
+interface FileNameDialogState {
+  kind: "rename" | "create";
+  entry: CatalogEntry | null;
+  value: string;
+}
+
+interface FileDeleteDialogState {
+  paths: string[];
+  permanent: boolean;
+  label: string;
+}
 
 const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
 const MENU_MNEMONICS: Record<string, MenuId> = {
@@ -261,6 +298,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
+  const fileOperationGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -317,6 +355,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [fileMask, setFileMask] = useState("");
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [catalogContextMenu, setCatalogContextMenu] =
+    useState<CatalogContextMenuState | null>(null);
+  const [fileClipboard, setFileClipboardStatus] = useState<FileClipboardStatus>({
+    available: false,
+    cut: false,
+    items: 0,
+  });
+  const [fileOperationBusy, setFileOperationBusy] = useState(false);
+  const [fileNameDialog, setFileNameDialog] = useState<FileNameDialogState | null>(null);
+  const [fileDeleteDialog, setFileDeleteDialog] = useState<FileDeleteDialogState | null>(null);
   const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
@@ -369,6 +417,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
+  const [viewerLaunchMode, setViewerLaunchMode] = useState<ViewerLaunchMode>("normal");
   const [recoveryNotice, setRecoveryNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPaneOpen, setSearchPaneOpen] = useState(false);
@@ -548,6 +597,46 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         refreshCatalog();
         return;
       }
+      const target = event.target;
+      const editing = target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement
+        || (target instanceof HTMLElement && target.isContentEditable);
+      if (!editing && libraryRoot !== null && viewerSession === null && !event.altKey) {
+        const commandKey = event.key.toLowerCase();
+        if ((event.ctrlKey || event.metaKey) && (commandKey === "x" || commandKey === "c")) {
+          if (selectedPaths.length === 0) return;
+          event.preventDefault();
+          const cut = commandKey === "x";
+          void runFileOperation(
+            (requestGeneration) => setFileClipboard(selectedPaths, cut, requestGeneration),
+            (result) => `${result.affected}件を${cut ? "切り取り" : "コピー"}ました。`,
+            { refresh: false },
+          ).then((succeeded) => {
+            if (succeeded) {
+              setFileClipboardStatus({ available: true, cut, items: selectedPaths.length });
+            }
+          });
+          return;
+        }
+        if ((event.ctrlKey || event.metaKey) && commandKey === "v") {
+          event.preventDefault();
+          void runFileOperation(
+            (requestGeneration) => pasteFileItems(navigation.current, requestGeneration),
+            (result) => `${result.affected}件を貼り付けました。`,
+          ).then(() => void refreshFileClipboardStatus());
+          return;
+        }
+        if (event.key === "Delete" && selectedPaths.length > 0) {
+          event.preventDefault();
+          setFileDeleteDialog({
+            paths: selectedPaths,
+            permanent: false,
+            label: selectedPaths.length === 1 ? selectedPaths[0] : `${selectedPaths.length}件の項目`,
+          });
+          return;
+        }
+      }
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       if (libraryRoot === null || viewerSession !== null) return;
       if (event.key === "ArrowLeft") {
@@ -613,7 +702,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, activeToolbarMenu, libraryRoot, navigation, selectedPath, viewerSession]);
+  }, [activeMenu, activeToolbarMenu, libraryRoot, navigation, selectedPath, selectedPaths, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -1053,6 +1142,273 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     } catch {
       setSelectionNotice("パスをコピーできませんでした。");
     }
+  }
+
+  function contextSelectionPaths(): string[] {
+    const entry = catalogContextMenu?.entry;
+    if (entry === null || entry === undefined) return [];
+    return selectedPaths.includes(entry.relativePath)
+      ? selectedPaths
+      : [entry.relativePath];
+  }
+
+  function absoluteLibraryPath(relativePath: string): string | null {
+    if (libraryRoot === null) return null;
+    if (relativePath.length === 0) return libraryRoot;
+    const separator = libraryRoot.includes("\\") ? "\\" : "/";
+    return `${libraryRoot.replace(/[\\/]$/, "")}${separator}${relativePath.replaceAll("/", separator)}`;
+  }
+
+  async function copyAbsolutePaths(paths: readonly string[]) {
+    const absolutePaths = paths
+      .map(absoluteLibraryPath)
+      .filter((path): path is string => path !== null);
+    if (absolutePaths.length === 0 || navigator.clipboard?.writeText === undefined) {
+      setSelectionNotice("パスをコピーできませんでした。");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(absolutePaths.join("\n"));
+      setSelectionNotice(`${absolutePaths.length}件の絶対パスをコピーしました。`);
+    } catch {
+      setSelectionNotice("パスをコピーできませんでした。");
+    }
+  }
+
+  async function refreshFileClipboardStatus() {
+    const requestGeneration = ++fileOperationGeneration.current;
+    try {
+      const response = await getFileClipboardStatus(requestGeneration);
+      if (requestGeneration !== fileOperationGeneration.current) return;
+      if (response.status === "ok") setFileClipboardStatus(response.data);
+      else if (response.status === "error") {
+        setFileClipboardStatus({ available: false, cut: false, items: 0 });
+      }
+    } catch {
+      if (requestGeneration === fileOperationGeneration.current) {
+        setFileClipboardStatus({ available: false, cut: false, items: 0 });
+      }
+    }
+  }
+
+  function openCatalogContextMenu(
+    entry: CatalogEntry | null,
+    position: { x: number; y: number },
+  ) {
+    if (entry !== null && !selectedPaths.includes(entry.relativePath)) selectEntry(entry);
+    const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
+    const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
+    setCatalogContextMenu({
+      entry,
+      x: Math.max(4, Math.min(position.x, viewportWidth - 328)),
+      y: Math.max(4, Math.min(position.y, viewportHeight - 610)),
+    });
+    void refreshFileClipboardStatus();
+  }
+
+  async function runFileOperation(
+    request: (generation: number) => Promise<ApiResponse<FileOperationResult>>,
+    successMessage: (result: FileOperationResult) => string,
+    options: { refresh?: boolean; restore?: string[] } = {},
+  ): Promise<boolean> {
+    if (fileOperationBusy) return false;
+    setFileOperationBusy(true);
+    setCatalogContextMenu(null);
+    const requestGeneration = ++fileOperationGeneration.current;
+    try {
+      const response = await request(requestGeneration);
+      if (requestGeneration !== fileOperationGeneration.current) return false;
+      if (response.status === "ok") {
+        setSelectionNotice(successMessage(response.data));
+        if (options.refresh !== false) {
+          await load(navigation.current, options.restore ?? []);
+        }
+        return true;
+      }
+      if (response.status === "error") setSelectionNotice(presentError(response.error));
+      else setSelectionNotice("ファイル操作をキャンセルしました。");
+      if (options.refresh !== false) await load(navigation.current);
+      return false;
+    } catch {
+      if (requestGeneration === fileOperationGeneration.current) {
+        setSelectionNotice(presentUnexpectedError());
+        if (options.refresh !== false) await load(navigation.current);
+      }
+      return false;
+    } finally {
+      if (requestGeneration === fileOperationGeneration.current) setFileOperationBusy(false);
+    }
+  }
+
+  function addPathToBookshelf(path: string) {
+    if (libraryRoot === null) return;
+    const result = addBookshelfItemResult(path, libraryRoot);
+    setBookshelfPaths(result.value);
+    setSelectionNotice(
+      result.ok ? "本棚に追加しました。" : "本棚へ永続化できませんでした。保存先を確認してください。",
+    );
+  }
+
+  async function handleCatalogContextAction(action: CatalogContextAction) {
+    const menu = catalogContextMenu;
+    const entry = menu?.entry ?? null;
+    const paths = contextSelectionPaths();
+    setCatalogContextMenu(null);
+    switch (action) {
+      case "open":
+        if (entry?.kind === "folder") navigate(entry.relativePath);
+        else if (entry !== null) void openComicEntry(entry);
+        return;
+      case "openFullscreen":
+        if (entry !== null) void openComicEntry(entry, "fullscreen");
+        return;
+      case "openSlideshow":
+        if (entry !== null) void openComicEntry(entry, "slideshow");
+        return;
+      case "reveal":
+        if (entry !== null) {
+          await runFileOperation(
+            (requestGeneration) => revealFileItem(entry.relativePath, requestGeneration),
+            () => "エクスプローラーで表示しました。",
+            { refresh: false },
+          );
+        }
+        return;
+      case "openWith":
+        if (entry !== null) {
+          await runFileOperation(
+            (requestGeneration) => openFileItemWith(entry.relativePath, requestGeneration),
+            () => "アプリケーションの選択画面を開きました。",
+            { refresh: false },
+          );
+        }
+        return;
+      case "openDefault":
+        if (entry !== null) {
+          await runFileOperation(
+            (requestGeneration) => openFileItemDefault(entry.relativePath, requestGeneration),
+            () => "Windowsの既定アプリケーションで開きました。",
+            { refresh: false },
+          );
+        }
+        return;
+      case "addBookshelf":
+        if (entry !== null) addPathToBookshelf(entry.relativePath);
+        return;
+      case "cut":
+      case "copy": {
+        const cut = action === "cut";
+        const succeeded = await runFileOperation(
+          (requestGeneration) => setFileClipboard(paths, cut, requestGeneration),
+          (result) => `${result.affected}件を${cut ? "切り取り" : "コピー"}ました。`,
+          { refresh: false },
+        );
+        if (succeeded) setFileClipboardStatus({ available: true, cut, items: paths.length });
+        return;
+      }
+      case "paste":
+        await runFileOperation(
+          (requestGeneration) => pasteFileItems(navigation.current, requestGeneration),
+          (result) => `${result.affected}件を貼り付けました。`,
+        );
+        void refreshFileClipboardStatus();
+        return;
+      case "copyToFolder":
+        await runFileOperation(
+          (requestGeneration) => copyFileItemsToFolder(paths, requestGeneration),
+          (result) => `${result.affected}件をコピーしました。`,
+        );
+        return;
+      case "moveToFolder":
+        await runFileOperation(
+          (requestGeneration) => moveFileItemsToFolder(paths, requestGeneration),
+          (result) => `${result.affected}件を移動しました。`,
+        );
+        return;
+      case "copyPath":
+        await copyAbsolutePaths(paths);
+        return;
+      case "copyParentPath": {
+        if (entry === null) return;
+        await copyAbsolutePaths([parentPath(entry.relativePath) ?? ""]);
+        return;
+      }
+      case "createFolder":
+        setFileNameDialog({ kind: "create", entry: null, value: "新しいフォルダ" });
+        return;
+      case "recycle":
+        if (paths.length > 0) {
+          setFileDeleteDialog({
+            paths,
+            permanent: false,
+            label: paths.length === 1 ? paths[0] : `${paths.length}件の項目`,
+          });
+        }
+        return;
+      case "rename":
+        if (entry !== null) {
+          setFileNameDialog({ kind: "rename", entry, value: entryDisplayName(entry) });
+        }
+        return;
+      case "properties":
+        setPropertiesOpen(entry !== null);
+        return;
+      case "permanentDelete": {
+        if (entry === null) return;
+        const target = entry.kind === "page"
+          ? parentPath(entry.relativePath)
+          : entry.relativePath;
+        if (target === null || target.length === 0) {
+          setSelectionNotice("ライブラリルートは完全削除できません。");
+          return;
+        }
+        setFileDeleteDialog({ paths: [target], permanent: true, label: target });
+      }
+    }
+  }
+
+  async function submitFileNameDialog(event: React.FormEvent) {
+    event.preventDefault();
+    const dialog = fileNameDialog;
+    if (dialog === null) return;
+    if (dialog.kind === "rename" && dialog.entry !== null) {
+      const parent = parentPath(dialog.entry.relativePath);
+      const restored = parent === null || parent.length === 0
+        ? dialog.value
+        : `${parent}/${dialog.value}`;
+      const succeeded = await runFileOperation(
+        (requestGeneration) => renameFileItem(
+          dialog.entry!.relativePath,
+          dialog.value,
+          requestGeneration,
+        ),
+        () => `名前を「${dialog.value}」へ変更しました。`,
+        { restore: [restored] },
+      );
+      if (succeeded) setFileNameDialog(null);
+      return;
+    }
+    const restored = navigation.current.length === 0
+      ? dialog.value
+      : `${navigation.current}/${dialog.value}`;
+    const succeeded = await runFileOperation(
+      (requestGeneration) => createFileFolder(navigation.current, dialog.value, requestGeneration),
+      () => `フォルダ「${dialog.value}」を作成しました。`,
+      { restore: [restored] },
+    );
+    if (succeeded) setFileNameDialog(null);
+  }
+
+  async function confirmFileDelete() {
+    const dialog = fileDeleteDialog;
+    if (dialog === null) return;
+    const succeeded = await runFileOperation(
+      (requestGeneration) => deleteFileItems(dialog.paths, dialog.permanent, requestGeneration),
+      (result) => dialog.permanent
+        ? `${result.affected}件を完全に削除しました。`
+        : `${result.affected}件をごみ箱へ移動しました。`,
+    );
+    if (succeeded) setFileDeleteDialog(null);
   }
 
   async function chooseRootWithPicker() {
@@ -2115,6 +2471,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setViewerSession(null);
+    setViewerLaunchMode("normal");
     metadataGeneration.current += 1;
     ratingSaveGeneration.current += 1;
     ratingSaveInFlight.current = false;
@@ -2130,7 +2487,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     thumbnailRequests.current.clear();
   }
 
-  async function openComicEntry(entry: CatalogEntry) {
+  async function openComicEntry(
+    entry: CatalogEntry,
+    launchMode: ViewerLaunchMode = "normal",
+  ) {
+    setViewerLaunchMode(launchMode);
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setLoadState({ status: "loading", path: entry.relativePath });
@@ -2216,6 +2577,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             persistViewerSettings({ layoutMode: next });
           }}
           fullscreenAdapter={fullscreenAdapter}
+          initialFullscreen={viewerLaunchMode === "fullscreen"}
+          slideshowIntervalMs={viewerLaunchMode === "slideshow" ? 3_000 : undefined}
           onScaleChange={(next: ViewerScaleState) => {
             setViewerScaleMode(next.mode);
             setViewerScale(next.scale);
@@ -3550,6 +3913,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
+              onContextMenu={openCatalogContextMenu}
               thumbnailFor={(entry) => {
                 const managed = entry.kind === "archive" || entry.kind === "comicFolder"
                   ? managedThumbnailFor(managedThumbnails, entry.relativePath)
@@ -3587,6 +3951,94 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         )}
         {trayNotice !== null && <span role="alert">{trayNotice}</span>}
       </footer>
+      {catalogContextMenu !== null && (
+        <CatalogContextMenu
+          entry={catalogContextMenu.entry}
+          x={catalogContextMenu.x}
+          y={catalogContextMenu.y}
+          selectionCount={contextSelectionPaths().length}
+          clipboard={fileClipboard}
+          busy={fileOperationBusy}
+          onAction={(action) => void handleCatalogContextAction(action)}
+          onClose={() => setCatalogContextMenu(null)}
+        />
+      )}
+      {fileNameDialog !== null && (
+        <div className="dialog-backdrop">
+          <form
+            className="file-operation-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={fileNameDialog.kind === "rename" ? "名前の変更" : "新しいフォルダ"}
+            onSubmit={(event) => void submitFileNameDialog(event)}
+          >
+            <header className="dialog-heading">
+              <p className="dialog-kicker">ファイル操作</p>
+              <h2>{fileNameDialog.kind === "rename" ? "名前の変更" : "新しいフォルダ"}</h2>
+              <p className="dialog-description">
+                {fileNameDialog.kind === "rename"
+                  ? fileNameDialog.entry?.relativePath
+                  : `作成先: ${navigation.current || "ライブラリ"}`}
+              </p>
+            </header>
+            <label>
+              名前
+              <input
+                autoFocus
+                required
+                aria-label="ファイル名"
+                value={fileNameDialog.value}
+                onFocus={(event) => event.currentTarget.select()}
+                onChange={(event) => setFileNameDialog((current) => current === null
+                  ? current
+                  : { ...current, value: event.target.value })}
+              />
+            </label>
+            <div className="dialog-actions">
+              <button type="button" disabled={fileOperationBusy} onClick={() => setFileNameDialog(null)}>
+                キャンセル
+              </button>
+              <button type="submit" disabled={fileOperationBusy || fileNameDialog.value.length === 0}>
+                {fileOperationBusy ? "処理中…" : "実行"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {fileDeleteDialog !== null && (
+        <div className="dialog-backdrop">
+          <section
+            className="file-operation-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={fileDeleteDialog.permanent ? "完全に削除" : "ごみ箱へ移動"}
+          >
+            <header className="dialog-heading">
+              <p className="dialog-kicker">ファイル操作</p>
+              <h2>{fileDeleteDialog.permanent ? "完全に削除" : "ごみ箱へ移動"}</h2>
+              <p className="dialog-description">対象: {fileDeleteDialog.label}</p>
+            </header>
+            <p>
+              {fileDeleteDialog.permanent
+                ? "この操作は取り消せません。対象を完全に削除しますか？"
+                : "選択した項目をごみ箱へ移動しますか？"}
+            </p>
+            <div className="dialog-actions">
+              <button type="button" disabled={fileOperationBusy} onClick={() => setFileDeleteDialog(null)}>
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className={fileDeleteDialog.permanent ? "danger-button" : undefined}
+                disabled={fileOperationBusy}
+                onClick={() => void confirmFileDelete()}
+              >
+                {fileOperationBusy ? "処理中…" : fileDeleteDialog.permanent ? "完全に削除" : "ごみ箱へ移動"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {settingsOpen && settingsDraft !== null && (
         <div className="dialog-backdrop">
           <section

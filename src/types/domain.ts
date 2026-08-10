@@ -50,6 +50,7 @@ export interface Page {
 export type ErrorCode =
   | "INVALID_REQUEST"
   | "INVALID_PATH"
+  | "CONFLICT"
   | "OUTSIDE_LIBRARY_ROOT"
   | "NOT_FOUND"
   | "ACCESS_DENIED"

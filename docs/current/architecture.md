@@ -55,7 +55,9 @@ comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fi
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
-root namespaceを再利用する。OS全体のfile managerには拡張しない。
+root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
+Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、
+folder作成、ごみ箱delete、rename、property、確認付き完全deleteを同じcontext menuから起動する。
 
 ## viewerとmedia
 
@@ -113,20 +115,27 @@ ratingなどのapp-local状態を保持する。SQLはRust repository境界だ�
 DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して空DBで継続し、再初期化と隔離先を
 通知する。原本から再構築できない利用者metadataはcacheと区別する。
 
-## path安全性と原本非破壊
+## path安全性と明示的file操作
 
-- filesystem adapterはread-only openと列挙だけを公開し、domainにrename/write/delete/create APIを持ち込まない。
+- 閲覧用filesystem adapterはread-onlyのまま保ち、変更操作は直列化した専用file-operation portへ隔離する。
+- rename、create、deleteの対象はcanonical library root内の相対pathだけとする。copy/move先はWindows folder picker、
+  paste元はCF_HDROPとして利用者が明示したpathだけを受け入れ、絶対pathをfrontend responseへ返さない。
+- copy/move/pasteは同名targetを上書きせず、reparse point、source自身または子孫への操作、重複sourceを拒否する。
+- 通常deleteはWindowsごみ箱へ送り、完全deleteはUIが対象名と復元不能性を確認した後だけ実行する。
+- clipboard cut/copyはCF_HDROPとPreferred DropEffectを設定し、paste成功後だけcut clipboardを消費する。
 - archive entry名をlibrary側host pathへ結合せず、暗号化、未対応compression、traversal、再帰深度・個数・size上限超過を読む前またはstream境界で拒否する。
 - cache、DB、profile、export、temp、recovery、logはlibrary root外だけに置く。
-- CSVやclipboardへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。
+- CSVへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。明示的なpath copyだけはOS操作用の絶対pathをclipboardへ出す。
 - error回復は原本の修復、削除、上書きを自動実行しない。
-- test/product harnessは操作前後のtree、kind、size、mtime、hash、archive entry一覧を比較する。
+- test/product harnessは閲覧操作では前後のtree、kind、size、mtime、hash、archive entry一覧が一致すること、
+  file manager操作では選択targetだけが変更されることを比較する。
 
 ## 画面状態と主要操作
 
 library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成る。
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
-cover/small/detail/reference tile、sort、search result、selection、loading/empty/errorを区別する。
+cover/small/detail/reference tile、sort、search result、selection、loading/empty/error、context menu、
+rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
 dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。

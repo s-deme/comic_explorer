@@ -1,4 +1,5 @@
 mod coordinator;
+pub mod file_operations;
 mod library_root;
 mod scheduler;
 
@@ -38,6 +39,7 @@ pub struct AppState {
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
     thumbnail_workers: PriorityTaskPool,
     page_workers: PriorityTaskPool,
+    file_operations: Arc<Mutex<()>>,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     recovery_notice: Mutex<bool>,
     shutting_down: AtomicBool,
@@ -66,6 +68,7 @@ impl Default for AppState {
             thumbnails: Arc::new(Mutex::new(thumbnails)),
             thumbnail_workers: PriorityTaskPool::new(2, 64),
             page_workers: PriorityTaskPool::new(2, 16),
+            file_operations: Arc::new(Mutex::new(())),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             recovery_notice: Mutex::new(recovered),
             shutting_down: AtomicBool::new(false),
@@ -3174,6 +3177,7 @@ mod shutdown_tests {
             thumbnails: Arc::new(Mutex::new(None)),
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
+            file_operations: Arc::new(Mutex::new(())),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(false),
             shutting_down: AtomicBool::new(false),
@@ -3217,6 +3221,7 @@ mod shutdown_tests {
             thumbnails: Arc::new(Mutex::new(None)),
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
+            file_operations: Arc::new(Mutex::new(())),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(true),
             shutting_down: AtomicBool::new(false),

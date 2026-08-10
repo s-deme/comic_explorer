@@ -264,6 +264,146 @@ export async function listFolder(
   });
 }
 
+export type FileOperationKind =
+  | "rename"
+  | "createFolder"
+  | "copy"
+  | "move"
+  | "recycle"
+  | "delete"
+  | "cut"
+  | "clipboardCopy"
+  | "pasteCopy"
+  | "pasteMove"
+  | "reveal"
+  | "openDefault"
+  | "openWith";
+
+export interface FileOperationResult {
+  operation: FileOperationKind;
+  affected: number;
+}
+
+export interface FileClipboardStatus {
+  available: boolean;
+  cut: boolean;
+  items: number;
+}
+
+export async function renameFileItem(
+  itemRelativePath: string,
+  newName: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("rename_file_item", {
+    context: context(generation),
+    itemRelativePath,
+    newName,
+  });
+}
+
+export async function createFileFolder(
+  parentRelativePath: string,
+  name: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("create_file_folder", {
+    context: context(generation),
+    parentRelativePath,
+    name,
+  });
+}
+
+export async function copyFileItemsToFolder(
+  itemRelativePaths: string[],
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("copy_file_items_to_folder", {
+    context: context(generation),
+    itemRelativePaths,
+  });
+}
+
+export async function moveFileItemsToFolder(
+  itemRelativePaths: string[],
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("move_file_items_to_folder", {
+    context: context(generation),
+    itemRelativePaths,
+  });
+}
+
+export async function deleteFileItems(
+  itemRelativePaths: string[],
+  permanent: boolean,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("delete_file_items", {
+    context: context(generation),
+    itemRelativePaths,
+    permanent,
+  });
+}
+
+export async function setFileClipboard(
+  itemRelativePaths: string[],
+  cut: boolean,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("set_file_clipboard", {
+    context: context(generation),
+    itemRelativePaths,
+    cut,
+  });
+}
+
+export async function getFileClipboardStatus(
+  generation: number,
+): Promise<ApiResponse<FileClipboardStatus>> {
+  return invoke("file_clipboard_status", { context: context(generation) });
+}
+
+export async function pasteFileItems(
+  destinationRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("paste_file_items", {
+    context: context(generation),
+    destinationRelativePath,
+  });
+}
+
+export async function revealFileItem(
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("reveal_file_item", {
+    context: context(generation),
+    itemRelativePath,
+  });
+}
+
+export async function openFileItemDefault(
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("open_file_item_default", {
+    context: context(generation),
+    itemRelativePath,
+  });
+}
+
+export async function openFileItemWith(
+  itemRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("open_file_item_with", {
+    context: context(generation),
+    itemRelativePath,
+  });
+}
+
 export async function searchLibrary(
   query: string,
   generation: number,

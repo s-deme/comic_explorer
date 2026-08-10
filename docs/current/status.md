@@ -24,16 +24,16 @@ codd:
 
 ## 機能集計
 
-現行台帳はMVP 26件（REQ 20、NFR 6）とMVP後/将来71件の計97件である。
+現行台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来71件の計98件である。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 66 |
-| Implemented | BLOCKED | 8 |
+| Implemented | BLOCKED | 16 |
 | Partial | BLOCKED | 9 |
-| Candidate | NOT TESTED | 10 |
+| Candidate | NOT TESTED | 3 |
 | Rejected | NOT TESTED | 4 |
-| **合計** |  | **97** |
+| **合計** |  | **98** |
 
 ## MVP状態
 
@@ -43,6 +43,7 @@ codd:
 | REQ-MVP-008 | Implemented / BLOCKED | BMP/JPEG/GIF/TIFF/PNG/ICO/SVG/WebPの列挙、実decode、安全なviewer配信とWIC thumbnailはWindows testでPASS。release WebView2上のanimated GIF直接観測は未完了。 |
 | REQ-MVP-018 | Partial / BLOCKED | code上はlocal-onlyだが、隔離VM外部からのDNS/TCP/UDP監視が未実施。 |
 | REQ-MVP-020 | Implemented / BLOCKED | PDFの独立種別、Windows.Data.Pdfによるpage列挙・上限付きPNG render、thumbnail、favorite、巻末遷移、source/root/error境界はWindows Rust canonicalとfrontend testでPASS。release WebView2上のPDF viewer・thumbnail直接観測は未完了。 |
+| REQ-MVP-021 | Implemented / BLOCKED | rename、create、copy、move、完全delete、実CF_HDROP、root containmentと衝突境界はWindows Rust canonicalでPASSし、context menu接続はfrontend testでPASS。ごみ箱、folder picker、Explorer、アプリ選択をrelease製品で直接観測するgateは未完了。 |
 | NFR-MVP-001〜003 | Partial / BLOCKED | 規模・性能・UIA/screen reader/high contrast/DPIの製品実測待ち。 |
 | NFR-MVP-004 | Implemented / PASS | lock inventory、SBOM、notice、license auditの受入証跡あり。 |
 | NFR-MVP-005〜006 | Partial / BLOCKED | clean VM配布、Windows製品性能・環境matrixが未完了。 |
@@ -72,10 +73,11 @@ codd:
 | FR-B19 / P7 | settings・help | Implemented / PASS | — |
 | FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
 | FR-B21 | standalone PDF | Implemented / BLOCKED | Windows.Data.Pdfの実renderと上限・分類・root containmentはPASS。release WebView2のviewer・thumbnailは未測定。 |
+| FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、context menu・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorer、アプリ選択の製品直接観測は未測定。 |
 
 ## CandidateとRejected
 
-- Candidate / NOT TESTED（10件）: FUT-C-024〜029、FUT-C-052、FUT-C-053、FUT-R-006、FUT-R-007。
+- Candidate / NOT TESTED（3件）: FUT-C-052、FUT-R-006、FUT-R-007。
 - Rejected / NOT TESTED（4件）: FUT-R-001〜003、FUT-R-008。
 - Candidateを`Partial`へ、RejectedをCandidateへ変更するには、先に
   [requirements.md](requirements.md)の採用境界と恒久安全原則を変更する。
@@ -95,5 +97,6 @@ codd:
 - WebView2 custom protocolの実Origin/Referer header統合。
 - animated GIFのrelease WebView2直接観測とcorrupt fallback、AVIFの製品decode、PDF viewer・thumbnailの製品直接観測。
 - tray notification area、P5 visual/DPI、thumbnail file pickerと実disk I/Oの製品gate。
+- file managerのnative folder picker、ごみ箱、Explorer、アプリ選択、release WebView2 context menuの製品直接観測。
 
 これらが残るため、製品全体を「すべてのrelease gateがPASS」とは判定しない。

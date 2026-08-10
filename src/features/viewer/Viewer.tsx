@@ -53,6 +53,8 @@ interface ViewerProps {
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
+  initialFullscreen?: boolean;
+  slideshowIntervalMs?: number;
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
   mouseGestures?: MouseGestureBindings;
@@ -88,6 +90,8 @@ export function Viewer({
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
+  initialFullscreen = false,
+  slideshowIntervalMs,
   bookmarks = [],
   onPageChange,
   mouseGestures,
@@ -125,6 +129,7 @@ export function Viewer({
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const pointerDownX = useRef<number | null>(null);
   const layoutInitialized = useRef(false);
+  const initialFullscreenRequested = useRef(false);
   const positionTimerRef = useRef<number | null>(null);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
@@ -290,6 +295,18 @@ export function Viewer({
   }, [fullscreenAdapter]);
 
   useEffect(() => {
+    if (!initialFullscreen || initialFullscreenRequested.current) return;
+    initialFullscreenRequested.current = true;
+    void requestFullscreen(true);
+  }, [initialFullscreen]);
+
+  useEffect(() => {
+    if (slideshowIntervalMs === undefined || slideshowIntervalMs < 500) return;
+    const timer = window.setTimeout(next, slideshowIntervalMs);
+    return () => window.clearTimeout(timer);
+  }, [slideshowIntervalMs, state.index, state.mode, visible.length]);
+
+  useEffect(() => {
     if (!layoutInitialized.current) {
       layoutInitialized.current = true;
       return;
@@ -434,6 +451,7 @@ export function Viewer({
       aria-label={`${session.displayName} ビューワ`}
       data-layout-mode={layoutMode}
       data-fullscreen={fullscreen}
+      data-slideshow={slideshowIntervalMs !== undefined}
     >
       <header className="viewer-toolbar">
         <strong>{session.displayName}</strong>

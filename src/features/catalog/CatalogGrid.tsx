@@ -15,6 +15,10 @@ interface CatalogGridProps {
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
   isFavorite?: (entry: CatalogEntry) => boolean;
   onToggleFavorite?: (entry: CatalogEntry) => void;
+  onContextMenu?: (
+    entry: CatalogEntry | null,
+    position: { x: number; y: number },
+  ) => void;
 }
 
 export type ThumbnailViewState =
@@ -86,6 +90,7 @@ export function CatalogGrid({
   onThumbnailNeeded = () => undefined,
   isFavorite = () => false,
   onToggleFavorite = () => undefined,
+  onContextMenu = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -160,6 +165,11 @@ export function CatalogGrid({
       aria-rowcount={rows.length}
       data-catalog-view-mode={viewMode}
       data-entry-count={entries.length}
+      onContextMenu={(event) => {
+        if ((event.target as Element).closest("[data-relative-path]") !== null) return;
+        event.preventDefault();
+        onContextMenu(null, { x: event.clientX, y: event.clientY });
+      }}
     >
       {entries.length === 0 ? (
         <p className="empty-state">表示できる項目はありません。</p>
@@ -249,7 +259,18 @@ export function CatalogGrid({
                             ? onNavigate(entry)
                             : canRead && onRead(entry)
                         }
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onContextMenu(entry, { x: event.clientX, y: event.clientY });
+                        }}
                         onKeyDown={(event) => {
+                          if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                            event.preventDefault();
+                            const bounds = event.currentTarget.getBoundingClientRect();
+                            onContextMenu(entry, { x: bounds.left + 24, y: bounds.top + 24 });
+                            return;
+                          }
                           const offsets: Partial<Record<string, number>> = {
                             ArrowLeft: -1,
                             ArrowRight: 1,

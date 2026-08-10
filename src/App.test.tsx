@@ -41,6 +41,17 @@ import {
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
+  renameFileItem,
+  createFileFolder,
+  copyFileItemsToFolder,
+  moveFileItemsToFolder,
+  deleteFileItems,
+  setFileClipboard,
+  getFileClipboardStatus,
+  pasteFileItems,
+  revealFileItem,
+  openFileItemDefault,
+  openFileItemWith,
   type CatalogSettings,
   type FavoriteEntry,
   type ItemMetadata,
@@ -81,6 +92,17 @@ vi.mock("./features/library/client", () => ({
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
+  renameFileItem: vi.fn(),
+  createFileFolder: vi.fn(),
+  copyFileItemsToFolder: vi.fn(),
+  moveFileItemsToFolder: vi.fn(),
+  deleteFileItems: vi.fn(),
+  setFileClipboard: vi.fn(),
+  getFileClipboardStatus: vi.fn(),
+  pasteFileItems: vi.fn(),
+  revealFileItem: vi.fn(),
+  openFileItemDefault: vi.fn(),
+  openFileItemWith: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
@@ -112,6 +134,17 @@ const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
 const diagnoseMock = vi.mocked(diagnoseLibrary);
+const renameFileItemMock = vi.mocked(renameFileItem);
+const createFileFolderMock = vi.mocked(createFileFolder);
+const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
+const moveFileItemsToFolderMock = vi.mocked(moveFileItemsToFolder);
+const deleteFileItemsMock = vi.mocked(deleteFileItems);
+const setFileClipboardMock = vi.mocked(setFileClipboard);
+const getFileClipboardStatusMock = vi.mocked(getFileClipboardStatus);
+const pasteFileItemsMock = vi.mocked(pasteFileItems);
+const revealFileItemMock = vi.mocked(revealFileItem);
+const openFileItemDefaultMock = vi.mocked(openFileItemDefault);
+const openFileItemWithMock = vi.mocked(openFileItemWith);
 
 const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   sortField: "name",
@@ -160,6 +193,15 @@ function viewerResponse(itemKey: string) {
     requestId: `open-${itemKey}` as never,
     generation: 1 as never,
     data: testSession(itemKey),
+  };
+}
+
+function fileOperationResponse(operation: string, affected = 1) {
+  return {
+    status: "ok" as const,
+    requestId: `file-${operation}` as never,
+    generation: 1 as never,
+    data: { operation: operation as never, affected },
   };
 }
 
@@ -330,6 +372,33 @@ describe("application shell", () => {
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
     diagnoseMock.mockReset();
+    renameFileItemMock.mockReset();
+    createFileFolderMock.mockReset();
+    copyFileItemsToFolderMock.mockReset();
+    moveFileItemsToFolderMock.mockReset();
+    deleteFileItemsMock.mockReset();
+    setFileClipboardMock.mockReset();
+    getFileClipboardStatusMock.mockReset();
+    pasteFileItemsMock.mockReset();
+    revealFileItemMock.mockReset();
+    openFileItemDefaultMock.mockReset();
+    openFileItemWithMock.mockReset();
+    renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
+    createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
+    copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
+    moveFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("move"));
+    deleteFileItemsMock.mockResolvedValue(fileOperationResponse("recycle"));
+    setFileClipboardMock.mockResolvedValue(fileOperationResponse("clipboardCopy"));
+    pasteFileItemsMock.mockResolvedValue(fileOperationResponse("pasteCopy"));
+    revealFileItemMock.mockResolvedValue(fileOperationResponse("reveal"));
+    openFileItemDefaultMock.mockResolvedValue(fileOperationResponse("openDefault"));
+    openFileItemWithMock.mockResolvedValue(fileOperationResponse("openWith"));
+    getFileClipboardStatusMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-clipboard-status" as never,
+      generation: 1 as never,
+      data: { available: true, cut: false, items: 2 },
+    });
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
       requestId: "recovery" as never,
@@ -2195,6 +2264,50 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "third-party license noticeを開く" }));
     const notice = screen.getByRole("dialog", { name: "third-party license notice" });
     expect(notice.querySelector("pre")?.textContent.length).toBeGreaterThan(100);
+  });
+
+  it("FR-B22 connects context-menu rename and recycle operations to the backend", async () => {
+    const original = testEntry("books/old.cbz");
+    const renamed = testEntry("books/new.cbz");
+    await registerTestLibrary([original]);
+    const item = screen.getByRole("button", { name: /old\.cbz/ });
+
+    fireEvent.contextMenu(item, { clientX: 100, clientY: 80 });
+    const menu = await screen.findByRole("menu", { name: "項目の操作" });
+    await waitFor(() => expect(getFileClipboardStatusMock).toHaveBeenCalled());
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "名前の変更" }));
+
+    const renameDialog = screen.getByRole("dialog", { name: "名前の変更" });
+    fireEvent.change(within(renameDialog).getByLabelText("ファイル名"), {
+      target: { value: "new.cbz" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "list-renamed" as never,
+      generation: 2 as never,
+      data: [renamed],
+    });
+    fireEvent.click(within(renameDialog).getByRole("button", { name: "実行" }));
+    await waitFor(() => expect(renameFileItemMock).toHaveBeenCalledWith(
+      "books/old.cbz",
+      "new.cbz",
+      expect.any(Number),
+    ));
+    expect(await screen.findByRole("button", { name: /new\.cbz/ })).toBeInTheDocument();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /new\.cbz/ }), {
+      clientX: 100,
+      clientY: 80,
+    });
+    fireEvent.click(within(screen.getByRole("menu", { name: "項目の操作" }))
+      .getByRole("menuitem", { name: /削除.*Del/ }));
+    const deleteDialog = screen.getByRole("alertdialog", { name: "ごみ箱へ移動" });
+    fireEvent.click(within(deleteDialog).getByRole("button", { name: "ごみ箱へ移動" }));
+    await waitFor(() => expect(deleteFileItemsMock).toHaveBeenCalledWith(
+      ["books/new.cbz"],
+      false,
+      expect.any(Number),
+    ));
   });
 
 });

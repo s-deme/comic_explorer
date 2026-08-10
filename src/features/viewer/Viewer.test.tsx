@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveReadingPosition } from "../library/client";
 import { Viewer } from "./Viewer";
@@ -398,6 +398,38 @@ describe("Viewer settings", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  it("starts context-menu fullscreen and advances slideshow pages", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={multiPageSession}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialFullscreen
+          slideshowIntervalMs={600}
+          fullscreenAdapter={adapter}
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      await act(async () => Promise.resolve());
+      expect(adapter.enter).toHaveBeenCalledTimes(1);
+      expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow", "true");
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTime(600));
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("FT-B15-001 resolves stale bookmark ordinals by pageKey and opens them from the list", async () => {

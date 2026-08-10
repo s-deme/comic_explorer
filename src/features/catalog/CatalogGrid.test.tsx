@@ -111,6 +111,33 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("opens the item context menu from right click and Shift+F10", () => {
+    const onContextMenu = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onContextMenu={onContextMenu}
+      />,
+    );
+    const item = screen.getByRole("button", { name: /book-0/ });
+    fireEvent.contextMenu(item, { clientX: 120, clientY: 80 });
+    expect(onContextMenu).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ relativePath: "book-0" }),
+      { x: 120, y: 80 },
+    );
+
+    fireEvent.keyDown(item, { key: "F10", shiftKey: true });
+    expect(onContextMenu).toHaveBeenCalledTimes(2);
+    expect(onContextMenu.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ relativePath: "book-0" }),
+    );
+  });
+
   it("opens supported kinds from the card without duplicate read buttons", () => {
     const folder: CatalogEntry = {
       relativePath: "library" as never,

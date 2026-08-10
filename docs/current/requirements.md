@@ -26,13 +26,13 @@ ICO、SVG、静止WebP、PDF、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを実装済み範
 Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFには実装済みの安全な
 分類・拒否境界があるが、製品decodeの受入は未完了である。
 
-対象外は、クラウド同期、外部書誌取得、telemetry、外部データ送信、library原本への自動変更、
-OS全体を操作するfile managerである。rename、move、copy、create、delete、OS clipboard file操作は
-採用未決定の候補であり、現行契約には含めない。
+対象外は、クラウド同期、外部書誌取得、telemetry、外部データ送信、library原本への自動変更である。
+明示的な利用者操作に限り、catalog context menuからOS全体を対象とするfile manager操作を提供する。
 
 ## 恒久安全原則
 
-- すべての閲覧経路はlibrary原本、書庫、mtime、sidecarを変更しない（REQ-MVP-017）。
+- すべての閲覧経路はlibrary原本、書庫、mtime、sidecarを変更しない。原本変更はfile managerの
+  明示操作と確認を経た対象だけに限定する（REQ-MVP-017、REQ-MVP-021）。
 - DB、設定、cache、temp、recovery、logはlibrary root外のapp-local領域だけへ保存する。
 - 漫画データ、path、読書情報、利用状況を外部送信せず、通常利用はofflineで完結する（REQ-MVP-018）。
 - UIへ絶対path、任意SQL、任意archive entry accessを公開せず、backendでroot境界とpathを検証する。
@@ -58,10 +58,11 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-014 | keyboard、click、wheel、Escで閲覧でき、viewer toolbarの操作を説明付きicon buttonで提供し、viewer generationの古い結果を捨てる。 |
 | REQ-MVP-015 | page keyを基準に読書位置をapp-local SQLiteへ保存・復元し、破損DBから安全に回復する。 |
 | REQ-MVP-016 | 巻末では現在のcatalog sort順に従って次の漫画へ進む。 |
-| REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。 |
+| REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。REQ-MVP-021の明示的file manager操作だけを例外とし、暗黙のrename、move、copy、create、deleteを行わない。 |
 | REQ-MVP-018 | 外部通信、telemetry、crash upload、書誌取得、cloud同期を行わない。 |
 | REQ-MVP-019 | 項目単位のaccess、missing、corrupt、unsupported errorから別操作へ復帰できる。 |
 | REQ-MVP-020 | standalone PDF（`.pdf`）をcatalogの独立したPDF種別から1冊として開き、Windows標準PDF APIで各pageを上限付き画像へ変換して既存viewerの単page・見開き・読書位置・thumbnail・favorite・巻末遷移へ接続する。PDF本体は1 GiB、page数は10,000、renderは最大辺16,384 pxかつ120,000,000 pixelsを上限とし、library root外へ展開・変換保存しない。非対応の暗号化PDF、破損PDF、空PDF、root外symlinkは分類した局所errorとする。 |
+| REQ-MVP-021 | catalog context menuからrename、任意folderへのmove/copy、folder作成、ごみ箱delete、確認付き完全delete、Explorer表示、Windowsのアプリ選択、OS clipboardのCF_HDROPによるcut/copy/pasteを行う。相対sourceはcanonical library root内に限定し、folder pickerとOS clipboardで利用者が明示した外部pathだけを入出力に許可する。同名衝突、root外symlink、source自身または子孫へのmove/copy、不正名、欠落、access拒否、途中失敗を分類して通知し、成功後はcatalogを再列挙する。 |
 
 ## MVP非機能要件
 
@@ -91,6 +92,7 @@ Git履歴から参照する。
 | FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
 | FR-B10 tag | REQ-FR-B10-001, REQ-FR-B10-002, REQ-FR-B10-003, REQ-FR-B10-004 | FUT-C-022 | normalized tagのassign/remove/query/rename/merge、invalid拒否、migration、再起動保存を保証する。 |
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | keyboard commandのremap、conflict拒否、reset、focus fallback、再起動保存を保証する。編集入口は統合設定だけに置き、helpは現在の割り当て表示だけを行う。touch/gamepadは候補のまま。 |
+| FR-B22 file manager | REQ-MVP-021, REQ-FR-B22-001, REQ-FR-B22-002, REQ-FR-B22-003, REQ-FR-B22-004 | FUT-C-024〜029, FUT-C-053 | 右click/keyboard context menu、Windows shell連携、選択項目のrename/move/copy/delete、現在folderへのcreate/paste、安全境界、成功後refreshを一貫して扱う。通常deleteはごみ箱、完全deleteは対象名を示す確認後だけ実行する。 |
 
 ## 採用済みP1〜P10
 
@@ -113,12 +115,13 @@ Git履歴から参照する。
 - E2E-MVP-002: ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
+- E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、選択した対象だけが変更され、成功後のcatalogへ結果が反映される。
 
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |
 |---|---|---|
-| Candidate | FUT-C-024, FUT-C-025, FUT-C-026, FUT-C-027, FUT-C-028, FUT-C-029, FUT-C-052, FUT-C-053 | rename、move、copy、folder作成、trash、完全削除、undo、OS clipboard file操作。採用時はREQ-MVP-017を先に改定する。 |
+| Candidate | FUT-C-052 | file operation undo。OS shellのundo履歴をapplication状態として保証できるまで未採用。 |
 | Candidate | FUT-R-006, FUT-R-007 | touch、gamepad。実機契約と直接観測ができるまで未採用。 |
 | Rejected | FUT-R-001, FUT-R-002, FUT-R-003, FUT-R-008 | cloud同期、外部書誌、外部送信、閲覧時の原本自動変更。恒久安全原則を変更しない限り採用しない。 |
 | Partial | FUT-C-006, FUT-C-007, FUT-C-008 | AVIFはunsupported/parser境界だけ実装済み。完全decodeを推定しない。 |
