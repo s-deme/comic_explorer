@@ -1036,7 +1036,9 @@ describe("application shell", () => {
 
     expect(policy).toHaveValue("loop");
     expect(saveEndPolicyMock).toHaveBeenCalledWith("loop", expect.any(Number));
-    expect(screen.getByLabelText("並べ替え条件"))
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+
+    expect(await screen.findByLabelText("並べ替え条件"))
       .toHaveAttribute("data-sort-field", "name");
   });
 
