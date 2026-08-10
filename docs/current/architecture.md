@@ -104,8 +104,9 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 
 ## 画面状態と主要操作
 
-library shellは5分類menu、toolbar、address、folder pane、catalog、status barから成る。catalogは
-cover/small/detail/reference tile、sort、search/mask、selection、loading/empty/errorを区別する。
+library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成る。
+toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
+cover/small/detail/reference tile、sort、search result、selection、loading/empty/errorを区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutはdialogまたはmenuから開く。
 

@@ -292,6 +292,11 @@ function chooseToolbarMenuItem(
   fireEvent.click(within(menu).getByRole("menuitemradio", { name: itemName }));
 }
 
+function openSearchPane() {
+  fireEvent.click(screen.getByRole("button", { name: "検索ペインを表示" }));
+  return screen.getByRole("complementary", { name: "検索ペイン" });
+}
+
 describe("application shell", () => {
   afterEach(cleanup);
 
@@ -794,14 +799,24 @@ describe("application shell", () => {
     expect(within(addressForm).queryByRole("button", { name: "タスクトレイへ収納" }))
       .not.toBeInTheDocument();
 
-    const search = screen.getByRole("button", { name: "検索" });
+    expect(screen.queryByLabelText("名前検索")).not.toBeInTheDocument();
+    const searchToggle = screen.getByRole("button", { name: "検索ペインを表示" });
+    expect(searchToggle).toHaveTextContent("⌕");
+    expect(searchToggle).toHaveAttribute("title", "検索とフィルタを表示");
+    const searchPane = openSearchPane();
+    const search = within(searchPane).getByRole("button", { name: "検索" });
     expect(search).toHaveTextContent("⌕");
     expect(search).not.toHaveTextContent("検索");
     expect(search).toHaveAttribute("title", "名前で検索");
-    const showAll = screen.getByRole("button", { name: "全件" });
+    const showAll = within(searchPane).getByRole("button", { name: "全件" });
     expect(showAll).toHaveTextContent("✕");
     expect(showAll).not.toHaveTextContent("全件");
     expect(showAll).toHaveAttribute("title", "ファイルマスクを解除して全件表示");
+    expect(screen.queryByRole("complementary", { name: "フォルダツリー" }))
+      .not.toBeInTheDocument();
+    fireEvent.click(within(searchPane).getByRole("button", { name: "検索ペインを閉じる" }));
+    expect(screen.getByRole("complementary", { name: "フォルダツリー" }))
+      .toBeInTheDocument();
 
     const viewMenu = openAppMenu("表示");
     expect(within(viewMenu).getByRole("menuitem", { name: "UIを表示" }))
@@ -1528,6 +1543,7 @@ describe("application shell", () => {
     ];
     searchMock.mockResolvedValueOnce(searchResponse(results));
     await registerTestLibrary([testEntry("root.cbz")]);
+    openSearchPane();
 
     const input = await screen.findByLabelText("名前検索");
     fireEvent.change(input, { target: { value: "  ＶＯＬＵＭＥ  " } });
@@ -1540,6 +1556,25 @@ describe("application shell", () => {
     expect(searchMock).toHaveBeenCalledWith("  ＶＯＬＵＭＥ  ", expect.any(Number));
   });
 
+  it("filters the catalog from the search side pane and restores all items", async () => {
+    await registerTestLibrary([
+      testEntry("book.cbz"),
+      { relativePath: "cover.jpg" as never, kind: "page" },
+    ]);
+    const pane = openSearchPane();
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
+
+    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+      target: { value: "*.cbz" },
+    });
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+    expect(screen.getByRole("button", { name: /book\.cbz/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cover\.jpg/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(pane).getByRole("button", { name: "全件" }));
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
+  });
+
   it("FT-B05-002 keeps mixed file and folder result kinds visible", async () => {
     const results: CatalogEntry[] = [
       { relativePath: "Series" as never, kind: "folder" },
@@ -1548,6 +1583,7 @@ describe("application shell", () => {
     ];
     searchMock.mockResolvedValueOnce(searchResponse(results));
     await registerTestLibrary([testEntry("root.cbz")]);
+    openSearchPane();
 
     fireEvent.change(await screen.findByLabelText("名前検索"), {
       target: { value: "series" },
@@ -1571,6 +1607,7 @@ describe("application shell", () => {
     };
     searchMock.mockResolvedValueOnce(searchResponse([result]));
     await registerTestLibrary([testEntry("root.cbz")]);
+    openSearchPane();
     listMock.mockResolvedValueOnce({
       status: "ok",
       requestId: "parent-list" as never,
@@ -1617,6 +1654,7 @@ describe("application shell", () => {
           }),
       );
     await registerTestLibrary([testEntry("root.cbz")]);
+    openSearchPane();
 
     const input = await screen.findByLabelText("名前検索");
     fireEvent.change(input, { target: { value: "missing" } });
@@ -1637,7 +1675,7 @@ describe("application shell", () => {
     fireEvent.change(input, { target: { value: "stale" } });
     fireEvent.click(screen.getByRole("button", { name: "検索" }));
     await waitFor(() => expect(searchMock).toHaveBeenCalledTimes(3));
-    fireEvent.click(screen.getByRole("button", { name: "クリア" }));
+    fireEvent.click(screen.getByRole("button", { name: "検索結果をクリア" }));
     expect(input).toHaveValue("");
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" })).toBeInTheDocument();
     expect(resolveStaleSearch).toBeDefined();
@@ -1663,6 +1701,7 @@ describe("application shell", () => {
       .mockResolvedValueOnce(searchResponse([oldResult]))
       .mockResolvedValueOnce(searchResponse([newResult]));
     await registerTestLibrary([testEntry("root.cbz")]);
+    openSearchPane();
 
     const input = await screen.findByLabelText("名前検索");
     fireEvent.change(input, { target: { value: "volume" } });

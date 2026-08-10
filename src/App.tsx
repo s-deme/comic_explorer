@@ -241,6 +241,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const diagnosticGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const menuBarRef = useRef<HTMLElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const menuTriggerRefs = useRef<Record<MenuId, HTMLButtonElement | null>>({
@@ -348,6 +349,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchPaneOpen, setSearchPaneOpen] = useState(false);
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
@@ -510,6 +512,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     });
     return () => cancelAnimationFrame(frame);
   }, [activeToolbarMenu]);
+
+  useEffect(() => {
+    if (!searchPaneOpen) return;
+    const frame = requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [searchPaneOpen]);
 
   useEffect(() => {
     function handleMnemonic(event: KeyboardEvent) {
@@ -1795,6 +1803,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     (entry) => entry.relativePath === selectedPath,
   );
   const up = parentPath(navigation.current);
+  const sidePaneVisible = treeVisible || searchPaneOpen;
   const selectedThumbnailDataUrl = selectedPath === null
     ? undefined
     : selected?.kind === "archive" || selected?.kind === "comicFolder"
@@ -3038,6 +3047,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           ↑
         </button>
         <div className="icon-command-toolbar" aria-label="コマンドツールバー">
+          <button
+            type="button"
+            aria-label={searchPaneOpen ? "検索ペインを閉じる" : "検索ペインを表示"}
+            title={searchPaneOpen ? "検索ペインを閉じる" : "検索とフィルタを表示"}
+            aria-pressed={searchPaneOpen}
+            data-product-id="toolbar-search"
+            onClick={() => {
+              setActiveToolbarMenu(null);
+              setSearchPaneOpen((current) => !current);
+            }}
+          >
+            <span aria-hidden="true">⌕</span>
+          </button>
           <button type="button" aria-label="現在場所を更新" title="現在のフォルダを再読み込み" data-product-id="toolbar-refresh" onClick={refreshCatalog}>⟳</button>
           <button type="button" aria-label="選択パスをコピー" title="選択した項目のパスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}>⧉</button>
           <button type="button" aria-label="選択項目のプロパティ" title="選択した項目のプロパティを表示" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}>ⓘ</button>
@@ -3324,63 +3346,93 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           <span aria-hidden="true">➜</span>
         </button>
       </form>
-      <form className="search-bar" aria-label="名前検索フォーム" onSubmit={submitSearch}>
-        <label htmlFor="catalog-search">名前検索</label>
-        <input
-          id="catalog-search"
-          aria-label="名前検索"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="ファイル名・フォルダ名"
-        />
-        <button type="submit" aria-label="検索" title="名前で検索">
-          <span aria-hidden="true">⌕</span>
-        </button>
-        {searchState.status !== "idle" && (
-          <button type="button" title="検索結果をクリア" onClick={clearSearch}>
-            クリア
-          </button>
-        )}
-      </form>
-      <form
-        className="filter-bar"
-        aria-label="ファイルマスクフォーム"
-        onSubmit={(event) => event.preventDefault()}
-      >
-        <label htmlFor="file-mask">ファイルマスク</label>
-        <input
-          id="file-mask"
-          aria-label="ファイルマスク"
-          value={fileMask}
-          onChange={(event) => setFileMask(event.target.value)}
-          placeholder="*.jpg;*.cbz"
-        />
-        <button
-          type="button"
-          aria-label="全件"
-          title="ファイルマスクを解除して全件表示"
-          onClick={() => setFileMask("")}
-        >
-          <span aria-hidden="true">✕</span>
-        </button>
-      </form>
       <div
         className="workspace"
         style={{
-          gridTemplateColumns: workspaceGridColumns(treeVisible, treeWidth),
+          gridTemplateColumns: workspaceGridColumns(sidePaneVisible, treeWidth),
         }}
       >
-        {treeVisible && (
+        {sidePaneVisible && (
           <>
-            <FolderTree
-              libraryRoot={libraryRoot}
-              currentPath={navigation.current}
-              onNavigate={(path) => navigate(path)}
-            />
+            {searchPaneOpen ? (
+              <aside className="search-pane" aria-label="検索ペイン">
+                <header className="search-pane-heading">
+                  <h2>検索</h2>
+                  <button
+                    type="button"
+                    aria-label="検索ペインを閉じる"
+                    title="検索ペインを閉じる"
+                    onClick={() => setSearchPaneOpen(false)}
+                  >
+                    <span aria-hidden="true">✕</span>
+                  </button>
+                </header>
+                <form
+                  className="search-pane-form"
+                  aria-label="名前検索フォーム"
+                  onSubmit={submitSearch}
+                >
+                  <label htmlFor="catalog-search">ファイル名・フォルダ名</label>
+                  <input
+                    ref={searchInputRef}
+                    id="catalog-search"
+                    aria-label="名前検索"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="検索する名前"
+                  />
+                  <div className="search-pane-actions">
+                    <button type="submit" aria-label="検索" title="名前で検索">
+                      <span aria-hidden="true">⌕</span>
+                    </button>
+                    {searchState.status !== "idle" && (
+                      <button
+                        type="button"
+                        aria-label="検索結果をクリア"
+                        title="検索結果をクリア"
+                        onClick={clearSearch}
+                      >
+                        <span aria-hidden="true">✕</span>
+                      </button>
+                    )}
+                  </div>
+                </form>
+                <form
+                  className="search-pane-form"
+                  aria-label="ファイルマスクフォーム"
+                  onSubmit={(event) => event.preventDefault()}
+                >
+                  <label htmlFor="file-mask">ファイルマスク</label>
+                  <input
+                    id="file-mask"
+                    aria-label="ファイルマスク"
+                    value={fileMask}
+                    onChange={(event) => setFileMask(event.target.value)}
+                    placeholder="*.jpg;*.cbz"
+                  />
+                  <div className="search-pane-actions">
+                    <button
+                      type="button"
+                      aria-label="全件"
+                      title="ファイルマスクを解除して全件表示"
+                      onClick={() => setFileMask("")}
+                    >
+                      <span aria-hidden="true">✕</span>
+                    </button>
+                  </div>
+                </form>
+              </aside>
+            ) : (
+              <FolderTree
+                libraryRoot={libraryRoot}
+                currentPath={navigation.current}
+                onNavigate={(path) => navigate(path)}
+              />
+            )}
             <div
               className="tree-splitter"
               role="separator"
-              aria-label="フォルダツリーの幅"
+              aria-label={searchPaneOpen ? "検索ペインの幅" : "フォルダツリーの幅"}
               aria-orientation="vertical"
               aria-valuemin={180}
               aria-valuenow={treeWidth}

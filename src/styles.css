@@ -45,7 +45,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: 28px 42px 32px 40px 40px minmax(0, 1fr) 28px;
+  grid-template-rows: 28px 42px 32px minmax(0, 1fr) 28px;
   height: 100vh;
   background: #fff;
 }
@@ -63,7 +63,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .app-shell[data-toolbar-visible="false"] {
   overflow: hidden;
 }
-.menu-bar, .toolbar, .address-bar, .search-bar, .filter-bar, .status-bar {
+.menu-bar, .toolbar, .address-bar, .status-bar {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -197,16 +197,61 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .address-bar button { padding: 1px 7px; }
 .address-bar button[type="submit"],
-.search-bar button[type="submit"],
-.filter-bar button {
+.search-pane-actions button {
   min-width: 30px;
 }
 .address-bar label { font-size: .75rem; }
-.search-bar label, .filter-bar label { font-size: .82rem; }
-.address-bar input, .search-bar input, .filter-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
+.address-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
 .address-bar input { padding-block: 2px; }
 
 .workspace { display: grid; min-height: 0; }
+.search-pane {
+  min-width: 0;
+  overflow: auto;
+  color: #1f2328;
+  background: #f7f8fa;
+}
+.search-pane-heading {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-bottom: 1px solid #c9cdd2;
+  background: #eef1f4;
+}
+.search-pane-heading h2 {
+  margin: 0;
+  font-size: .9rem;
+}
+.search-pane-heading button,
+.search-pane-actions button {
+  min-height: 26px;
+  padding: 1px 6px;
+}
+.search-pane-form {
+  display: grid;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #d7dce2;
+}
+.search-pane-form label {
+  font-size: .78rem;
+  font-weight: 600;
+}
+.search-pane-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 6px;
+}
+.search-pane-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
 .viewer-shell--detached {
   position: fixed;
   z-index: 20;

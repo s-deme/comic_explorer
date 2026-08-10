@@ -83,7 +83,7 @@ Git履歴から参照する。
 | FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037 | 共通scale model、25%〜400%、fit幅/高さ/全体、原寸、状態維持、pointerルーペ、再起動復元。 |
 | FR-B02 巻末動作 | REQ-FR-B02-001, REQ-FR-B02-002, REQ-FR-B02-003 | FUT-C-020, FUT-C-038, FUT-C-039, FUT-C-040, FUT-C-041 | `auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を安全に適用し、sortと設定を維持する。 |
 | FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `small_thumbnail`、`detail_list`、`cover_list`の操作・focus・永続化を共通modelで扱う。 |
-| FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | 正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。 |
+| FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。 |
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
 | FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
@@ -97,7 +97,7 @@ Git履歴から参照する。
 | P1 / FR-B13 | FUT-C-049, FUT-C-054, FUT-C-055, FUT-C-057, FUT-C-068 | refresh、複数・種別選択、相対path copy、property、現在位置status。 |
 | P2 / FR-B14 | FUT-C-042, FUT-C-044, FUT-C-051, FUT-C-056 | root内open、成功openのrecent、履歴jump、明示終了。 |
 | P3 / FR-B15 | FUT-C-045, FUT-C-046, FUT-C-047 | page-key bookmark、next/wrap、favoriteと別のapp-local bookshelf。 |
-| P4 / FR-B16 | FUT-C-050, FUT-C-058 | basename maskと、absolute pathを含まずformulaを無害化するCSV出力。 |
+| P4 / FR-B16 | FUT-C-050, FUT-C-058 | 検索side paneのbasename maskと、absolute pathを含まずformulaを無害化するCSV出力。 |
 | P5 / FR-B17 | FUT-C-065, FUT-C-066, FUT-C-067 | 5分類menu、accessible icon toolbar、永続化する`reference_tile`。 |
 | P6 / FR-B18 | FUT-C-060, FUT-C-061, FUT-C-062, FUT-C-063 | pane/bar可逆表示、viewer分離、native tray hide/showと終了の分離。 |
 | P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、gesture、offline help、version/runtime/license表示。 |
