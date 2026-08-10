@@ -1,0 +1,36 @@
+import re
+import unittest
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+STYLES = (PROJECT_ROOT / "src" / "styles.css").read_text(encoding="utf-8")
+
+
+class UiStyleContractTests(unittest.TestCase):
+    def assert_rule_contains(self, selector: str, declaration: str) -> None:
+        rule = re.search(
+            rf"{re.escape(selector)}\s*\{{(?P<body>[^}}]*)\}}",
+            STYLES,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(rule, f"missing CSS rule for {selector}")
+        self.assertIn(declaration, rule.group("body"))
+
+    def test_menu_and_address_controls_are_compact(self) -> None:
+        self.assert_rule_contains(".menu-bar", "font-size: .78rem")
+        self.assert_rule_contains(
+            ".menu-bar .menu-trigger", "min-height: 22px"
+        )
+        self.assert_rule_contains(".address-bar", "font-size: .78rem")
+        self.assert_rule_contains(
+            ".address-bar button,\n.address-bar input", "min-height: 24px"
+        )
+
+    def test_tree_labels_have_an_explicit_dark_foreground(self) -> None:
+        self.assert_rule_contains(".folder-tree", "color: #1f2328")
+        self.assert_rule_contains(".tree-node", "color: #1f2328")
+
+
+if __name__ == "__main__":
+    unittest.main()

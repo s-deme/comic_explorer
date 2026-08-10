@@ -44,7 +44,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: 34px 42px 40px 40px 40px minmax(0, 1fr) 28px;
+  grid-template-rows: 28px 42px 32px 40px 40px minmax(0, 1fr) 28px;
   height: 100vh;
   background: #fff;
 }
@@ -74,6 +74,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   position: relative;
   z-index: 6;
   overflow: visible;
+  gap: 2px;
+  padding-block: 2px;
+  font-size: .78rem;
 }
 .menu-group {
   position: relative;
@@ -82,8 +85,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-items: center;
 }
 .menu-bar .menu-trigger {
-  min-height: 28px;
-  padding: 2px 8px;
+  min-height: 22px;
+  padding: 1px 6px;
   color: #1f2328;
   border: 0;
   background: transparent;
@@ -158,8 +161,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: .78rem;
 }
 .toolbar label { display: flex; align-items: center; gap: 5px; margin-left: auto; }
-.address-bar label, .search-bar label, .filter-bar label { font-size: .82rem; }
+.address-bar {
+  gap: 5px;
+  padding-block: 3px;
+  font-size: .78rem;
+}
+.address-bar button,
+.address-bar input {
+  min-height: 24px;
+}
+.address-bar button { padding: 1px 7px; }
+.address-bar label { font-size: .75rem; }
+.search-bar label, .filter-bar label { font-size: .82rem; }
 .address-bar input, .search-bar input, .filter-bar input { flex: 1; min-width: 0; padding: 4px 8px; }
+.address-bar input { padding-block: 2px; }
 
 .workspace { display: grid; min-height: 0; }
 .viewer-shell--detached {
@@ -175,6 +190,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .folder-tree {
   position: relative;
   overflow: auto;
+  color: #1f2328;
   background: #f7f8fa;
 }
 .tree-splitter {
@@ -196,6 +212,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 26px;
   flex: 0 0 26px;
   padding: 0;
+  color: #46515d;
   border: 0;
   background: transparent;
 }
@@ -205,6 +222,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   flex: 1;
   padding: 5px 8px;
   overflow: hidden;
+  color: #1f2328;
   border: 0;
   background: transparent;
   text-align: left;

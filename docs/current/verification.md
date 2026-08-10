@@ -32,7 +32,7 @@ codd:
 | Rust canonical | PASS（既存実装） | 最新の統合前記録ではlib 115件 + shutdown process 1件、FAIL 0。文書統合ではRust source未変更・再実行なし。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | TypeScript/frontend | PASS | 2026-08-10、21 files / 179 tests PASS、FAIL 0。TypeScript typecheckもexit 0。 |
-| Python | PASS | 2026-08-10、33 tests PASS、FAIL 0。現行status/verification間の5値consistencyもPASS。 |
+| Python | PASS | 2026-08-10、35 tests PASS、FAIL 0。menu/addressのcompact寸法とtree文字色のstyle contract 2件、現行status/verification間の5値consistencyもPASS。 |
 | frontend build/SBOM | PASS / SBOMは既存証跡 | Windows buildはtypecheck後に61 modulesをbuild、exit 0。SBOMは2026-08-09 accepted laneでunknown/prohibited license 0、本変更では再生成なし。 |
 | release executable | PARTIAL | static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |
@@ -106,7 +106,7 @@ check時間は同一環境の単回実測で18.73秒（約61%）短縮した。�
 
 最終Windows-native `verify`はexit 0、38.44秒。DAGは3 PASS / red FAIL 0 / amber WARN 1 /
 SKIP 3 / VACUOUS 1、CoDD verification-node集計は0件である。一方、設定されたproject test commandは
-Python 33件とfrontend 179件を実行して全件PASSし、typecheckを実行、source integrity 13 filesを確認した。
+Python 35件とfrontend 179件を実行して全件PASSし、typecheckを実行、source integrity 13 filesを確認した。
 SKIP、VACUOUS、0件のverification-node集計を機能PASSへ読み替えない。
 
 `scan`出力は`Frontmatter: 4 documents in docs\current`であり、他の資料をCoDD対象に含めない。
