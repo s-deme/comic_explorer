@@ -44,6 +44,17 @@ class UiStyleContractTests(unittest.TestCase):
             "grid-template-columns: minmax(0, 1fr) auto",
         )
 
+    def test_dialogs_share_a_readable_visual_system(self) -> None:
+        self.assert_rule_contains(
+            '.dialog-backdrop > [role="dialog"]', "border-radius: 12px"
+        )
+        self.assert_rule_contains(
+            '.dialog-backdrop > [role="dialog"]', "max-height: calc(100vh - 32px)"
+        )
+        self.assert_rule_contains(".settings-section", "border: 1px solid #dce3ec")
+        self.assert_rule_contains(".settings-actions", "position: sticky")
+        self.assert_rule_contains(".settings-grid", "grid-template-columns: repeat(2, minmax(0, 1fr))")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -517,33 +517,156 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   z-index: 10;
   inset: 0;
   display: grid;
+  overflow: hidden;
+  padding: 16px;
   place-items: center;
-  background: #0006;
+  background: #11182799;
+  backdrop-filter: blur(3px);
 }
-.help-dialog { width: 440px; padding: 24px; border-radius: 6px; background: white; box-shadow: 0 12px 40px #0005; }
-.settings-dialog,
-.license-dialog,
-.bookmark-dialog,
-.diagnostic-panel,
-.properties-dialog {
-  width: min(760px, calc(100vw - 48px));
-  max-height: min(720px, calc(100vh - 48px));
+.dialog-backdrop > [role="dialog"] {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   overflow: auto;
-  padding: 24px;
+  padding: 26px 28px;
+  border: 1px solid #d7dee8;
+  border-radius: 12px;
+  color: #172033;
+  background: #fbfcfe;
+  box-shadow: 0 24px 70px #0f172a59, 0 2px 8px #0f172a24;
+  scrollbar-color: #9aa8ba transparent;
+  scrollbar-width: thin;
+}
+.dialog-backdrop > [role="dialog"] > h2,
+.dialog-heading h2 {
+  margin: 0;
+  color: #152238;
+  font-size: 1.35rem;
+  line-height: 1.3;
+  letter-spacing: .01em;
+}
+.dialog-backdrop > [role="dialog"] h3 {
+  margin: 0 0 12px;
+  color: #24344d;
+  font-size: 1rem;
+}
+.dialog-backdrop > [role="dialog"] p { line-height: 1.65; }
+.dialog-backdrop button,
+.dialog-backdrop .file-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border: 1px solid #aeb9c8;
   border-radius: 6px;
-  color: #1f2328;
-  background: white;
-  box-shadow: 0 12px 40px #0005;
+  color: #25344b;
+  background: #f4f6f9;
+  cursor: default;
+}
+.dialog-backdrop button:hover:not(:disabled),
+.dialog-backdrop .file-button:hover { border-color: #7e91aa; background: #e9eef5; }
+.dialog-backdrop button:disabled { opacity: .55; }
+.dialog-backdrop input:not([type="checkbox"]):not([type="file"]),
+.dialog-backdrop select {
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid #aeb9c8;
+  border-radius: 5px;
+  color: #182235;
+  background: #fff;
+  color-scheme: light;
+}
+.dialog-backdrop input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #1769c2;
+}
+.dialog-heading {
+  margin: -2px 0 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dce3ec;
+}
+.dialog-kicker {
+  margin: 0 0 5px;
+  color: #1769c2;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+.dialog-description,
+.settings-section-description { margin: 8px 0 0; color: #5a687c; }
+.dialog-backdrop > .settings-dialog {
+  width: min(940px, calc(100vw - 32px));
+  padding-bottom: 0;
+}
+.settings-section {
+  margin: 0 0 18px;
+  padding: 18px;
+  border: 1px solid #dce3ec;
+  border-radius: 9px;
+  background: #fff;
 }
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 18px;
+  gap: 2px 22px;
 }
-.settings-grid label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.settings-dialog section { margin-top: 18px; }
-.settings-dialog [data-shortcut-command] { display: grid; grid-template-columns: 140px 150px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 6px 0; }
-.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.settings-grid label,
+.settings-gesture-grid label {
+  display: grid;
+  min-width: 0;
+  min-height: 44px;
+  grid-template-columns: minmax(112px, .75fr) minmax(140px, 1.25fr);
+  align-items: center;
+  gap: 12px;
+  padding: 5px 2px;
+  border-bottom: 1px solid #edf0f4;
+}
+.settings-grid label:has(input[type="checkbox"]) { grid-template-columns: 1fr auto; }
+.settings-grid select,
+.settings-grid input[type="number"],
+.settings-gesture-grid select { width: 100%; }
+.settings-dialog [data-shortcut-command] {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(116px, .65fr) minmax(130px, .7fr) minmax(220px, 1.5fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #edf0f4;
+}
+.settings-dialog [data-shortcut-command] > span {
+  color: #667489;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.settings-gesture-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 22px; }
+.settings-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px -28px 0;
+  padding: 14px 28px 16px;
+  border-top: 1px solid #d7dee8;
+  background: #fbfcfef5;
+  backdrop-filter: blur(8px);
+}
+.settings-actions [data-product-id="shortcut-apply"] {
+  margin-left: auto;
+  border-color: #0e5fad;
+  color: #fff;
+  background: #1769c2;
+}
+.settings-actions [data-product-id="shortcut-apply"]:hover:not(:disabled) {
+  border-color: #094b8c;
+  background: #105da9;
+}
+.file-button { position: relative; overflow: hidden; }
+.file-button input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .license-dialog pre {
   max-height: 60vh;
   overflow: auto;
@@ -555,17 +678,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .bookmark-dialog ul { display: grid; gap: 6px; padding-left: 22px; }
 .bookmark-dialog li button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
-.end-of-volume-dialog { width: min(440px, calc(100vw - 48px)); padding: 24px; border-radius: 6px; color: #1f2328; background: white; box-shadow: 0 12px 40px #0005; }
+.dialog-backdrop > .help-dialog,
+.dialog-backdrop > .end-of-volume-dialog { width: min(520px, calc(100vw - 32px)); }
 .end-of-volume-dialog button + button { margin-left: 8px; }
-.quick-access-dialog {
-  width: min(760px, calc(100vw - 48px));
-  max-height: min(680px, calc(100vh - 48px));
-  overflow: auto;
-  padding: 22px;
-  border-radius: 6px;
-  color: #1f2328;
-  background: white;
-  box-shadow: 0 12px 40px #0005;
+.dialog-backdrop > .quick-access-dialog {
+  width: min(820px, calc(100vw - 32px));
 }
 .quick-access-heading { display: flex; align-items: center; gap: 12px; }
 .quick-access-heading h2 { margin: 0; margin-right: auto; }
@@ -589,21 +706,62 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .quick-access-resolved { color: #6b4b00; font-size: .8rem; }
 .quick-access-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .quick-access-actions button { white-space: nowrap; }
-.thumbnail-manager-dialog {
-  width: min(620px, calc(100vw - 48px));
-  max-height: min(560px, calc(100vh - 48px));
-  overflow: auto;
-  padding: 22px;
-  border-radius: 6px;
-  color: #1f2328;
-  background: white;
-  box-shadow: 0 12px 40px #0005;
+.dialog-backdrop > .thumbnail-manager-dialog {
+  width: min(680px, calc(100vw - 32px));
 }
 .thumbnail-manager-stats { display: flex; gap: 24px; margin: 16px 0; }
 .thumbnail-manager-stats div { display: grid; gap: 3px; }
 .thumbnail-manager-stats dt { color: #59636f; font-size: .8rem; }
 .thumbnail-manager-stats dd { margin: 0; font-weight: 600; }
 .thumbnail-manager-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.properties-dialog dl,
+.help-dialog dl { display: grid; gap: 0; margin: 16px 0; }
+.properties-dialog dl > div,
+.help-dialog dl > div {
+  display: grid;
+  grid-template-columns: minmax(110px, .65fr) minmax(0, 1.35fr);
+  gap: 16px;
+  padding: 9px 4px;
+  border-bottom: 1px solid #e4e9f0;
+}
+.properties-dialog dt,
+.help-dialog dt { color: #657287; }
+.properties-dialog dd,
+.help-dialog dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.tag-manager-dialog form { display: flex; align-items: end; gap: 8px; margin: 14px 0; }
+.tag-manager-dialog form label { display: grid; gap: 5px; }
+.tag-manager-dialog form input { flex: 1; }
+.tag-manager-dialog ul,
+.bookshelf-dialog ul,
+.history-dialog ol { display: grid; gap: 7px; margin: 16px 0; padding: 0; list-style: none; }
+.tag-manager-dialog li,
+.bookshelf-dialog li,
+.history-dialog li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #dce3ec;
+  border-radius: 7px;
+  background: #fff;
+}
+.tag-manager-dialog li > span:first-child,
+.bookshelf-dialog li > button:first-child,
+.history-dialog li > span:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.history-dialog li > span:last-child { color: #657287; font-size: .82rem; }
+
+@media (max-width: 760px) {
+  .settings-grid,
+  .settings-gesture-grid { grid-template-columns: 1fr; }
+  .settings-dialog [data-shortcut-command] {
+    grid-template-columns: minmax(110px, .7fr) minmax(130px, 1fr) auto;
+  }
+  .settings-dialog [data-shortcut-command] > span {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
 
 @media (prefers-contrast: more) {
   .catalog-item[data-selected="true"] { border-width: 3px; }

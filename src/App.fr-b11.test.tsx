@@ -280,7 +280,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     );
     await waitFor(() => expect(resetNextInput).toHaveValue("PageDown"));
     expect(saveSettingsMock).toHaveBeenCalledTimes(1);
-    expect(resetDialog).toHaveTextContent("表示・操作設定だけを扱います");
+    expect(resetDialog).toHaveTextContent("画面表示と操作方法を設定します");
 
     const resetApply = resetDialog.querySelector<HTMLButtonElement>(
       '[data-product-id="shortcut-apply"]',

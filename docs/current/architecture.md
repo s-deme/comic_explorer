@@ -109,7 +109,8 @@ library shellは5分類menu、toolbar、address、folder/search side pane、cata
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
 cover/small/detail/reference tile、sort、search result、selection、loading/empty/errorを区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。settings、quick access、
-bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutはdialogまたはmenuから開く。
+bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
+dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。

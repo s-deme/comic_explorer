@@ -3583,9 +3583,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             aria-label="統合設定"
             data-product-id="shortcut-dialog"
           >
-            <h2>統合設定</h2>
-            <p>表示・操作設定だけを扱います。library path、秘密情報、machine固有値はprofileに含めません。</p>
-            <div className="settings-grid">
+            <header className="dialog-heading">
+              <p className="dialog-kicker">環境設定</p>
+              <h2>統合設定</h2>
+              <p className="dialog-description">
+                画面表示と操作方法を設定します。設定プロファイルにはライブラリの場所や端末固有の情報は含まれません。
+              </p>
+            </header>
+            <section className="settings-section" aria-label="基本設定">
+              <h3>基本設定</h3>
+              <div className="settings-grid">
               <label>
                 並べ替え
                 <select
@@ -3745,10 +3752,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   />
                 </label>
               ))}
-            </div>
-            <section aria-label="ショートカット設定">
+              </div>
+            </section>
+            <section className="settings-section" aria-label="ショートカット設定">
               <h3>ショートカット</h3>
-              <p>キーを入力しても、適用するまでは現在の操作設定を変更しません。</p>
+              <p className="settings-section-description">
+                入力欄でキーを押して割り当てます。「適用」を押すまで現在の操作には反映されません。
+              </p>
               {SHORTCUT_COMMANDS.map((command) => (
                 <div key={command} data-shortcut-command={command}>
                   <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
@@ -3771,31 +3781,33 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               ))}
               <button type="button" onClick={resetAllDraftShortcuts}>すべて既定に戻す</button>
             </section>
-            <section aria-label="マウスジェスチャー設定">
+            <section className="settings-section" aria-label="マウスジェスチャー設定">
               <h3>マウスジェスチャー</h3>
-              {MOUSE_GESTURE_NAMES.map((name) => (
-                <label key={name}>
-                  {name}
-                  <select
-                    aria-label={`${name}ジェスチャー`}
-                    value={settingsDraft.mouseGestures[name]}
-                    onChange={(event) => {
-                      const action = event.target.value as MouseGestureBindings[typeof name];
-                      const current = settingsDraft.mouseGestures;
-                      const next = { ...current, [name]: action };
-                      const duplicate = action !== "none" && MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
-                      if (duplicate) {
-                        setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
-                        return;
-                      }
-                      setProfileNotice(null);
-                      setSettingsDraft({ ...settingsDraft, mouseGestures: next });
-                    }}
-                  >
-                    {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{action}</option>)}
-                  </select>
-                </label>
-              ))}
+              <div className="settings-gesture-grid">
+                {MOUSE_GESTURE_NAMES.map((name) => (
+                  <label key={name}>
+                    <span>{name}</span>
+                    <select
+                      aria-label={`${name}ジェスチャー`}
+                      value={settingsDraft.mouseGestures[name]}
+                      onChange={(event) => {
+                        const action = event.target.value as MouseGestureBindings[typeof name];
+                        const current = settingsDraft.mouseGestures;
+                        const next = { ...current, [name]: action };
+                        const duplicate = action !== "none" && MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
+                        if (duplicate) {
+                          setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
+                          return;
+                        }
+                        setProfileNotice(null);
+                        setSettingsDraft({ ...settingsDraft, mouseGestures: next });
+                      }}
+                    >
+                      {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{action}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </div>
             </section>
             {profileNotice !== null && <p role="status">{profileNotice}</p>}
             <div className="settings-actions">
