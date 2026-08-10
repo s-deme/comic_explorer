@@ -50,7 +50,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | toolbar buttonから並べ替え、昇降順、巻末動作、一覧形式のmenuを操作し、設定を保存する。 |
 | REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
-| REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
+| REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。対応書庫内の対応書庫は形式を混在でき、内側3階層・内側書庫64個・内側書庫の展開データ累計512 MiBを上限として再帰的に読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
 | REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |

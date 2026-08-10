@@ -13,6 +13,9 @@ export const CONTRACT_LIMITS = Object.freeze({
   archiveEntries: 100_000,
   archiveEntryBytes: 512 * 1024 * 1024,
   archiveTotalBytes: 8 * 1024 * 1024 * 1024,
+  nestedArchiveDepth: 3,
+  nestedArchives: 64,
+  nestedArchiveBytes: 512 * 1024 * 1024,
 });
 
 export interface RequestContext {

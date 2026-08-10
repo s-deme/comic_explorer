@@ -1,6 +1,8 @@
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::cmp::Ordering;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 use delharc::LhaHeader;
 use sevenz_rust::{
@@ -10,7 +12,10 @@ use unrar::error::{Code as UnrarCode, UnrarError, When as UnrarWhen};
 use unrar::{Archive, VolumeInfo};
 use zip::{CompressionMethod, ZipArchive};
 
-use crate::api::{MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES};
+use crate::api::{
+    MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES,
+    MAX_NESTED_ARCHIVE_BYTES, MAX_NESTED_ARCHIVE_DEPTH, MAX_NESTED_ARCHIVES,
+};
 use crate::domain::{AppError, ErrorCode, FileKind, RelativePath, classify_file_name, natural_cmp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +36,21 @@ pub(crate) struct ArchiveEntryBytes {
     pub fingerprint_detail: String,
 }
 
+#[derive(Debug, Default)]
+struct ArchiveListing {
+    pages: Vec<RelativePath>,
+    archives: Vec<RelativePath>,
+}
+
+#[derive(Debug, Default)]
+struct NestedArchiveBudget {
+    archives: usize,
+    bytes: u64,
+}
+
+const NESTED_PAGE_KEY_PREFIX: &str = "@comic-explorer-nested-v1/";
+static TEMP_ARCHIVE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
 pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
     match path
         .extension()
@@ -50,17 +70,77 @@ pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
 }
 
 pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+    let mut chains = Vec::new();
+    let mut budget = NestedArchiveBudget::default();
+    enumerate_archive_tree(path, &[], 0, &mut budget, &mut chains)?;
+    chains.sort_by(|left, right| compare_archive_chains(left, right));
+    chains
+        .iter()
+        .map(|chain| encode_archive_page_key(chain))
+        .collect()
+}
+
+fn list_archive(path: &Path) -> Result<ArchiveListing, AppError> {
     match archive_adapter_kind(path) {
         ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub => {
-            enumerate_zip_pages(path)
+            list_zip_archive(path)
         }
-        ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => enumerate_rar_pages(path),
-        ArchiveAdapterKind::SevenZip | ArchiveAdapterKind::Cb7 => enumerate_seven_zip_pages(path),
-        ArchiveAdapterKind::Lzh => enumerate_lzh_pages(path),
+        ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => list_rar_archive(path),
+        ArchiveAdapterKind::SevenZip | ArchiveAdapterKind::Cb7 => list_seven_zip_archive(path),
+        ArchiveAdapterKind::Lzh => list_lzh_archive(path),
     }
 }
 
 pub(crate) fn read_archive_entry(
+    path: &Path,
+    entry_name: &str,
+    max_bytes: u64,
+) -> Result<ArchiveEntryBytes, AppError> {
+    let chain = decode_archive_page_key(entry_name)?;
+    if chain.len() == 1 {
+        return read_direct_archive_entry(path, &chain[0], max_bytes);
+    }
+    if chain.len().saturating_sub(1) > MAX_NESTED_ARCHIVE_DEPTH {
+        return Err(limit_error("Nested archive depth limit exceeded."));
+    }
+
+    let mut current_path = path.to_path_buf();
+    let mut current_temp = None;
+    let mut nested_bytes = 0_u64;
+    let mut fingerprint_parts = Vec::new();
+    for (index, entry_name) in chain.iter().enumerate() {
+        let is_page = index + 1 == chain.len();
+        let remaining = if is_page {
+            max_bytes
+        } else {
+            MAX_NESTED_ARCHIVE_BYTES.saturating_sub(nested_bytes)
+        };
+        if remaining == 0 {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let entry = read_direct_archive_entry(&current_path, entry_name, remaining)?;
+        fingerprint_parts.push(entry.fingerprint_detail.clone());
+        if is_page {
+            return Ok(ArchiveEntryBytes {
+                bytes: entry.bytes,
+                fingerprint_detail: format!("nested:{}", fingerprint_parts.join("|")),
+            });
+        }
+        nested_bytes = nested_bytes
+            .checked_add(entry.bytes.len() as u64)
+            .ok_or_else(|| limit_error("Nested archive byte limit exceeded."))?;
+        if nested_bytes > MAX_NESTED_ARCHIVE_BYTES {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let temporary = TemporaryArchive::create(entry_name, &entry.bytes)?;
+        current_path = temporary.path.clone();
+        current_temp = Some(temporary);
+    }
+    drop(current_temp);
+    Err(archive_entry_not_found())
+}
+
+fn read_direct_archive_entry(
     path: &Path,
     entry_name: &str,
     max_bytes: u64,
@@ -79,7 +159,51 @@ pub(crate) fn read_archive_entry(
     }
 }
 
-fn enumerate_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+fn enumerate_archive_tree(
+    path: &Path,
+    prefix: &[String],
+    depth: usize,
+    budget: &mut NestedArchiveBudget,
+    pages: &mut Vec<Vec<String>>,
+) -> Result<(), AppError> {
+    let listing = list_archive(path)?;
+    for page in listing.pages {
+        let mut chain = prefix.to_vec();
+        chain.push(page.as_str().to_string());
+        pages.push(chain);
+    }
+    if listing.archives.is_empty() {
+        return Ok(());
+    }
+    if depth >= MAX_NESTED_ARCHIVE_DEPTH {
+        return Err(limit_error("Nested archive depth limit exceeded."));
+    }
+    for nested in listing.archives {
+        budget.archives = budget.archives.saturating_add(1);
+        if budget.archives > MAX_NESTED_ARCHIVES {
+            return Err(limit_error("Nested archive count limit exceeded."));
+        }
+        let remaining = MAX_NESTED_ARCHIVE_BYTES.saturating_sub(budget.bytes);
+        if remaining == 0 {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let entry = read_direct_archive_entry(path, nested.as_str(), remaining)?;
+        budget.bytes = budget
+            .bytes
+            .checked_add(entry.bytes.len() as u64)
+            .ok_or_else(|| limit_error("Nested archive byte limit exceeded."))?;
+        if budget.bytes > MAX_NESTED_ARCHIVE_BYTES {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let temporary = TemporaryArchive::create(nested.as_str(), &entry.bytes)?;
+        let mut nested_prefix = prefix.to_vec();
+        nested_prefix.push(nested.as_str().to_string());
+        enumerate_archive_tree(&temporary.path, &nested_prefix, depth + 1, budget, pages)?;
+    }
+    Ok(())
+}
+
+fn list_zip_archive(path: &Path) -> Result<ArchiveListing, AppError> {
     let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
     let mut archive = ZipArchive::new(file).map_err(|source| AppError {
         code: ErrorCode::CorruptArchive,
@@ -92,7 +216,7 @@ fn enumerate_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
     }
 
     let mut total_size = 0_u64;
-    let mut pages = Vec::new();
+    let mut listing = ArchiveListing::default();
     for index in 0..archive.len() {
         let entry = archive.by_index_raw(index).map_err(|source| AppError {
             code: ErrorCode::CorruptArchive,
@@ -131,7 +255,7 @@ fn enumerate_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
         if total_size > MAX_ARCHIVE_TOTAL_BYTES {
             return Err(limit_error("Archive total byte limit exceeded."));
         }
-        if entry.is_dir() || classify_file_name(entry.name()) != FileKind::Image {
+        if entry.is_dir() {
             continue;
         }
         let relative = RelativePath::parse(entry.name()).map_err(|_| AppError {
@@ -140,25 +264,18 @@ fn enumerate_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
             target: None,
             retryable: false,
         })?;
-        if relative
-            .as_str()
-            .split('/')
-            .any(|part| part.starts_with('.'))
-        {
-            continue;
-        }
-        pages.push(relative);
+        add_supported_entry(&mut listing, relative);
     }
-    pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
-    Ok(pages)
+    sort_archive_listing(&mut listing);
+    Ok(listing)
 }
 
-fn enumerate_rar_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+fn list_rar_archive(path: &Path) -> Result<ArchiveListing, AppError> {
     File::open(path).map_err(|source| archive_io_error(path, source))?;
     let archive = Archive::new(path).open_for_listing().map_err(unrar_error)?;
     ensure_single_volume(archive.volume_info())?;
     let mut total_size = 0_u64;
-    let mut pages = Vec::new();
+    let mut listing = ArchiveListing::default();
     for (index, result) in archive.enumerate() {
         if index >= MAX_ARCHIVE_ENTRIES {
             return Err(limit_error("Archive entry-count limit exceeded."));
@@ -175,26 +292,18 @@ fn enumerate_rar_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
             continue;
         }
         let relative = rar_relative_path(&entry)?;
-        if classify_file_name(relative.as_str()) != FileKind::Image
-            || relative
-                .as_str()
-                .split('/')
-                .any(|part| part.starts_with('.'))
-        {
-            continue;
-        }
-        pages.push(relative);
+        add_supported_entry(&mut listing, relative);
     }
-    pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
-    Ok(pages)
+    sort_archive_listing(&mut listing);
+    Ok(listing)
 }
 
-fn enumerate_seven_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+fn list_seven_zip_archive(path: &Path) -> Result<ArchiveListing, AppError> {
     let archive = SevenZipArchive::open(path).map_err(seven_zip_error)?;
     validate_seven_zip_archive(&archive)
 }
 
-fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<Vec<RelativePath>, AppError> {
+fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<ArchiveListing, AppError> {
     if archive.files.len() > MAX_ARCHIVE_ENTRIES {
         return Err(limit_error("Archive entry-count limit exceeded."));
     }
@@ -254,7 +363,7 @@ fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<Vec<RelativeP
     }
 
     let mut total_size = 0_u64;
-    let mut pages = Vec::new();
+    let mut listing = ArchiveListing::default();
     for entry in &archive.files {
         if entry.is_directory() {
             continue;
@@ -268,24 +377,18 @@ fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<Vec<RelativeP
         if total_size > MAX_ARCHIVE_TOTAL_BYTES {
             return Err(limit_error("Archive total byte limit exceeded."));
         }
-        if classify_file_name(entry.name()) != FileKind::Image {
-            continue;
-        }
         let relative = safe_archive_relative_path(entry.name(), "7z")?;
-        if is_hidden_archive_path(&relative) {
-            continue;
-        }
-        pages.push(relative);
+        add_supported_entry(&mut listing, relative);
     }
-    pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
-    Ok(pages)
+    sort_archive_listing(&mut listing);
+    Ok(listing)
 }
 
-fn enumerate_lzh_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+fn list_lzh_archive(path: &Path) -> Result<ArchiveListing, AppError> {
     let mut archive = open_lzh(path)?;
     let mut count = 0_usize;
     let mut total_size = 0_u64;
-    let mut pages = Vec::new();
+    let mut listing = ArchiveListing::default();
     loop {
         count = count.saturating_add(1);
         if count > MAX_ARCHIVE_ENTRIES {
@@ -308,11 +411,7 @@ fn enumerate_lzh_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
         }
         if !header.is_directory() {
             let relative = lzh_relative_path(header)?;
-            if classify_file_name(relative.as_str()) == FileKind::Image
-                && !is_hidden_archive_path(&relative)
-            {
-                pages.push(relative);
-            }
+            add_supported_entry(&mut listing, relative);
         }
         if !archive
             .next_file()
@@ -321,8 +420,8 @@ fn enumerate_lzh_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
             break;
         }
     }
-    pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
-    Ok(pages)
+    sort_archive_listing(&mut listing);
+    Ok(listing)
 }
 
 fn validate_rar_entry(entry: &unrar::FileHeader) -> Result<(), AppError> {
@@ -509,7 +608,7 @@ fn read_lzh_entry(
     entry_name: &str,
     max_bytes: u64,
 ) -> Result<ArchiveEntryBytes, AppError> {
-    enumerate_lzh_pages(path)?;
+    list_lzh_archive(path)?;
     let mut archive = open_lzh(path)?;
     let mut count = 0_usize;
     loop {
@@ -596,6 +695,173 @@ fn safe_archive_relative_path(name: &str, kind: &str) -> Result<RelativePath, Ap
 
 fn is_hidden_archive_path(path: &RelativePath) -> bool {
     path.as_str().split('/').any(|part| part.starts_with('.'))
+}
+
+fn add_supported_entry(listing: &mut ArchiveListing, path: RelativePath) {
+    if is_hidden_archive_path(&path) {
+        return;
+    }
+    match classify_file_name(path.as_str()) {
+        FileKind::Image => listing.pages.push(path),
+        FileKind::Archive => listing.archives.push(path),
+        _ => {}
+    }
+}
+
+fn sort_archive_listing(listing: &mut ArchiveListing) {
+    listing
+        .pages
+        .sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
+    listing
+        .archives
+        .sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
+}
+
+fn compare_archive_chains(left: &[String], right: &[String]) -> Ordering {
+    for (left_part, right_part) in left.iter().zip(right) {
+        let ordering = natural_cmp(left_part, right_part);
+        if ordering != Ordering::Equal {
+            return ordering;
+        }
+    }
+    left.len().cmp(&right.len())
+}
+
+fn encode_archive_page_key(chain: &[String]) -> Result<RelativePath, AppError> {
+    if chain.len() == 1 && !chain[0].starts_with(NESTED_PAGE_KEY_PREFIX) {
+        return safe_archive_relative_path(&chain[0], "archive");
+    }
+    let encoded = chain
+        .iter()
+        .map(|part| hex_encode(part.as_bytes()))
+        .collect::<Vec<_>>()
+        .join("/");
+    safe_archive_relative_path(&format!("{NESTED_PAGE_KEY_PREFIX}{encoded}"), "archive")
+}
+
+fn decode_archive_page_key(page_key: &str) -> Result<Vec<String>, AppError> {
+    if !page_key.starts_with(NESTED_PAGE_KEY_PREFIX) {
+        return Ok(vec![
+            safe_archive_relative_path(page_key, "archive")?
+                .as_str()
+                .to_string(),
+        ]);
+    }
+    let encoded = &page_key[NESTED_PAGE_KEY_PREFIX.len()..];
+    let mut chain = Vec::new();
+    for part in encoded.split('/') {
+        let bytes = hex_decode(part)?;
+        let decoded = String::from_utf8(bytes)
+            .map_err(|_| invalid_archive_path_error("Invalid nested archive page key."))?;
+        let relative = safe_archive_relative_path(&decoded, "nested archive")?;
+        if relative.as_str() != decoded {
+            return Err(invalid_archive_path_error(
+                "Non-canonical nested archive page key.",
+            ));
+        }
+        chain.push(decoded);
+    }
+    if chain.is_empty() || chain.len() > MAX_NESTED_ARCHIVE_DEPTH + 1 {
+        return Err(limit_error("Nested archive depth limit exceeded."));
+    }
+    if chain.len() > 1 {
+        if chain[..chain.len() - 1]
+            .iter()
+            .any(|entry| classify_file_name(entry) != FileKind::Archive)
+            || classify_file_name(chain.last().expect("chain is non-empty")) != FileKind::Image
+        {
+            return Err(invalid_archive_path_error(
+                "Invalid nested archive page key.",
+            ));
+        }
+    }
+    Ok(chain)
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(HEX[usize::from(byte >> 4)] as char);
+        encoded.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    encoded
+}
+
+fn hex_decode(encoded: &str) -> Result<Vec<u8>, AppError> {
+    if encoded.is_empty() || !encoded.len().is_multiple_of(2) {
+        return Err(invalid_archive_path_error(
+            "Invalid nested archive page key.",
+        ));
+    }
+    encoded
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let high = hex_value(pair[0])?;
+            let low = hex_value(pair[1])?;
+            Ok((high << 4) | low)
+        })
+        .collect()
+}
+
+fn hex_value(byte: u8) -> Result<u8, AppError> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        _ => Err(invalid_archive_path_error(
+            "Invalid nested archive page key.",
+        )),
+    }
+}
+
+struct TemporaryArchive {
+    path: PathBuf,
+}
+
+impl TemporaryArchive {
+    fn create(entry_name: &str, bytes: &[u8]) -> Result<Self, AppError> {
+        let extension = Path::new(entry_name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(str::to_ascii_lowercase)
+            .filter(|value| {
+                matches!(
+                    value.as_str(),
+                    "zip" | "cbz" | "epub" | "rar" | "cbr" | "7z" | "cb7" | "lzh" | "lha"
+                )
+            })
+            .ok_or_else(|| unsupported_archive_error("Unsupported nested archive format."))?;
+        for _ in 0..16 {
+            let sequence = TEMP_ARCHIVE_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "comic-explorer-nested-{}-{sequence}.{extension}",
+                std::process::id()
+            ));
+            match OpenOptions::new().write(true).create_new(true).open(&path) {
+                Ok(mut file) => {
+                    if let Err(source) = file.write_all(bytes) {
+                        drop(file);
+                        let _ = std::fs::remove_file(&path);
+                        return Err(archive_io_error(&path, source));
+                    }
+                    drop(file);
+                    return Ok(Self { path });
+                }
+                Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(source) => return Err(archive_io_error(&path, source)),
+            }
+        }
+        Err(limit_error(
+            "Could not allocate a temporary nested archive.",
+        ))
+    }
+}
+
+impl Drop for TemporaryArchive {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
 }
 
 fn archive_entry_not_found() -> AppError {
@@ -755,7 +1021,7 @@ fn limit_error(message: &str) -> AppError {
 mod tests {
     use super::*;
     use std::fs;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
     use zip::write::SimpleFileOptions;
@@ -824,6 +1090,20 @@ mod tests {
             archive.push_archive_entry(entry, Some(*bytes)).unwrap();
         }
         archive.finish().unwrap();
+    }
+
+    fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, bytes) in entries {
+            writer
+                .start_file(
+                    *name,
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+                )
+                .unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
     }
 
     #[test]
@@ -1035,6 +1315,150 @@ mod tests {
         write_stored_lzh(&path, &[("../escape.png", b"unsafe")]);
         assert_eq!(
             enumerate_archive_pages(&path).unwrap_err().code,
+            ErrorCode::InvalidPath
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn nested_archives_are_flattened_in_natural_order_and_read_by_opaque_page_key() {
+        let inner = zip_bytes(&[("pages/10.jpg", b"ten"), ("pages/2.png", b"two")]);
+        let path = temporary_archive("nested-zip");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file("1-cover.jpg", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"cover").unwrap();
+        writer
+            .start_file("2-volume.cbz", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(&inner).unwrap();
+        writer.finish().unwrap();
+
+        let pages = enumerate_archive_pages(&path).unwrap();
+        assert_eq!(pages[0].as_str(), "1-cover.jpg");
+        assert_eq!(pages.len(), 3);
+        let nested_chains = pages[1..]
+            .iter()
+            .map(|page| decode_archive_page_key(page.as_str()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            nested_chains,
+            [
+                vec!["2-volume.cbz".to_string(), "pages/2.png".to_string()],
+                vec!["2-volume.cbz".to_string(), "pages/10.jpg".to_string()],
+            ]
+        );
+        let entry = read_archive_entry(&path, pages[1].as_str(), 32).unwrap();
+        assert_eq!(entry.bytes, b"two");
+        assert!(entry.fingerprint_detail.starts_with("nested:"));
+        assert!(!path.parent().unwrap().join("2-volume.cbz").exists());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn nested_archives_can_mix_all_supported_adapter_families() {
+        let zip = zip_bytes(&[("zip/page.png", b"zip")]);
+
+        let mut seven_zip_path = temporary_archive("nested-source-seven-zip");
+        seven_zip_path.set_extension("cb7");
+        write_seven_zip(&seven_zip_path, &[("seven/page.png", b"seven")]);
+        let seven_zip = fs::read(&seven_zip_path).unwrap();
+
+        let mut lzh_path = temporary_archive("nested-source-lzh");
+        lzh_path.set_extension("lzh");
+        write_stored_lzh(&lzh_path, &[("lzh/page.png", b"lzh")]);
+        let lzh = fs::read(&lzh_path).unwrap();
+
+        let rar_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-RAR-001/standard.rar");
+        let rar = fs::read(rar_path).unwrap();
+
+        let path = temporary_archive("nested-mixed");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        for (name, bytes) in [
+            ("1.cbz", zip.as_slice()),
+            ("2.cb7", seven_zip.as_slice()),
+            ("3.lzh", lzh.as_slice()),
+            ("4.cbr", rar.as_slice()),
+        ] {
+            writer
+                .start_file(name, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(bytes).unwrap();
+        }
+        writer.finish().unwrap();
+
+        let pages = enumerate_archive_pages(&path).unwrap();
+        let chains = pages
+            .iter()
+            .map(|page| decode_archive_page_key(page.as_str()).unwrap())
+            .collect::<Vec<_>>();
+        for inner in ["1.cbz", "2.cb7", "3.lzh", "4.cbr"] {
+            assert!(chains.iter().any(|chain| chain[0] == inner), "{inner}");
+        }
+        for page in &pages {
+            assert!(
+                !read_archive_entry(&path, page.as_str(), 1024 * 1024)
+                    .unwrap()
+                    .bytes
+                    .is_empty()
+            );
+        }
+
+        fs::remove_file(path).unwrap();
+        fs::remove_file(seven_zip_path).unwrap();
+        fs::remove_file(lzh_path).unwrap();
+    }
+
+    #[test]
+    fn nested_archive_depth_limit_is_enforced() {
+        let mut bytes = zip_bytes(&[("page.png", b"page")]);
+        for depth in (1..=4).rev() {
+            let name = format!("level-{depth}.cbz");
+            bytes = zip_bytes(&[(&name, &bytes)]);
+        }
+        let path = temporary_archive("nested-depth-limit");
+        fs::write(&path, bytes).unwrap();
+
+        assert_eq!(
+            enumerate_archive_pages(&path).unwrap_err().code,
+            ErrorCode::ResourceLimit
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn nested_archive_count_limit_is_enforced() {
+        let empty_archive = zip_bytes(&[]);
+        let path = temporary_archive("nested-count-limit");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        for index in 0..=MAX_NESTED_ARCHIVES {
+            writer
+                .start_file(format!("nested-{index}.cbz"), SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(&empty_archive).unwrap();
+        }
+        writer.finish().unwrap();
+
+        assert_eq!(
+            enumerate_archive_pages(&path).unwrap_err().code,
+            ErrorCode::ResourceLimit
+        );
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn malformed_nested_page_keys_are_rejected() {
+        let path = temporary_archive("nested-malformed-key");
+        fs::write(&path, zip_bytes(&[("page.png", b"page")])).unwrap();
+        assert_eq!(
+            read_archive_entry(&path, "@comic-explorer-nested-v1/not-hex/still-not-hex", 32,)
+                .unwrap_err()
+                .code,
             ErrorCode::InvalidPath
         );
         fs::remove_file(path).unwrap();

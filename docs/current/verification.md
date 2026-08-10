@@ -29,13 +29,13 @@ codd:
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
-| Rust canonical | PASS | 2026-08-10、lib 129件 + shutdown process 1件、FAIL 0。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
+| Rust canonical | PASS | 2026-08-10、lib 134件 + shutdown process 1件、FAIL 0。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
 | TypeScript/frontend | PASS | 2026-08-10、21 files / 184 tests PASS、FAIL 0。TypeScript typecheckもexit 0。 |
 | Python | PASS | 2026-08-10、38 tests PASS、FAIL 0。menu/addressのcompact寸法とtree文字色のstyle contract 2件、現行status/verification間の5値consistencyもPASS。 |
 | EPUB書庫 | PASS | ZIP互換Stored/DeflateのEPUBについて、大文字小文字を無視した分類、自然順画像列挙、catalog、WebP、media token、原本非破壊をWindows Rust canonicalと87-file fixtureで直接検証。HTML本文組版は対象外。 |
-| 対応書庫 | PASS | ZIP/CBZ/EPUB、RAR/CBR、7z/CB7、LZHについて、大文字小文字を無視した分類、自然順画像列挙、entry読取、catalog metadata、診断、原本非展開をWindows Rust canonicalで直接検証。RARは単一volume・非暗号化RAR4/RAR5、7zはCopy/LZMA/LZMA2、LZHはStored/LH1/LH4〜LH7/LZS/LZ5を採用範囲とし、危険path、size/entry上限、未対応圧縮方式を拒否する。 |
+| 対応書庫 | PASS | ZIP/CBZ/EPUB、RAR/CBR、7z/CB7、LZHについて、大文字小文字を無視した分類、自然順画像列挙、entry読取、catalog metadata、診断、原本非展開をWindows Rust canonicalで直接検証。ZIP内でCBZ/CB7/LZH/CBRを混在させた多重圧縮の列挙・読取、opaque page key、内側3階層と64書庫の上限も直接検証した。RARは単一volume・非暗号化RAR4/RAR5、7zはCopy/LZMA/LZMA2、LZHはStored/LH1/LH4〜LH7/LZS/LZ5を採用範囲とし、危険path、size/entry/再帰上限、未対応圧縮方式を拒否する。 |
 | frontend build/SBOM | PASS | Windows buildは61 modulesをbuild、exit 0。SBOMは729 components、unknown/prohibited license 0。UnRAR、`sevenz-rust`、`delharc`を含むnoticeを同期済み。 |
 | release executable | PASS / 製品受入部分BLOCKED | 追加decoderを含むWindows release executableを再buildしexit 0。static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。animated GIF観測、P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |

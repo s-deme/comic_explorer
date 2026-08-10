@@ -19,7 +19,7 @@ codd:
 | desktop shell | Tauri 2、Windows WebView2、NSIS |
 | frontend | React 19、TypeScript、Vite、TanStack Virtual、HTML/CSS |
 | backend | Rust 2024 edition、Tokio、typed Tauri commands |
-| catalog/archive | read-only filesystem adapter、`zip`（Stored/Deflate）、`unrar`（RAR4/RAR5）、`sevenz-rust`（Copy/LZMA/LZMA2）、`delharc`（LHA/LZH）、自然順 |
+| catalog/archive | read-only filesystem adapter、`zip`（Stored/Deflate）、`unrar`（RAR4/RAR5）、`sevenz-rust`（Copy/LZMA/LZMA2）、`delharc`（LHA/LZH）、上限付き多重圧縮、自然順 |
 | image/thumbnail | WIC thumbnail pipeline、`image` raster validation/PNG conversion、`resvg` static SVG rasterize、静止WebPは`image-webp`によるpure-Rust decode |
 | persistence | app-local SQLite WAL（`rusqlite` bundled）、local settings/collections、file cache |
 | verification | Vitest/Testing Library、Python unittest、Cargo test、Windows release product harness、CoDD |
@@ -64,6 +64,9 @@ UnRARのlisting/processing APIで単一volume・非暗号化RAR4/RAR5の必要en
 7z/CB7は`sevenz-rust`でCopy/LZMA/LZMA2 entryを、LZHは`delharc`でStored/LH1/LH4〜LH7/LZS/LZ5
 entryを読み、いずれもlibraryへ展開しない。分割RAR、暗号化書庫、未対応compression、危険path、
 entry数・展開後entry size・展開後合計size上限超過は読取前またはstream境界で拒否する。
+対応書庫entryは形式を混在して再帰列挙し、内側3階層、内側書庫64個、内側書庫の展開データ累計
+512 MiBを上限とする。通常pageの相対keyは維持し、入れ子pageだけbackend専用の衝突しないopaque keyで
+書庫entry chainを表す。内側書庫はlibrary root外のOS tempへ寿命付きfileとして展開し、読取後に削除する。
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
 BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
 解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。
@@ -106,7 +109,7 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 ## path安全性と原本非破壊
 
 - filesystem adapterはread-only openと列挙だけを公開し、domainにrename/write/delete/create APIを持ち込まない。
-- archive entry名をhost pathへ結合せず、暗号化、未対応compression、traversal、size上限超過を読む前に拒否する。
+- archive entry名をlibrary側host pathへ結合せず、暗号化、未対応compression、traversal、再帰深度・個数・size上限超過を読む前またはstream境界で拒否する。
 - cache、DB、profile、export、temp、recovery、logはlibrary root外だけに置く。
 - CSVやclipboardへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。
 - error回復は原本の修復、削除、上書きを自動実行しない。

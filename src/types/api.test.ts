@@ -28,6 +28,9 @@ describe("UI/backend contract", () => {
       archiveEntries: 100_000,
       archiveEntryBytes: 536_870_912,
       archiveTotalBytes: 8_589_934_592,
+      nestedArchiveDepth: 3,
+      nestedArchives: 64,
+      nestedArchiveBytes: 536_870_912,
     });
   });
 

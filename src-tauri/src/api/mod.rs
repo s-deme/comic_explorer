@@ -11,6 +11,9 @@ pub const MAX_IMAGE_PIXELS: u64 = 120_000_000;
 pub const MAX_ARCHIVE_ENTRIES: usize = 100_000;
 pub const MAX_ARCHIVE_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_ARCHIVE_TOTAL_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+pub const MAX_NESTED_ARCHIVE_DEPTH: usize = 3;
+pub const MAX_NESTED_ARCHIVES: usize = 64;
+pub const MAX_NESTED_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
