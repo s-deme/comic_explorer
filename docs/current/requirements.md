@@ -54,7 +54,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |
-| REQ-MVP-014 | keyboard、click、wheel、Escで閲覧でき、viewer generationの古い結果を捨てる。 |
+| REQ-MVP-014 | keyboard、click、wheel、Escで閲覧でき、viewer toolbarの操作を説明付きicon buttonで提供し、viewer generationの古い結果を捨てる。 |
 | REQ-MVP-015 | page keyを基準に読書位置をapp-local SQLiteへ保存・復元し、破損DBから安全に回復する。 |
 | REQ-MVP-016 | 巻末では現在のcatalog sort順に従って次の漫画へ進む。 |
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。 |
@@ -67,7 +67,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 |---|---|---|
 | NFR-MVP-001 | 1TB、10,000 files、1,000作品、1冊300pageを想定し、遅延処理、virtualize、10GiB thumbnail LRUを使う。 | 10,000項目のWindows製品UI性能はBLOCKED。 |
 | NFR-MVP-002 | cold起動3秒、cached一覧1秒、prefetch済みpage 100ms、10,000項目検索1秒、idle 250MiBを基準PCで測る。 | 現行release候補の基準PC測定はBLOCKED。 |
-| NFR-MVP-003 | tree、catalog、viewerをkeyboardで操作でき、focusを視認できる。menuとaddress barはcompactな高さとし、icon buttonは間隔、accessible name、hover説明を持ち、tree labelは選択状態によらず背景と判別できる文字色で表示する。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
+| NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、tree labelは選択状態によらず背景と判別できる文字色で表示する。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
 | NFR-MVP-004 | lockfile全依存を再配布可能licenseに限定し、SBOMとTHIRD-PARTY-NOTICESを同期する。 | 既知の禁止・unknown licenseは0。 |
 | NFR-MVP-005 | Windows 10 22H2 x64と対応中Windows 11 x64向けinstallerを生成する。 | clean VM install/uninstallはBLOCKED。 |
 | NFR-MVP-006 | 採用構成を再現可能なfixture、性能値、原本snapshot、配布検証で評価し、実測・推定・未測定を分ける。 | 外部環境の未測定を保持する。 |

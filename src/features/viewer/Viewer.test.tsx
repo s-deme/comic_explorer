@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveReadingPosition } from "../library/client";
 import { Viewer } from "./Viewer";
@@ -71,6 +71,36 @@ describe("Viewer settings", () => {
     expect(onSettingsChange).toHaveBeenCalledWith("single", "leftToRight");
     fireEvent.click(screen.getByRole("button", { name: "読み方向" }));
     expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
+  });
+
+  it("renders viewer actions as explained icon buttons", () => {
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
+    expect(toolbar).not.toBeNull();
+    const buttons = within(toolbar!).getAllByRole("button");
+    expect(buttons).toHaveLength(11);
+    buttons.forEach((button) => {
+      expect(button).toHaveClass("viewer-icon-button");
+      expect(button).toHaveAttribute("title");
+      expect(button.getAttribute("title")).not.toBe("");
+    });
+
+    const spread = within(toolbar!).getByRole("button", { name: "見開きへ" });
+    expect(spread).toHaveTextContent("▯▯");
+    expect(spread).not.toHaveTextContent("見開きへ");
+    const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
+    expect(close).toHaveTextContent("↩");
+    expect(close).not.toHaveTextContent("一覧へ戻る");
   });
 
   it("flushes the confirmed position before closing or advancing", async () => {

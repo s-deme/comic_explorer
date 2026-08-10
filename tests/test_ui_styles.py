@@ -18,6 +18,7 @@ class UiStyleContractTests(unittest.TestCase):
         self.assertIn(declaration, rule.group("body"))
 
     def test_menu_and_address_controls_are_compact(self) -> None:
+        self.assert_rule_contains(":root", "font-size: 14px")
         self.assert_rule_contains(".menu-bar", "font-size: .78rem")
         self.assert_rule_contains(
             ".menu-bar .menu-trigger", "min-height: 22px"
@@ -33,6 +34,8 @@ class UiStyleContractTests(unittest.TestCase):
 
     def test_icon_toolbar_buttons_have_visible_spacing(self) -> None:
         self.assert_rule_contains(".icon-command-toolbar", "gap: 6px")
+        self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
+        self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
 
 if __name__ == "__main__":

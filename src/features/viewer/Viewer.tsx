@@ -487,72 +487,107 @@ export function Viewer({
           <span aria-label="現在の倍率">{Math.round(scale.scale * 100)}%</span>
         </label>
         <button
+          className="viewer-icon-button"
           aria-label="倍率を下げる"
+          title="倍率を下げる"
           onClick={() => applyScale({ type: "zoomOut" })}
         >
-          −
+          <span aria-hidden="true">−</span>
         </button>
         <button
+          className="viewer-icon-button"
           aria-label="倍率を上げる"
+          title="倍率を上げる"
           onClick={() => applyScale({ type: "zoomIn" })}
         >
-          ＋
+          <span aria-hidden="true">＋</span>
         </button>
         <button
+          className="viewer-icon-button"
           aria-label="ルーペ"
+          title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
           aria-pressed={scale.loupeEnabled}
           onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
         >
-          ルーペ {scale.loupeEnabled ? "オン" : "オフ"}
+          <span aria-hidden="true">⌕</span>
         </button>
         <button
+          className="viewer-icon-button"
+          aria-label={state.mode === "single" ? "見開きへ" : "単ページへ"}
+          title={state.mode === "single" ? "見開き表示へ切り替え" : "単ページ表示へ切り替え"}
           onClick={() => changeMode(state.mode === "single" ? "spread" : "single")}
         >
-          {state.mode === "single" ? "見開きへ" : "単ページへ"}
-        </button>
-        <button onClick={toggleDirection}>
-          読み方向
+          <span aria-hidden="true">{state.mode === "single" ? "▯▯" : "▯"}</span>
         </button>
         <button
+          className="viewer-icon-button"
+          aria-label="読み方向"
+          title={state.direction === "rightToLeft"
+            ? "読み方向を左開きへ切り替え"
+            : "読み方向を右開きへ切り替え"}
+          onClick={toggleDirection}
+        >
+          <span aria-hidden="true">⇄</span>
+        </button>
+        <button
+          className="viewer-icon-button"
           type="button"
           aria-label="しおりを保存"
+          title="現在のページをしおりに保存"
           onClick={() => onSaveBookmark?.(state.index)}
         >
-          しおりを保存
+          <span aria-hidden="true">★</span>
         </button>
         <button
+          className="viewer-icon-button"
           type="button"
           aria-label="次のしおり"
+          title="次のしおりへ移動"
           disabled={resolvedBookmarks.length === 0}
           onClick={jumpToNextBookmark}
         >
-          次のしおり
+          <span aria-hidden="true">★→</span>
         </button>
         <button
+          className="viewer-icon-button"
           type="button"
           aria-label="しおり一覧"
+          title="しおり一覧を表示"
           disabled={bookmarks.length === 0}
           onClick={() => setBookmarkListOpen(true)}
         >
-          しおり一覧
+          <span aria-hidden="true">☷</span>
         </button>
         <button
+          className="viewer-icon-button"
           type="button"
           aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
+          title={detached ? "画像表示をメイン画面へ統合" : "画像表示を別領域へ分離"}
           aria-pressed={detached}
           onClick={onToggleDetached}
         >
-          {detached ? "表示を統合" : "表示を分離"}
+          <span aria-hidden="true">{detached ? "↙" : "↗"}</span>
         </button>
         <button
           ref={fullscreenButtonRef}
+          className="viewer-icon-button"
           aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
+          title={fullscreen ? "全画面表示を終了" : "全画面表示へ切り替え"}
           aria-pressed={fullscreen}
           onClick={() => void requestFullscreen(!fullscreen)}
         >
-          {fullscreen ? "全画面終了" : "全画面"}
+          <span aria-hidden="true">{fullscreen ? "⊡" : "⛶"}</span>
         </button>
-        <button data-product-id="viewer-close" onClick={close}>一覧へ戻る</button>
+        <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="一覧へ戻る"
+          title="ビューワを閉じて一覧へ戻る"
+          data-product-id="viewer-close"
+          onClick={close}
+        >
+          <span aria-hidden="true">↩</span>
+        </button>
         {fullscreenError !== null && (
           <span className="fullscreen-error" role="status">
             {fullscreenError}
