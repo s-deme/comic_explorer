@@ -93,6 +93,13 @@ def cargo_components(lock_path: Path, metadata_path: Path) -> list[dict[str, obj
             "licenses": [{"expression": license_name}],
             "scope": "required",
         }
+        if package["name"] == "unrar_sys":
+            component["licenses"].append({  # type: ignore[union-attr]
+                "license": {
+                    "name": "UnRAR source license",
+                    "url": "https://www.rarlab.com/rar/unlicense.html",
+                }
+            })
         if checksum := package.get("checksum"):
             component["hashes"] = [{"alg": "SHA-256", "content": checksum}]
         components.append(component)
@@ -121,6 +128,28 @@ def notices(components: list[dict[str, object]]) -> str:
         "distribution. This notice does not alter the terms of those licenses.",
         "",
     ])
+    if any(component["name"] == "unrar_sys" for component in components):
+        lines.extend([
+            "## Bundled UnRAR source notice",
+            "",
+            "The `unrar_sys` component bundles the UnRAR extraction source. In addition to",
+            "the wrapper license shown above, the following upstream terms apply:",
+            "",
+            "> UnRAR source code may be used in any software to handle",
+            "> RAR archives without limitations free of charge, but cannot be",
+            "> used to develop RAR (WinRAR) compatible archiver and to",
+            "> re-create RAR compression algorithm, which is proprietary.",
+            "> Distribution of modified UnRAR source code in separate form",
+            "> or as a part of other software is permitted, provided that",
+            "> full text of this paragraph, starting from \"UnRAR source code\"",
+            "> words, is included in license, or in documentation if license",
+            "> is not available, and in source code comments of resulting package.",
+            "",
+            "The UnRAR utility and source are distributed without warranty. Comic Explorer",
+            "uses this component only to list and read existing RAR archives; it does not",
+            "create RAR archives.",
+            "",
+        ])
     return "\n".join(lines)
 
 

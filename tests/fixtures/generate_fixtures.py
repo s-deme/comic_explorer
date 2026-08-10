@@ -24,7 +24,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 SEED = 20260728
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 FIXED_EPOCH = 1_700_000_000
 ZIP_TIME = (2023, 11, 14, 22, 13, 20)
 SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png", ".webp"}
@@ -208,6 +208,80 @@ class Builder:
                 info.external_attr = 0o100644 << 16
                 archive.writestr(info, data)
 
+    def rar_archive(
+        self,
+        path: Path,
+        entries: list[tuple[str, bytes, int]],
+    ) -> None:
+        """Write a deterministic RAR 4.x archive using only Stored members.
+
+        The final tuple value contains RAR file-header flags. Tests use it to
+        model encrypted and split members without shipping protected content.
+        """
+        def header(kind: int, flags: int, body: bytes) -> bytes:
+            size = 7 + len(body)
+            payload = struct.pack("<BHH", kind, flags, size) + body
+            return struct.pack("<H", zlib.crc32(payload) & 0xFFFF) + payload
+
+        payload = bytearray(b"Rar!\x1a\x07\x00")
+        payload.extend(header(0x73, 0, struct.pack("<HI", 0, 0)))
+        for name, data, flags in entries:
+            encoded_name = name.encode("ascii")
+            file_body = struct.pack(
+                "<IIBIIBBHI",
+                len(data),
+                len(data),
+                2,
+                zlib.crc32(data) & 0xFFFFFFFF,
+                0,
+                20,
+                0x30,
+                len(encoded_name),
+                0x20,
+            ) + encoded_name
+            payload.extend(header(0x74, 0x8000 | flags, file_body))
+            payload.extend(data)
+        payload.extend(header(0x7B, 0, b""))
+        path.write_bytes(payload)
+
+    def rar5_archive(self, path: Path, entries: list[tuple[str, bytes]]) -> None:
+        """Write a deterministic RAR 5.x archive using only Stored members."""
+        def vint(value: int) -> bytes:
+            encoded = bytearray()
+            while True:
+                byte = value & 0x7F
+                value >>= 7
+                encoded.append(byte | (0x80 if value else 0))
+                if not value:
+                    return bytes(encoded)
+
+        def block(kind: int, flags: int, body: bytes, data_size: int = 0) -> bytes:
+            fields = vint(kind) + vint(flags)
+            if flags & 0x0002:
+                fields += vint(data_size)
+            fields += body
+            crc_payload = vint(len(fields)) + fields
+            return struct.pack("<I", zlib.crc32(crc_payload) & 0xFFFFFFFF) + crc_payload
+
+        payload = bytearray(b"Rar!\x1a\x07\x01\x00")
+        payload.extend(block(0x01, 0, vint(0)))
+        for name, data in entries:
+            encoded_name = name.encode("utf-8")
+            file_body = (
+                vint(0x0004)
+                + vint(len(data))
+                + vint(0x20)
+                + struct.pack("<I", zlib.crc32(data) & 0xFFFFFFFF)
+                + vint(0)
+                + vint(0)
+                + vint(len(encoded_name))
+                + encoded_name
+            )
+            payload.extend(block(0x02, 0x0002, file_body, len(data)))
+            payload.extend(data)
+        payload.extend(block(0x05, 0, vint(0)))
+        path.write_bytes(payload)
+
 
 def mark_encrypted(path: Path) -> None:
     """Set ZIP encryption flags for a deterministic negative fixture.
@@ -332,6 +406,54 @@ def build_core(builder: Builder) -> None:
         [("mimetype", b"application/epub+zip", ZIP_STORED), *entries],
     )
 
+    p = builder.fixture(
+        "FIX-RAR-001",
+        "single-volume non-encrypted RAR 4.x Stored pages",
+        ["1.png", "chapter/2.png", "chapter/10.png"],
+        "1.png",
+        "success",
+    )
+    rar_sources = []
+    for page in (1, 2, 10):
+        temporary = p / f"_source_{page}.png"
+        builder.image(temporary, 320, 480, "FIX-RAR-001", page)
+        rar_sources.append((page, temporary.read_bytes()))
+        temporary.unlink()
+    builder.rar_archive(
+        p / "standard.rar",
+        [
+            ("chapter/10.png", rar_sources[2][1], 0),
+            ("notes.txt", b"unsupported", 0),
+            ("1.png", rar_sources[0][1], 0),
+            ("chapter/2.png", rar_sources[1][1], 0),
+        ],
+    )
+    builder.rar5_archive(
+        p / "standard-rar5.rar",
+        [
+            ("chapter/10.png", rar_sources[2][1]),
+            ("notes.txt", b"unsupported"),
+            ("1.png", rar_sources[0][1]),
+            ("chapter/2.png", rar_sources[1][1]),
+        ],
+    )
+
+    p = builder.fixture(
+        "FIX-RAR-ERROR-001",
+        "RAR corruption, encryption, split members and unsafe paths",
+        [],
+        None,
+        "classified-error",
+    )
+    sample = png_bytes(16, 16, "1", SEED)
+    builder.rar_archive(p / "encrypted-flag.rar", [("1.png", sample, 0x0004)])
+    builder.rar_archive(p / "split-flag.rar", [("1.png", sample, 0x0002)])
+    builder.rar_archive(p / "dangerous-entry.rar", [("../escape.png", sample, 0)])
+    valid_rar = (builder.root / "FIX-RAR-001/standard.rar").read_bytes()
+    corrupt_rar = bytearray(valid_rar)
+    corrupt_rar[0:4] = b"BAD!"
+    (p / "corrupt.rar").write_bytes(corrupt_rar)
+
     p = builder.fixture("FIX-ZIP-ERROR-001", "archive errors and Zip Slip names", [], None, "classified-error")
     builder.archive(p / "empty.zip", [])
     builder.archive(p / "no-images.cbz", [("notes.txt", b"no images", ZIP_DEFLATED)])
@@ -351,7 +473,7 @@ def build_core(builder: Builder) -> None:
     malformed[0:4] = b"BAD!"
     (p / "malformed-local-header.zip").write_bytes(malformed)
 
-    p = builder.fixture("FIX-READING-001", "reading position for folder/ZIP/CBZ/EPUB", [f"page{i}.png" for i in range(1, 13)], "page1.png", "success")
+    p = builder.fixture("FIX-READING-001", "reading position for folder/ZIP/CBZ/EPUB/RAR", [f"page{i}.png" for i in range(1, 13)], "page1.png", "success")
     folder = p / "folder"
     folder.mkdir()
     reading_entries = []
@@ -364,6 +486,10 @@ def build_core(builder: Builder) -> None:
     builder.archive(
         p / "same-content.epub",
         [("mimetype", b"application/epub+zip", ZIP_STORED), *reading_entries],
+    )
+    builder.rar_archive(
+        p / "same-content.rar",
+        [(name, data, 0) for name, data, _compression in reversed(reading_entries)],
     )
     (p / "reading-oracle.json").write_text(
         json.dumps(
@@ -387,7 +513,7 @@ def build_core(builder: Builder) -> None:
     shutil.copyfile(builder.root / "FIX-ZIP-001/standard.zip", p / "volume.zip")
     shutil.copyfile(builder.root / "FIX-ZIP-001/standard.cbz", p / "volume.cbz")
     shutil.copyfile(builder.root / "FIX-ZIP-001/standard.epub", p / "volume.epub")
-    (p / "future.rar").write_bytes(b"unsupported")
+    shutil.copyfile(builder.root / "FIX-RAR-001/standard.rar", p / "volume.rar")
     (p / "empty-folder").mkdir()
     (p / ("long-" + "x" * 180)).mkdir()
     for name in ("same-a.cbz", "same-b.cbz"):
@@ -395,7 +521,7 @@ def build_core(builder: Builder) -> None:
 
     p = builder.fixture(
         "FIX-WEBP-001",
-        "static lossy/lossless/alpha WebP for folders and ZIP/CBZ/EPUB",
+        "static lossy/lossless/alpha WebP for folders and ZIP/CBZ/EPUB/RAR",
         ["1-lossy.webp", "2-lossless.webp", "3-alpha.webp"],
         "1-lossy.webp",
         "static-webp-with-negative-cases",
@@ -427,6 +553,10 @@ def build_core(builder: Builder) -> None:
     builder.archive(
         p / "static-webp.epub",
         [("mimetype", b"application/epub+zip", ZIP_STORED), *archive_entries],
+    )
+    builder.rar_archive(
+        p / "static-webp.rar",
+        [(name, payload, 0) for name, payload in reversed(static_webp)],
     )
 
 
@@ -563,13 +693,13 @@ def finalize(builder: Builder, include_performance: bool) -> None:
             entry["fileType"] = "image"
         elif path.suffix.lower() in SUPPORTED_IMAGES:
             entry["fileType"] = "invalid-image"
-        elif path.suffix.lower() in {".zip", ".cbz"}:
+        elif path.suffix.lower() in {".zip", ".cbz", ".epub", ".rar"}:
             entry["fileType"] = "archive"
         else:
             entry["fileType"] = "other"
         # Zero-byte performance items model list entries, not readable archives.
         # Avoid opening all 11,000 placeholders during manifest generation.
-        if path.suffix.lower() in {".zip", ".cbz"} and path.stat().st_size:
+        if path.suffix.lower() in {".zip", ".cbz", ".epub"} and path.stat().st_size:
             try:
                 with ZipFile(path) as archive:
                     entry["archiveEntries"] = [

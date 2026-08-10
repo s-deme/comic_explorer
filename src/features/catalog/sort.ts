@@ -56,7 +56,8 @@ function kindRank(entry: CatalogEntry): number {
   if (entry.kind === "archive" && entry.archiveKind === "zip") return 2;
   if (entry.kind === "archive" && entry.archiveKind === "cbz") return 3;
   if (entry.kind === "archive" && entry.archiveKind === "epub") return 4;
-  return 5;
+  if (entry.kind === "archive" && entry.archiveKind === "rar") return 5;
+  return 6;
 }
 
 function optionalNumberCompare(

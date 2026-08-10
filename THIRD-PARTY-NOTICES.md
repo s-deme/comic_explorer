@@ -350,6 +350,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / unic-ucd-version | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | cargo / unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
+| cargo / unrar | 0.5.8 | MIT OR Apache-2.0 |
+| cargo / unrar_sys | 0.5.8 | MIT OR Apache-2.0 |
 | cargo / url | 2.5.8 | MIT OR Apache-2.0 |
 | cargo / urlpattern | 0.3.0 | MIT |
 | cargo / utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
@@ -376,6 +378,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / webview2-com-macros | 0.8.1 | MIT |
 | cargo / webview2-com-sys | 0.38.2 | MIT |
 | cargo / webview2-com | 0.38.2 | MIT |
+| cargo / widestring | 1.2.1 | MIT OR Apache-2.0 |
 | cargo / winapi-i686-pc-windows-gnu | 0.4.0 | MIT OR Apache-2.0 |
 | cargo / winapi-util | 0.1.11 | Unlicense OR MIT |
 | cargo / winapi-x86_64-pc-windows-gnu | 0.4.0 | MIT OR Apache-2.0 |
@@ -676,3 +679,22 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 
 Copyright and full license texts remain available from each component's source
 distribution. This notice does not alter the terms of those licenses.
+
+## Bundled UnRAR source notice
+
+The `unrar_sys` component bundles the UnRAR extraction source. In addition to
+the wrapper license shown above, the following upstream terms apply:
+
+> UnRAR source code may be used in any software to handle
+> RAR archives without limitations free of charge, but cannot be
+> used to develop RAR (WinRAR) compatible archiver and to
+> re-create RAR compression algorithm, which is proprietary.
+> Distribution of modified UnRAR source code in separate form
+> or as a part of other software is permitted, provided that
+> full text of this paragraph, starting from "UnRAR source code"
+> words, is included in license, or in documentation if license
+> is not available, and in source code comments of resulting package.
+
+The UnRAR utility and source are distributed without warranty. Comic Explorer
+uses this component only to list and read existing RAR archives; it does not
+create RAR archives.

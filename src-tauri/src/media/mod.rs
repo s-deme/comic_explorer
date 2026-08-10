@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
 use std::hash::{BuildHasher, Hasher, RandomState};
-use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::http::{Method, Request, Response, StatusCode};
 
-use crate::catalog::{ArchiveAdapterKind, archive_adapter_kind};
+use crate::catalog::read_archive_entry;
 use crate::domain::{AppError, ErrorCode, PageId};
 
 const PRODUCTION_ORIGIN: &str = "http://tauri.localhost";
@@ -109,32 +108,7 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
     let bytes = match &grant.source {
         PageSource::File(path) => fs::read(path).map_err(media_io_error)?,
         PageSource::ArchiveEntry { archive, entry } => {
-            let adapter = archive_adapter_kind(archive);
-            if !matches!(
-                adapter,
-                ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub
-            ) {
-                return Err(AppError {
-                    code: ErrorCode::UnsupportedFormat,
-                    message: format!("Archive adapter is unavailable for {}.", archive.display()),
-                    target: None,
-                    retryable: false,
-                });
-            }
-            let file = fs::File::open(archive).map_err(media_io_error)?;
-            let mut archive = zip::ZipArchive::new(file).map_err(media_error)?;
-            let entry = archive.by_name(entry).map_err(media_error)?;
-            if entry.encrypted() || entry.size() > grant.max_bytes {
-                return Err(limit_error());
-            }
-            let mut bytes = Vec::with_capacity(
-                usize::try_from(entry.size().min(grant.max_bytes)).unwrap_or_default(),
-            );
-            entry
-                .take(grant.max_bytes.saturating_add(1))
-                .read_to_end(&mut bytes)
-                .map_err(media_io_error)?;
-            bytes
+            read_archive_entry(archive, entry, grant.max_bytes)?.bytes
         }
         PageSource::Memory(bytes) => bytes.clone(),
     };
@@ -298,15 +272,6 @@ fn media_io_error(error: impl std::fmt::Display) -> AppError {
         message: format!("Cannot read page source: {error}"),
         target: None,
         retryable: true,
-    }
-}
-
-fn media_error(error: impl std::fmt::Display) -> AppError {
-    AppError {
-        code: ErrorCode::CorruptArchive,
-        message: format!("Cannot read archive page: {error}"),
-        target: None,
-        retryable: false,
     }
 }
 

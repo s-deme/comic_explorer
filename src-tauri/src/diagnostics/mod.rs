@@ -2,7 +2,7 @@
 //!
 //! The scanner deliberately keeps its snapshot in the request/response
 //! boundary.  Nothing is persisted next to the library, and archive
-//! validation reuses the existing ZIP/CBZ/EPUB page enumerator rather than adding
+//! validation reuses the existing ZIP/CBZ/EPUB/RAR page enumerator rather than adding
 //! another decoder or extraction path.
 
 use std::collections::{BTreeMap, HashMap};
@@ -206,7 +206,7 @@ fn scan_directory(
 fn archive_reader_available(entry: &CatalogEntry) -> bool {
     matches!(
         entry.archive_kind,
-        Some(ArchiveKind::Zip | ArchiveKind::Cbz | ArchiveKind::Epub)
+        Some(ArchiveKind::Zip | ArchiveKind::Cbz | ArchiveKind::Epub | ArchiveKind::Rar)
     )
 }
 
@@ -425,13 +425,13 @@ fn kind_key(kind: ItemKind) -> String {
 
 fn archive_error_message(code: ErrorCode) -> &'static str {
     match code {
-        ErrorCode::CorruptArchive => "ZIP/CBZ/EPUB書庫を読み取れません。",
-        ErrorCode::EncryptedArchive => "暗号化されたZIP/CBZ/EPUB書庫は診断できません。",
-        ErrorCode::UnsupportedFormat => "ZIP/CBZ/EPUB書庫の圧縮方式に対応していません。",
-        ErrorCode::ResourceLimit => "ZIP/CBZ/EPUB書庫が安全な読み取り上限を超えています。",
-        ErrorCode::NotFound => "診断中にZIP/CBZ/EPUB書庫が見つからなくなりました。",
-        ErrorCode::AccessDenied => "ZIP/CBZ/EPUB書庫へアクセスできません。",
-        _ => "ZIP/CBZ/EPUB書庫の診断に失敗しました。",
+        ErrorCode::CorruptArchive => "ZIP/CBZ/EPUB/RAR書庫を読み取れません。",
+        ErrorCode::EncryptedArchive => "暗号化されたZIP/CBZ/EPUB/RAR書庫は診断できません。",
+        ErrorCode::UnsupportedFormat => "ZIP/CBZ/EPUB/RAR書庫の形式に対応していません。",
+        ErrorCode::ResourceLimit => "ZIP/CBZ/EPUB/RAR書庫が安全な読み取り上限を超えています。",
+        ErrorCode::NotFound => "診断中にZIP/CBZ/EPUB/RAR書庫が見つからなくなりました。",
+        ErrorCode::AccessDenied => "ZIP/CBZ/EPUB/RAR書庫へアクセスできません。",
+        _ => "ZIP/CBZ/EPUB/RAR書庫の診断に失敗しました。",
     }
 }
 
@@ -580,7 +580,7 @@ mod tests {
                     .extension()
                     .and_then(|value| value.to_str())
                     .map(|value| value.to_ascii_lowercase());
-                if matches!(extension.as_deref(), Some("zip" | "cbz" | "epub")) {
+                if matches!(extension.as_deref(), Some("zip" | "cbz" | "epub" | "rar")) {
                     let entries = enumerate_archive_pages(&path)
                         .unwrap()
                         .into_iter()
@@ -677,11 +677,10 @@ mod tests {
     }
 
     #[test]
-    fn fr_b12_unavailable_archives_are_unsupported_and_not_reported_as_corrupt_zip() {
+    fn fr_b12_cbr_and_7z_are_unsupported_and_not_reported_as_corrupt_archive() {
         let root = temporary_root("unsupported-archives");
         fs::create_dir_all(&root).unwrap();
         for (name, bytes) in [
-            ("volume.rar", b"Rar!\x1a\x07\x00".as_slice()),
             ("volume.cbr", b"Rar!\x1a\x07\x00".as_slice()),
             ("volume.7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
         ] {
@@ -691,7 +690,7 @@ mod tests {
 
         let report = scan(&root, &[]);
 
-        for name in ["volume.rar", "volume.cbr", "volume.7z"] {
+        for name in ["volume.cbr", "volume.7z"] {
             let snapshot = report
                 .snapshot
                 .iter()
@@ -707,6 +706,26 @@ mod tests {
         );
         assert_eq!(source_state(&root), before);
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn fr_b12_rar_is_scanned_as_a_readable_archive_without_source_mutation() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-RAR-001")
+            .canonicalize()
+            .unwrap();
+        let before = source_state(&root);
+
+        let report = scan(&root, &[]);
+
+        assert_eq!(report.summary.errors, 0);
+        assert!(
+            report
+                .snapshot
+                .iter()
+                .all(|entry| entry.kind == ItemKind::Archive)
+        );
+        assert_eq!(source_state(&root), before);
     }
 
     #[test]

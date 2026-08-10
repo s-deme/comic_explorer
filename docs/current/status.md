@@ -59,7 +59,7 @@ codd:
 | FR-B08 / P8 | FUT-C-006〜008 | Partial / BLOCKED | release WebView2でGIF/AVIF decode、animation、corrupt fallback未測定。 |
 | FR-B10 | tag | Implemented / PASS | — |
 | FR-B11 / keyboard | FUT-C-019 | Implemented / PASS | touch/gamepadはCandidate。 |
-| FR-B12 / P9 | FUT-C-001, 002 | Partial / BLOCKED | RAR/CBR/7z reader、license、fixture未承認。 |
+| FR-B12 / P9 | FUT-C-001, 002 | Partial / BLOCKED | RAR4/RAR5 reader・license・fixtureはPASS。CBR/7z readerは未承認。 |
 | FR-B13 / P1 | catalog command | Implemented / PASS | — |
 | FR-B14 / P2 | open・navigation | Implemented / PASS | — |
 | FR-B15 / P3 | bookmark・bookshelf | Implemented / PASS | — |
@@ -89,7 +89,7 @@ codd:
 - 基準PCでのcold TTI、10,000項目、scroll/FPS、input/page latency、working set、cache測定。
 - Windows UIA、Narrator/NVDA、high contrast、100/150/200% DPI。
 - WebView2 custom protocolの実Origin/Referer header統合。
-- GIF/AVIFの製品decode、animation、corrupt fallback、RAR/CBR/7z reader。
+- GIF/AVIFの製品decode、animation、corrupt fallback、CBR/7z reader。
 - tray notification area、P5 visual/DPI、thumbnail file pickerと実disk I/Oの製品gate。
 
 これらが残るため、製品全体を「すべてのrelease gateがPASS」とは判定しない。

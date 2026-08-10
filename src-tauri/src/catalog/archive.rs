@@ -1,6 +1,9 @@
 use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 
+use unrar::error::{Code as UnrarCode, UnrarError, When as UnrarWhen};
+use unrar::{Archive, VolumeInfo};
 use zip::{CompressionMethod, ZipArchive};
 
 use crate::api::{MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES};
@@ -14,6 +17,12 @@ pub enum ArchiveAdapterKind {
     Rar,
     Cbr,
     SevenZip,
+}
+
+#[derive(Debug)]
+pub(crate) struct ArchiveEntryBytes {
+    pub bytes: Vec<u8>,
+    pub fingerprint_detail: String,
 }
 
 pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
@@ -33,13 +42,30 @@ pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
 }
 
 pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
-    let adapter = archive_adapter_kind(path);
-    if !matches!(
-        adapter,
-        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub
-    ) {
-        return Err(unsupported_adapter_error(path, adapter));
+    match archive_adapter_kind(path) {
+        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub => {
+            enumerate_zip_pages(path)
+        }
+        ArchiveAdapterKind::Rar => enumerate_rar_pages(path),
+        adapter => Err(unsupported_adapter_error(path, adapter)),
     }
+}
+
+pub(crate) fn read_archive_entry(
+    path: &Path,
+    entry_name: &str,
+    max_bytes: u64,
+) -> Result<ArchiveEntryBytes, AppError> {
+    match archive_adapter_kind(path) {
+        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub => {
+            read_zip_entry(path, entry_name, max_bytes)
+        }
+        ArchiveAdapterKind::Rar => read_rar_entry(path, entry_name, max_bytes),
+        adapter => Err(unsupported_adapter_error(path, adapter)),
+    }
+}
+
+fn enumerate_zip_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
     let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
     let mut archive = ZipArchive::new(file).map_err(|source| AppError {
         code: ErrorCode::CorruptArchive,
@@ -113,17 +139,219 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
     Ok(pages)
 }
 
+fn enumerate_rar_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
+    File::open(path).map_err(|source| archive_io_error(path, source))?;
+    let archive = Archive::new(path).open_for_listing().map_err(unrar_error)?;
+    ensure_single_volume(archive.volume_info())?;
+    let mut total_size = 0_u64;
+    let mut pages = Vec::new();
+    for (index, result) in archive.enumerate() {
+        if index >= MAX_ARCHIVE_ENTRIES {
+            return Err(limit_error("Archive entry-count limit exceeded."));
+        }
+        let entry = result.map_err(unrar_error)?;
+        validate_rar_entry(&entry)?;
+        total_size = total_size
+            .checked_add(entry.unpacked_size)
+            .ok_or_else(|| limit_error("Archive total byte limit exceeded."))?;
+        if total_size > MAX_ARCHIVE_TOTAL_BYTES {
+            return Err(limit_error("Archive total byte limit exceeded."));
+        }
+        if !entry.is_file() {
+            continue;
+        }
+        let relative = rar_relative_path(&entry)?;
+        if classify_file_name(relative.as_str()) != FileKind::Image
+            || relative
+                .as_str()
+                .split('/')
+                .any(|part| part.starts_with('.'))
+        {
+            continue;
+        }
+        pages.push(relative);
+    }
+    pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
+    Ok(pages)
+}
+
+fn validate_rar_entry(entry: &unrar::FileHeader) -> Result<(), AppError> {
+    if entry.is_split() {
+        return Err(AppError {
+            code: ErrorCode::UnsupportedFormat,
+            message: "Multi-volume RAR archives are not supported.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    if entry.is_encrypted() {
+        return Err(AppError {
+            code: ErrorCode::EncryptedArchive,
+            message: "Encrypted RAR archives are not supported.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    if entry.unpacked_size > MAX_ARCHIVE_ENTRY_BYTES {
+        return Err(limit_error("Archive entry byte limit exceeded."));
+    }
+    Ok(())
+}
+
+fn rar_relative_path(entry: &unrar::FileHeader) -> Result<RelativePath, AppError> {
+    let name = entry.filename.to_str().ok_or_else(|| AppError {
+        code: ErrorCode::InvalidPath,
+        message: "RAR entry name is not valid Unicode.".into(),
+        target: None,
+        retryable: false,
+    })?;
+    RelativePath::parse(name).map_err(|_| AppError {
+        code: ErrorCode::InvalidPath,
+        message: "Unsafe RAR entry path.".into(),
+        target: None,
+        retryable: false,
+    })
+}
+
+fn read_zip_entry(
+    path: &Path,
+    entry_name: &str,
+    max_bytes: u64,
+) -> Result<ArchiveEntryBytes, AppError> {
+    let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
+    let mut archive = ZipArchive::new(file).map_err(|source| AppError {
+        code: ErrorCode::CorruptArchive,
+        message: format!("Cannot parse archive: {source}"),
+        target: None,
+        retryable: false,
+    })?;
+    let entry = archive.by_name(entry_name).map_err(|source| AppError {
+        code: ErrorCode::CorruptArchive,
+        message: format!("Cannot read archive entry: {source}"),
+        target: None,
+        retryable: false,
+    })?;
+    if entry.encrypted() {
+        return Err(AppError {
+            code: ErrorCode::EncryptedArchive,
+            message: "Encrypted archive entries are not supported.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    if !matches!(
+        entry.compression(),
+        CompressionMethod::Stored | CompressionMethod::Deflated
+    ) {
+        return Err(AppError {
+            code: ErrorCode::UnsupportedFormat,
+            message: "Unsupported archive compression method.".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    if entry.size() > max_bytes {
+        return Err(limit_error("Archive entry byte limit exceeded."));
+    }
+    let detail = format!("crc:{:08x}:size:{}", entry.crc32(), entry.size());
+    let mut bytes = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or_default());
+    entry
+        .take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|source| archive_io_error(path, source))?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(limit_error("Archive entry byte limit exceeded."));
+    }
+    Ok(ArchiveEntryBytes {
+        bytes,
+        fingerprint_detail: detail,
+    })
+}
+
+fn read_rar_entry(
+    path: &Path,
+    entry_name: &str,
+    max_bytes: u64,
+) -> Result<ArchiveEntryBytes, AppError> {
+    File::open(path).map_err(|source| archive_io_error(path, source))?;
+    let mut archive = Archive::new(path)
+        .open_for_processing()
+        .map_err(unrar_error)?;
+    ensure_single_volume(archive.volume_info())?;
+    while let Some(header) = archive.read_header().map_err(unrar_error)? {
+        validate_rar_entry(header.entry())?;
+        let relative = rar_relative_path(header.entry())?;
+        if relative.as_str() == entry_name {
+            if header.entry().unpacked_size > max_bytes {
+                return Err(limit_error("Archive entry byte limit exceeded."));
+            }
+            let crc = header.entry().file_crc;
+            let size = header.entry().unpacked_size;
+            let (bytes, _rest) = header.read().map_err(unrar_error)?;
+            if bytes.len() as u64 > max_bytes {
+                return Err(limit_error("Archive entry byte limit exceeded."));
+            }
+            return Ok(ArchiveEntryBytes {
+                bytes,
+                fingerprint_detail: format!("crc:{crc:08x}:size:{size}"),
+            });
+        }
+        archive = header.skip().map_err(unrar_error)?;
+    }
+    Err(AppError {
+        code: ErrorCode::NotFound,
+        message: "Archive entry was not found.".into(),
+        target: None,
+        retryable: false,
+    })
+}
+
 fn unsupported_adapter_error(_path: &Path, adapter: ArchiveAdapterKind) -> AppError {
     let name = match adapter {
-        ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => "RAR/CBR",
+        ArchiveAdapterKind::Cbr => "CBR",
         ArchiveAdapterKind::SevenZip => "7z",
-        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub => {
-            "ZIP/CBZ/EPUB"
-        }
+        ArchiveAdapterKind::Zip
+        | ArchiveAdapterKind::Cbz
+        | ArchiveAdapterKind::Epub
+        | ArchiveAdapterKind::Rar => "ZIP/CBZ/EPUB/RAR",
     };
     AppError {
         code: ErrorCode::UnsupportedFormat,
         message: format!("{name} archive adapter is unavailable."),
+        target: None,
+        retryable: false,
+    }
+}
+
+fn ensure_single_volume(volume: VolumeInfo) -> Result<(), AppError> {
+    if volume == VolumeInfo::None {
+        Ok(())
+    } else {
+        Err(AppError {
+            code: ErrorCode::UnsupportedFormat,
+            message: "Multi-volume RAR archives are not supported.".into(),
+            target: None,
+            retryable: false,
+        })
+    }
+}
+
+fn unrar_error(error: UnrarError) -> AppError {
+    let code = match (error.code, error.when) {
+        (UnrarCode::MissingPassword | UnrarCode::BadPassword, _) => ErrorCode::EncryptedArchive,
+        (UnrarCode::NoMemory, _) => ErrorCode::ResourceLimit,
+        (UnrarCode::EOpen, UnrarWhen::Process) => ErrorCode::UnsupportedFormat,
+        _ => ErrorCode::CorruptArchive,
+    };
+    AppError {
+        code,
+        message: match code {
+            ErrorCode::EncryptedArchive => "Encrypted RAR archives are not supported.",
+            ErrorCode::ResourceLimit => "RAR archive exceeded the memory limit.",
+            ErrorCode::UnsupportedFormat => "Multi-volume RAR archives are not supported.",
+            _ => "Cannot read RAR archive.",
+        }
+        .into(),
         target: None,
         retryable: false,
     }
@@ -265,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b12_classifies_rar_cbr_and_7z_without_extracting_or_faking_support() {
+    fn fr_b12_classifies_cbr_and_7z_without_extracting_or_faking_support() {
         assert_eq!(
             archive_adapter_kind(Path::new("volume.cbr")),
             ArchiveAdapterKind::Cbr
@@ -275,7 +503,6 @@ mod tests {
             ArchiveAdapterKind::SevenZip
         );
         for (extension, signature) in [
-            ("rar", b"Rar!\x1a\x07\x00".as_slice()),
             ("cbr", b"Rar!\x1a\x07\x00".as_slice()),
             ("7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
         ] {

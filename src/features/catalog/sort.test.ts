@@ -48,18 +48,19 @@ describe("catalog sorting", () => {
       .toEqual(["small.zip", "runtime-null-folder"]);
   });
 
-  it("orders folder, comic folder, ZIP, CBZ and EPUB and reverses the kind order", () => {
+  it("orders folder, comic folder, ZIP, CBZ, EPUB and RAR and reverses the kind order", () => {
     const values = [
       entry("book.epub", { archiveKind: "epub" }),
+      entry("book.rar", { archiveKind: "rar" }),
       entry("book.cbz", { archiveKind: "cbz" }),
       entry("book.zip"),
       entry("comic", { kind: "comicFolder", archiveKind: undefined }),
       entry("folder", { kind: "folder", archiveKind: undefined }),
     ];
     expect(sortCatalogEntries(values, "kind", "ascending").map((item) => item.relativePath))
-      .toEqual(["folder", "comic", "book.zip", "book.cbz", "book.epub"]);
+      .toEqual(["folder", "comic", "book.zip", "book.cbz", "book.epub", "book.rar"]);
     expect(sortCatalogEntries(values, "kind", "descending").map((item) => item.relativePath))
-      .toEqual(["book.epub", "book.cbz", "book.zip", "comic", "folder"]);
+      .toEqual(["book.rar", "book.epub", "book.cbz", "book.zip", "comic", "folder"]);
   });
 
   it("selects only the next readable item in the established list order", () => {

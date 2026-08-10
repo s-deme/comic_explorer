@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import struct
+import zlib
 from pathlib import Path, PurePosixPath
 from zipfile import BadZipFile, ZipFile
 
@@ -47,6 +48,41 @@ def webp_chunks(data: bytes) -> list[bytes]:
         chunks.append(fourcc)
     assert position == len(data)
     return chunks
+
+
+def rar4_entries(path: Path) -> list[dict[str, object]]:
+    data = path.read_bytes()
+    assert data.startswith(b"Rar!\x1a\x07\x00")
+    position = 7
+    entries: list[dict[str, object]] = []
+    while position < len(data):
+        assert position + 7 <= len(data)
+        expected_crc, kind, flags, header_size = struct.unpack_from("<HBHH", data, position)
+        assert header_size >= 7 and position + header_size <= len(data)
+        header_payload = data[position + 2 : position + header_size]
+        assert zlib.crc32(header_payload) & 0xFFFF == expected_crc
+        if kind == 0x7B:
+            assert position + header_size == len(data)
+            break
+        if kind != 0x74:
+            position += header_size
+            continue
+        packed_size, unpacked_size = struct.unpack_from("<II", data, position + 7)
+        method = data[position + 25]
+        name_size = struct.unpack_from("<H", data, position + 26)[0]
+        name = data[position + 32 : position + 32 + name_size].decode("ascii")
+        start = position + header_size
+        end = start + packed_size
+        assert end <= len(data)
+        entries.append({
+            "name": name,
+            "flags": flags,
+            "method": method,
+            "unpackedSize": unpacked_size,
+            "data": data[start:end],
+        })
+        position = end
+    return entries
 
 
 def main() -> None:
@@ -105,6 +141,19 @@ def main() -> None:
         assert archive.infolist()[0].compress_type == 99
     assert (zip_root / "malformed-local-header.zip").read_bytes().startswith(b"BAD!")
 
+    rar_root = root / "FIX-RAR-001"
+    rar_entries = rar4_entries(rar_root / "standard.rar")
+    assert [entry["name"] for entry in rar_entries] == [
+        "chapter/10.png", "notes.txt", "1.png", "chapter/2.png"
+    ]
+    assert all(entry["method"] == 0x30 for entry in rar_entries)
+    rar_error_root = root / "FIX-RAR-ERROR-001"
+    assert rar4_entries(rar_error_root / "encrypted-flag.rar")[0]["flags"] & 0x0004
+    assert rar4_entries(rar_error_root / "split-flag.rar")[0]["flags"] & 0x0002
+    assert unsafe_archive_name(
+        str(rar4_entries(rar_error_root / "dangerous-entry.rar")[0]["name"])
+    )
+
     image_root = root / "FIX-IMAGE-ERROR-001"
     assert {"invalid-crc.png", "dimension-bomb.png"} <= {
         path.name for path in image_root.iterdir()
@@ -135,6 +184,10 @@ def main() -> None:
             assert sorted(names) == static_names
             for name in names:
                 assert webp_chunks(archive.read(name)) == expected_webp[name][2]
+    rar_webp = rar4_entries(webp_root / "static-webp.rar")
+    assert sorted(entry["name"] for entry in rar_webp) == static_names
+    for entry in rar_webp:
+        assert webp_chunks(entry["data"]) == expected_webp[str(entry["name"])][2]
 
     for forbidden in ("escape.png", "absolute.png"):
         assert not (root / forbidden).exists()
@@ -143,7 +196,8 @@ def main() -> None:
     fixture_ids = {
         "FIX-ORDER-001", "FIX-ORDER-002", "FIX-ORDER-003", "FIX-ORDER-004",
         "FIX-NESTED-001", "FIX-IMAGE-001", "FIX-IMAGE-ERROR-001",
-        "FIX-ZIP-001", "FIX-ZIP-ERROR-001", "FIX-LIBRARY-001", "FIX-READING-001",
+        "FIX-ZIP-001", "FIX-ZIP-ERROR-001", "FIX-RAR-001", "FIX-RAR-ERROR-001",
+        "FIX-LIBRARY-001", "FIX-READING-001",
         "FIX-WEBP-001",
     }
     assert fixture_ids <= set(manifest["fixtures"])

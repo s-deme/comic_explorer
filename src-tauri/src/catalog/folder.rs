@@ -31,7 +31,7 @@ pub enum ArchiveKind {
 
 impl ArchiveKind {
     fn reader_available(self) -> bool {
-        matches!(self, Self::Zip | Self::Cbz | Self::Epub)
+        matches!(self, Self::Zip | Self::Cbz | Self::Epub | Self::Rar)
     }
 }
 
@@ -344,14 +344,12 @@ mod tests {
         assert_eq!(zip.kind, ItemKind::Archive);
         assert_eq!(cbz.kind, ItemKind::Archive);
         assert_eq!(epub.kind, ItemKind::Archive);
+        assert_eq!(rar.kind, ItemKind::Archive);
         assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
         assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
         assert_eq!(epub.archive_kind, Some(ArchiveKind::Epub));
-        for (entry, archive_kind) in [
-            (rar, ArchiveKind::Rar),
-            (cbr, ArchiveKind::Cbr),
-            (seven_zip, ArchiveKind::SevenZip),
-        ] {
+        assert_eq!(rar.archive_kind, Some(ArchiveKind::Rar));
+        for (entry, archive_kind) in [(cbr, ArchiveKind::Cbr), (seven_zip, ArchiveKind::SevenZip)] {
             assert_eq!(entry.kind, ItemKind::Unsupported);
             assert_eq!(entry.archive_kind, Some(archive_kind));
         }

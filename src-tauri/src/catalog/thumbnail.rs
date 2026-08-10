@@ -1,6 +1,6 @@
 use crate::api::{MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 use crate::domain::{AppError, ErrorCode, FileKind, ImageFormat, RelativePath, classify_file_name};
-use std::io::{BufReader, Cursor, Read};
+use std::io::{BufReader, Cursor};
 use std::path::Path;
 
 pub const THUMBNAIL_LONG_EDGE: u32 = 384;
@@ -20,36 +20,13 @@ pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppErr
         let cover = pages.first().ok_or_else(|| {
             thumbnail_error(ErrorCode::NotFound, "Archive has no supported cover.")
         })?;
-        let file = std::fs::File::open(&item_path).map_err(thumbnail_io_error)?;
-        let mut archive = zip::ZipArchive::new(file).map_err(|error| {
-            thumbnail_error(
-                ErrorCode::CorruptArchive,
-                &format!("Cannot read cover archive: {error}"),
-            )
-        })?;
-        let entry = archive.by_name(cover.as_str()).map_err(|error| {
-            thumbnail_error(
-                ErrorCode::CorruptArchive,
-                &format!("Cannot read cover entry: {error}"),
-            )
-        })?;
-        if entry.size() > MAX_IMAGE_BYTES {
-            return Err(thumbnail_error(
-                ErrorCode::ResourceLimit,
-                "Archive cover exceeds the image byte limit.",
-            ));
-        }
-        let detail = format!("crc:{:08x}:size:{}", entry.crc32(), entry.size());
-        let mut bytes = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or_default());
-        entry
-            .take(MAX_IMAGE_BYTES.saturating_add(1))
-            .read_to_end(&mut bytes)
-            .map_err(thumbnail_io_error)?;
+        let entry = super::read_archive_entry(&item_path, cover.as_str(), MAX_IMAGE_BYTES)?;
+        let bytes = entry.bytes;
         validate_cover_format(cover, &bytes)?;
         Ok(CoverBytes {
             bytes,
             source_key: format!("archive:{}#{}", item.as_str(), cover.as_str()),
-            fingerprint_detail: detail,
+            fingerprint_detail: entry.fingerprint_detail,
         })
     } else {
         let pages = super::enumerate_folder_pages(root, &item_path)?;
@@ -679,6 +656,7 @@ mod tests {
             .collect::<Vec<_>>();
         let folder = read_cover(&root, &RelativePath::parse("comic-folder").unwrap()).unwrap();
         let archive = read_cover(&root, &RelativePath::parse("same-a.cbz").unwrap()).unwrap();
+        let rar = read_cover(&root, &RelativePath::parse("volume.rar").unwrap()).unwrap();
         let folder_pages =
             super::super::enumerate_folder_pages(&root, &root.join("comic-folder")).unwrap();
         let archive_pages =
@@ -687,6 +665,8 @@ mod tests {
         assert!(archive.source_key.ends_with(archive_pages[0].as_str()));
         assert!(!folder.bytes.is_empty());
         assert!(!archive.bytes.is_empty());
+        assert!(rar.source_key.ends_with("1.png"));
+        assert!(!rar.bytes.is_empty());
         let after = std::fs::read_dir(&root)
             .unwrap()
             .map(|entry| entry.unwrap().file_name())

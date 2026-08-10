@@ -3,6 +3,7 @@ mod folder;
 mod image_metadata;
 mod thumbnail;
 
+pub(crate) use archive::read_archive_entry;
 pub use archive::{ArchiveAdapterKind, archive_adapter_kind, enumerate_archive_pages};
 pub use folder::{ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages};
 pub use image_metadata::{ImageMetadata, inspect_image};
@@ -156,6 +157,19 @@ mod fixture_tests {
                 .collect::<Vec<_>>(),
             ["1.JPG", "章/2.PNG", "章/10.JPEG"]
         );
+
+        let rar_pages = enumerate_archive_pages(&root.join("FIX-RAR-001/standard.rar"))
+            .unwrap()
+            .into_iter()
+            .map(|page| page.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(rar_pages, ["1.png", "chapter/2.png", "chapter/10.png"]);
+        let rar5_pages = enumerate_archive_pages(&root.join("FIX-RAR-001/standard-rar5.rar"))
+            .unwrap()
+            .into_iter()
+            .map(|page| page.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(rar5_pages, rar_pages);
     }
 
     #[test]
@@ -186,11 +200,11 @@ mod fixture_tests {
         assert_eq!(by_name["volume.zip"], ItemKind::Archive);
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
         assert_eq!(by_name["volume.epub"], ItemKind::Archive);
-        assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
+        assert_eq!(by_name["volume.rar"], ItemKind::Archive);
         assert_eq!(
             entries
                 .iter()
-                .find(|entry| entry.relative_path.as_str().ends_with("future.rar"))
+                .find(|entry| entry.relative_path.as_str().ends_with("volume.rar"))
                 .and_then(|entry| entry.archive_kind),
             Some(ArchiveKind::Rar)
         );
@@ -281,6 +295,31 @@ mod fixture_tests {
                 .code,
             ErrorCode::EncryptedArchive
         );
+        let rar_root = root.join("FIX-RAR-ERROR-001");
+        assert_eq!(
+            enumerate_archive_pages(&rar_root.join("corrupt.rar"))
+                .unwrap_err()
+                .code,
+            ErrorCode::CorruptArchive
+        );
+        assert_eq!(
+            enumerate_archive_pages(&rar_root.join("encrypted-flag.rar"))
+                .unwrap_err()
+                .code,
+            ErrorCode::EncryptedArchive
+        );
+        assert_eq!(
+            enumerate_archive_pages(&rar_root.join("split-flag.rar"))
+                .unwrap_err()
+                .code,
+            ErrorCode::UnsupportedFormat
+        );
+        assert_eq!(
+            enumerate_archive_pages(&rar_root.join("dangerous-entry.rar"))
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
         assert_eq!(snapshot(&root), before);
     }
 
@@ -359,6 +398,8 @@ mod fixture_tests {
         enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.zip")).unwrap();
         enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.cbz")).unwrap();
         enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.epub")).unwrap();
+        enumerate_archive_pages(&root.join("FIX-RAR-001/standard.rar")).unwrap();
+        enumerate_archive_pages(&root.join("FIX-RAR-001/standard-rar5.rar")).unwrap();
 
         let mut media = MediaTokenRegistry::new(Duration::from_secs(60));
         let file_token = media.issue(MediaGrant {
@@ -370,11 +411,11 @@ mod fixture_tests {
         media.read(&file_token).unwrap();
         let archive_token = media.issue(MediaGrant {
             page_id: PageId::parse("source-archive").unwrap(),
-            mime_type: "image/jpeg",
+            mime_type: "image/png",
             max_bytes: crate::api::MAX_IMAGE_BYTES,
             source: PageSource::ArchiveEntry {
-                archive: root.join("FIX-ZIP-001/standard.epub"),
-                entry: "1.JPG".into(),
+                archive: root.join("FIX-RAR-001/standard.rar"),
+                entry: "1.png".into(),
             },
         });
         media.read(&archive_token).unwrap();
