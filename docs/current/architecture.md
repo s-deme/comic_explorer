@@ -99,7 +99,7 @@ shutdownは新規受付拒否、task cancel/join、読書位置flush、media gra
 
 ## thumbnailとcache
 
-thumbnailは自然順の先頭表示可能pageから生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。
+thumbnailは漫画folder・対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。
 BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止WebPはWIC codecに依存しない
 pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
 animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、

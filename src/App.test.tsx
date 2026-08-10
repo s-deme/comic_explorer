@@ -1014,6 +1014,19 @@ describe("application shell", () => {
     expect(priorities.filter((value) => value === "background")).toHaveLength(5);
   });
 
+  it("requests cached thumbnails for images displayed directly in a folder", async () => {
+    const entries: CatalogEntry[] = ["001.jpg", "002.jpg"].map((relativePath) => ({
+      relativePath: relativePath as never,
+      kind: "page",
+    }));
+    thumbnailMock.mockImplementation(() => new Promise(() => undefined));
+
+    await registerTestLibrary(entries);
+
+    await waitFor(() => expect(thumbnailMock).toHaveBeenCalledTimes(2));
+    expect(thumbnailMock.mock.calls.map(([path]) => path)).toEqual(["001.jpg", "002.jpg"]);
+  });
+
   it("persists the selected end-of-volume policy without changing the catalog sort", async () => {
     registerMock.mockResolvedValue({
       status: "ok",

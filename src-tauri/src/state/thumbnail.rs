@@ -233,6 +233,12 @@ mod tests {
         assert!(archive_thumbnail.path.is_file());
         assert!(!fixture_root.join("FIX-LIBRARY-001/1.png").exists());
 
+        let direct_image = RelativePath::parse("FIX-IMAGE-001/portrait.png").unwrap();
+        let direct_thumbnail = pipeline
+            .resolve(&store, &fixture_root, &direct_image, 180)
+            .unwrap();
+        assert!(direct_thumbnail.path.is_file());
+
         let broken = RelativePath::parse("FIX-IMAGE-ERROR-001").unwrap();
         let first_error = pipeline
             .resolve(&store, &fixture_root, &broken, 200)

@@ -15,62 +15,80 @@ pub struct CoverBytes {
 
 pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppError> {
     let (root, item_path) = contained_thumbnail_item(root, item)?;
-    if classify_file_name(item.as_str()) == FileKind::Pdf {
-        let pages = super::enumerate_pdf_pages(&item_path)?;
-        let cover = pages.first().ok_or_else(|| {
-            thumbnail_error(ErrorCode::NotFound, "PDF has no supported cover page.")
-        })?;
-        let bytes = super::render_pdf_page(&item_path, cover)?;
-        validate_rendered_pdf_cover(&bytes)?;
-        let metadata = item_path.metadata().map_err(thumbnail_io_error)?;
-        Ok(CoverBytes {
-            bytes,
-            source_key: format!("pdf:{}#{}", item.as_str(), cover.as_str()),
-            fingerprint_detail: format!(
-                "size:{}:modified:{:?}:page:{}",
-                metadata.len(),
-                metadata.modified().ok(),
-                cover.as_str()
-            ),
-        })
-    } else if classify_file_name(item.as_str()) == FileKind::Archive {
-        let pages = super::enumerate_archive_pages(&item_path)?;
-        let cover = pages.first().ok_or_else(|| {
-            thumbnail_error(ErrorCode::NotFound, "Archive has no supported cover.")
-        })?;
-        let entry = super::read_archive_entry(&item_path, cover.as_str(), MAX_IMAGE_BYTES)?;
-        let bytes = entry.bytes;
-        validate_cover_format(cover, &bytes)?;
-        Ok(CoverBytes {
-            bytes,
-            source_key: format!("archive:{}#{}", item.as_str(), cover.as_str()),
-            fingerprint_detail: entry.fingerprint_detail,
-        })
-    } else {
-        let pages = super::enumerate_folder_pages(&root, &item_path)?;
-        let cover = pages.first().ok_or_else(|| {
-            thumbnail_error(ErrorCode::NotFound, "Folder has no supported cover.")
-        })?;
-        let path = root.join(cover.as_str());
-        let bytes = std::fs::read(&path).map_err(thumbnail_io_error)?;
-        if bytes.len() as u64 > MAX_IMAGE_BYTES {
-            return Err(thumbnail_error(
-                ErrorCode::ResourceLimit,
-                "Folder cover exceeds the image byte limit.",
-            ));
+    match classify_file_name(item.as_str()) {
+        FileKind::Pdf => {
+            let pages = super::enumerate_pdf_pages(&item_path)?;
+            let cover = pages.first().ok_or_else(|| {
+                thumbnail_error(ErrorCode::NotFound, "PDF has no supported cover page.")
+            })?;
+            let bytes = super::render_pdf_page(&item_path, cover)?;
+            validate_rendered_pdf_cover(&bytes)?;
+            let metadata = item_path.metadata().map_err(thumbnail_io_error)?;
+            Ok(CoverBytes {
+                bytes,
+                source_key: format!("pdf:{}#{}", item.as_str(), cover.as_str()),
+                fingerprint_detail: format!(
+                    "size:{}:modified:{:?}:page:{}",
+                    metadata.len(),
+                    metadata.modified().ok(),
+                    cover.as_str()
+                ),
+            })
         }
-        validate_cover_format(cover, &bytes)?;
-        let metadata = path.metadata().map_err(thumbnail_io_error)?;
-        Ok(CoverBytes {
-            bytes,
-            source_key: format!("folder:{}#{}", item.as_str(), cover.as_str()),
-            fingerprint_detail: format!(
-                "size:{}:modified:{:?}",
-                metadata.len(),
-                metadata.modified().ok()
-            ),
-        })
+        FileKind::Archive => {
+            let pages = super::enumerate_archive_pages(&item_path)?;
+            let cover = pages.first().ok_or_else(|| {
+                thumbnail_error(ErrorCode::NotFound, "Archive has no supported cover.")
+            })?;
+            let entry = super::read_archive_entry(&item_path, cover.as_str(), MAX_IMAGE_BYTES)?;
+            let bytes = entry.bytes;
+            validate_cover_format(cover, &bytes)?;
+            Ok(CoverBytes {
+                bytes,
+                source_key: format!("archive:{}#{}", item.as_str(), cover.as_str()),
+                fingerprint_detail: entry.fingerprint_detail,
+            })
+        }
+        FileKind::Image => {
+            read_image_thumbnail(&item_path, item, format!("image:{}", item.as_str()))
+        }
+        FileKind::Unsupported => {
+            let pages = super::enumerate_folder_pages(&root, &item_path)?;
+            let cover = pages.first().ok_or_else(|| {
+                thumbnail_error(ErrorCode::NotFound, "Folder has no supported cover.")
+            })?;
+            read_image_thumbnail(
+                &root.join(cover.as_str()),
+                cover,
+                format!("folder:{}#{}", item.as_str(), cover.as_str()),
+            )
+        }
     }
+}
+
+fn read_image_thumbnail(
+    path: &Path,
+    source: &RelativePath,
+    source_key: String,
+) -> Result<CoverBytes, AppError> {
+    let bytes = std::fs::read(path).map_err(thumbnail_io_error)?;
+    if bytes.len() as u64 > MAX_IMAGE_BYTES {
+        return Err(thumbnail_error(
+            ErrorCode::ResourceLimit,
+            "Thumbnail image exceeds the image byte limit.",
+        ));
+    }
+    validate_cover_format(source, &bytes)?;
+    let metadata = path.metadata().map_err(thumbnail_io_error)?;
+    Ok(CoverBytes {
+        bytes,
+        source_key,
+        fingerprint_detail: format!(
+            "size:{}:modified:{:?}",
+            metadata.len(),
+            metadata.modified().ok()
+        ),
+    })
 }
 
 fn contained_thumbnail_item(
@@ -760,6 +778,16 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(before, after);
         assert!(!root.join("1.png").exists());
+    }
+
+    #[test]
+    fn direct_image_thumbnail_uses_the_image_itself() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-LIBRARY-001");
+        let image = read_cover(&root, &RelativePath::parse("comic-folder/1.png").unwrap()).unwrap();
+
+        assert_eq!(image.source_key, "image:comic-folder/1.png");
+        assert!(!image.bytes.is_empty());
     }
 
     #[test]

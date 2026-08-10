@@ -365,4 +365,26 @@ describe("CatalogGrid", () => {
     );
     expect(slot).toHaveAttribute("data-cache-hit", "true");
   });
+
+  it("requests a thumbnail for an image displayed directly in the catalog", async () => {
+    const page: CatalogEntry = {
+      relativePath: "chapter/001.jpg" as never,
+      kind: "page",
+    };
+    const onNeeded = vi.fn();
+    render(
+      <CatalogGrid
+        entries={[page]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onThumbnailNeeded={onNeeded}
+      />,
+    );
+
+    expect(document.querySelector(".thumbnail"))
+      .toHaveAttribute("data-thumbnail-state", "loading");
+    await waitFor(() => expect(onNeeded).toHaveBeenCalledWith(page));
+  });
 });

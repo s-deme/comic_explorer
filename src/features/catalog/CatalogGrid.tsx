@@ -386,7 +386,8 @@ function Thumbnail({
   state: ThumbnailViewState;
   onNeeded: (entry: CatalogEntry) => void;
 }) {
-  const eligible = entry.kind === "archive" || entry.kind === "comicFolder" || isPdfEntry(entry);
+  const eligible = entry.kind === "archive" || entry.kind === "comicFolder"
+    || entry.kind === "page" || isPdfEntry(entry);
   useEffect(() => {
     if (eligible && state.status === "loading") onNeeded(entry);
   }, [eligible, entry, onNeeded, state.status]);
