@@ -17,11 +17,11 @@ producer = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(producer)
 
 
-FEATURE_TEXT = """# Feature status fixture
+FEATURE_TEXT = """# Current status fixture
 
-## Phase 6の歴史スナップショット
+## MVP release case summary
 
-`source: docs/product/feature-status.md`、`scope: Phase 6`、`PASS: 3`、`FAIL: 1`、`BLOCKED: 2`、`NOT RUN: 4`、`total: 10`
+`source: docs/current/verification.md`、`scope: MVP release cases`、`PASS: 3`、`FAIL: 1`、`BLOCKED: 2`、`NOT RUN: 4`、`total: 10`
 """
 
 SUMMARY_TABLE = """| 結果 | 件数 |
@@ -33,9 +33,9 @@ SUMMARY_TABLE = """| 結果 | 件数 |
 | **合計** | **10** |
 """
 
-PHASE6_TEXT = f"""# Phase 6 result fixture
+PHASE6_TEXT = f"""# Current verification fixture
 
-## 集計
+## MVP release case summary
 
 {SUMMARY_TABLE}
 
@@ -53,17 +53,16 @@ EXPECTED = {
 
 
 def write_fixture(root: Path, feature: str = FEATURE_TEXT, phase6: str = PHASE6_TEXT) -> None:
-    (root / "docs/product").mkdir(parents=True)
-    (root / "docs/testing").mkdir(parents=True)
+    (root / "docs/current").mkdir(parents=True)
     (root / ".codd").mkdir()
-    (root / "docs/product/feature-status.md").write_text(feature, encoding="utf-8")
-    (root / "docs/testing/phase6-case-results.md").write_text(phase6, encoding="utf-8")
+    (root / producer.FEATURE_STATUS_PATH).write_text(feature, encoding="utf-8")
+    (root / producer.PHASE6_RESULTS_PATH).write_text(phase6, encoding="utf-8")
     dag = {
         "nodes": [],
         "edges": [
             {
-                "from_id": "docs/product/feature-status.md",
-                "to_id": "docs/testing/phase6-case-results.md",
+                "from_id": producer.FEATURE_STATUS_PATH,
+                "to_id": producer.PHASE6_RESULTS_PATH,
                 "kind": "depends_on",
             }
         ],
@@ -129,8 +128,8 @@ class CoddConsistencyProducerTests(unittest.TestCase):
 
     def test_rejects_missing_duplicate_and_unscoped_sections(self) -> None:
         cases = [
-            FEATURE_TEXT.replace("## Phase 6の歴史スナップショット", "## Other"),
-            FEATURE_TEXT + "\n## Phase 6の歴史スナップショット\n`PASS: 3`\n",
+            FEATURE_TEXT.replace("## MVP release case summary", "## Other"),
+            FEATURE_TEXT + "\n## MVP release case summary\n`PASS: 3`\n",
         ]
         for feature in cases:
             with self.subTest(feature=feature), tempfile.TemporaryDirectory() as temporary:
@@ -140,7 +139,7 @@ class CoddConsistencyProducerTests(unittest.TestCase):
                     producer.build_payload(root)
 
         cases = [
-            PHASE6_TEXT.replace("## 集計", "## Other"),
+            PHASE6_TEXT.replace("## MVP release case summary", "## Other"),
             PHASE6_TEXT.replace(
                 "The rest of the document is outside the table scope.",
                 f"{SUMMARY_TABLE}\nThe rest of the document is outside the table scope.",
@@ -200,7 +199,7 @@ class CoddConsistencyProducerTests(unittest.TestCase):
             write_fixture(root)
             output = producer.generate(root)
             before = output.read_bytes()
-            source = root / "docs/product/feature-status.md"
+            source = root / producer.FEATURE_STATUS_PATH
             source.write_bytes(source.read_bytes() + b" ")
             with self.assertRaises(producer.ProducerError):
                 producer.validate_output(root, output)

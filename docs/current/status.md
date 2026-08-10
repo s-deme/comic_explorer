@@ -1,0 +1,95 @@
+---
+codd:
+  node_id: "doc:project-status"
+  type: documentation
+  status: active
+  confidence: 0.95
+  depends_on:
+    - id: "req:project-requirements"
+      relation: "derives_from"
+      semantic: "current-status"
+    - id: "test:project-verification"
+      relation: "refines"
+      semantic: "verification-summary"
+---
+
+# Comic Explorer 現在状態
+
+## 判定規則
+
+実装状態と検証状態を分ける。`Implemented`は対象sourceが接続済み、`Partial`は受入範囲の一部だけが
+実装・観測済み、`Candidate`は未採用、`Rejected`は恒久方針により非採用を表す。検証の`BLOCKED`は
+実装の有無にかかわらず必要な直接観測が不足している状態で、`PASS`へ読み替えない。詳細証跡は
+[verification.md](verification.md)を正とする。
+
+## 機能集計
+
+現行台帳はMVP 25件（REQ 19、NFR 6）とMVP後/将来71件の計96件である。
+
+| 実装状態 | 検証状態 | 件数 |
+|---|---|---:|
+| Implemented | PASS | 65 |
+| Implemented | BLOCKED | 6 |
+| Partial | BLOCKED | 11 |
+| Candidate | NOT TESTED | 10 |
+| Rejected | NOT TESTED | 4 |
+| **合計** |  | **96** |
+
+## MVP状態
+
+| 範囲 | 状態 | 備考 |
+|---|---|---|
+| REQ-MVP-001〜017, 019 | Implemented / PASS | catalog、viewer、読書位置、原本非破壊、error回復を直接観測済み。 |
+| REQ-MVP-018 | Partial / BLOCKED | code上はlocal-onlyだが、隔離VM外部からのDNS/TCP/UDP監視が未実施。 |
+| NFR-MVP-001〜003 | Partial / BLOCKED | 規模・性能・UIA/screen reader/high contrast/DPIの製品実測待ち。 |
+| NFR-MVP-004 | Implemented / PASS | lock inventory、SBOM、notice、license auditの受入証跡あり。 |
+| NFR-MVP-005〜006 | Partial / BLOCKED | clean VM配布、Windows製品性能・環境matrixが未完了。 |
+
+## Feature lane状態
+
+| Lane | 対象 | 現在状態 | 未完了境界 |
+|---|---|---|---|
+| FR-B01 | 表示倍率 | Implemented / PASS | — |
+| FR-B02 | 巻末policy | Implemented / PASS | — |
+| FR-B03 | catalog表示形式 | Implemented / PASS | — |
+| FR-B05 | 名前検索 | Implemented / PASS | 10,000項目/1秒はNFR gate。 |
+| FR-B06 | quick access・favorite保存 | Implemented / PASS | — |
+| FR-B07 | memo・history・rating | Implemented / PASS | — |
+| FR-B08 / static WebP | FUT-C-005 | Implemented / PASS | animated WebPへ波及しない。 |
+| FR-B08 / P8 | FUT-C-006〜008 | Partial / BLOCKED | release WebView2でGIF/AVIF decode、animation、corrupt fallback未測定。 |
+| FR-B10 | tag | Implemented / PASS | — |
+| FR-B11 / keyboard | FUT-C-019 | Implemented / PASS | touch/gamepadはCandidate。 |
+| FR-B12 / P9 | FUT-C-001, 002 | Partial / BLOCKED | RAR/CBR/7z reader、license、fixture未承認。 |
+| FR-B13 / P1 | catalog command | Implemented / PASS | — |
+| FR-B14 / P2 | open・navigation | Implemented / PASS | — |
+| FR-B15 / P3 | bookmark・bookshelf | Implemented / PASS | — |
+| FR-B16 / P4 | filter・CSV | Implemented / PASS | — |
+| FR-B17 / P5 | reference shell | Implemented / BLOCKED | release DPI/visualと製品復元gate未測定。 |
+| FR-B18 / P6 | workspace・tray | Implemented / BLOCKED | notification area、native hide/show/focus、lifecycle未測定。 |
+| FR-B19 / P7 | settings・help | Implemented / PASS | — |
+| FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
+
+## CandidateとRejected
+
+- Candidate / NOT TESTED（10件）: FUT-C-024〜029、FUT-C-052、FUT-C-053、FUT-R-006、FUT-R-007。
+- Rejected / NOT TESTED（4件）: FUT-R-001〜003、FUT-R-008。
+- Candidateを`Partial`へ、RejectedをCandidateへ変更するには、先に
+  [requirements.md](requirements.md)の採用境界と恒久安全原則を変更する。
+
+## MVP release case summary
+
+最新の承認済みMVPケース仕様73件に対する現行集計は、`source: docs/current/verification.md`、
+`scope: MVP release cases`、`PASS: 60`、`FAIL: 0`、`BLOCKED: 12`、`NOT RUN: 1`、`total: 73`である。
+73件目のTC-NFR-006-001は旧Phase 6結果に行がなく、推測でPASSへ追加せずNOT RUNとする。
+
+## 未完了release gate
+
+- Windows 10 22H2 / Windows 11 clean VMのinstall、offline WebView2、launch、uninstall、user-data保持/削除。
+- VM外部からのDNS/TCP/UDP監視による外部通信0の確認。
+- 基準PCでのcold TTI、10,000項目、scroll/FPS、input/page latency、working set、cache測定。
+- Windows UIA、Narrator/NVDA、high contrast、100/150/200% DPI。
+- WebView2 custom protocolの実Origin/Referer header統合。
+- GIF/AVIFの製品decode、animation、corrupt fallback、RAR/CBR/7z reader。
+- tray notification area、P5 visual/DPI、thumbnail file pickerと実disk I/Oの製品gate。
+
+これらが残るため、製品全体を「すべてのrelease gateがPASS」とは判定しない。

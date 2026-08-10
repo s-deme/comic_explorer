@@ -87,7 +87,7 @@ scan:
   test_dirs:
     - "tests/"
   doc_dirs:
-    - "docs/"
+    - "docs/current/"
   config_files:
     - "package.json"
     - "package-lock.json"

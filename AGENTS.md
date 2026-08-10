@@ -41,7 +41,7 @@ verify, once after the final source change.
 
 Before implementing or changing user-visible behavior:
 
-1. Record or update the applicable requirement under `docs/requirements/`.
+1. Record or update the applicable requirement in `docs/current/requirements.md`.
 2. Run `.venv/bin/codd scan`.
 3. Inspect the affected artifacts with `.venv/bin/codd impact`.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the checked, deterministic Phase 6 consistency snapshot.
+"""Generate the checked, deterministic MVP release-case consistency snapshot.
 
 The producer deliberately knows about one documented ``depends_on`` edge.  It
 does not scan arbitrary numbers from either document: each parser is scoped to
@@ -19,18 +19,18 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
-FEATURE_STATUS_PATH = "docs/product/feature-status.md"
-PHASE6_RESULTS_PATH = "docs/testing/phase6-case-results.md"
+FEATURE_STATUS_PATH = "docs/current/status.md"
+PHASE6_RESULTS_PATH = "docs/current/verification.md"
 FROM_NODE = FEATURE_STATUS_PATH
 TO_NODE = PHASE6_RESULTS_PATH
 EDGE_KIND = "depends_on"
-VALUE_TYPE = "phase6_snapshot_count"
+VALUE_TYPE = "mvp_release_case_count"
 OUTPUT_PATH = ".codd/propagation_results.json"
 PRODUCER_PATH = "scripts/generate_codd_consistency.py"
 SCHEMA_VERSION = 1
 
-FEATURE_SECTION = "Phase 6の歴史スナップショット"
-PHASE6_SECTION = "集計"
+FEATURE_SECTION = "MVP release case summary"
+PHASE6_SECTION = "MVP release case summary"
 LABELS = ("PASS", "FAIL", "BLOCKED", "NOT RUN", "total")
 
 
@@ -143,7 +143,7 @@ def _extract_inline_counts(section: str, source_name: str) -> dict[str, str]:
 
 
 def extract_feature_status_counts(text: str) -> dict[str, str]:
-    """Extract the five values from the feature-status history section."""
+    """Extract the five values from the current status summary."""
 
     section = _section_body(text, FEATURE_SECTION, FEATURE_STATUS_PATH)
     return _extract_inline_counts(section, FEATURE_STATUS_PATH)
@@ -175,7 +175,7 @@ def _normalize_table_label(label: str, source_name: str) -> str:
 
 
 def extract_phase6_counts(text: str) -> dict[str, str]:
-    """Extract the five values from the table directly under ``## 集計``."""
+    """Extract the five values from the current verification summary table."""
 
     section = _section_body(text, PHASE6_SECTION, PHASE6_RESULTS_PATH)
     lines = section.splitlines()
