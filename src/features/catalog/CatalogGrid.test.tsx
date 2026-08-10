@@ -214,6 +214,7 @@ describe("CatalogGrid", () => {
         onSelect={onSelect}
         onNavigate={onNavigate}
         onRead={onRead}
+        viewMode="detail_list"
       />,
     );
 
@@ -271,6 +272,34 @@ describe("CatalogGrid", () => {
       .not.toBeInTheDocument();
   });
 
+  it.each(["small_thumbnail", "cover_list", "reference_tile"] as const)(
+    "%s cards reserve the label for the file name and hide the file format",
+    (viewMode) => {
+      const archive: CatalogEntry = {
+        relativePath: "tall-cover with a very long title.cbz" as never,
+        kind: "archive",
+        archiveKind: "cbz",
+      };
+      render(
+        <CatalogGrid
+          entries={[archive]}
+          selectedPath={null}
+          onSelect={() => undefined}
+          onNavigate={() => undefined}
+          onRead={() => undefined}
+          viewMode={viewMode}
+        />,
+      );
+
+      const item = screen.getByRole("button", { name: /^tall-cover/ });
+      expect(within(item).getByText("tall-cover with a very long title.cbz"))
+        .toHaveClass("item-name");
+      expect(within(item).getByText("▣")).toHaveClass("thumbnail");
+      expect(within(item).queryByText("CBZ")).not.toBeInTheDocument();
+      expect(item).toHaveAttribute("aria-label", expect.stringContaining("CBZ"));
+    },
+  );
+
   it("shows an unsupported file's original extension and no read/favorite actions", () => {
     const unsupported: CatalogEntry = {
       relativePath: "future.RAR" as never,
@@ -287,6 +316,7 @@ describe("CatalogGrid", () => {
         onNavigate={() => undefined}
         onRead={onRead}
         onToggleFavorite={onToggleFavorite}
+        viewMode="detail_list"
       />,
     );
 

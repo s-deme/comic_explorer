@@ -1482,7 +1482,7 @@ describe("application shell", () => {
     );
   });
 
-  it("FT-B03-002 exposes long names, kinds, counts and missing metadata in every mode", async () => {
+  it("FT-B03-002 keeps long names and missing metadata available in every mode", async () => {
     const entries: CatalogEntry[] = [
       {
         relativePath:
@@ -1518,7 +1518,12 @@ describe("application shell", () => {
       expect(grid).toHaveAttribute("data-entry-count", "3");
       expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
         .toBeInTheDocument();
-      expect(screen.getByText("フォルダ")).toBeInTheDocument();
+      const folderItem = screen.getByRole("button", { name: /^missing-metadata、フォルダ/ });
+      if (mode === "detail_list") {
+        expect(within(folderItem).getByText("フォルダ")).toBeInTheDocument();
+      } else {
+        expect(within(folderItem).queryByText("フォルダ")).not.toBeInTheDocument();
+      }
       expect(screen.getByText("3項目")).toBeInTheDocument();
     }
 

@@ -337,7 +337,6 @@ export function CatalogGrid({
                           <>
                             {thumbnail}
                             <span className="item-name">{name}</span>
-                            <span className="item-kind">{kind}</span>
                           </>
                         )}
                       </button>

@@ -149,6 +149,7 @@ dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時�
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。
+サムネイル系cardは画像とファイル名を別のgrid領域に配置して画像の縦横比で名前を侵食させず、種別は詳細リストだけに表示する。
 shortcut編集はoptionsの統合設定だけから行い、helpは現在の割り当てをread-onlyで表示する。
 stale responseは現在画面を置換せず、局所error後もretry、
 前後移動、別項目open、catalog復帰を可能にする。
