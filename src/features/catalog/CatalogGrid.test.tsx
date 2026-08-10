@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
-import { CatalogGrid } from "./CatalogGrid";
+import { CatalogGrid, catalogColumnCountFor } from "./CatalogGrid";
 
 function entries(count: number): CatalogEntry[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -13,7 +13,51 @@ function entries(count: number): CatalogEntry[] {
 }
 
 describe("CatalogGrid", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("reduces card columns to the available catalog width", () => {
+    expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(8);
+    expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(6);
+    expect(catalogColumnCountFor("cover_list", 700)).toBe(4);
+    expect(catalogColumnCountFor("reference_tile", 460)).toBe(3);
+    expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
+  });
+
+  it("recomputes virtual rows when the catalog width changes", async () => {
+    const resizeCallbacks: Array<() => void> = [];
+    class ResizeObserverMock {
+      constructor(private readonly callback: () => void) {}
+
+      observe() { resizeCallbacks.push(this.callback); }
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+
+    render(
+      <CatalogGrid
+        entries={entries(20)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        viewMode="cover_list"
+      />,
+    );
+    const grid = screen.getByRole("grid");
+    Object.defineProperty(grid, "clientWidth", {
+      configurable: true,
+      value: 700,
+    });
+    resizeCallbacks.forEach((callback) => callback());
+
+    await waitFor(() =>
+      expect(grid).toHaveAttribute("data-catalog-column-count", "4"),
+    );
+    expect(grid).toHaveAttribute("aria-rowcount", "5");
+  });
 
   it("moves selection and focus with grid arrow keys", () => {
     const onSelect = vi.fn();

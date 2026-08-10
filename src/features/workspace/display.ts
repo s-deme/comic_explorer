@@ -7,7 +7,7 @@ export interface WorkspaceDisplayState {
 export function shellGridRows(state: Pick<WorkspaceDisplayState, "menuBarVisible" | "toolbarVisible">): string {
   return [
     ...(state.menuBarVisible ? ["28px"] : []),
-    ...(state.toolbarVisible ? ["42px"] : []),
+    ...(state.toolbarVisible ? ["minmax(42px, auto)"] : []),
     "32px",
     "minmax(0, 1fr)",
     "28px",

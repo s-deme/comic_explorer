@@ -53,7 +53,10 @@ comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fi
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。
 
-catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。検索、mask、複数選択、property、
+catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。card形式はscroll containerの幅を観測して、
+各形式の上限を超えない範囲で行あたりの列数を決めるため、仮想行、keyboardの上下移動、focus復元が
+同じ列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
+primary情報と独立した操作欄を維持する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
 Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、

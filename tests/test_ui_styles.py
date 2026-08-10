@@ -44,6 +44,15 @@ class UiStyleContractTests(unittest.TestCase):
             "grid-template-columns: minmax(0, 1fr) auto",
         )
 
+    def test_catalog_layout_shrinks_without_a_fixed_page_width(self) -> None:
+        self.assertNotIn("min-width: 1024px", STYLES)
+        self.assert_rule_contains(".virtual-canvas", "min-width: 0")
+        self.assert_rule_contains(
+            ".catalog-row--cover_list",
+            "repeat(var(--catalog-column-count), minmax(0, 1fr))",
+        )
+        self.assertIn("@container (max-width: 720px)", STYLES)
+
     def test_dialogs_share_a_readable_visual_system(self) -> None:
         self.assert_rule_contains(
             '.dialog-backdrop > [role="dialog"]', "border-radius: 12px"

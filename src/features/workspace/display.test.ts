@@ -9,13 +9,13 @@ import {
 describe("workspace display", () => {
   it("keeps the five visible shell surfaces in their declared order", () => {
     expect(shellGridRows({ menuBarVisible: true, toolbarVisible: true })).toBe(
-      "28px 42px 32px minmax(0, 1fr) 28px",
+      "28px minmax(42px, auto) 32px minmax(0, 1fr) 28px",
     );
   });
 
   it("FT-B18-002 removes hidden menu and toolbar tracks so remaining surfaces compact", () => {
     expect(shellGridRows({ menuBarVisible: false, toolbarVisible: true })).toBe(
-      "42px 32px minmax(0, 1fr) 28px",
+      "minmax(42px, auto) 32px minmax(0, 1fr) 28px",
     );
     expect(shellGridRows({ menuBarVisible: true, toolbarVisible: false })).toBe(
       "28px 32px minmax(0, 1fr) 28px",

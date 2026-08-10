@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CatalogEntry } from "../../types/domain";
 import type { CatalogViewMode } from "./view-mode";
 
@@ -28,13 +28,31 @@ export type ThumbnailViewState =
 
 const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
-  { columnCount: number; rowHeight: number }
+  { maxColumnCount: number; minColumnWidth: number; rowHeight: number }
 > = {
-  small_thumbnail: { columnCount: 8, rowHeight: 142 },
-  detail_list: { columnCount: 1, rowHeight: 62 },
-  cover_list: { columnCount: 5, rowHeight: 288 },
-  reference_tile: { columnCount: 6, rowHeight: 248 },
+  small_thumbnail: { maxColumnCount: 8, minColumnWidth: 104, rowHeight: 142 },
+  detail_list: { maxColumnCount: 1, minColumnWidth: 0, rowHeight: 62 },
+  cover_list: { maxColumnCount: 5, minColumnWidth: 150, rowHeight: 288 },
+  reference_tile: { maxColumnCount: 6, minColumnWidth: 132, rowHeight: 248 },
 };
+
+const CATALOG_HORIZONTAL_PADDING = 24;
+const CATALOG_COLUMN_GAP = 10;
+
+export function catalogColumnCountFor(
+  viewMode: CatalogViewMode,
+  scrollWidth: number | null,
+): number {
+  const { maxColumnCount, minColumnWidth } = VIEW_MODE_CONFIG[viewMode];
+  if (scrollWidth === null || scrollWidth <= 0) return maxColumnCount;
+  if (maxColumnCount === 1) return 1;
+
+  const availableWidth = Math.max(0, scrollWidth - CATALOG_HORIZONTAL_PADDING);
+  const fittingColumns = Math.floor(
+    (availableWidth + CATALOG_COLUMN_GAP) / (minColumnWidth + CATALOG_COLUMN_GAP),
+  );
+  return Math.max(1, Math.min(maxColumnCount, fittingColumns));
+}
 
 function displayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
@@ -94,18 +112,36 @@ export function CatalogGrid({
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
+  const columnCount = catalogColumnCountFor(viewMode, scrollWidth);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return undefined;
+    const reportWidth = () => {
+      const nextWidth = element.clientWidth;
+      setScrollWidth((current) => current === nextWidth ? current : nextWidth);
+    };
+
+    reportWidth();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(reportWidth);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   const rows = useMemo(() => {
     const output: CatalogEntry[][] = [];
     for (
       let index = 0;
       index < entries.length;
-      index += modeConfig.columnCount
+      index += columnCount
     ) {
-      output.push(entries.slice(index, index + modeConfig.columnCount));
+      output.push(entries.slice(index, index + columnCount));
     }
     return output;
-  }, [entries, modeConfig.columnCount]);
+  }, [columnCount, entries]);
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
@@ -141,7 +177,7 @@ export function CatalogGrid({
     if (!next) return;
     if (action === undefined) onSelect(next);
     else onSelect(next, action);
-    virtualizer.scrollToIndex(Math.floor(nextIndex / modeConfig.columnCount));
+    virtualizer.scrollToIndex(Math.floor(nextIndex / columnCount));
     requestAnimationFrame(() => itemRefs.current.get(next.relativePath)?.focus());
   }
 
@@ -151,10 +187,10 @@ export function CatalogGrid({
       (entry) => entry.relativePath === selectedPath,
     );
     if (index >= 0) {
-      virtualizer.scrollToIndex(Math.floor(index / modeConfig.columnCount));
+      virtualizer.scrollToIndex(Math.floor(index / columnCount));
       requestAnimationFrame(() => itemRefs.current.get(selectedPath)?.focus());
     }
-  }, [entries, modeConfig.columnCount, selectedPath, virtualizer, viewMode]);
+  }, [columnCount, entries, selectedPath, virtualizer, viewMode]);
 
   return (
     <div
@@ -164,7 +200,9 @@ export function CatalogGrid({
       aria-label="現在のフォルダの項目"
       aria-rowcount={rows.length}
       data-catalog-view-mode={viewMode}
+      data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
+      style={{ "--catalog-column-count": String(columnCount) } as CSSProperties}
       onContextMenu={(event) => {
         if ((event.target as Element).closest("[data-relative-path]") !== null) return;
         event.preventDefault();
@@ -198,7 +236,7 @@ export function CatalogGrid({
               >
                 {rows[virtualRow.index].map((entry, columnIndex) => {
                   const itemIndex =
-                    virtualRow.index * modeConfig.columnCount + columnIndex;
+                    virtualRow.index * columnCount + columnIndex;
                   const name = displayName(entry);
                   const kind = kindLabel(entry);
                   const size = formatSize(entry.byteSize);
@@ -274,8 +312,8 @@ export function CatalogGrid({
                           const offsets: Partial<Record<string, number>> = {
                             ArrowLeft: -1,
                             ArrowRight: 1,
-                            ArrowUp: -modeConfig.columnCount,
-                            ArrowDown: modeConfig.columnCount,
+                            ArrowUp: -columnCount,
+                            ArrowDown: columnCount,
                             Home: -itemIndex,
                             End: entries.length - 1 - itemIndex,
                           };
