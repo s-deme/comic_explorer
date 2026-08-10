@@ -1593,7 +1593,7 @@ describe("application shell", () => {
     const region = await screen.findByRole("region", { name: "名前検索結果" });
     expect(region).toHaveAttribute("data-search-result-count", "3");
     expect(region).toHaveTextContent("フォルダ");
-    expect(region).toHaveTextContent("ZIP / CBZ / EPUB / RAR");
+    expect(region).toHaveTextContent("ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH");
     expect(region).toHaveTextContent("画像");
     expect(region.querySelector('[data-search-result-kind="folder"]')).toBeInTheDocument();
     expect(region.querySelector('[data-search-result-kind="archive"]')).toBeInTheDocument();

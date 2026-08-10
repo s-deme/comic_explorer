@@ -19,7 +19,7 @@ codd:
 | desktop shell | Tauri 2、Windows WebView2、NSIS |
 | frontend | React 19、TypeScript、Vite、TanStack Virtual、HTML/CSS |
 | backend | Rust 2024 edition、Tokio、typed Tauri commands |
-| catalog/archive | read-only filesystem adapter、`zip`（Deflate、default features off）、自然順 |
+| catalog/archive | read-only filesystem adapter、`zip`（Stored/Deflate）、`unrar`（RAR4/RAR5）、`sevenz-rust`（Copy/LZMA/LZMA2）、`delharc`（LHA/LZH）、自然順 |
 | image/thumbnail | WIC thumbnail pipeline、`image` raster validation/PNG conversion、`resvg` static SVG rasterize、静止WebPは`image-webp`によるpure-Rust decode |
 | persistence | app-local SQLite WAL（`rusqlite` bundled）、local settings/collections、file cache |
 | verification | Vitest/Testing Library、Python unittest、Cargo test、Windows release product harness、CoDD |
@@ -49,7 +49,7 @@ stale responseを構造的に区別する。
 ## catalogとnavigation
 
 登録rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
-comic folder、画像、ZIP/CBZ/EPUB/RAR、unsupported archiveをtyped kindとして列挙し、自然順と選択中sortを
+comic folder、画像、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。
 
@@ -59,9 +59,11 @@ root namespaceを再利用する。OS全体のfile managerには拡張しない�
 
 ## viewerとmedia
 
-folder pageはread-only file stream、ZIP/CBZ/EPUB pageは必要entryだけをinflateする。RAR4/RAR5は
-UnRARのlisting/processing APIで単一volume・非暗号化書庫の必要entryだけをmemoryへ読み、いずれも
-libraryへ展開しない。分割・暗号化RAR、CBR、7zは読取開始前に分類して拒否する。
+folder pageはread-only file stream、ZIP/CBZ/EPUB pageは必要entryだけをinflateする。RAR/CBRは
+UnRARのlisting/processing APIで単一volume・非暗号化RAR4/RAR5の必要entryだけをmemoryへ読む。
+7z/CB7は`sevenz-rust`でCopy/LZMA/LZMA2 entryを、LZHは`delharc`でStored/LH1/LH4〜LH7/LZS/LZ5
+entryを読み、いずれもlibraryへ展開しない。分割RAR、暗号化書庫、未対応compression、危険path、
+entry数・展開後entry size・展開後合計size上限超過は読取前またはstream境界で拒否する。
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
 BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
 解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。
@@ -134,7 +136,8 @@ item局所、page errorはviewer局所、root/DB起動errorだけをshell-level�
 
 ## 現在の設計判断
 
-Tauri/React/Rust、SQLite bundled、ZIP互換（ZIP/CBZ/EPUB）Stored/Deflate、UnRARによるRAR4/RAR5読取、opaque media token、bounded worker、app-local cacheを
+Tauri/React/Rust、SQLite bundled、ZIP互換（ZIP/CBZ/EPUB）Stored/Deflate、UnRARによるRAR/CBR、
+`sevenz-rust`による7z/CB7、`delharc`によるLZH読取、opaque media token、bounded worker、app-local cacheを
 採用済みとする。比較検討と実装phaseの完了履歴はGit履歴から参照する。Windows製品性能、
-clean VM、UIA/DPI、外部通信監視、GIF/AVIF decode、CBR/7z reader、tray/file pickerの実製品gateは
+clean VM、UIA/DPI、外部通信監視、GIF/AVIF decode、tray/file pickerの実製品gateは
 設計未決ではなく検証未完了であり、[status.md](status.md)と[verification.md](verification.md)で追跡する。

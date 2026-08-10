@@ -298,7 +298,7 @@ function fileName(value: string): string {
 
 function catalogAliases(entry: CatalogEntry): string[] {
   const base = fileName(entry.relativePath).toLocaleLowerCase();
-  const stem = base.replace(/\.(?:zip|cbz|rar|cbr|7z)$/i, "");
+  const stem = base.replace(/\.(?:zip|cbz|epub|rar|cbr|7z|cb7|lzh)$/i, "");
   return [base, stem];
 }
 

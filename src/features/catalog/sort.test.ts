@@ -48,19 +48,29 @@ describe("catalog sorting", () => {
       .toEqual(["small.zip", "runtime-null-folder"]);
   });
 
-  it("orders folder, comic folder, ZIP, CBZ, EPUB and RAR and reverses the kind order", () => {
+  it("orders every supported archive kind and reverses the kind order", () => {
     const values = [
       entry("book.epub", { archiveKind: "epub" }),
       entry("book.rar", { archiveKind: "rar" }),
+      entry("book.cbr", { archiveKind: "cbr" }),
+      entry("book.7z", { archiveKind: "sevenZip" }),
+      entry("book.cb7", { archiveKind: "cb7" }),
+      entry("book.lzh", { archiveKind: "lzh" }),
       entry("book.cbz", { archiveKind: "cbz" }),
       entry("book.zip"),
       entry("comic", { kind: "comicFolder", archiveKind: undefined }),
       entry("folder", { kind: "folder", archiveKind: undefined }),
     ];
     expect(sortCatalogEntries(values, "kind", "ascending").map((item) => item.relativePath))
-      .toEqual(["folder", "comic", "book.zip", "book.cbz", "book.epub", "book.rar"]);
+      .toEqual([
+        "folder", "comic", "book.zip", "book.cbz", "book.epub", "book.rar",
+        "book.cbr", "book.7z", "book.cb7", "book.lzh",
+      ]);
     expect(sortCatalogEntries(values, "kind", "descending").map((item) => item.relativePath))
-      .toEqual(["book.rar", "book.epub", "book.cbz", "book.zip", "comic", "folder"]);
+      .toEqual([
+        "book.lzh", "book.cb7", "book.7z", "book.cbr", "book.rar", "book.epub",
+        "book.cbz", "book.zip", "comic", "folder",
+      ]);
   });
 
   it("selects only the next readable item in the established list order", () => {

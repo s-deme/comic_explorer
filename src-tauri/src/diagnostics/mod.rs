@@ -2,7 +2,7 @@
 //!
 //! The scanner deliberately keeps its snapshot in the request/response
 //! boundary.  Nothing is persisted next to the library, and archive
-//! validation reuses the existing ZIP/CBZ/EPUB/RAR page enumerator rather than adding
+//! validation reuses the existing supported-archive page enumerator rather than adding
 //! another decoder or extraction path.
 
 use std::collections::{BTreeMap, HashMap};
@@ -206,7 +206,16 @@ fn scan_directory(
 fn archive_reader_available(entry: &CatalogEntry) -> bool {
     matches!(
         entry.archive_kind,
-        Some(ArchiveKind::Zip | ArchiveKind::Cbz | ArchiveKind::Epub | ArchiveKind::Rar)
+        Some(
+            ArchiveKind::Zip
+                | ArchiveKind::Cbz
+                | ArchiveKind::Epub
+                | ArchiveKind::Rar
+                | ArchiveKind::Cbr
+                | ArchiveKind::SevenZip
+                | ArchiveKind::Cb7
+                | ArchiveKind::Lzh
+        )
     )
 }
 
@@ -425,13 +434,13 @@ fn kind_key(kind: ItemKind) -> String {
 
 fn archive_error_message(code: ErrorCode) -> &'static str {
     match code {
-        ErrorCode::CorruptArchive => "ZIP/CBZ/EPUB/RAR書庫を読み取れません。",
-        ErrorCode::EncryptedArchive => "暗号化されたZIP/CBZ/EPUB/RAR書庫は診断できません。",
-        ErrorCode::UnsupportedFormat => "ZIP/CBZ/EPUB/RAR書庫の形式に対応していません。",
-        ErrorCode::ResourceLimit => "ZIP/CBZ/EPUB/RAR書庫が安全な読み取り上限を超えています。",
-        ErrorCode::NotFound => "診断中にZIP/CBZ/EPUB/RAR書庫が見つからなくなりました。",
-        ErrorCode::AccessDenied => "ZIP/CBZ/EPUB/RAR書庫へアクセスできません。",
-        _ => "ZIP/CBZ/EPUB/RAR書庫の診断に失敗しました。",
+        ErrorCode::CorruptArchive => "対応書庫を読み取れません。",
+        ErrorCode::EncryptedArchive => "暗号化された対応書庫は診断できません。",
+        ErrorCode::UnsupportedFormat => "書庫内の圧縮形式に対応していません。",
+        ErrorCode::ResourceLimit => "書庫が安全な読み取り上限を超えています。",
+        ErrorCode::NotFound => "診断中に書庫が見つからなくなりました。",
+        ErrorCode::AccessDenied => "書庫へアクセスできません。",
+        _ => "書庫の診断に失敗しました。",
     }
 }
 
@@ -677,12 +686,14 @@ mod tests {
     }
 
     #[test]
-    fn fr_b12_cbr_and_7z_are_unsupported_and_not_reported_as_corrupt_archive() {
-        let root = temporary_root("unsupported-archives");
+    fn fr_b12_supported_archive_extensions_are_diagnosed_as_archives() {
+        let root = temporary_root("supported-archive-extensions");
         fs::create_dir_all(&root).unwrap();
         for (name, bytes) in [
             ("volume.cbr", b"Rar!\x1a\x07\x00".as_slice()),
             ("volume.7z", b"7z\xbc\xaf\x27\x1c".as_slice()),
+            ("volume.cb7", b"7z\xbc\xaf\x27\x1c".as_slice()),
+            ("volume.lzh", b"not-an-lzh".as_slice()),
         ] {
             fs::write(root.join(name), bytes).unwrap();
         }
@@ -690,19 +701,20 @@ mod tests {
 
         let report = scan(&root, &[]);
 
-        for name in ["volume.cbr", "volume.7z"] {
+        for name in ["volume.cbr", "volume.7z", "volume.cb7", "volume.lzh"] {
             let snapshot = report
                 .snapshot
                 .iter()
                 .find(|entry| entry.relative_path.as_str() == name)
                 .unwrap();
-            assert_eq!(snapshot.kind, ItemKind::Unsupported);
+            assert_eq!(snapshot.kind, ItemKind::Archive);
         }
+        assert!(report.summary.errors > 0);
         assert!(
             report
                 .findings
                 .iter()
-                .all(|finding| finding.status != DiagnosticStatus::Corrupt)
+                .any(|finding| finding.status == DiagnosticStatus::Corrupt)
         );
         assert_eq!(source_state(&root), before);
         fs::remove_dir_all(root).unwrap();

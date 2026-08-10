@@ -8,11 +8,11 @@ describe("error presentation", () => {
     const cases: [ErrorCode, string][] = [
       [
         "INVALID_REQUEST",
-        "対応していません。対応する画像、ZIP、CBZ、EPUB、RARを選んでください。",
+        "対応していません。対応する画像または対応書庫を選んでください。",
       ],
       [
         "INVALID_PATH",
-        "対応していません。対応する画像、ZIP、CBZ、EPUB、RARを選んでください。",
+        "対応していません。対応する画像または対応書庫を選んでください。",
       ],
       [
         "OUTSIDE_LIBRARY_ROOT",
@@ -28,7 +28,7 @@ describe("error presentation", () => {
       ],
       [
         "UNSUPPORTED_FORMAT",
-        "対応していません。対応する画像、ZIP、CBZ、EPUB、RARを選んでください。",
+        "対応していません。対応する画像または対応書庫を選んでください。",
       ],
       [
         "CORRUPT_IMAGE",

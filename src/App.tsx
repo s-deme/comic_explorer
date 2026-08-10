@@ -189,8 +189,12 @@ function archiveKindFromPath(path: string): CatalogEntry["archiveKind"] {
     extension === "zip" ||
     extension === "cbz" ||
     extension === "epub" ||
-    extension === "rar"
+    extension === "rar" ||
+    extension === "cbr" ||
+    extension === "cb7" ||
+    extension === "lzh"
   ) return extension;
+  if (extension === "7z") return "sevenZip";
   return undefined;
 }
 
@@ -201,7 +205,7 @@ function entryKindLabel(entry: CatalogEntry): string {
     case "comicFolder":
       return "漫画フォルダ";
     case "archive":
-      return "ZIP / CBZ / EPUB / RAR";
+      return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
     case "page":
       return "画像";
     default: {

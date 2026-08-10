@@ -12,7 +12,9 @@ pub fn classify_file_name(name: &str) -> FileKind {
             "bmp" | "jpg" | "jpeg" | "png" | "webp" | "gif" | "tif" | "tiff" | "ico" | "svg"
             | "avif",
         ) => FileKind::Image,
-        Some("zip" | "cbz" | "epub" | "rar" | "cbr" | "7z") => FileKind::Archive,
+        Some("zip" | "cbz" | "epub" | "rar" | "cbr" | "7z" | "cb7" | "lzh" | "lha") => {
+            FileKind::Archive
+        }
         _ => FileKind::Unsupported,
     }
 }
@@ -36,6 +38,9 @@ mod tests {
             "book.RAR",
             "book.CBR",
             "book.7Z",
+            "book.CB7",
+            "book.LzH",
+            "book.LHA",
         ] {
             assert_eq!(classify_file_name(name), FileKind::Archive);
         }

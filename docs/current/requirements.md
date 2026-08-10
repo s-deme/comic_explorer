@@ -22,9 +22,9 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 
 対象は、登録したlibrary root内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
 利用者metadata、app-local設定/cache、Windows配布である。BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、
-ICO、SVG、静止WebP、ZIP/CBZ/EPUB/RARを実装済み範囲とする。WICは画像形式ではなく、
-Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFとCBR/7zには
-実装済みの安全な分類・拒否境界があるが、製品decodeまたはreaderの受入は未完了である。
+ICO、SVG、静止WebP、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを実装済み範囲とする。WICは画像形式ではなく、
+Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFには実装済みの安全な
+分類・拒否境界があるが、製品decodeの受入は未完了である。
 
 対象外は、クラウド同期、外部書誌取得、telemetry、外部データ送信、library原本への自動変更、
 OS全体を操作するfile managerである。rename、move、copy、create、delete、OS clipboard file操作は
@@ -50,7 +50,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | toolbar buttonから並べ替え、昇降順、巻末動作、一覧形式のmenuを操作し、設定を保存する。 |
 | REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
-| REQ-MVP-009 | ZIP/CBZ/EPUBと単一volume・非暗号化RAR4/RAR5を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。分割RAR、暗号化RAR、EPUBのHTML本文組版は対象外とする。 |
+| REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
 | REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
@@ -87,7 +87,7 @@ Git履歴から参照する。
 | FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。 |
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
-| FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZ/EPUB/RARの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
+| FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
 | FR-B10 tag | REQ-FR-B10-001, REQ-FR-B10-002, REQ-FR-B10-003, REQ-FR-B10-004 | FUT-C-022 | normalized tagのassign/remove/query/rename/merge、invalid拒否、migration、再起動保存を保証する。 |
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | keyboard commandのremap、conflict拒否、reset、focus fallback、再起動保存を保証する。編集入口は統合設定だけに置き、helpは現在の割り当て表示だけを行う。touch/gamepadは候補のまま。 |
 
@@ -103,13 +103,13 @@ Git履歴から参照する。
 | P6 / FR-B18 | FUT-C-060, FUT-C-061, FUT-C-062, FUT-C-063 | pane/bar可逆表示、viewer分離、native tray hide/showと終了の分離。 |
 | P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、gesture、offline help、version/runtime/license表示。 |
 | P8 / FR-B08 | FUT-C-006, FUT-C-007, FUT-C-008 | GIFの安全な分類・metadata・MIME・製品decodeと、AVIFの安全な分類・metadata・MIME・corrupt境界。AVIFの製品decodeは未受入。 |
-| P9 / FR-B12 | FUT-C-001, 002 | 単一volume・非暗号化RAR4/RAR5を安全に読み、CBR/7zと分割・暗号化RARはunsupported分類する。 |
+| P9 / FR-B12 | FUT-C-001, FUT-C-002 | 単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を安全に読み、分割RAR、暗号化書庫、未対応圧縮方式はunsupported分類する。 |
 | P10 / FR-B20 | FUT-C-073, FUT-C-074, FUT-C-075 | app-local thumbnail管理、明示保存、検証済みJPEG import。製品file picker gateは未完了。 |
 
 ## 全体受入シナリオ
 
 - E2E-MVP-001: root登録から画像folderを開き、単page/見開きで読み、再起動後に読書位置を復元する。
-- E2E-MVP-002: ZIP/CBZ/EPUB/RARを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
+- E2E-MVP-002: ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
 
@@ -120,6 +120,6 @@ Git履歴から参照する。
 | Candidate | FUT-C-024, FUT-C-025, FUT-C-026, FUT-C-027, FUT-C-028, FUT-C-029, FUT-C-052, FUT-C-053 | rename、move、copy、folder作成、trash、完全削除、undo、OS clipboard file操作。採用時はREQ-MVP-017を先に改定する。 |
 | Candidate | FUT-R-006, FUT-R-007 | touch、gamepad。実機契約と直接観測ができるまで未採用。 |
 | Rejected | FUT-R-001, FUT-R-002, FUT-R-003, FUT-R-008 | cloud同期、外部書誌、外部送信、閲覧時の原本自動変更。恒久安全原則を変更しない限り採用しない。 |
-| Partial | FUT-C-001, FUT-C-002, FUT-C-006, FUT-C-007, FUT-C-008 | CBR/7zとAVIFはunsupported/parser境界だけ実装済み。完全reader/decodeを推定しない。 |
+| Partial | FUT-C-006, FUT-C-007, FUT-C-008 | AVIFはunsupported/parser境界だけ実装済み。完全decodeを推定しない。 |
 
 FR-B04とFR-B09は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。

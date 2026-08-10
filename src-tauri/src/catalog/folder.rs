@@ -27,11 +27,23 @@ pub enum ArchiveKind {
     Rar,
     Cbr,
     SevenZip,
+    Cb7,
+    Lzh,
 }
 
 impl ArchiveKind {
     fn reader_available(self) -> bool {
-        matches!(self, Self::Zip | Self::Cbz | Self::Epub | Self::Rar)
+        matches!(
+            self,
+            Self::Zip
+                | Self::Cbz
+                | Self::Epub
+                | Self::Rar
+                | Self::Cbr
+                | Self::SevenZip
+                | Self::Cb7
+                | Self::Lzh
+        )
     }
 }
 
@@ -47,6 +59,8 @@ fn archive_kind_for_name(name: &str) -> Option<ArchiveKind> {
         Some("rar") => Some(ArchiveKind::Rar),
         Some("cbr") => Some(ArchiveKind::Cbr),
         Some("7z") => Some(ArchiveKind::SevenZip),
+        Some("cb7") => Some(ArchiveKind::Cb7),
+        Some("lzh") | Some("lha") => Some(ArchiveKind::Lzh),
         _ => None,
     }
 }
@@ -318,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b12_catalog_separates_available_and_unavailable_archive_kinds() {
+    fn fr_b12_catalog_exposes_all_supported_archive_kinds() {
         let root = temporary_root("catalog-metadata");
         fs::create_dir_all(root.join("folder")).unwrap();
         fs::write(root.join("book.zip"), b"zip").unwrap();
@@ -327,6 +341,8 @@ mod tests {
         fs::write(root.join("book.rar"), b"rar").unwrap();
         fs::write(root.join("book.cbr"), b"cbr").unwrap();
         fs::write(root.join("book.7z"), b"7z").unwrap();
+        fs::write(root.join("book.cb7"), b"cb7").unwrap();
+        fs::write(root.join("book.lzh"), b"lzh").unwrap();
 
         let entries = enumerate_folder(&root, &root).unwrap();
         let folder = entries
@@ -357,6 +373,14 @@ mod tests {
             .iter()
             .find(|entry| entry.relative_path.as_str() == "book.7z")
             .unwrap();
+        let cb7 = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.cb7")
+            .unwrap();
+        let lzh = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.lzh")
+            .unwrap();
 
         assert_eq!(folder.byte_size, None);
         assert!(folder.modified_ms.is_some());
@@ -364,14 +388,18 @@ mod tests {
         assert_eq!(cbz.kind, ItemKind::Archive);
         assert_eq!(epub.kind, ItemKind::Archive);
         assert_eq!(rar.kind, ItemKind::Archive);
+        assert_eq!(cbr.kind, ItemKind::Archive);
+        assert_eq!(seven_zip.kind, ItemKind::Archive);
+        assert_eq!(cb7.kind, ItemKind::Archive);
+        assert_eq!(lzh.kind, ItemKind::Archive);
         assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
         assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
         assert_eq!(epub.archive_kind, Some(ArchiveKind::Epub));
         assert_eq!(rar.archive_kind, Some(ArchiveKind::Rar));
-        for (entry, archive_kind) in [(cbr, ArchiveKind::Cbr), (seven_zip, ArchiveKind::SevenZip)] {
-            assert_eq!(entry.kind, ItemKind::Unsupported);
-            assert_eq!(entry.archive_kind, Some(archive_kind));
-        }
+        assert_eq!(cbr.archive_kind, Some(ArchiveKind::Cbr));
+        assert_eq!(seven_zip.archive_kind, Some(ArchiveKind::SevenZip));
+        assert_eq!(cb7.archive_kind, Some(ArchiveKind::Cb7));
+        assert_eq!(lzh.archive_kind, Some(ArchiveKind::Lzh));
         fs::remove_dir_all(root).unwrap();
     }
 }

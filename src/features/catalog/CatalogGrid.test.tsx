@@ -144,7 +144,7 @@ describe("CatalogGrid", () => {
 
     expect(screen.getByText("フォルダ")).toBeInTheDocument();
     expect(screen.getByText("漫画フォルダ")).toBeInTheDocument();
-    expect(screen.getByText("ZIP / CBZ / EPUB / RAR")).toBeInTheDocument();
+    expect(screen.getByText("ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH")).toBeInTheDocument();
     expect(screen.getByText("画像")).toBeInTheDocument();
 
     fireEvent.doubleClick(screen.getByRole("button", { name: /^library、フォルダ/ }));

@@ -34,7 +34,7 @@ export interface CatalogEntry {
   kind: ItemKind;
   byteSize?: number;
   modifiedMs?: number;
-  archiveKind?: "zip" | "cbz" | "epub" | "rar" | "cbr" | "sevenZip";
+  archiveKind?: "zip" | "cbz" | "epub" | "rar" | "cbr" | "sevenZip" | "cb7" | "lzh";
 }
 
 export interface Page {
