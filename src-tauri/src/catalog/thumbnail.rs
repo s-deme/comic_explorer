@@ -62,10 +62,14 @@ fn validate_cover_format(cover: &RelativePath, bytes: &[u8]) -> Result<(), AppEr
         .map(|(_, extension)| extension.to_ascii_lowercase())
         .as_deref()
     {
+        Some("bmp") => ImageFormat::Bmp,
         Some("jpg" | "jpeg") => ImageFormat::Jpeg,
         Some("png") => ImageFormat::Png,
         Some("webp") => ImageFormat::Webp,
         Some("gif") => ImageFormat::Gif,
+        Some("tif" | "tiff") => ImageFormat::Tiff,
+        Some("ico") => ImageFormat::Ico,
+        Some("svg") => ImageFormat::Svg,
         Some("avif") => ImageFormat::Avif,
         _ => {
             return Err(thumbnail_error(
@@ -79,12 +83,6 @@ fn validate_cover_format(cover: &RelativePath, bytes: &[u8]) -> Result<(), AppEr
         return Err(thumbnail_error(
             ErrorCode::CorruptImage,
             "Cover extension does not match its image data.",
-        ));
-    }
-    if metadata.format == ImageFormat::Gif && metadata.animated {
-        return Err(thumbnail_error(
-            ErrorCode::UnsupportedFormat,
-            "Animated GIF covers are not persisted as thumbnails.",
         ));
     }
     Ok(())
@@ -321,6 +319,10 @@ pub fn encode_wic_jpeg(bytes: &[u8], output: &std::path::Path) -> Result<(u32, u
     if is_webp(bytes) {
         return encode_webp_wic_jpeg(bytes, output);
     }
+    if svg_text_candidate(bytes) {
+        let (_, _, png) = super::render_svg_png(bytes, Some(THUMBNAIL_LONG_EDGE))?;
+        return encode_wic_jpeg(&png, output);
+    }
     let orientation = exif_orientation(bytes);
     // WIC objects remain inside this worker and are released before COM is uninitialized.
     unsafe {
@@ -381,6 +383,15 @@ pub fn encode_wic_jpeg(bytes: &[u8], output: &std::path::Path) -> Result<(u32, u
         CoUninitialize();
         result
     }
+}
+
+fn svg_text_candidate(bytes: &[u8]) -> bool {
+    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
+    bytes
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace())
+        == Some(b'<')
 }
 
 #[cfg(target_os = "windows")]
@@ -621,14 +632,9 @@ mod tests {
     }
 
     #[test]
-    fn fr_b08_thumbnail_gate_rejects_animated_gif_frames_from_disk_cache() {
+    fn animated_gif_is_accepted_and_uses_its_first_frame_for_thumbnailing() {
         let bytes = animated_gif();
-        assert_eq!(
-            validate_cover_format(&RelativePath::parse("1.gif").unwrap(), &bytes)
-                .unwrap_err()
-                .code,
-            ErrorCode::UnsupportedFormat
-        );
+        validate_cover_format(&RelativePath::parse("1.gif").unwrap(), &bytes).unwrap();
     }
 
     #[test]
@@ -772,6 +778,44 @@ mod tests {
                 .unwrap();
         assert_eq!((metadata.width, metadata.height), dimensions);
         std::fs::remove_file(output).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn wic_decodes_bmp_gif_tiff_ico_and_rendered_svg_as_jpeg() {
+        use image::{DynamicImage, ImageBuffer, ImageFormat as DecoderFormat, Rgba};
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let image =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([20, 40, 60, 255])));
+        let mut sources = Vec::new();
+        for (name, format) in [
+            ("bmp", DecoderFormat::Bmp),
+            ("gif", DecoderFormat::Gif),
+            ("tiff", DecoderFormat::Tiff),
+            ("ico", DecoderFormat::Ico),
+        ] {
+            let mut encoded = Cursor::new(Vec::new());
+            image.write_to(&mut encoded, format).unwrap();
+            sources.push((name, encoded.into_inner()));
+        }
+        sources.push((
+            "svg",
+            br#"<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2"><rect width="3" height="2" fill="navy"/></svg>"#.to_vec(),
+        ));
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        for (name, bytes) in sources {
+            let output = std::env::temp_dir().join(format!(
+                "comic-explorer-wic-{name}-{}-{nonce}.jpg",
+                std::process::id()
+            ));
+            assert_eq!(encode_wic_jpeg(&bytes, &output).unwrap(), (3, 2));
+            assert!(std::fs::read(&output).unwrap().starts_with(&[0xff, 0xd8]));
+            std::fs::remove_file(output).unwrap();
+        }
     }
 
     #[cfg(target_os = "windows")]

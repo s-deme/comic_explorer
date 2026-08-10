@@ -122,6 +122,10 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
             bytes.starts_with(b"RIFF") && bytes.get(8..12).is_some_and(|format| format == b"WEBP")
         }
         "image/gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "image/bmp" => bytes.starts_with(b"BM"),
+        "image/tiff" => bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*"),
+        "image/x-icon" => bytes.starts_with(&[0, 0, 1, 0]),
+        "image/svg+xml" => svg_signature(&bytes),
         "image/avif" => {
             bytes.get(4..8).is_some_and(|kind| kind == b"ftyp")
                 && bytes
@@ -139,6 +143,16 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
         });
     }
     Ok(bytes)
+}
+
+fn svg_signature(bytes: &[u8]) -> bool {
+    let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let text = text.trim_start();
+    text.starts_with("<svg")
+        || ((text.starts_with("<?xml") || text.starts_with("<!--")) && text.contains("<svg"))
 }
 
 pub fn handle_protocol_request(
@@ -322,6 +336,39 @@ mod tests {
             read_grant_bytes(&invalid).unwrap_err().code,
             ErrorCode::CorruptImage
         );
+    }
+
+    #[test]
+    fn additional_image_media_types_require_matching_signatures() {
+        for (index, (mime_type, bytes)) in [
+            ("image/bmp", b"BMpayload".as_slice()),
+            ("image/tiff", b"II*\0payload".as_slice()),
+            ("image/x-icon", b"\0\0\x01\0payload".as_slice()),
+            (
+                "image/svg+xml",
+                b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>".as_slice(),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let grant = MediaGrant {
+                page_id: PageId::parse(format!("page-{index}")).unwrap(),
+                mime_type,
+                max_bytes: 1024,
+                source: PageSource::Memory(bytes.to_vec()),
+            };
+            assert!(read_grant_bytes(&grant).is_ok(), "{mime_type}");
+            assert_eq!(
+                read_grant_bytes(&MediaGrant {
+                    source: PageSource::Memory(b"wrong signature".to_vec()),
+                    ..grant
+                })
+                .unwrap_err()
+                .code,
+                ErrorCode::CorruptImage
+            );
+        }
     }
 
     #[test]

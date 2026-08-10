@@ -12,6 +12,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / android_system_properties | 0.1.5 | MIT OR Apache-2.0 |
 | cargo / anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | cargo / arbitrary | 1.4.2 | MIT OR Apache-2.0 |
+| cargo / arrayref | 0.3.9 | BSD-2-Clause |
+| cargo / arrayvec | 0.7.8 | MIT OR Apache-2.0 |
 | cargo / atk-sys | 0.18.2 | MIT |
 | cargo / atk | 0.18.2 | MIT |
 | cargo / atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
@@ -43,16 +45,19 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cargo / cfg-if | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / chrono | 0.4.45 | MIT OR Apache-2.0 |
+| cargo / color_quant | 1.1.0 | MIT |
 | cargo / combine | 4.6.7 | MIT |
 | cargo / cookie | 0.18.1 | MIT OR Apache-2.0 |
 | cargo / core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
 | cargo / core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | cargo / core-graphics-types | 0.2.0 | MIT OR Apache-2.0 |
 | cargo / core-graphics | 0.25.0 | MIT OR Apache-2.0 |
+| cargo / core_maths | 0.1.1 | MIT |
 | cargo / cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
 | cargo / crc32fast | 1.5.0 | MIT OR Apache-2.0 |
 | cargo / crossbeam-channel | 0.5.16 | MIT OR Apache-2.0 |
 | cargo / crossbeam-utils | 0.8.22 | MIT OR Apache-2.0 |
+| cargo / crunchy | 0.2.4 | MIT |
 | cargo / crypto-common | 0.1.7 | MIT OR Apache-2.0 |
 | cargo / cssparser-macros | 0.6.1 | MPL-2.0 |
 | cargo / cssparser | 0.36.0 | MPL-2.0 |
@@ -61,6 +66,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / darling | 0.21.3 | MIT |
 | cargo / darling_core | 0.21.3 | MIT |
 | cargo / darling_macro | 0.21.3 | MIT |
+| cargo / data-url | 0.3.2 | MIT OR Apache-2.0 |
 | cargo / dbus | 0.9.12 | Apache-2.0 OR MIT |
 | cargo / deranged | 0.5.8 | MIT OR Apache-2.0 |
 | cargo / derive_arbitrary | 1.4.2 | MIT OR Apache-2.0 |
@@ -85,16 +91,21 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / embed_plist | 1.2.2 | MIT OR Apache-2.0 |
 | cargo / equivalent | 1.0.2 | Apache-2.0 OR MIT |
 | cargo / erased-serde | 0.4.10 | MIT OR Apache-2.0 |
+| cargo / euclid | 0.22.14 | MIT OR Apache-2.0 |
 | cargo / fallible-iterator | 0.3.0 | MIT OR Apache-2.0 |
 | cargo / fallible-streaming-iterator | 0.1.9 | MIT OR Apache-2.0 |
 | cargo / fastrand | 2.5.0 | Apache-2.0 OR MIT |
+| cargo / fax | 0.2.7 | MIT |
 | cargo / fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | cargo / field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | cargo / find-msvc-tools | 0.1.9 | MIT OR Apache-2.0 |
 | cargo / flate2 | 1.1.9 | MIT OR Apache-2.0 |
+| cargo / float-cmp | 0.9.0 | MIT |
 | cargo / fnv | 1.0.7 | Apache-2.0 OR MIT |
 | cargo / foldhash | 0.1.5 | Zlib |
 | cargo / foldhash | 0.2.0 | Zlib |
+| cargo / fontconfig-parser | 0.5.8 | MIT |
+| cargo / fontdb | 0.23.0 | MIT |
 | cargo / foreign-types-macros | 0.2.4 | MIT OR Apache-2.0 |
 | cargo / foreign-types-shared | 0.3.1 | MIT OR Apache-2.0 |
 | cargo / foreign-types | 0.5.0 | MIT OR Apache-2.0 |
@@ -118,6 +129,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / getrandom | 0.2.17 | MIT OR Apache-2.0 |
 | cargo / getrandom | 0.3.4 | MIT OR Apache-2.0 |
 | cargo / getrandom | 0.4.3 | MIT OR Apache-2.0 |
+| cargo / gif | 0.14.2 | MIT OR Apache-2.0 |
 | cargo / gio-sys | 0.18.1 | MIT |
 | cargo / gio | 0.18.4 | MIT |
 | cargo / glib-macros | 0.18.5 | MIT |
@@ -128,6 +140,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / gtk-sys | 0.18.2 | MIT |
 | cargo / gtk3-macros | 0.18.2 | MIT |
 | cargo / gtk | 0.18.2 | MIT |
+| cargo / half | 2.7.1 | MIT OR Apache-2.0 |
 | cargo / hashbrown | 0.12.3 | MIT OR Apache-2.0 |
 | cargo / hashbrown | 0.15.5 | MIT OR Apache-2.0 |
 | cargo / hashbrown | 0.17.1 | MIT OR Apache-2.0 |
@@ -156,6 +169,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / idna | 1.1.0 | MIT OR Apache-2.0 |
 | cargo / idna_adapter | 1.2.1 | Apache-2.0 OR MIT |
 | cargo / image-webp | 0.2.4 | MIT OR Apache-2.0 |
+| cargo / image | 0.25.9 | MIT OR Apache-2.0 |
+| cargo / imagesize | 0.13.0 | MIT |
 | cargo / indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | cargo / indexmap | 2.14.0 | Apache-2.0 OR MIT |
 | cargo / infer | 0.19.0 | MIT |
@@ -171,11 +186,13 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / json-patch | 3.0.1 | MIT OR Apache-2.0 |
 | cargo / jsonptr | 0.6.3 | MIT OR Apache-2.0 |
 | cargo / keyboard-types | 0.7.0 | MIT OR Apache-2.0 |
+| cargo / kurbo | 0.11.3 | Apache-2.0 OR MIT |
 | cargo / libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |
 | cargo / libappindicator | 0.9.0 | Apache-2.0 OR MIT |
 | cargo / libc | 0.2.189 | MIT OR Apache-2.0 |
 | cargo / libdbus-sys | 0.2.7 | Apache-2.0 OR MIT |
 | cargo / libloading | 0.7.4 | ISC |
+| cargo / libm | 0.2.16 | MIT |
 | cargo / libredox | 0.1.18 | MIT |
 | cargo / libsqlite3-sys | 0.35.0 | MIT |
 | cargo / litemap | 0.8.2 | Unicode-3.0 |
@@ -187,6 +204,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / mime | 0.3.17 | MIT OR Apache-2.0 |
 | cargo / miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | cargo / mio | 1.2.2 | MIT |
+| cargo / moxcms | 0.7.11 | BSD-3-Clause OR Apache-2.0 |
 | cargo / muda | 0.19.3 | Apache-2.0 OR MIT |
 | cargo / ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | cargo / ndk | 0.9.0 | MIT OR Apache-2.0 |
@@ -224,6 +242,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / phf_generator | 0.13.1 | MIT |
 | cargo / phf_macros | 0.13.1 | MIT |
 | cargo / phf_shared | 0.13.1 | MIT |
+| cargo / pico-args | 0.5.0 | MIT |
 | cargo / pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | cargo / pkg-config | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / plist | 1.8.0 | MIT |
@@ -238,6 +257,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / proc-macro-error-attr | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / proc-macro-error | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
+| cargo / pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | cargo / quick-error | 2.0.1 | MIT OR Apache-2.0 |
 | cargo / quick-xml | 0.38.4 | MIT |
 | cargo / quote | 1.0.47 | MIT OR Apache-2.0 |
@@ -252,10 +272,14 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | cargo / regex | 1.13.1 | MIT OR Apache-2.0 |
 | cargo / reqwest | 0.13.4 | MIT OR Apache-2.0 |
+| cargo / resvg | 0.45.1 | Apache-2.0 OR MIT |
+| cargo / rgb | 0.8.53 | MIT |
+| cargo / roxmltree | 0.20.0 | MIT OR Apache-2.0 |
 | cargo / rusqlite | 0.37.0 | MIT |
 | cargo / rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | cargo / rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | cargo / rustversion | 1.0.23 | MIT OR Apache-2.0 |
+| cargo / rustybuzz | 0.20.1 | MIT |
 | cargo / same-file | 1.0.6 | Unlicense OR MIT |
 | cargo / schemars | 0.8.22 | MIT |
 | cargo / schemars | 0.9.0 | MIT |
@@ -281,17 +305,21 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | cargo / shlex | 2.0.1 | MIT OR Apache-2.0 |
 | cargo / simd-adler32 | 0.3.10 | MIT |
+| cargo / simplecss | 0.2.2 | Apache-2.0 OR MIT |
 | cargo / siphasher | 1.0.3 | MIT OR Apache-2.0 |
 | cargo / slab | 0.4.12 | MIT |
+| cargo / slotmap | 1.1.1 | Zlib |
 | cargo / smallvec | 1.15.2 | MIT OR Apache-2.0 |
 | cargo / socket2 | 0.6.5 | MIT OR Apache-2.0 |
 | cargo / softbuffer | 0.4.8 | MIT OR Apache-2.0 |
 | cargo / soup3-sys | 0.5.0 | MIT |
 | cargo / soup3 | 0.5.0 | MIT |
 | cargo / stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
+| cargo / strict-num | 0.1.1 | MIT |
 | cargo / string_cache | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 |
 | cargo / strsim | 0.11.1 | MIT |
+| cargo / svgtypes | 0.15.3 | Apache-2.0 OR MIT |
 | cargo / swift-rs | 1.0.7 | MIT OR Apache-2.0 |
 | cargo / syn | 1.0.109 | MIT OR Apache-2.0 |
 | cargo / syn | 2.0.119 | MIT OR Apache-2.0 |
@@ -315,10 +343,15 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / thiserror-impl | 2.0.19 | MIT OR Apache-2.0 |
 | cargo / thiserror | 1.0.69 | MIT OR Apache-2.0 |
 | cargo / thiserror | 2.0.19 | MIT OR Apache-2.0 |
+| cargo / tiff | 0.10.3 | MIT |
 | cargo / time-core | 0.1.7 | MIT OR Apache-2.0 |
 | cargo / time-macros | 0.2.25 | MIT OR Apache-2.0 |
 | cargo / time | 0.3.45 | MIT OR Apache-2.0 |
+| cargo / tiny-skia-path | 0.11.4 | BSD-3-Clause |
+| cargo / tiny-skia | 0.11.4 | BSD-3-Clause |
 | cargo / tinystr | 0.8.3 | Unicode-3.0 |
+| cargo / tinyvec | 1.12.0 | Zlib OR Apache-2.0 OR MIT |
+| cargo / tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib |
 | cargo / tokio-macros | 2.7.1 | MIT |
 | cargo / tokio-util | 0.7.19 | MIT |
 | cargo / tokio | 1.53.1 | MIT |
@@ -341,6 +374,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / tracing | 0.1.44 | MIT |
 | cargo / tray-icon | 0.24.2 | MIT OR Apache-2.0 |
 | cargo / try-lock | 0.2.5 | MIT |
+| cargo / ttf-parser | 0.25.1 | MIT OR Apache-2.0 |
 | cargo / typeid | 1.0.3 | MIT OR Apache-2.0 |
 | cargo / typenum | 1.20.1 | MIT OR Apache-2.0 |
 | cargo / unic-char-property | 0.9.0 | MIT OR Apache-2.0 |
@@ -348,12 +382,19 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / unic-common | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / unic-ucd-ident | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / unic-ucd-version | 0.9.0 | MIT OR Apache-2.0 |
+| cargo / unicode-bidi-mirroring | 0.4.0 | MIT OR Apache-2.0 |
+| cargo / unicode-bidi | 0.3.18 | MIT OR Apache-2.0 |
+| cargo / unicode-ccc | 0.4.0 | MIT OR Apache-2.0 |
 | cargo / unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
+| cargo / unicode-properties | 0.1.4 | MIT OR Apache-2.0 |
+| cargo / unicode-script | 0.5.8 | MIT OR Apache-2.0 |
 | cargo / unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
+| cargo / unicode-vo | 0.1.0 | MIT OR Apache-2.0 |
 | cargo / unrar | 0.5.8 | MIT OR Apache-2.0 |
 | cargo / unrar_sys | 0.5.8 | MIT OR Apache-2.0 |
 | cargo / url | 2.5.8 | MIT OR Apache-2.0 |
 | cargo / urlpattern | 0.3.0 | MIT |
+| cargo / usvg | 0.45.1 | Apache-2.0 OR MIT |
 | cargo / utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | cargo / uuid | 1.24.0 | Apache-2.0 OR MIT |
 | cargo / vcpkg | 0.2.15 | MIT OR Apache-2.0 |
@@ -378,6 +419,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / webview2-com-macros | 0.8.1 | MIT |
 | cargo / webview2-com-sys | 0.38.2 | MIT |
 | cargo / webview2-com | 0.38.2 | MIT |
+| cargo / weezl | 0.1.12 | MIT OR Apache-2.0 |
 | cargo / widestring | 1.2.1 | MIT OR Apache-2.0 |
 | cargo / winapi-i686-pc-windows-gnu | 0.4.0 | MIT OR Apache-2.0 |
 | cargo / winapi-util | 0.1.11 | Unlicense OR MIT |
@@ -434,8 +476,11 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / wry | 0.55.1 | Apache-2.0 OR MIT |
 | cargo / x11-dl | 2.21.0 | MIT |
 | cargo / x11 | 2.21.0 | MIT |
+| cargo / xmlwriter | 0.1.0 | MIT |
 | cargo / yoke-derive | 0.8.2 | Unicode-3.0 |
 | cargo / yoke | 0.8.3 | Unicode-3.0 |
+| cargo / zerocopy-derive | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
+| cargo / zerocopy | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | cargo / zerofrom-derive | 0.1.7 | Unicode-3.0 |
 | cargo / zerofrom | 0.1.8 | Unicode-3.0 |
 | cargo / zerotrie | 0.2.4 | Unicode-3.0 |
@@ -445,6 +490,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / zlib-rs | 0.6.6 | Zlib |
 | cargo / zmij | 1.0.23 | MIT |
 | cargo / zopfli | 0.8.3 | Apache-2.0 |
+| cargo / zune-core | 0.4.12 | MIT OR Apache-2.0 OR Zlib |
+| cargo / zune-jpeg | 0.4.21 | MIT OR Apache-2.0 OR Zlib |
 | npm / @acemir/cssom | 0.9.31 | MIT |
 | npm / @adobe/css-tools | 4.5.0 | MIT |
 | npm / @asamuzakjp/css-color | 4.1.2 | MIT |

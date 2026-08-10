@@ -418,6 +418,18 @@ mod tests {
             )
             .unwrap();
         writer.write_all(b"two").unwrap();
+        for name in [
+            "chapter/3.bmp",
+            "chapter/4.gif",
+            "chapter/5.tiff",
+            "chapter/6.ico",
+            "chapter/7.svg",
+        ] {
+            writer
+                .start_file(name, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(b"supported by extension").unwrap();
+        }
         writer
             .start_file("notes.txt", SimpleFileOptions::default())
             .unwrap();
@@ -429,7 +441,18 @@ mod tests {
             .into_iter()
             .map(|page| page.to_string())
             .collect::<Vec<_>>();
-        assert_eq!(pages, ["chapter/2.PNG", "chapter/10.JPG"]);
+        assert_eq!(
+            pages,
+            [
+                "chapter/2.PNG",
+                "chapter/3.bmp",
+                "chapter/4.gif",
+                "chapter/5.tiff",
+                "chapter/6.ico",
+                "chapter/7.svg",
+                "chapter/10.JPG"
+            ]
+        );
         assert!(!path.parent().unwrap().join("chapter").exists());
         fs::remove_file(path).unwrap();
     }

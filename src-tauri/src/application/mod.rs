@@ -21,8 +21,8 @@ use crate::catalog::{
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
-    AppError, ErrorCode, FileKind, ItemKind, PageId, RelativePath, RequestId, classify_file_name,
-    item_id_for, page_id_for,
+    AppError, ErrorCode, FileKind, ImageFormat, ItemKind, PageId, RelativePath, RequestId,
+    classify_file_name, item_id_for, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
 use crate::state::{AppPaths, FavoriteRecord, StateStore, ThumbnailPipeline};
@@ -2007,10 +2007,23 @@ fn resolve_thumbnail(
     }
 }
 
-fn read_page_bytes(grant: &MediaGrant, target: &RelativePath) -> Result<Vec<u8>, AppError> {
+fn read_page_bytes(
+    grant: &MediaGrant,
+    target: &RelativePath,
+) -> Result<(&'static str, Vec<u8>), AppError> {
     let result = read_grant_bytes(grant).and_then(|bytes| {
-        crate::catalog::inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)?;
-        Ok(bytes)
+        let metadata = crate::catalog::inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)?;
+        match metadata.format {
+            ImageFormat::Bmp | ImageFormat::Tiff | ImageFormat::Ico => Ok((
+                "image/png",
+                crate::catalog::raster_delivery_png(&bytes, metadata.format)?,
+            )),
+            ImageFormat::Svg => {
+                let (_, _, png) = crate::catalog::render_svg_png(&bytes, None)?;
+                Ok(("image/png", png))
+            }
+            _ => Ok((grant.mime_type, bytes)),
+        }
     });
     result.map_err(|mut error| {
         error.target = Some(target.clone());
@@ -2827,7 +2840,8 @@ pub async fn load_page(
     if state
         .page_workers
         .submit(priority.into(), cancellation.clone(), move || {
-            let result = read_page_bytes(&grant, &worker_page).map(|bytes| (grant, bytes));
+            let result = read_page_bytes(&grant, &worker_page)
+                .map(|(delivered_mime_type, bytes)| (grant, delivered_mime_type, bytes));
             if !cancellation.is_cancelled() {
                 let _ = sender.send(result);
             }
@@ -2856,7 +2870,7 @@ pub async fn load_page(
             generation: context.generation,
         });
     }
-    let (grant, bytes) = match result {
+    let (grant, delivered_mime_type, bytes) = match result {
         Ok(value) => value,
         Err(error) => return Ok(error_response(&context, error)),
     };
@@ -2865,6 +2879,7 @@ pub async fn load_page(
         .lock()
         .map_err(|_| "state poisoned")?
         .issue(MediaGrant {
+            mime_type: delivered_mime_type,
             source: PageSource::Memory(bytes),
             ..grant
         });
@@ -2885,9 +2900,13 @@ fn page_mime_type(page: &RelativePath) -> &'static str {
         .map(|(_, extension)| extension.to_ascii_lowercase())
         .as_deref()
     {
+        Some("bmp") => "image/bmp",
         Some("png") => "image/png",
         Some("webp") => "image/webp",
         Some("gif") => "image/gif",
+        Some("tif" | "tiff") => "image/tiff",
+        Some("ico") => "image/x-icon",
+        Some("svg") => "image/svg+xml",
         Some("avif") => "image/avif",
         _ => "image/jpeg",
     }
@@ -2964,7 +2983,11 @@ mod shutdown_tests {
     use std::sync::Condvar;
 
     #[test]
-    fn fr_b08_webp_uses_the_exact_viewer_media_type() {
+    fn supported_images_use_exact_source_media_types_before_safe_transcoding() {
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/00.BMP").unwrap()),
+            "image/bmp"
+        );
         assert_eq!(
             page_mime_type(&RelativePath::parse("chapter/01.WEBP").unwrap()),
             "image/webp"
@@ -2976,6 +2999,18 @@ mod shutdown_tests {
         assert_eq!(
             page_mime_type(&RelativePath::parse("chapter/03.AVIF").unwrap()),
             "image/avif"
+        );
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/04.TIFF").unwrap()),
+            "image/tiff"
+        );
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/05.ICO").unwrap()),
+            "image/x-icon"
+        );
+        assert_eq!(
+            page_mime_type(&RelativePath::parse("chapter/06.SVG").unwrap()),
+            "image/svg+xml"
         );
     }
 
@@ -3228,6 +3263,44 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn page_adapter_transcodes_additional_rasters_and_static_svg_to_safe_png_media() {
+        use image::{DynamicImage, ImageBuffer, ImageFormat as DecoderFormat, Rgba};
+
+        for (decoder_format, extension, mime_type) in [
+            (DecoderFormat::Bmp, "bmp", "image/bmp"),
+            (DecoderFormat::Tiff, "tiff", "image/tiff"),
+            (DecoderFormat::Ico, "ico", "image/x-icon"),
+        ] {
+            let image =
+                DynamicImage::ImageRgba8(ImageBuffer::from_pixel(5, 3, Rgba([10, 20, 30, 255])));
+            let mut output = Cursor::new(Vec::new());
+            image.write_to(&mut output, decoder_format).unwrap();
+            let target = RelativePath::parse(format!("page.{extension}")).unwrap();
+            let grant = MediaGrant {
+                page_id: PageId::parse(format!("page-{extension}")).unwrap(),
+                mime_type,
+                max_bytes: MAX_IMAGE_BYTES,
+                source: PageSource::Memory(output.into_inner()),
+            };
+            let (delivered_mime, bytes) = read_page_bytes(&grant, &target).unwrap();
+            assert_eq!(delivered_mime, "image/png");
+            assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+        }
+
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="5" height="3"><rect width="5" height="3" fill="blue"/></svg>"#;
+        let target = RelativePath::parse("page.svg").unwrap();
+        let grant = MediaGrant {
+            page_id: PageId::parse("page-svg").unwrap(),
+            mime_type: "image/svg+xml",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::Memory(svg.to_vec()),
+        };
+        let (delivered_mime, bytes) = read_page_bytes(&grant, &target).unwrap();
+        assert_eq!(delivered_mime, "image/png");
+        assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    }
+
+    #[test]
     fn page_adapter_reports_the_target_and_recovers_on_the_next_real_page() {
         let fixtures =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");
@@ -3271,7 +3344,8 @@ mod shutdown_tests {
             max_bytes: MAX_IMAGE_BYTES,
             source: PageSource::File(root.join(next_target.as_str())),
         };
-        let bytes = read_page_bytes(&next, &next_target).unwrap();
+        let (mime_type, bytes) = read_page_bytes(&next, &next_target).unwrap();
+        assert_eq!(mime_type, "image/png");
         assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
         std::fs::remove_dir_all(root).unwrap();
     }

@@ -28,8 +28,8 @@ codd:
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
-| Implemented | PASS | 65 |
-| Implemented | BLOCKED | 6 |
+| Implemented | PASS | 64 |
+| Implemented | BLOCKED | 7 |
 | Partial | BLOCKED | 11 |
 | Candidate | NOT TESTED | 10 |
 | Rejected | NOT TESTED | 4 |
@@ -39,7 +39,8 @@ codd:
 
 | 範囲 | 状態 | 備考 |
 |---|---|---|
-| REQ-MVP-001〜017, 019 | Implemented / PASS | catalog、viewer、読書位置、原本非破壊、error回復を直接観測済み。 |
+| REQ-MVP-001〜007, 009〜017, 019 | Implemented / PASS | catalog、viewer、読書位置、原本非破壊、error回復を直接観測済み。 |
+| REQ-MVP-008 | Implemented / BLOCKED | BMP/JPEG/GIF/TIFF/PNG/ICO/SVG/WebPの列挙、実decode、安全なviewer配信とWIC thumbnailはWindows testでPASS。release WebView2上のanimated GIF直接観測は未完了。 |
 | REQ-MVP-018 | Partial / BLOCKED | code上はlocal-onlyだが、隔離VM外部からのDNS/TCP/UDP監視が未実施。 |
 | NFR-MVP-001〜003 | Partial / BLOCKED | 規模・性能・UIA/screen reader/high contrast/DPIの製品実測待ち。 |
 | NFR-MVP-004 | Implemented / PASS | lock inventory、SBOM、notice、license auditの受入証跡あり。 |
@@ -56,7 +57,8 @@ codd:
 | FR-B06 | quick access・favorite保存 | Implemented / PASS | — |
 | FR-B07 | memo・history・rating | Implemented / PASS | — |
 | FR-B08 / static WebP | FUT-C-005 | Implemented / PASS | animated WebPへ波及しない。 |
-| FR-B08 / P8 | FUT-C-006〜008 | Partial / BLOCKED | release WebView2でGIF/AVIF decode、animation、corrupt fallback未測定。 |
+| FR-B08 / P8 GIF | FUT-C-006〜008のGIF範囲 | Implemented / BLOCKED | 実decodeとWIC先頭frame thumbnailはPASS。release WebView2でanimation、corrupt fallback未測定。 |
+| FR-B08 / P8 AVIF | FUT-C-006〜008のAVIF範囲 | Partial / BLOCKED | 安全な分類・metadata・MIMEのみ。製品decode未受入。 |
 | FR-B10 | tag | Implemented / PASS | — |
 | FR-B11 / keyboard | FUT-C-019 | Implemented / PASS | touch/gamepadはCandidate。 |
 | FR-B12 / P9 | FUT-C-001, 002 | Partial / BLOCKED | RAR4/RAR5 reader・license・fixtureはPASS。CBR/7z readerは未承認。 |
@@ -89,7 +91,7 @@ codd:
 - 基準PCでのcold TTI、10,000項目、scroll/FPS、input/page latency、working set、cache測定。
 - Windows UIA、Narrator/NVDA、high contrast、100/150/200% DPI。
 - WebView2 custom protocolの実Origin/Referer header統合。
-- GIF/AVIFの製品decode、animation、corrupt fallback、CBR/7z reader。
+- animated GIFのrelease WebView2直接観測とcorrupt fallback、AVIFの製品decode、CBR/7z reader。
 - tray notification area、P5 visual/DPI、thumbnail file pickerと実disk I/Oの製品gate。
 
 これらが残るため、製品全体を「すべてのrelease gateがPASS」とは判定しない。

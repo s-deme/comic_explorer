@@ -20,7 +20,7 @@ codd:
 | frontend | React 19、TypeScript、Vite、TanStack Virtual、HTML/CSS |
 | backend | Rust 2024 edition、Tokio、typed Tauri commands |
 | catalog/archive | read-only filesystem adapter、`zip`（Deflate、default features off）、自然順 |
-| image/thumbnail | WebView2 page decode、WIC thumbnail pipeline、静止WebPは`image-webp`によるpure-Rust decode |
+| image/thumbnail | WIC thumbnail pipeline、`image` raster validation/PNG conversion、`resvg` static SVG rasterize、静止WebPは`image-webp`によるpure-Rust decode |
 | persistence | app-local SQLite WAL（`rusqlite` bundled）、local settings/collections、file cache |
 | verification | Vitest/Testing Library、Python unittest、Cargo test、Windows release product harness、CoDD |
 
@@ -63,6 +63,9 @@ folder pageはread-only file stream、ZIP/CBZ/EPUB pageは必要entryだけをin
 UnRARのlisting/processing APIで単一volume・非暗号化書庫の必要entryだけをmemoryへ読み、いずれも
 libraryへ展開しない。分割・暗号化RAR、CBR、7zは読取開始前に分類して拒否する。
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
+BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
+解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。
+JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIMEをopaque media URLから渡す。
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
 
@@ -78,8 +81,10 @@ shutdownは新規受付拒否、task cancel/join、読書位置flush、media gra
 ## thumbnailとcache
 
 thumbnailは自然順の先頭表示可能pageから生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。
-JPEG/JPG/PNGはWIC、静止WebPはWIC codecに依存しないpure-Rust decoderを使う。animated WebP/GIF、
-破損画像、過大dimensionは局所errorまたはplaceholderとし、他項目の操作を止めない。
+BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止WebPはWIC codecに依存しない
+pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
+animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、
+過大dimensionは局所errorまたはplaceholderとし、他項目の操作を止めない。
 
 source fingerprintはfile size/mtimeと必要なarchive metadataを含む。生成物はtemp write後にatomic renameし、
 DB transactionでindexを更新する。cache rootは`%LOCALAPPDATA%\ComicExplorer\cache`、自動生成thumbnailは

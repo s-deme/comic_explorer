@@ -27,10 +27,14 @@ pub enum ItemKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ImageFormat {
+    Bmp,
     Jpeg,
     Png,
     Webp,
     Gif,
+    Tiff,
+    Ico,
+    Svg,
     Avif,
 }
 

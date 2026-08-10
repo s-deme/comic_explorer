@@ -269,6 +269,12 @@ mod tests {
         fs::create_dir_all(comic.join("chapter")).unwrap();
         fs::write(comic.join("10.jpg"), b"test").unwrap();
         fs::write(comic.join("2.PNG"), b"test").unwrap();
+        fs::write(comic.join("3.bmp"), b"test").unwrap();
+        fs::write(comic.join("4.GIF"), b"test").unwrap();
+        fs::write(comic.join("5.tif"), b"test").unwrap();
+        fs::write(comic.join("6.TIFF"), b"test").unwrap();
+        fs::write(comic.join("7.ico"), b"test").unwrap();
+        fs::write(comic.join("8.SVG"), b"test").unwrap();
         fs::write(comic.join("chapter/3.jpeg"), b"test").unwrap();
         fs::write(comic.join("chapter/notes.txt"), b"test").unwrap();
         fs::write(comic.join(".hidden.png"), b"test").unwrap();
@@ -279,7 +285,20 @@ mod tests {
             .map(|path| path.to_string())
             .collect::<Vec<_>>();
 
-        assert_eq!(pages, ["book/2.PNG", "book/10.jpg", "book/chapter/3.jpeg"]);
+        assert_eq!(
+            pages,
+            [
+                "book/2.PNG",
+                "book/3.bmp",
+                "book/4.GIF",
+                "book/5.tif",
+                "book/6.TIFF",
+                "book/7.ico",
+                "book/8.SVG",
+                "book/10.jpg",
+                "book/chapter/3.jpeg"
+            ]
+        );
         fs::remove_dir_all(&root).unwrap();
     }
 

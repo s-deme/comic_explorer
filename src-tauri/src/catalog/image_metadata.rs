@@ -3,6 +3,8 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::api::{MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 use crate::domain::{AppError, ErrorCode, ImageFormat};
 
+use super::image_render::{decode_raster_metadata, inspect_svg};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ImageMetadata {
     pub format: ImageFormat,
@@ -22,15 +24,19 @@ pub fn inspect_image<R: Read + Seek>(
             "Image byte limit exceeded.",
         ));
     }
-    let mut signature = [0_u8; 24];
+    let mut signature = Vec::with_capacity(24);
     reader
-        .read_exact(&mut signature)
-        .map_err(|_| error(ErrorCode::CorruptImage, "Image header is truncated."))?;
+        .take(24)
+        .read_to_end(&mut signature)
+        .map_err(|_| error(ErrorCode::CorruptImage, "Image header cannot be read."))?;
     reader
         .seek(SeekFrom::Start(0))
         .map_err(|_| error(ErrorCode::CorruptImage, "Image stream is not seekable."))?;
 
-    let metadata = if signature.starts_with(b"\x89PNG\r\n\x1a\n") && &signature[12..16] == b"IHDR" {
+    let metadata = if signature.starts_with(b"\x89PNG\r\n\x1a\n")
+        && signature.get(12..16).is_some_and(|kind| kind == b"IHDR")
+        && signature.len() >= 24
+    {
         let has_alpha = png_has_alpha(reader)?;
         ImageMetadata {
             format: ImageFormat::Png,
@@ -45,16 +51,56 @@ pub fn inspect_image<R: Read + Seek>(
         inspect_webp(reader, compressed_size)?
     } else if signature.starts_with(b"GIF87a") || signature.starts_with(b"GIF89a") {
         inspect_gif(reader, compressed_size)?
-    } else if &signature[4..8] == b"ftyp" {
+    } else if signature.starts_with(b"BM") {
+        inspect_decoded_raster(reader, compressed_size, ImageFormat::Bmp)?
+    } else if signature.starts_with(b"II*\0") || signature.starts_with(b"MM\0*") {
+        inspect_decoded_raster(reader, compressed_size, ImageFormat::Tiff)?
+    } else if signature.starts_with(&[0, 0, 1, 0]) {
+        inspect_decoded_raster(reader, compressed_size, ImageFormat::Ico)?
+    } else if signature.get(4..8).is_some_and(|kind| kind == b"ftyp") {
         inspect_avif(reader, compressed_size)?
     } else {
-        return Err(error(
-            ErrorCode::CorruptImage,
-            "File signature is not a supported image.",
-        ));
+        inspect_svg_stream(reader, compressed_size)?
     };
     validate_dimensions(metadata)?;
     Ok(metadata)
+}
+
+fn inspect_decoded_raster<R: Read + Seek>(
+    reader: &mut R,
+    compressed_size: u64,
+    format: ImageFormat,
+) -> Result<ImageMetadata, AppError> {
+    reader
+        .seek(SeekFrom::Start(0))
+        .map_err(|_| error(ErrorCode::CorruptImage, "Image stream is not seekable."))?;
+    let bytes = read_exact_image_bytes(reader, compressed_size, "Image stream is truncated.")?;
+    let (width, height, has_alpha) = decode_raster_metadata(&bytes, format)?;
+    Ok(ImageMetadata {
+        format,
+        width,
+        height,
+        has_alpha,
+        animated: false,
+    })
+}
+
+fn inspect_svg_stream<R: Read + Seek>(
+    reader: &mut R,
+    compressed_size: u64,
+) -> Result<ImageMetadata, AppError> {
+    reader
+        .seek(SeekFrom::Start(0))
+        .map_err(|_| error(ErrorCode::CorruptImage, "SVG stream is not seekable."))?;
+    let bytes = read_exact_image_bytes(reader, compressed_size, "SVG stream is truncated.")?;
+    let (width, height) = inspect_svg(&bytes)?;
+    Ok(ImageMetadata {
+        format: ImageFormat::Svg,
+        width,
+        height,
+        has_alpha: true,
+        animated: false,
+    })
 }
 
 fn inspect_gif<R: Read + Seek>(
@@ -215,6 +261,12 @@ fn inspect_gif<R: Read + Seek>(
             }
             _ => return Err(corrupt_gif("GIF contains an invalid block marker.")),
         }
+    }
+    let (decoded_width, decoded_height, _) = decode_raster_metadata(&bytes, ImageFormat::Gif)?;
+    if (decoded_width, decoded_height) != (width, height) {
+        return Err(corrupt_gif(
+            "GIF decoder dimensions do not match its logical screen.",
+        ));
     }
     Ok(ImageMetadata {
         format: ImageFormat::Gif,
@@ -1591,6 +1643,39 @@ mod tests {
                 width: 320,
                 height: 480,
                 has_alpha: false,
+                animated: false,
+            }
+        );
+    }
+
+    #[test]
+    fn reads_bmp_tiff_ico_and_static_svg_dimensions_from_decodable_content() {
+        use image::{DynamicImage, ImageBuffer, ImageFormat as DecoderFormat, Rgba};
+
+        for (decoder_format, domain_format) in [
+            (DecoderFormat::Bmp, ImageFormat::Bmp),
+            (DecoderFormat::Tiff, ImageFormat::Tiff),
+            (DecoderFormat::Ico, ImageFormat::Ico),
+        ] {
+            let image =
+                DynamicImage::ImageRgba8(ImageBuffer::from_pixel(7, 11, Rgba([20, 40, 60, 128])));
+            let mut output = Cursor::new(Vec::new());
+            image.write_to(&mut output, decoder_format).unwrap();
+            let bytes = output.into_inner();
+            let metadata = inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64).unwrap();
+            assert_eq!(metadata.format, domain_format);
+            assert_eq!((metadata.width, metadata.height), (7, 11));
+            assert!(metadata.has_alpha);
+        }
+
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="13" height="17"><rect width="13" height="17"/></svg>"#;
+        assert_eq!(
+            inspect_image(&mut Cursor::new(svg), svg.len() as u64).unwrap(),
+            ImageMetadata {
+                format: ImageFormat::Svg,
+                width: 13,
+                height: 17,
+                has_alpha: true,
                 animated: false,
             }
         );

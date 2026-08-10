@@ -29,14 +29,15 @@ codd:
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
-| Rust canonical | PASS | 2026-08-10、lib 119件 + shutdown process 1件、FAIL 0。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
+| Rust canonical | PASS | 2026-08-10、lib 125件 + shutdown process 1件、FAIL 0。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
+| 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
 | TypeScript/frontend | PASS | 2026-08-10、21 files / 184 tests PASS、FAIL 0。TypeScript typecheckもexit 0。 |
 | Python | PASS | 2026-08-10、38 tests PASS、FAIL 0。menu/addressのcompact寸法とtree文字色のstyle contract 2件、現行status/verification間の5値consistencyもPASS。 |
 | EPUB書庫 | PASS | ZIP互換Stored/DeflateのEPUBについて、大文字小文字を無視した分類、自然順画像列挙、catalog、WebP、media token、原本非破壊をWindows Rust canonicalと87-file fixtureで直接検証。HTML本文組版は対象外。 |
 | RAR書庫 | PASS | 単一volume・非暗号化RAR4/RAR5について、自然順画像列挙、catalog、静止WebP、media token、表紙、診断、原本非破壊をWindows Rust canonicalと再生成可能なStored fixtureで直接検証。暗号化・分割・危険path・破損の拒否もPASS。CBR/7zには波及しない。 |
-| frontend build/SBOM | PASS | Windows buildは61 modulesをbuild、exit 0。SBOMは671 components、unknown/prohibited license 0。UnRAR source noticeを同期済み。 |
-| release executable | PARTIAL | static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。P5/P6/P8/P10と全外部release gateへ波及しない。 |
+| frontend build/SBOM | PASS | Windows buildは61 modulesをbuild、exit 0。SBOMは718 components、unknown/prohibited license 0。UnRAR source noticeと追加画像依存noticeを同期済み。 |
+| release executable | PASS / 製品受入部分BLOCKED | 追加decoderを含むWindows release executableを再buildしexit 0。static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。animated GIF観測、P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |
 | 外部通信 | BLOCKED | code/依存境界はlocal-only。VM外部監視による完全観測は未実施。 |
 | CoDD | PASS（red 0） | scan 4 documents / 49 nodes / 104 edges。check red 0。verify exit 0、DAG red FAIL 0。構造的SKIP/VACUOUSはPASSへ加算しない。 |
@@ -57,7 +58,7 @@ codd:
 ## Feature受入要約
 
 - PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B13〜B16、B19、FR-B11のkeyboard範囲、FR-B12のRAR範囲。
-- BLOCKED/PARTIAL: B08のGIF/AVIF、B11のtouch/gamepad、B12のCBR/7z、B17、B18、B20。
+- BLOCKED/PARTIAL: B08のanimated GIF製品観測とAVIF decode、B11のtouch/gamepad、B12のCBR/7z、B17、B18、B20。
 - Windows release WebView2を直接観測したlaneと、Vitest/jsdom・Rust contractだけのlaneを区別する。
 - focused testのexcluded-by-pattern、構造的SKIP、vacuous check、advisoryをPASS件数へ加えない。
 
@@ -70,7 +71,7 @@ codd:
 | 製品性能 | BLOCKED | 基準PCのcold TTI、10,000項目、FPS、latency、working set未測定。 |
 | accessibility/DPI | BLOCKED | UIA、screen reader、high contrast、100/150/200% DPI未測定。 |
 | custom protocol実header | BLOCKED | WebView2が送るOrigin/Refererの実統合trace未採取。 |
-| GIF/AVIF/CBR/7z | BLOCKED | parser/unsupported境界はPASSだが、製品decodeまたはreader未受入。 |
+| animated GIF / AVIF / CBR / 7z | BLOCKED | GIFのparser・実decode・thumbnailはPASSだがrelease WebView2のanimation未観測。AVIFの製品decodeとCBR/7z readerは未受入。 |
 | P5/P6/P10 product UI | BLOCKED | visual/DPI、tray、file picker、実disk保存/import未測定。 |
 | TC-NFR-006-001 | NOT RUN | 仕様にはあるが旧個別結果に収載されていない。 |
 

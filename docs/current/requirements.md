@@ -21,9 +21,10 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 ## 範囲
 
 対象は、登録したlibrary root内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
-利用者metadata、app-local設定/cache、Windows配布である。JPEG/JPG/PNG、ZIP/CBZ/EPUB/RAR、静止WebPを
-実装済み範囲とする。GIF/AVIFとCBR/7zには実装済みの安全な分類・拒否境界があるが、
-製品decodeまたはreaderの受入は未完了である。
+利用者metadata、app-local設定/cache、Windows配布である。BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、
+ICO、SVG、静止WebP、ZIP/CBZ/EPUB/RARを実装済み範囲とする。WICは画像形式ではなく、
+Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFとCBR/7zには
+実装済みの安全な分類・拒否境界があるが、製品decodeまたはreaderの受入は未完了である。
 
 対象外は、クラウド同期、外部書誌取得、telemetry、外部データ送信、library原本への自動変更、
 OS全体を操作するfile managerである。rename、move、copy、create、delete、OS clipboard file操作は
@@ -48,7 +49,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。 |
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | toolbar buttonから並べ替え、昇降順、巻末動作、一覧形式のmenuを操作し、設定を保存する。 |
-| REQ-MVP-008 | 画像folder内のJPEG/JPG/PNGを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。 |
+| REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
 | REQ-MVP-009 | ZIP/CBZ/EPUBと単一volume・非暗号化RAR4/RAR5を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。分割RAR、暗号化RAR、EPUBのHTML本文組版は対象外とする。 |
 | REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
@@ -101,7 +102,7 @@ Git履歴から参照する。
 | P5 / FR-B17 | FUT-C-065, FUT-C-066, FUT-C-067 | 5分類menu、accessible icon toolbar、永続化する`reference_tile`。 |
 | P6 / FR-B18 | FUT-C-060, FUT-C-061, FUT-C-062, FUT-C-063 | pane/bar可逆表示、viewer分離、native tray hide/showと終了の分離。 |
 | P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、gesture、offline help、version/runtime/license表示。 |
-| P8 / FR-B08 | FUT-C-006, FUT-C-007, FUT-C-008 | GIF/AVIFの安全な分類・metadata・MIME・corrupt境界。製品decodeは未受入。 |
+| P8 / FR-B08 | FUT-C-006, FUT-C-007, FUT-C-008 | GIFの安全な分類・metadata・MIME・製品decodeと、AVIFの安全な分類・metadata・MIME・corrupt境界。AVIFの製品decodeは未受入。 |
 | P9 / FR-B12 | FUT-C-001, 002 | 単一volume・非暗号化RAR4/RAR5を安全に読み、CBR/7zと分割・暗号化RARはunsupported分類する。 |
 | P10 / FR-B20 | FUT-C-073, FUT-C-074, FUT-C-075 | app-local thumbnail管理、明示保存、検証済みJPEG import。製品file picker gateは未完了。 |
 
@@ -119,6 +120,6 @@ Git履歴から参照する。
 | Candidate | FUT-C-024, FUT-C-025, FUT-C-026, FUT-C-027, FUT-C-028, FUT-C-029, FUT-C-052, FUT-C-053 | rename、move、copy、folder作成、trash、完全削除、undo、OS clipboard file操作。採用時はREQ-MVP-017を先に改定する。 |
 | Candidate | FUT-R-006, FUT-R-007 | touch、gamepad。実機契約と直接観測ができるまで未採用。 |
 | Rejected | FUT-R-001, FUT-R-002, FUT-R-003, FUT-R-008 | cloud同期、外部書誌、外部送信、閲覧時の原本自動変更。恒久安全原則を変更しない限り採用しない。 |
-| Partial | FUT-C-001, FUT-C-002, FUT-C-006, FUT-C-007, FUT-C-008 | CBR/7zとGIF/AVIFはunsupported/parser境界だけ実装済み。完全reader/decodeを推定しない。 |
+| Partial | FUT-C-001, FUT-C-002, FUT-C-006, FUT-C-007, FUT-C-008 | CBR/7zとAVIFはunsupported/parser境界だけ実装済み。完全reader/decodeを推定しない。 |
 
 FR-B04とFR-B09は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。
