@@ -13,7 +13,7 @@ codd:
 # FR-B05 名前検索結果
 
 `FUT-C-010`はIMP-012で`Implemented / PASS`、FR-B05は単一featureのため`Done`である。
-`FUT-D-001`の10,000項目・1秒性能はFR-S03の別gateであり、未実測のまま本結果へ加算しない。
+10,000項目・1秒性能は別の性能gateであり、未実測のまま本結果へ加算しない。
 
 ## IMP-012 Windows製品・canonical結果
 

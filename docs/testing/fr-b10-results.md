@@ -71,7 +71,7 @@ commit対象にしない。
 - `StateStore`からTauri command、TypeScript client、production `App`のタグ管理UIへ接続した。
 - タグの正規化、assign/remove/query/rename/merge、空・不正入力拒否をlocal metadata境界へ限定した。
 - 漫画folder、ZIP/CBZ、画像、sidecar、library管理fileへの書込み、network、外部同期、
-  `FUT-D-004`は範囲外のまま保持した。
+  未決定の作品別表示設定は範囲外のまま保持した。
 
 ## cmd_400 accepted evidence（履歴）
 

@@ -21,8 +21,8 @@ Q4-1/Q4-4由来の候補について、LordのOption B受理（2026-08-02）に�
 `FUT-C-010`をFR-B05の機能契約として採用する。対象はlibrary内の可視なfile/folder
 name検索であり、外部書誌情報、tag、favorite、破壊的file operationは含めない。
 
-検索機能の正しさは本要件で扱い、10,000項目・1秒以内の性能受入（`FUT-D-001`）は
-`FR-S03`へ分離する。性能未実測をFR-B05の機能PASSへ混ぜない。
+検索機能の正しさは本要件で扱い、10,000項目・1秒以内の性能受入は別の性能トラックへ
+分離する。性能未実測をFR-B05の機能PASSへ混ぜない。
 
 ## REQ-FR-B05-001: query and matching boundary
 
@@ -61,7 +61,7 @@ stack traceを表示しない。
 結果へ反映される。各要求はgenerationで識別し、古い走査結果を現在画面へ反映しない。
 
 このfreshness契約は検索の正しさと更新可視性だけを定め、検索時間・memory・p95の
-empirical evidenceを提供しない。これらは`FR-S03`のWindows基準環境gateで別途測定する。
+empirical evidenceを提供しない。これらはWindows基準環境gateで別途測定する。
 
 ## REQ-FR-B05-005: local-only and non-destructive boundary
 
@@ -72,7 +72,7 @@ sidecar、temporary file作成を行わない。設定SQLiteへ検索queryやind
 ## C0/C1 ownership checkpoint
 
 FR-B05はserial1の一名integration ownerで実装する。C0でquery normalization、basename
-substring、mixed kind、fresh rescan、FR-S03性能分離を固定し、C1で次のpath ownershipと
+substring、mixed kind、fresh rescan、性能分離を固定し、C1で次のpath ownershipと
 connected evidence matrixを凍結する。
 
 | boundary | owned paths | contract |
@@ -113,7 +113,7 @@ clearによる通常catalog復帰を確認する。harnessだけが一時probe�
 復元する。空白trimとclear後の旧generation抑止は`FT-B05-001`/`FT-B05-004`、再走査の置換と
 generationは`FT-B05-005`/Rust filterを正本とする。検索はlibrary source treeへwrite、rename、
 delete、cache、sidecar、temporary fileを作らず、前後のpath、bytes、SHA-256は一致しなければならない。
-`FT-B05-006`のPASSは`FUT-C-010`だけを完了させる。10,000項目・1秒の`FUT-D-001`は`FR-S03`の
+`FT-B05-006`のPASSは`FUT-C-010`だけを完了させる。10,000項目・1秒の性能測定は別の
 性能gateであり、本featureのPASSへ加算せず、また本gateを妨げない。
 
 ## Batch and evidence boundary
@@ -121,5 +121,5 @@ delete、cache、sidecar、temporary fileを作らず、前後のpath、bytes、
 選択対象のfocused機能テストはSKIP 0で実測する。canonical aggregateはfocused成功後に一回だけ実行し、
 CoDDの構造検査が同条件で非PASSとなる場合は、生値・check名・影響をledgerとreportへ残す。
 その場合も機能証跡PASSとCoDD structural certificationを分離し、「全gate PASS」と称しない。
-Windows WebView2製品実機は`FT-B05-006`を現在のPASS根拠とする。FR-S03の10,000項目性能測定は
+Windows WebView2製品実機は`FT-B05-006`を現在のPASS根拠とする。10,000項目性能測定は
 本batchのPASS根拠ではなく、未実測でもFR-B05の機能PASSを妨げない。

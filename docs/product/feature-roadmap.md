@@ -196,7 +196,7 @@ product gateを代替しない。優先度再検討では、Leeyes代替とし�
   empty/clear、explicit rescan、source tree差分0。性能閾値は含めない。
 - **batch末尾 gate:** selected focused exact5をSKIP 0で実測し、Windows WebView2 `FT-B05-006`、
   外部通信0・原本差分0、canonical aggregateを確認して`Done`。10,000項目/1秒の性能PASSは
-  性能トラックの実測証跡まで`FUT-D-001`へ分離したまま、FR-B05を阻害しない。
+  性能トラックの実測証跡まで分離したまま、FR-B05を阻害しない。
 
 ### FR-B06 — お気に入り（Batch 6）
 
@@ -227,8 +227,7 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 
 - **状態:** `Done`。IMP-006で`FUT-C-023`、IMP-007で`FUT-R-004`、IMP-008で`FUT-R-005`の
   Windows WebView2製品gateと現行canonical aggregateを完了し、3原子機能はすべて
-  `Implemented / PASS`である。`FUT-D-005` の読書状態ラベルは未決定の別トラックとして本バッチへ
-  混入させない。
+  `Implemented / PASS`である。
 - **対象 feature ID:** `FUT-C-023`, `FUT-R-004`, `FUT-R-005`（memo、閲覧履歴、評価）。
 - **user outcome:** 読者が作品にメモ、閲覧履歴、評価をローカル保存し、後から同じ作品の
   読書文脈を確認できる。
@@ -259,7 +258,6 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
   `library.index`不変を観測した。CoDD scan/check/verifyも各exit 0だが、verifyの生値は
   3 SKIP・1 VACUOUS・verification tests 0であり、SKIP=FAIL規則によりcmd_400時点の
   `BATCH-END-GATE` は未達だった。この履歴を後続の3 atomic WebView2 gateの受入へ読み替えない。
-  `FUT-D-005` の採否判断は別トラックで行う。
 
 #### IMP-006 memo受入証跡
 
@@ -372,8 +370,8 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 - **user outcome:** 読者が作品へ tag を付け、tag で検索し、再起動後も同じ分類を利用できる。
 - **共通基盤:** B06/B07 と共有できる local metadata schema、tag normalization、query index、
   add/remove/rename の冪等性。
-- **依存:** local-only metadata と stable path identity。`FUT-D-004` の作品別表示設定とは
-  別機能であり、未決定のまま結合しない。
+- **依存:** local-only metadata と stable path identity。未決定の作品別表示設定とは
+  結合しない。
 - **実装順:** (1) tag schema/normalization、(2) assign/remove、(3) tag query、
   (4) rename/merge/invalid/empty、(5) migration と restart persistence。
 - **focused test 範囲:** `FT-B10-001` assign/remove、`FT-B10-002` query/Unicode/empty、
@@ -666,12 +664,11 @@ focused exact5とSHAは2026-08-03時点のaccepted rawとして保持し、現�
 |---|---|
 | `FUT-C-011` / `FUT-C-021` | `FUT-C-011` はお気に入り・quick access の利用体験、`FUT-C-021` は永続保存の原子機能。FR-B06で一つの縦切りとして実装し、quick-access UI と metadata persistence を別々の重複機能として作らない。 |
 | `FUT-C-020` / `FUT-C-038`〜`FUT-C-041` | `FUT-C-020` は巻末動作設定の umbrella、後四つは確認、一覧復帰、停止、loop の原子 option。FR-B02の共通 policy と option mapping に集約し、umbrella 自体へ別実装を作らない。既存 `REQ-MVP-016` の固定既定動作は維持する。 |
-| `FUT-C-010` / `FUT-D-001` | `FUT-C-010` は名前検索の機能/UI umbrella。`FUT-D-001` は10,000項目・1秒以内の性能受入であり、同じ検索 UI の二重機能ではない。FR-B05の機能テストと性能実測を分離する。 |
 | `REQ-MVP-015` / 読書情報 | MVPの reading position は既存の保存・復元機能であり、FR-B07の memo/history/rating や未決定の読書状態ラベルへ再実装しない。 |
 | `REQ-MVP-015` / `FUT-C-045`, `FUT-C-046` | reading positionは最後に読んだ位置の自動保存、page bookmarkは利用者が明示した複数位置の保存・移動。永続化基盤は共有しても意味とUIを混同しない。 |
 | `FUT-C-011`, `FUT-C-021` / `FUT-C-047` | favorite/quick accessと本棚が同じcollection semanticsなら新しい保存modelを作らない。別collectionを採用する場合だけ差分要件を先に固定する。 |
 | `REQ-MVP-004`, `FUT-R-004` / `FUT-C-044`, `FUT-C-056` | navigation stackと閲覧履歴を再利用する。recentの対象を漫画だけにするかfile・folderまで広げるかを要件化し、同じ対象集合の履歴を二重保存しない。 |
-| `FUT-C-030` / `FUT-C-057` | `FUT-C-030`は自動変更検出、`FUT-C-057`は利用者が起動する現在場所の再読込。F5更新だけで自動監視を実装済みとしない。 |
+| `FUT-C-057` | 利用者が起動する現在場所の再読込。F5更新だけで自動監視を実装済みとしない。 |
 | `FUT-C-012`〜`FUT-C-014`, `REQ-MVP-005`, `REQ-MVP-006` / `FUT-C-067` | 既存view mode、catalog state、thumbnail取得を維持し、参照型tileはvisual・interaction差分だけを実装する。 |
 | `REQ-MVP-006` / `FUT-C-073`〜`FUT-C-075` | 既存の内部cache生成・上限制御と、利用者向け管理・保存・一括読込を分離する。後者の採用で既存cacheを暗黙の永続user dataへ変えない。 |
 | `FR-B13`〜`FR-B16` / `FR-B17` | menu/toolbarは先行batchのcommandを呼ぶ情報設計・presentation層。B17内に同じ処理を再実装しない。 |

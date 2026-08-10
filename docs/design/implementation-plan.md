@@ -87,7 +87,6 @@ IMP-008/FUT-R-005は同じFR-B07 fileから`FT-B07-003`だけを選び、
 `fr_b07_rating_boundaries_and_invalid_rejection` Rust filterとRatingOnly product gateへ接続する。
 IMP-012/FUT-C-010は現行App suiteの`FT-B05-` prefixを選び、exact 5 PASS・0 FAIL・0 SKIPを
 machine-readable resultで強制する。`search_port_` Rust filterとSearchOnly product gateへ接続し、
-performanceの`FUT-D-001`はFR-S03へ分離したままこのlaneへ含めない。
 IMP-013/FUT-C-011はshared FR-B06 implementationから`FT-B06-001`と`FT-B06-002`だけを選び、exact 2 PASS・
 0 FAIL・0 SKIPをmachine-readable resultで強制する。
 `favorite_target_enforces_relative_path_and_eligible_kind_boundaries` Rust filterとQuickAccessOnly product

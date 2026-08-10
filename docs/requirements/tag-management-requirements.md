@@ -23,7 +23,7 @@ FR-B10では、候補 `FUT-C-022` のタグ付与・除去・検索・名称変�
 
 保存先は既存B06/B07と共有するlibrary root外のapp-local SQLiteだけとする。漫画folder、
 ZIP/CBZ、画像、sidecar、library管理fileへ書き込まず、network、外部同期、外部書誌、
-FUT-D-004（作品別表示設定）を実装しない。
+未決定の作品別表示設定を実装しない。
 
 ## REQ-FR-B10-001: stable identity and normalized tag assignment
 

@@ -85,9 +85,6 @@ codd:
 
 | 登録順 | 現行優先度 | 管理ID | Feature ID | 機能 | 現在の台帳状態 | 作業状態 | 次の作業 |
 |---:|---|---|---|---|---|---|---|
-| 1 | Done | `IMP-001` | `FUT-C-015` | 縦スクロール | Implemented / PASS | **Done** | focused test、canonical aggregate、CoDD consistencyを記録済み |
-| 2 | Done | `IMP-002` | `FUT-C-016` | 横スクロール | Implemented / PASS | **Done** | RTL/LTRのページ順、wheel横移動、focused test、canonical aggregateを記録済み |
-| 3 | Done | `IMP-003` | `FUT-C-017` | フルスクリーン | Implemented / PASS | **Done** | `FT-B04-006`でWindows WebView2製品ゲート、原本差分0、focused回帰を完了 |
 | 4 | Done | `IMP-004` | `FUT-C-019` | ユーザー定義ショートカット | Implemented / PASS | **Done** | `FT-B11-006`でremap・restart・reset・原本差分0、Rust 79+1を完了 |
 | 5 | Done | `IMP-005` | `FUT-C-022` | タグ付与・検索 | Implemented / PASS | **Done** | `FT-B10-005`で付与・検索・rename・restart・remove・原本差分0、canonical aggregateを完了 |
 | 6 | Done | `IMP-006` | `FUT-C-023` | メモ保存 | Implemented / PASS | **Done** | `FT-B07-006`でsave・再open・restart復元・clear・原本差分0、canonical aggregateを完了 |
@@ -139,24 +136,8 @@ codd:
 | 48 | Hold / FR-S02 | `IMP-048` | `FUT-C-053` | クリップボードのファイル操作 | Candidate / NOT TESTED | Candidate | mutation command後にclipboard format、cut state、権限境界を決定 |
 | 47 | Hold / FR-S02 | `IMP-047` | `FUT-C-052` | 編集操作の元に戻す | Candidate / NOT TESTED | Candidate | transaction/journal確立後にundo対象、履歴、失敗回復を要件化 |
 | 29 | Hold / FR-S02 | `IMP-029` | `FUT-C-029` | 完全削除 | Candidate / NOT TESTED | Candidate | TBD-007を再評価し、最後に不可逆操作の安全条件を承認 |
-| 38 | Hold / FR-S06 | `IMP-038` | `FUT-C-043` | 指定動作で開く | Candidate / NOT TESTED | Candidate | 参照submenuの動作集合を確認して要件化 |
-| 54 | Hold / FR-S06 | `IMP-054` | `FUT-C-059` | ファイル表示の切り替え | Candidate / NOT TESTED | Candidate | 参照commandの切替対象と有効条件を確認 |
-| 59 | Hold / FR-S06 | `IMP-059` | `FUT-C-064` | OS全体フォルダツリー | Candidate / NOT TESTED | Candidate | shell namespace、権限、network path、安全境界を決定 |
-| 43 | Hold / FR-S06 | `IMP-043` | `FUT-C-048` | メディア表示 | Candidate / NOT TESTED | Candidate | 対象media、表示semantics、data sourceを決定 |
-| 65 | Hold / FR-S06 | `IMP-065` | `FUT-C-070` | プラグイン設定 | Candidate / NOT TESTED | Candidate | plugin runtime、trust、設定対象、安全・配布境界を評価 |
-| 21 | Hold / FR-S01 | `IMP-021` | `FUT-C-003` | PDF閲覧 | Candidate / NOT TESTED | Candidate | 独立readerとして採否、library、license、配布境界を決定 |
-| 22 | Hold / FR-S01 | `IMP-022` | `FUT-C-004` | EPUB閲覧 | Candidate / NOT TESTED | Candidate | 独立readerとして採否、rendering、license、配布境界を決定 |
-| 23 | Hold / FR-S01 | `IMP-023` | `FUT-C-009` | 動画対応 | Candidate / NOT TESTED | Candidate | codec、再生lifecycle、license、配布条件を決定 |
-| 9 | Hold / FR-B09 | `IMP-009` | `FUT-C-030` | ファイル変更検出 | Partial / BLOCKED | Blocked | FR-B09のWindows file-change product gateを解消 |
-| 10 | Hold / FR-B09 | `IMP-010` | `FUT-C-031` | 重複作品検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
-| 11 | Hold / FR-B09 | `IMP-011` | `FUT-C-032` | 壊れた書庫検出 | Partial / BLOCKED | Blocked | FR-B09のCoDD・Windows product gateを解消 |
 | 35 | Hold / FR-B11 | `IMP-035` | `FUT-R-006` | タッチ操作 | Candidate / NOT TESTED | Blocked | タッチ実機を確保してFR-B11を測定 |
 | 36 | Hold / FR-B11 | `IMP-036` | `FUT-R-007` | ゲームパッド操作 | Candidate / NOT TESTED | Blocked | ゲームパッド実機を確保してFR-B11を測定 |
-| 30 | Hold / FR-S03 | `IMP-030` | `FUT-D-001` | 名前検索性能 | Deferred / NOT TESTED | Deferred | Windows基準環境で検索性能受入を確定 |
-| 32 | Hold / FR-S03 | `IMP-032` | `FUT-D-003` | 性能計測条件の適用 | Deferred / NOT TESTED | Deferred | Windows基準環境で測定条件を確定 |
-| 31 | Hold / FR-S04 | `IMP-031` | `FUT-D-002` | 最大ファイルサイズ | Deferred / NOT TESTED | Deferred | 対象datasetと上限を決定 |
-| 33 | Hold / FR-S04 | `IMP-033` | `FUT-D-004` | 作品別表示設定 | Deferred / NOT TESTED | Deferred | 採否と保存スコープを決定 |
-| 34 | Hold / FR-S04 | `IMP-034` | `FUT-D-005` | 読書状態ラベル | Deferred / NOT TESTED | Deferred | 読書位置との状態モデル境界を決定 |
 
 ## リリース確認バックログ
 

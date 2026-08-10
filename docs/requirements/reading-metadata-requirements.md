@@ -19,7 +19,7 @@ codd:
 
 FR-B07では、同じ作品を後から開いたときに読書文脈を復元できるよう、候補ID
 `FUT-C-023`（メモ）、`FUT-R-004`（閲覧履歴）、`FUT-R-005`（評価）を採用する。
-`FUT-D-005`（未読・読書中・読了の読書状態ラベル）は未決定の別トラックであり、本要件、
+未読・読書中・読了の読書状態ラベルは未決定の別トラックであり、本要件、
 API、SQLite schema、focused testへ混入させない。
 
 保存先は既存のlibrary root外にあるapp-local SQLiteだけとする。library root、漫画folder、
@@ -89,7 +89,7 @@ exact 1 PASS・0 FAILでなければexit 0でも失敗させる。
 
 ## 非採用・境界
 
-- `FUT-D-005`の読書状態ラベル（未読・読書中・読了）は未決定のため別トラックで扱う。
+- 読書状態ラベル（未読・読書中・読了）は未決定のため別トラックで扱う。
 - 読書位置のpage key、natural ordinal、保存タイミング、既存APIをmetadataの代替にしない。
 - library root内のファイル操作、rename、move、copy、delete、sidecar書込みを行わない。
 - network、install、外部同期、外部サービス、秘密情報を機能の前提にしない。

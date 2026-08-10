@@ -79,4 +79,4 @@ pure unit testだけで完了扱いにせず、少なくとも`App`から`Catalo
 
 一覧形式の設定はlibrary root外の既存app-local stateだけへ保存する。原本、ZIP/CBZ、
 library管理file、thumbnail sourceへ書込みを行わず、network/installを実行しない。
-FR-B04〜FR-B12はFR-B03のfocused QCとbatch末尾gateがACCEPTされるまで開始しない。
+後続batchはFR-B03のfocused QCとbatch末尾gateがACCEPTされるまで開始しない。

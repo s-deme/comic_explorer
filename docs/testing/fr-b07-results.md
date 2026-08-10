@@ -162,7 +162,7 @@ restart、unset、viewer再openと同じ製品境界を追加観測した。過�
 ## cmd_400 実測範囲と接続境界（履歴）
 
 - 採用対象は `FUT-C-023`（memo）、`FUT-R-004`（閲覧履歴）、`FUT-R-005`（評価）。
-- `FUT-D-005`（未読・読書中・読了）は未決定の別トラックであり、本結果に含めない。
+- 未読・読書中・読了の読書状態ラベルは未決定の別トラックであり、本結果に含めない。
 - metadataはlibrary root外のapp-local SQLiteだけへ保存し、原本、書庫、画像、sidecar、管理fileへ
   書き込まない。cloud sync、外部書誌、telemetry、network送信は機能の前提にしない。
 - accepted frontend exact5/typecheck/build evidence root:
