@@ -1,4 +1,5 @@
 import type { FavoriteEntry } from "../library/client";
+import { itemKindLabel } from "./kind-label";
 
 interface QuickAccessProps {
   favorites: FavoriteEntry[];
@@ -13,18 +14,7 @@ interface QuickAccessProps {
 }
 
 function kindLabel(favorite: FavoriteEntry): string {
-  switch (favorite.kind) {
-    case "folder":
-      return "フォルダ";
-    case "comicFolder":
-      return "漫画フォルダ";
-    case "archive":
-      return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
-    case "pdf":
-      return "PDF";
-    default:
-      return "不明";
-  }
+  return itemKindLabel(favorite.kind, favorite.resolvedPath ?? favorite.relativePath);
 }
 
 function statusLabel(favorite: FavoriteEntry): string {

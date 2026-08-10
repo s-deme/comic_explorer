@@ -175,6 +175,7 @@ import {
   type SearchOptions,
   type SearchSizeComparison,
 } from "./features/catalog/search-options";
+import { archiveKindFromPath, itemKindLabel } from "./features/catalog/kind-label";
 import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
 
 type LoadState =
@@ -233,41 +234,8 @@ function nonNegativeNumber(value: string): number {
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
-function archiveKindFromPath(path: string): CatalogEntry["archiveKind"] {
-  const extension = path.split(".").at(-1)?.toLocaleLowerCase("en-US");
-  if (
-    extension === "zip" ||
-    extension === "cbz" ||
-    extension === "epub" ||
-    extension === "rar" ||
-    extension === "cbr" ||
-    extension === "cb7" ||
-    extension === "lzh"
-  ) return extension;
-  if (extension === "7z") return "sevenZip";
-  return undefined;
-}
-
 function entryKindLabel(entry: CatalogEntry): string {
-  switch (entry.kind) {
-    case "folder":
-      return "フォルダ";
-    case "comicFolder":
-      return "漫画フォルダ";
-    case "archive":
-      return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
-    case "pdf":
-      return "PDF";
-    case "page":
-      return "画像";
-    default: {
-      const name = entryDisplayName(entry);
-      const separator = name.lastIndexOf(".");
-      return separator > 0 && separator < name.length - 1
-        ? name.slice(separator)
-        : "拡張子なし";
-    }
-  }
+  return itemKindLabel(entry.kind, entry.relativePath, entry.archiveKind);
 }
 
 function diagnosticStatusLabel(status: DiagnosticReport["findings"][number]["status"]): string {

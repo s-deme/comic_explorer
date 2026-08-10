@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CatalogEntry } from "../../types/domain";
+import { itemKindLabel } from "./kind-label";
 import type { CatalogViewMode } from "./view-mode";
 
 interface CatalogGridProps {
@@ -63,25 +64,7 @@ function isPdfEntry(entry: CatalogEntry): boolean {
 }
 
 function kindLabel(entry: CatalogEntry): string {
-  switch (entry.kind) {
-    case "folder":
-      return "フォルダ";
-    case "comicFolder":
-      return "漫画フォルダ";
-    case "archive":
-      return "ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH";
-    case "pdf":
-      return "PDF";
-    case "page":
-      return "画像";
-    default: {
-      const name = displayName(entry);
-      const separator = name.lastIndexOf(".");
-      return separator > 0 && separator < name.length - 1
-        ? name.slice(separator)
-        : "拡張子なし";
-    }
-  }
+  return itemKindLabel(entry.kind, entry.relativePath, entry.archiveKind);
 }
 
 function formatSize(value: number | undefined): string {

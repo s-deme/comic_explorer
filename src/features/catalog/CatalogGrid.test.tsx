@@ -219,13 +219,13 @@ describe("CatalogGrid", () => {
 
     expect(screen.getByText("フォルダ")).toBeInTheDocument();
     expect(screen.getByText("漫画フォルダ")).toBeInTheDocument();
-    expect(screen.getByText("ZIP / CBZ / EPUB / RAR / CBR / 7Z / CB7 / LZH")).toBeInTheDocument();
+    expect(screen.getByText("CBZ")).toBeInTheDocument();
     expect(screen.getByText("画像")).toBeInTheDocument();
     expect(screen.getAllByText("PDF").length).toBeGreaterThanOrEqual(1);
 
     fireEvent.doubleClick(screen.getByRole("button", { name: /^library、フォルダ/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^series、漫画フォルダ/ }));
-    fireEvent.doubleClick(screen.getByRole("button", { name: /^volume\.cbz、ZIP \/ CBZ/ }));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^volume\.cbz、CBZ/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^cover\.jpg、画像/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^document\.PDF、PDF/ }));
 

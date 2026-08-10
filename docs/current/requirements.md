@@ -107,7 +107,7 @@ Git履歴から参照する。
 | P6 / FR-B18 | FUT-C-060, FUT-C-061, FUT-C-062, FUT-C-063 | pane/bar可逆表示、viewer分離、native tray hide/showと終了の分離。 |
 | P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、gesture、offline help、version/runtime/license表示。ヘルプmenuでは一般ヘルプとバージョン情報を別の項目・dialogとして開く。 |
 | P8 / FR-B08 | FUT-C-006, FUT-C-007, FUT-C-008 | GIFの安全な分類・metadata・MIME・製品decodeと、AVIFの安全な分類・metadata・MIME・corrupt境界。AVIFの製品decodeは未受入。 |
-| P9 / FR-B12 | FUT-C-001, FUT-C-002 | 単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を安全に読み、分割RAR、暗号化書庫、未対応圧縮方式はunsupported分類する。 |
+| P9 / FR-B12 | FUT-C-001, FUT-C-002 | 単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を安全に読み、分割RAR、暗号化書庫、未対応圧縮方式はunsupported分類する。一覧・検索結果・お気に入りでは、対応書庫の集合ではなく各項目の実際の形式（ZIP、CBZ、EPUB、RAR、CBR、7Z、CB7、LZH）を表示する。 |
 | P10 / FR-B20 | FUT-C-073, FUT-C-074, FUT-C-075 | app-local thumbnail管理、明示保存、検証済みJPEG import。製品file picker gateは未完了。 |
 
 ## 全体受入シナリオ
