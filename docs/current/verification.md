@@ -29,16 +29,16 @@ codd:
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
-| Rust canonical | PASS | 2026-08-11、lib 147件 + shutdown process 1件、FAIL 0。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
+| Rust canonical | PASS | 2026-08-11、lib 148件 + shutdown process 1件、FAIL 0。検索のscope・種別・size・更新日時・固定場所の条件適用を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
-| TypeScript/frontend | PASS | 2026-08-11、22 files / 193 tests PASS、FAIL 0。catalogの利用可能幅に応じたcard列数・virtual行の縮退、TypeScript typecheckもexit 0。 |
-| Python | PASS | 2026-08-11、39 tests PASS、FAIL 0。menu/addressのcompact寸法、tree文字色、固定page幅を持たないcatalog縮退のstyle contract、現行status/verification間の5値consistencyもPASS。 |
+| TypeScript/frontend | PASS | 2026-08-11、23 files / 196 tests PASS、FAIL 0。検索条件のrequest変換・検索結果保持、catalogの利用可能幅に応じたcard列数・virtual行の縮退、TypeScript typecheckもexit 0。 |
+| Python | PASS | 2026-08-11、40 tests PASS、FAIL 0。menu/addressのcompact寸法、tree文字色、固定page幅を持たないcatalog縮退、検索条件のstyle contract、現行status/verification間の5値consistencyもPASS。 |
 | standalone PDF | PASS / 製品観測BLOCKED | Windows.Data.Pdfで実PDFのpage列挙とPNG renderを直接検証。1 GiB source、10,000 pages、最大辺16,384 px、120,000,000 pixelsをrender前に制限し、暗号化・破損・access・missingのerror分類、root外symlink拒否、独立した`pdf`種別と画像選択境界をRust canonicalとfrontend testで検証した。release WebView2のviewer・thumbnail表示は未観測。 |
 | file manager | PASS / 製品観測BLOCKED | Windows Rust canonicalでrename、folder作成、copy、move、完全delete、CF_HDROPのcopy/cut round trip、root containment、reparse point・同名衝突・子孫destination拒否を実filesystem上で検証。frontend testで右click/keyboard menu、rename・delete接続、確認dialog、全画面・slideshow起動を検証した。release製品のnative folder picker、ごみ箱、Explorer、アプリ選択は未観測。 |
 | EPUB書庫 | PASS | ZIP互換Stored/DeflateのEPUBについて、大文字小文字を無視した分類、自然順画像列挙、catalog、WebP、media token、原本非破壊をWindows Rust canonicalと87-file fixtureで直接検証。HTML本文組版は対象外。 |
 | 対応書庫 | PASS | ZIP/CBZ/EPUB、RAR/CBR、7z/CB7、LZHについて、大文字小文字を無視した分類、自然順画像列挙、entry読取、catalog metadata、診断、原本非展開をWindows Rust canonicalで直接検証。ZIP内でCBZ/CB7/LZH/CBRを混在させた多重圧縮の列挙・読取、opaque page key、内側3階層と64書庫の上限も直接検証した。RARは単一volume・非暗号化RAR4/RAR5、7zはCopy/LZMA/LZMA2、LZHはStored/LH1/LH4〜LH7/LZS/LZ5を採用範囲とし、危険path、size/entry/再帰上限、未対応圧縮方式を拒否する。 |
-| frontend build/SBOM | PASS | Windows buildは62 modulesをbuild、exit 0。SBOMは729 components、unknown/prohibited license 0。UnRAR、`sevenz-rust`、`delharc`を含むnoticeを同期済み。 |
+| frontend build/SBOM | PASS | Windows buildは63 modulesをbuild、exit 0。SBOMは729 components、unknown/prohibited license 0。UnRAR、`sevenz-rust`、`delharc`を含むnoticeを同期済み。 |
 | release executable | PASS / 製品受入部分BLOCKED | 追加decoderを含むWindows release executableを再buildしexit 0。static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。animated GIF観測、P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |
 | 外部通信 | BLOCKED | code/依存境界はlocal-only。VM外部監視による完全観測は未実施。 |
@@ -113,7 +113,7 @@ check時間は同一環境の単回実測で18.73秒（約61%）短縮した。�
 
 2026-08-11の最終Windows-native `verify`はexit 0。DAGは3 PASS / red FAIL 0 / amber WARN 1 /
 SKIP 3 / VACUOUS 1、CoDD verification-node集計は0件である。一方、設定されたproject test commandは
-Python 38件とfrontend 191件を実行して全件PASSし、typecheckを実行、source integrityを確認した。
+Python 40件とfrontend 196件を実行して全件PASSし、typecheckを実行、source integrityを確認した。
 SKIP、VACUOUS、0件のverification-node集計を機能PASSへ読み替えない。
 
 `scan`出力は`Frontmatter: 4 documents in docs\current`であり、他の資料をCoDD対象に含めない。

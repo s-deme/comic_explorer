@@ -1622,7 +1622,58 @@ describe("application shell", () => {
     expect(region).toHaveAttribute("data-search-result-count", "2");
     expect(region).toHaveTextContent("Volume 01.cbz");
     expect(region).toHaveTextContent("Volume 02.cbz");
-    expect(searchMock).toHaveBeenCalledWith("  ＶＯＬＵＭＥ  ", expect.any(Number));
+    expect(searchMock).toHaveBeenCalledWith(
+      "  ＶＯＬＵＭＥ  ",
+      expect.any(Number),
+      expect.objectContaining({
+        includeSubfolders: true,
+        includeFolders: true,
+        includeFiles: true,
+        fixedLocation: null,
+      }),
+    );
+  });
+
+  it("passes active search options and retains results when requested", async () => {
+    const result = testEntry("Series/large-volume.cbz");
+    searchMock.mockResolvedValueOnce(searchResponse([result]));
+    await registerTestLibrary([testEntry("root.cbz")]);
+    const pane = openSearchPane();
+
+    fireEvent.click(within(pane).getByLabelText("サブフォルダも検索する"));
+    fireEvent.click(within(pane).getByLabelText("フォルダは検索対象にしない"));
+    fireEvent.click(within(pane).getByLabelText("検索結果を破棄しない"));
+    fireEvent.click(within(pane).getByLabelText("検索場所を固定する"));
+    fireEvent.click(within(pane).getByLabelText("サイズ指定を有効にする"));
+    fireEvent.change(within(pane).getByLabelText("サイズ (KB)"), {
+      target: { value: "128" },
+    });
+    fireEvent.change(within(pane).getByLabelText("名前検索"), {
+      target: { value: "large" },
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "検索" }));
+
+    await screen.findByRole("region", { name: "名前検索結果" });
+    expect(searchMock).toHaveBeenCalledWith(
+      "large",
+      expect.any(Number),
+      expect.objectContaining({
+        includeSubfolders: false,
+        includeFolders: false,
+        includeFiles: true,
+        fixedLocation: "",
+        minSizeBytes: 128 * 1024,
+      }),
+    );
+
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "retained-search-result" as never,
+      generation: 2 as never,
+      data: [result],
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Series\/large-volume\.cbz/ }));
+    expect(await screen.findByRole("region", { name: "名前検索結果" })).toBeInTheDocument();
   });
 
   it("filters the catalog from the search side pane and restores all items", async () => {

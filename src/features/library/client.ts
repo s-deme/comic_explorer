@@ -15,6 +15,7 @@ import type {
 import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogViewMode } from "../catalog/view-mode";
+import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
 import type { MouseGestureBindings, SettingsProfile } from "../settings/profile";
 
@@ -407,10 +408,12 @@ export async function openFileItemWith(
 export async function searchLibrary(
   query: string,
   generation: number,
+  options: SearchRequestOptions,
 ): Promise<ApiResponse<CatalogEntry[]>> {
   return invoke("search_library", {
     context: context(generation),
     query,
+    options,
   });
 }
 

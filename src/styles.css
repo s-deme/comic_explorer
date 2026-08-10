@@ -288,6 +288,74 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   justify-content: flex-end;
   gap: 6px;
 }
+.search-options {
+  display: grid;
+  gap: 6px;
+  padding: 10px 8px;
+  font-size: .78rem;
+}
+.search-options h3 {
+  margin: 0;
+  color: #3f4a57;
+  font-size: .82rem;
+}
+.search-options > label,
+.search-options-group > label,
+.search-options-group legend label,
+.search-options-radios label,
+.search-options-date-row label,
+.search-options-date-end {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.search-options-group {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 7px;
+  border: 1px solid #d7dce2;
+}
+.search-options-group legend { padding: 0 3px; font-weight: 600; }
+.search-options-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #59636f;
+}
+.search-options-condition,
+.search-options-radios,
+.search-options-date-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+.search-options-condition input,
+.search-options-date-row input[type="number"] {
+  width: 66px;
+  min-width: 0;
+  min-height: 25px;
+  padding: 2px 4px;
+}
+.search-options-date-row--calendar { flex-wrap: wrap; }
+.search-options-date-row input[type="date"] {
+  min-width: 0;
+  min-height: 25px;
+  padding: 2px 4px;
+}
+.search-options-radios { flex-wrap: wrap; }
+.search-options-date-end {
+  justify-content: space-between;
+  gap: 6px;
+}
+.search-options-date-end input {
+  width: 132px;
+  min-width: 0;
+  min-height: 25px;
+  padding: 2px 4px;
+}
 .viewer-shell--detached {
   position: fixed;
   z-index: 20;

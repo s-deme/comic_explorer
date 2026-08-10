@@ -167,6 +167,14 @@ import {
   presentError,
   presentUnexpectedError,
 } from "./features/errors/presentation";
+import {
+  defaultSearchOptions,
+  toSearchRequestOptions,
+  type SearchDateComparison,
+  type SearchDateMode,
+  type SearchOptions,
+  type SearchSizeComparison,
+} from "./features/catalog/search-options";
 import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
 
 type LoadState =
@@ -218,6 +226,11 @@ const MENU_MNEMONICS: Record<string, MenuId> = {
 
 function entryDisplayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
+}
+
+function nonNegativeNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
 function archiveKindFromPath(path: string): CatalogEntry["archiveKind"] {
@@ -421,6 +434,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [recoveryNotice, setRecoveryNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPaneOpen, setSearchPaneOpen] = useState(false);
+  const [searchOptions, setSearchOptions] = useState<SearchOptions>(defaultSearchOptions);
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
@@ -1442,7 +1456,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     selectionPath: string | null = null,
   ) {
     addressInputDirty.current = false;
-    setSearchState({ status: "idle" });
+    if (!searchOptions.retainResults) setSearchState({ status: "idle" });
     if (history === "push") dispatch({ type: "navigate", path });
     else if (typeof history === "string") dispatch({ type: history });
     else dispatch(history);
@@ -1898,7 +1912,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setThumbnails({});
     thumbnailRequests.current.clear();
     try {
-      const response = await searchLibrary(query, requestGeneration);
+      const response = await searchLibrary(
+        query,
+        requestGeneration,
+        toSearchRequestOptions(searchOptions),
+      );
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
         setSearchState({ status: "ready", query, results: response.data });
@@ -3802,6 +3820,326 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                     </button>
                   </div>
                 </form>
+                <section className="search-options" aria-label="検索オプション">
+                  <h3>オプション</h3>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={searchOptions.includeSubfolders}
+                      onChange={(event) =>
+                        setSearchOptions((current) => ({
+                          ...current,
+                          includeSubfolders: event.target.checked,
+                        }))
+                      }
+                    />
+                    サブフォルダも検索する
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!searchOptions.includeFolders}
+                      onChange={(event) =>
+                        setSearchOptions((current) => ({
+                          ...current,
+                          includeFolders: !event.target.checked,
+                        }))
+                      }
+                    />
+                    フォルダは検索対象にしない
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!searchOptions.includeFiles}
+                      onChange={(event) =>
+                        setSearchOptions((current) => ({
+                          ...current,
+                          includeFiles: !event.target.checked,
+                        }))
+                      }
+                    />
+                    ファイルは検索対象にしない
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={searchOptions.retainResults}
+                      onChange={(event) =>
+                        setSearchOptions((current) => ({
+                          ...current,
+                          retainResults: event.target.checked,
+                        }))
+                      }
+                    />
+                    検索結果を破棄しない
+                  </label>
+
+                  <fieldset className="search-options-group">
+                    <legend>検索場所</legend>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={searchOptions.fixedLocation !== null}
+                        onChange={(event) =>
+                          setSearchOptions((current) => ({
+                            ...current,
+                            fixedLocation: event.target.checked ? navigation.current : null,
+                          }))
+                        }
+                      />
+                      検索場所を固定する
+                    </label>
+                    {searchOptions.fixedLocation !== null && (
+                      <p className="search-options-note">
+                        {searchOptions.fixedLocation === ""
+                          ? "ライブラリのルート"
+                          : searchOptions.fixedLocation}
+                      </p>
+                    )}
+                  </fieldset>
+
+                  <fieldset className="search-options-group">
+                    <legend>
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label="サイズ指定を有効にする"
+                          checked={searchOptions.sizeEnabled}
+                          onChange={(event) =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              sizeEnabled: event.target.checked,
+                            }))
+                          }
+                        />
+                        サイズ指定
+                      </label>
+                    </legend>
+                    <div className="search-options-condition">
+                      <input
+                        type="number"
+                        aria-label="サイズ (KB)"
+                        min="0"
+                        value={searchOptions.sizeKiB}
+                        disabled={!searchOptions.sizeEnabled}
+                        onChange={(event) =>
+                          setSearchOptions((current) => ({
+                            ...current,
+                            sizeKiB: nonNegativeNumber(event.target.value),
+                          }))
+                        }
+                      />
+                      <span>KB</span>
+                    </div>
+                    <div className="search-options-radios">
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-size-comparison"
+                          checked={searchOptions.sizeComparison === "atLeast"}
+                          disabled={!searchOptions.sizeEnabled}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              sizeComparison: "atLeast" satisfies SearchSizeComparison,
+                            }))
+                          }
+                        />
+                        以上
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-size-comparison"
+                          checked={searchOptions.sizeComparison === "atMost"}
+                          disabled={!searchOptions.sizeEnabled}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              sizeComparison: "atMost" satisfies SearchSizeComparison,
+                            }))
+                          }
+                        />
+                        以下
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <fieldset className="search-options-group">
+                    <legend>
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label="日付指定を有効にする"
+                          checked={searchOptions.dateEnabled}
+                          onChange={(event) =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateEnabled: event.target.checked,
+                            }))
+                          }
+                        />
+                        日付指定
+                      </label>
+                    </legend>
+                    <div className="search-options-date-row">
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-mode"
+                          checked={searchOptions.dateMode === "recentMonths"}
+                          disabled={!searchOptions.dateEnabled}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateMode: "recentMonths" satisfies SearchDateMode,
+                            }))
+                          }
+                        />
+                        過去
+                      </label>
+                      <input
+                        type="number"
+                        aria-label="過去の月数"
+                        min="1"
+                        value={searchOptions.dateAmount}
+                        disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "recentMonths"}
+                        onChange={(event) =>
+                          setSearchOptions((current) => ({
+                            ...current,
+                            dateAmount: Math.max(1, Math.floor(nonNegativeNumber(event.target.value))),
+                          }))
+                        }
+                      />
+                      <span>ヶ月間</span>
+                    </div>
+                    <div className="search-options-date-row">
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-mode"
+                          checked={searchOptions.dateMode === "recentDays"}
+                          disabled={!searchOptions.dateEnabled}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateMode: "recentDays" satisfies SearchDateMode,
+                            }))
+                          }
+                        />
+                        過去
+                      </label>
+                      <input
+                        type="number"
+                        aria-label="過去の日数"
+                        min="1"
+                        value={searchOptions.dateAmount}
+                        disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "recentDays"}
+                        onChange={(event) =>
+                          setSearchOptions((current) => ({
+                            ...current,
+                            dateAmount: Math.max(1, Math.floor(nonNegativeNumber(event.target.value))),
+                          }))
+                        }
+                      />
+                      <span>日間</span>
+                    </div>
+                    <div className="search-options-date-row search-options-date-row--calendar">
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-mode"
+                          checked={searchOptions.dateMode === "calendarDate"}
+                          disabled={!searchOptions.dateEnabled}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateMode: "calendarDate" satisfies SearchDateMode,
+                            }))
+                          }
+                        />
+                        日付指定
+                      </label>
+                      <input
+                        type="date"
+                        aria-label="日付"
+                        value={searchOptions.dateStart}
+                        disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "calendarDate"}
+                        onChange={(event) =>
+                          setSearchOptions((current) => ({
+                            ...current,
+                            dateStart: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="search-options-radios">
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-comparison"
+                          checked={searchOptions.dateComparison === "before"}
+                          disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "calendarDate"}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateComparison: "before" satisfies SearchDateComparison,
+                            }))
+                          }
+                        />
+                        以前
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-comparison"
+                          checked={searchOptions.dateComparison === "after"}
+                          disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "calendarDate"}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateComparison: "after" satisfies SearchDateComparison,
+                            }))
+                          }
+                        />
+                        以降
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="search-date-comparison"
+                          checked={searchOptions.dateComparison === "between"}
+                          disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "calendarDate"}
+                          onChange={() =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateComparison: "between" satisfies SearchDateComparison,
+                            }))
+                          }
+                        />
+                        期間
+                      </label>
+                    </div>
+                    {searchOptions.dateComparison === "between" && (
+                      <label className="search-options-date-end">
+                        終了日
+                        <input
+                          type="date"
+                          aria-label="終了日"
+                          value={searchOptions.dateEnd}
+                          disabled={!searchOptions.dateEnabled || searchOptions.dateMode !== "calendarDate"}
+                          onChange={(event) =>
+                            setSearchOptions((current) => ({
+                              ...current,
+                              dateEnd: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    )}
+                  </fieldset>
+                </section>
               </aside>
             ) : (
               <FolderTree

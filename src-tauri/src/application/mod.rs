@@ -45,6 +45,54 @@ pub struct AppState {
     shutting_down: AtomicBool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchOptions {
+    #[serde(default = "default_search_subfolders")]
+    include_subfolders: bool,
+    #[serde(default = "default_search_folders")]
+    include_folders: bool,
+    #[serde(default = "default_search_files")]
+    include_files: bool,
+    #[serde(default)]
+    fixed_location: Option<String>,
+    #[serde(default)]
+    min_size_bytes: Option<u64>,
+    #[serde(default)]
+    max_size_bytes: Option<u64>,
+    #[serde(default)]
+    modified_after_ms: Option<u64>,
+    #[serde(default)]
+    modified_before_ms: Option<u64>,
+}
+
+const fn default_search_subfolders() -> bool {
+    true
+}
+
+const fn default_search_folders() -> bool {
+    true
+}
+
+const fn default_search_files() -> bool {
+    true
+}
+
+impl Default for SearchOptions {
+    fn default() -> Self {
+        Self {
+            include_subfolders: true,
+            include_folders: true,
+            include_files: true,
+            fixed_location: None,
+            min_size_bytes: None,
+            max_size_bytes: None,
+            modified_after_ms: None,
+            modified_before_ms: None,
+        }
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
         let (store, library_root, thumbnails, recovered) = AppPaths::discover()
@@ -1765,6 +1813,7 @@ pub async fn search_library(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
     query: String,
+    options: Option<SearchOptions>,
 ) -> Result<Response<Vec<CatalogEntry>>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
@@ -1784,6 +1833,7 @@ pub async fn search_library(
             ));
         }
     };
+    let options = options.unwrap_or_default();
     let cancellation = state
         .navigation
         .lock()
@@ -1791,7 +1841,7 @@ pub async fn search_library(
         .begin(context.generation);
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        search_library_port(&worker_root, &normalized_query, &cancellation)
+        search_library_with_options_port(&worker_root, &normalized_query, &options, &cancellation)
     })
     .await
     .map_err(|error| format!("search worker failed: {error}"))?;
@@ -2247,6 +2297,15 @@ fn search_library_port(
     query: &str,
     cancellation: &CancellationToken,
 ) -> Result<Vec<CatalogEntry>, AppError> {
+    search_library_with_options_port(root, query, &SearchOptions::default(), cancellation)
+}
+
+fn search_library_with_options_port(
+    root: &std::path::Path,
+    query: &str,
+    options: &SearchOptions,
+    cancellation: &CancellationToken,
+) -> Result<Vec<CatalogEntry>, AppError> {
     if query.is_empty() {
         return Ok(Vec::new());
     }
@@ -2267,8 +2326,33 @@ fn search_library_port(
             "Library root is not a directory.",
         ));
     }
+    let directory = match options.fixed_location.as_deref() {
+        Some(location) => {
+            let relative = RelativePath::parse(location).map_err(|_| {
+                request_error(ErrorCode::InvalidPath, "Search location is invalid.")
+            })?;
+            let directory = root.join(relative.as_str()).canonicalize().map_err(|_| {
+                request_error(ErrorCode::InvalidPath, "Search location cannot be read.")
+            })?;
+            if !directory.starts_with(&root) || !directory.is_dir() {
+                return Err(request_error(
+                    ErrorCode::InvalidPath,
+                    "Search location is outside the library root.",
+                ));
+            }
+            directory
+        }
+        None => root.clone(),
+    };
     let mut results = Vec::new();
-    search_directory(&root, &root, query, cancellation, &mut results)?;
+    search_directory(
+        &root,
+        &directory,
+        query,
+        options,
+        cancellation,
+        &mut results,
+    )?;
     results.sort_by(|left, right| {
         crate::domain::natural_cmp(left.relative_path.as_str(), right.relative_path.as_str())
     });
@@ -2283,6 +2367,7 @@ fn search_directory(
     root: &std::path::Path,
     directory: &std::path::Path,
     query: &str,
+    options: &SearchOptions,
     cancellation: &CancellationToken,
     results: &mut Vec<CatalogEntry>,
 ) -> Result<(), AppError> {
@@ -2300,20 +2385,51 @@ fn search_directory(
             .rsplit('/')
             .next()
             .unwrap_or(entry.relative_path.as_str());
-        if normalize_search_text(name).contains(query) {
+        if normalize_search_text(name).contains(query) && matches_search_options(&entry, options) {
             results.push(entry.clone());
         }
-        if matches!(entry.kind, ItemKind::Folder | ItemKind::ComicFolder) {
+        if options.include_subfolders
+            && matches!(entry.kind, ItemKind::Folder | ItemKind::ComicFolder)
+        {
             search_directory(
                 root,
                 &root.join(entry.relative_path.as_str()),
                 query,
+                options,
                 cancellation,
                 results,
             )?;
         }
     }
     Ok(())
+}
+
+fn matches_search_options(entry: &CatalogEntry, options: &SearchOptions) -> bool {
+    let folder = matches!(entry.kind, ItemKind::Folder | ItemKind::ComicFolder);
+    if (folder && !options.include_folders) || (!folder && !options.include_files) {
+        return false;
+    }
+    if let Some(minimum) = options.min_size_bytes {
+        if entry.byte_size.map_or(true, |size| size < minimum) {
+            return false;
+        }
+    }
+    if let Some(maximum) = options.max_size_bytes {
+        if entry.byte_size.map_or(true, |size| size > maximum) {
+            return false;
+        }
+    }
+    if let Some(after) = options.modified_after_ms {
+        if entry.modified_ms.map_or(true, |modified| modified < after) {
+            return false;
+        }
+    }
+    if let Some(before) = options.modified_before_ms {
+        if entry.modified_ms.map_or(true, |modified| modified > before) {
+            return false;
+        }
+    }
+    true
 }
 
 fn normalize_search_text(value: &str) -> String {
@@ -3488,6 +3604,82 @@ mod shutdown_tests {
             .unwrap();
         assert_eq!(after.len(), 1);
         assert_eq!(after[0].relative_path.as_str(), "New Volume.cbz");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn search_port_applies_scope_kind_size_date_and_fixed_location_options() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-search-options-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(root.join("Nested")).unwrap();
+        std::fs::write(root.join("root-volume.cbz"), b"tiny").unwrap();
+        std::fs::write(root.join("Nested/nested-volume.cbz"), b"large-search-entry").unwrap();
+
+        let cancellation = CancellationToken::new();
+        let mut options = SearchOptions::default();
+        options.include_subfolders = false;
+        let direct = search_library_with_options_port(
+            &root,
+            &normalize_search_text("volume"),
+            &options,
+            &cancellation,
+        )
+        .unwrap();
+        assert_eq!(direct.len(), 1);
+        assert_eq!(direct[0].relative_path.as_str(), "root-volume.cbz");
+
+        options.include_subfolders = true;
+        options.include_files = false;
+        assert!(
+            search_library_with_options_port(
+                &root,
+                &normalize_search_text("volume"),
+                &options,
+                &cancellation,
+            )
+            .unwrap()
+            .is_empty()
+        );
+
+        options.include_files = true;
+        options.min_size_bytes = Some(10);
+        let sized = search_library_with_options_port(
+            &root,
+            &normalize_search_text("volume"),
+            &options,
+            &cancellation,
+        )
+        .unwrap();
+        assert_eq!(sized.len(), 1);
+        assert_eq!(sized[0].relative_path.as_str(), "Nested/nested-volume.cbz");
+
+        options.min_size_bytes = None;
+        options.modified_before_ms = Some(0);
+        assert!(
+            search_library_with_options_port(
+                &root,
+                &normalize_search_text("volume"),
+                &options,
+                &cancellation,
+            )
+            .unwrap()
+            .is_empty()
+        );
+
+        options.modified_before_ms = None;
+        options.fixed_location = Some("Nested".into());
+        let fixed = search_library_with_options_port(
+            &root,
+            &normalize_search_text("volume"),
+            &options,
+            &cancellation,
+        )
+        .unwrap();
+        assert_eq!(fixed.len(), 1);
+        assert_eq!(fixed[0].relative_path.as_str(), "Nested/nested-volume.cbz");
         std::fs::remove_dir_all(root).unwrap();
     }
 

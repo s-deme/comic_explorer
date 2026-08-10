@@ -53,6 +53,11 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assertIn("@container (max-width: 720px)", STYLES)
 
+    def test_search_options_group_conditions_without_overflow(self) -> None:
+        self.assert_rule_contains(".search-options", "display: grid")
+        self.assert_rule_contains(".search-options-group", "min-width: 0")
+        self.assert_rule_contains(".search-options-radios", "flex-wrap: wrap")
+
     def test_dialogs_share_a_readable_visual_system(self) -> None:
         self.assert_rule_contains(
             '.dialog-backdrop > [role="dialog"]', "border-radius: 12px"
