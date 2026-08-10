@@ -43,7 +43,7 @@ function kindLabel(entry: CatalogEntry): string {
     case "comicFolder":
       return "漫画フォルダ";
     case "archive":
-      return "ZIP / CBZ";
+      return "ZIP / CBZ / EPUB";
     case "page":
       return "画像";
     default: {

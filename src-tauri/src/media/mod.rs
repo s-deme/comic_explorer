@@ -110,7 +110,10 @@ pub fn read_grant_bytes(grant: &MediaGrant) -> Result<Vec<u8>, AppError> {
         PageSource::File(path) => fs::read(path).map_err(media_io_error)?,
         PageSource::ArchiveEntry { archive, entry } => {
             let adapter = archive_adapter_kind(archive);
-            if !matches!(adapter, ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz) {
+            if !matches!(
+                adapter,
+                ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub
+            ) {
                 return Err(AppError {
                     code: ErrorCode::UnsupportedFormat,
                     message: format!("Archive adapter is unavailable for {}.", archive.display()),

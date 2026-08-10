@@ -49,7 +49,7 @@ stale responseを構造的に区別する。
 ## catalogとnavigation
 
 登録rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
-comic folder、画像、ZIP/CBZ、unsupported archiveをtyped kindとして列挙し、自然順と選択中sortを
+comic folder、画像、ZIP/CBZ/EPUB、unsupported archiveをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。
 
@@ -59,7 +59,7 @@ root namespaceを再利用する。OS全体のfile managerには拡張しない�
 
 ## viewerとmedia
 
-folder pageはread-only file stream、ZIP/CBZ pageは必要entryだけをinflateし、libraryへ展開しない。
+folder pageはread-only file stream、ZIP/CBZ/EPUB pageは必要entryだけをinflateし、libraryへ展開しない。
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
@@ -127,7 +127,7 @@ item局所、page errorはviewer局所、root/DB起動errorだけをshell-level�
 
 ## 現在の設計判断
 
-Tauri/React/Rust、SQLite bundled、ZIP Deflate、opaque media token、bounded worker、app-local cacheを
+Tauri/React/Rust、SQLite bundled、ZIP互換（ZIP/CBZ/EPUB）Stored/Deflate、opaque media token、bounded worker、app-local cacheを
 採用済みとする。比較検討と実装phaseの完了履歴はGit履歴から参照する。Windows製品性能、
 clean VM、UIA/DPI、外部通信監視、GIF/AVIF decode、RAR/7z reader、tray/file pickerの実製品gateは
 設計未決ではなく検証未完了であり、[status.md](status.md)と[verification.md](verification.md)で追跡する。

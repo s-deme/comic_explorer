@@ -129,9 +129,9 @@ def main() -> None:
         assert webp_chunks((webp_root / "folder" / name).read_bytes()) == chunks
     assert by_path["FIX-WEBP-001/errors/5-animated.webp"]["image"]["animated"] is True
     assert by_path["FIX-WEBP-001/errors/4-corrupt.webp"]["fileType"] == "invalid-image"
-    for archive_name in ("static-webp.zip", "static-webp.cbz"):
+    for archive_name in ("static-webp.zip", "static-webp.cbz", "static-webp.epub"):
         with ZipFile(webp_root / archive_name) as archive:
-            names = [item.filename for item in archive.infolist()]
+            names = [item.filename for item in archive.infolist() if item.filename != "mimetype"]
             assert sorted(names) == static_names
             for name in names:
                 assert webp_chunks(archive.read(name)) == expected_webp[name][2]

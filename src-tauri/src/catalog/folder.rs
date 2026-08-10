@@ -23,6 +23,7 @@ pub struct CatalogEntry {
 pub enum ArchiveKind {
     Zip,
     Cbz,
+    Epub,
     Rar,
     Cbr,
     SevenZip,
@@ -30,7 +31,7 @@ pub enum ArchiveKind {
 
 impl ArchiveKind {
     fn reader_available(self) -> bool {
-        matches!(self, Self::Zip | Self::Cbz)
+        matches!(self, Self::Zip | Self::Cbz | Self::Epub)
     }
 }
 
@@ -42,6 +43,7 @@ fn archive_kind_for_name(name: &str) -> Option<ArchiveKind> {
     {
         Some("zip") => Some(ArchiveKind::Zip),
         Some("cbz") => Some(ArchiveKind::Cbz),
+        Some("epub") => Some(ArchiveKind::Epub),
         Some("rar") => Some(ArchiveKind::Rar),
         Some("cbr") => Some(ArchiveKind::Cbr),
         Some("7z") => Some(ArchiveKind::SevenZip),
@@ -302,6 +304,7 @@ mod tests {
         fs::create_dir_all(root.join("folder")).unwrap();
         fs::write(root.join("book.zip"), b"zip").unwrap();
         fs::write(root.join("book.cbz"), b"cbz").unwrap();
+        fs::write(root.join("book.epub"), b"epub").unwrap();
         fs::write(root.join("book.rar"), b"rar").unwrap();
         fs::write(root.join("book.cbr"), b"cbr").unwrap();
         fs::write(root.join("book.7z"), b"7z").unwrap();
@@ -318,6 +321,10 @@ mod tests {
         let cbz = entries
             .iter()
             .find(|entry| entry.relative_path.as_str() == "book.cbz")
+            .unwrap();
+        let epub = entries
+            .iter()
+            .find(|entry| entry.relative_path.as_str() == "book.epub")
             .unwrap();
         let rar = entries
             .iter()
@@ -336,8 +343,10 @@ mod tests {
         assert!(folder.modified_ms.is_some());
         assert_eq!(zip.kind, ItemKind::Archive);
         assert_eq!(cbz.kind, ItemKind::Archive);
+        assert_eq!(epub.kind, ItemKind::Archive);
         assert_eq!(zip.archive_kind, Some(ArchiveKind::Zip));
         assert_eq!(cbz.archive_kind, Some(ArchiveKind::Cbz));
+        assert_eq!(epub.archive_kind, Some(ArchiveKind::Epub));
         for (entry, archive_kind) in [
             (rar, ArchiveKind::Rar),
             (cbr, ArchiveKind::Cbr),

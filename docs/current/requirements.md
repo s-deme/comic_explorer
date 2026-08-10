@@ -21,7 +21,7 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 ## 範囲
 
 対象は、登録したlibrary root内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
-利用者metadata、app-local設定/cache、Windows配布である。JPEG/JPG/PNG、ZIP/CBZ、静止WebPを
+利用者metadata、app-local設定/cache、Windows配布である。JPEG/JPG/PNG、ZIP/CBZ/EPUB、静止WebPを
 実装済み範囲とする。GIF/AVIFとRAR/CBR/7zには実装済みの安全な分類・拒否境界があるが、
 製品decodeまたはreaderの受入は未完了である。
 
@@ -49,7 +49,7 @@ OS全体を操作するfile managerである。rename、move、copy、create、d
 | REQ-MVP-006 | 自然順の先頭pageから表紙thumbnailを生成し、fingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | toolbar buttonから並べ替え、昇降順、巻末動作、一覧形式のmenuを操作し、設定を保存する。 |
 | REQ-MVP-008 | 画像folder内のJPEG/JPG/PNGを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。 |
-| REQ-MVP-009 | ZIP/CBZを隣接展開せず、Deflate entryを検証して自然順で読む。 |
+| REQ-MVP-009 | ZIP/CBZ/EPUBを隣接展開せず、Stored/Deflate entryを検証し、格納画像を自然順で読む。EPUBのHTML本文組版は対象外とする。 |
 | REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
@@ -86,7 +86,7 @@ Git履歴から参照する。
 | FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。 |
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
-| FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
+| FR-B08 静止WebP | REQ-FR-B08-001, REQ-FR-B08-002, REQ-FR-B08-003, REQ-FR-B08-004, REQ-FR-B08-005 | FUT-C-005 | folder/ZIP/CBZ/EPUBの静止WebPを列挙・表示・thumbnail化し、corrupt/animatedを局所errorにしてlicense gateを通す。 |
 | FR-B10 tag | REQ-FR-B10-001, REQ-FR-B10-002, REQ-FR-B10-003, REQ-FR-B10-004 | FUT-C-022 | normalized tagのassign/remove/query/rename/merge、invalid拒否、migration、再起動保存を保証する。 |
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | keyboard commandのremap、conflict拒否、reset、focus fallback、再起動保存を保証する。編集入口は統合設定だけに置き、helpは現在の割り当て表示だけを行う。touch/gamepadは候補のまま。 |
 
@@ -108,7 +108,7 @@ Git履歴から参照する。
 ## 全体受入シナリオ
 
 - E2E-MVP-001: root登録から画像folderを開き、単page/見開きで読み、再起動後に読書位置を復元する。
-- E2E-MVP-002: ZIP/CBZを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
+- E2E-MVP-002: ZIP/CBZ/EPUBを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
 

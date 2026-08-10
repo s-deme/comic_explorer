@@ -19,7 +19,7 @@ function kindLabel(favorite: FavoriteEntry): string {
     case "comicFolder":
       return "漫画フォルダ";
     case "archive":
-      return "ZIP / CBZ";
+      return "ZIP / CBZ / EPUB";
     default:
       return "不明";
   }

@@ -2,7 +2,7 @@
 //!
 //! The scanner deliberately keeps its snapshot in the request/response
 //! boundary.  Nothing is persisted next to the library, and archive
-//! validation reuses the existing ZIP/CBZ page enumerator rather than adding
+//! validation reuses the existing ZIP/CBZ/EPUB page enumerator rather than adding
 //! another decoder or extraction path.
 
 use std::collections::{BTreeMap, HashMap};
@@ -206,7 +206,7 @@ fn scan_directory(
 fn archive_reader_available(entry: &CatalogEntry) -> bool {
     matches!(
         entry.archive_kind,
-        Some(ArchiveKind::Zip | ArchiveKind::Cbz)
+        Some(ArchiveKind::Zip | ArchiveKind::Cbz | ArchiveKind::Epub)
     )
 }
 
@@ -425,13 +425,13 @@ fn kind_key(kind: ItemKind) -> String {
 
 fn archive_error_message(code: ErrorCode) -> &'static str {
     match code {
-        ErrorCode::CorruptArchive => "ZIP/CBZ書庫を読み取れません。",
-        ErrorCode::EncryptedArchive => "暗号化されたZIP/CBZ書庫は診断できません。",
-        ErrorCode::UnsupportedFormat => "ZIP/CBZ書庫の圧縮方式に対応していません。",
-        ErrorCode::ResourceLimit => "ZIP/CBZ書庫が安全な読み取り上限を超えています。",
-        ErrorCode::NotFound => "診断中にZIP/CBZ書庫が見つからなくなりました。",
-        ErrorCode::AccessDenied => "ZIP/CBZ書庫へアクセスできません。",
-        _ => "ZIP/CBZ書庫の診断に失敗しました。",
+        ErrorCode::CorruptArchive => "ZIP/CBZ/EPUB書庫を読み取れません。",
+        ErrorCode::EncryptedArchive => "暗号化されたZIP/CBZ/EPUB書庫は診断できません。",
+        ErrorCode::UnsupportedFormat => "ZIP/CBZ/EPUB書庫の圧縮方式に対応していません。",
+        ErrorCode::ResourceLimit => "ZIP/CBZ/EPUB書庫が安全な読み取り上限を超えています。",
+        ErrorCode::NotFound => "診断中にZIP/CBZ/EPUB書庫が見つからなくなりました。",
+        ErrorCode::AccessDenied => "ZIP/CBZ/EPUB書庫へアクセスできません。",
+        _ => "ZIP/CBZ/EPUB書庫の診断に失敗しました。",
     }
 }
 
@@ -580,7 +580,7 @@ mod tests {
                     .extension()
                     .and_then(|value| value.to_str())
                     .map(|value| value.to_ascii_lowercase());
-                if matches!(extension.as_deref(), Some("zip" | "cbz")) {
+                if matches!(extension.as_deref(), Some("zip" | "cbz" | "epub")) {
                     let entries = enumerate_archive_pages(&path)
                         .unwrap()
                         .into_iter()

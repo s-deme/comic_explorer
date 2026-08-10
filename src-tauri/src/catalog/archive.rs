@@ -10,6 +10,7 @@ use crate::domain::{AppError, ErrorCode, FileKind, RelativePath, classify_file_n
 pub enum ArchiveAdapterKind {
     Zip,
     Cbz,
+    Epub,
     Rar,
     Cbr,
     SevenZip,
@@ -23,6 +24,7 @@ pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
         .as_deref()
     {
         Some("cbz") => ArchiveAdapterKind::Cbz,
+        Some("epub") => ArchiveAdapterKind::Epub,
         Some("rar") => ArchiveAdapterKind::Rar,
         Some("cbr") => ArchiveAdapterKind::Cbr,
         Some("7z") => ArchiveAdapterKind::SevenZip,
@@ -32,7 +34,10 @@ pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
 
 pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppError> {
     let adapter = archive_adapter_kind(path);
-    if !matches!(adapter, ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz) {
+    if !matches!(
+        adapter,
+        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub
+    ) {
         return Err(unsupported_adapter_error(path, adapter));
     }
     let file = File::open(path).map_err(|source| archive_io_error(path, source))?;
@@ -112,7 +117,9 @@ fn unsupported_adapter_error(_path: &Path, adapter: ArchiveAdapterKind) -> AppEr
     let name = match adapter {
         ArchiveAdapterKind::Rar | ArchiveAdapterKind::Cbr => "RAR/CBR",
         ArchiveAdapterKind::SevenZip => "7z",
-        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz => "ZIP/CBZ",
+        ArchiveAdapterKind::Zip | ArchiveAdapterKind::Cbz | ArchiveAdapterKind::Epub => {
+            "ZIP/CBZ/EPUB"
+        }
     };
     AppError {
         code: ErrorCode::UnsupportedFormat,
@@ -196,6 +203,46 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(pages, ["chapter/2.PNG", "chapter/10.JPG"]);
         assert!(!path.parent().unwrap().join("chapter").exists());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn epub_uses_the_zip_adapter_and_lists_only_images_in_natural_order() {
+        let mut path = temporary_archive("epub-pages");
+        path.set_extension("EPUB");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file(
+                "mimetype",
+                SimpleFileOptions::default().compression_method(CompressionMethod::Stored),
+            )
+            .unwrap();
+        writer.write_all(b"application/epub+zip").unwrap();
+        writer
+            .start_file("OEBPS/Text/chapter.xhtml", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"<html></html>").unwrap();
+        for name in ["OEBPS/Images/10.jpg", "OEBPS/Images/2.jpg"] {
+            writer
+                .start_file(
+                    name,
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+                )
+                .unwrap();
+            writer.write_all(b"image").unwrap();
+        }
+        writer.finish().unwrap();
+
+        assert_eq!(archive_adapter_kind(&path), ArchiveAdapterKind::Epub);
+        assert_eq!(
+            enumerate_archive_pages(&path)
+                .unwrap()
+                .into_iter()
+                .map(|page| page.to_string())
+                .collect::<Vec<_>>(),
+            ["OEBPS/Images/2.jpg", "OEBPS/Images/10.jpg"]
+        );
         fs::remove_file(path).unwrap();
     }
 

@@ -311,7 +311,7 @@ def build_core(builder: Builder) -> None:
         encoding="utf-8",
     )
 
-    p = builder.fixture("FIX-ZIP-001", "stored/deflated ZIP and CBZ pages", ["1.JPG", "章/2.PNG", "章/10.JPEG"], "1.JPG", "success")
+    p = builder.fixture("FIX-ZIP-001", "stored/deflated ZIP, CBZ and EPUB pages", ["1.JPG", "章/2.PNG", "章/10.JPEG"], "1.JPG", "success")
     sources = []
     for index, (name, suffix) in enumerate((("1", ".JPG"), ("2", ".PNG"), ("10", ".JPEG")), 1):
         temporary = p / f"_source_{name}{suffix}"
@@ -327,6 +327,10 @@ def build_core(builder: Builder) -> None:
     ]
     builder.archive(p / "standard.zip", entries)
     builder.archive(p / "standard.cbz", list(reversed(entries)))
+    builder.archive(
+        p / "standard.epub",
+        [("mimetype", b"application/epub+zip", ZIP_STORED), *entries],
+    )
 
     p = builder.fixture("FIX-ZIP-ERROR-001", "archive errors and Zip Slip names", [], None, "classified-error")
     builder.archive(p / "empty.zip", [])
@@ -347,7 +351,7 @@ def build_core(builder: Builder) -> None:
     malformed[0:4] = b"BAD!"
     (p / "malformed-local-header.zip").write_bytes(malformed)
 
-    p = builder.fixture("FIX-READING-001", "reading position for folder/ZIP/CBZ", [f"page{i}.png" for i in range(1, 13)], "page1.png", "success")
+    p = builder.fixture("FIX-READING-001", "reading position for folder/ZIP/CBZ/EPUB", [f"page{i}.png" for i in range(1, 13)], "page1.png", "success")
     folder = p / "folder"
     folder.mkdir()
     reading_entries = []
@@ -357,6 +361,10 @@ def build_core(builder: Builder) -> None:
         reading_entries.append((target.name, target.read_bytes(), ZIP_DEFLATED))
     builder.archive(p / "same-content.zip", list(reversed(reading_entries)))
     builder.archive(p / "same-content.cbz", reading_entries)
+    builder.archive(
+        p / "same-content.epub",
+        [("mimetype", b"application/epub+zip", ZIP_STORED), *reading_entries],
+    )
     (p / "reading-oracle.json").write_text(
         json.dumps(
             {
@@ -378,6 +386,7 @@ def build_core(builder: Builder) -> None:
     builder.image(comic / "1.png", 320, 480, "FIX-LIBRARY-001", 1)
     shutil.copyfile(builder.root / "FIX-ZIP-001/standard.zip", p / "volume.zip")
     shutil.copyfile(builder.root / "FIX-ZIP-001/standard.cbz", p / "volume.cbz")
+    shutil.copyfile(builder.root / "FIX-ZIP-001/standard.epub", p / "volume.epub")
     (p / "future.rar").write_bytes(b"unsupported")
     (p / "empty-folder").mkdir()
     (p / ("long-" + "x" * 180)).mkdir()
@@ -386,7 +395,7 @@ def build_core(builder: Builder) -> None:
 
     p = builder.fixture(
         "FIX-WEBP-001",
-        "static lossy/lossless/alpha WebP for folders and ZIP/CBZ",
+        "static lossy/lossless/alpha WebP for folders and ZIP/CBZ/EPUB",
         ["1-lossy.webp", "2-lossless.webp", "3-alpha.webp"],
         "1-lossy.webp",
         "static-webp-with-negative-cases",
@@ -415,6 +424,10 @@ def build_core(builder: Builder) -> None:
     ]
     builder.archive(p / "static-webp.zip", archive_entries)
     builder.archive(p / "static-webp.cbz", list(reversed(archive_entries)))
+    builder.archive(
+        p / "static-webp.epub",
+        [("mimetype", b"application/epub+zip", ZIP_STORED), *archive_entries],
+    )
 
 
 def build_performance(builder: Builder) -> None:

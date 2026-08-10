@@ -183,6 +183,12 @@ function entryDisplayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
 }
 
+function archiveKindFromPath(path: string): CatalogEntry["archiveKind"] {
+  const extension = path.split(".").at(-1)?.toLocaleLowerCase("en-US");
+  if (extension === "zip" || extension === "cbz" || extension === "epub") return extension;
+  return undefined;
+}
+
 function entryKindLabel(entry: CatalogEntry): string {
   switch (entry.kind) {
     case "folder":
@@ -190,7 +196,7 @@ function entryKindLabel(entry: CatalogEntry): string {
     case "comicFolder":
       return "漫画フォルダ";
     case "archive":
-      return "ZIP / CBZ";
+      return "ZIP / CBZ / EPUB";
     case "page":
       return "画像";
     default: {
@@ -1156,7 +1162,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       openComicEntry({
         relativePath: favorite.resolvedPath,
         kind: favorite.kind,
-        ...(favorite.kind === "archive" ? { archiveKind: "cbz" } : {}),
+        ...(favorite.kind === "archive"
+          ? { archiveKind: archiveKindFromPath(favorite.resolvedPath) }
+          : {}),
       });
     }
   }

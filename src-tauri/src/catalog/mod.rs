@@ -146,7 +146,9 @@ mod fixture_tests {
         let archive_root = root.join("FIX-ZIP-001");
         let zip_pages = enumerate_archive_pages(&archive_root.join("standard.zip")).unwrap();
         let cbz_pages = enumerate_archive_pages(&archive_root.join("standard.cbz")).unwrap();
+        let epub_pages = enumerate_archive_pages(&archive_root.join("standard.epub")).unwrap();
         assert_eq!(zip_pages, cbz_pages);
+        assert_eq!(zip_pages, epub_pages);
         assert_eq!(
             zip_pages
                 .iter()
@@ -183,6 +185,7 @@ mod fixture_tests {
         assert_eq!(by_name["comic-folder"], ItemKind::ComicFolder);
         assert_eq!(by_name["volume.zip"], ItemKind::Archive);
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
+        assert_eq!(by_name["volume.epub"], ItemKind::Archive);
         assert_eq!(by_name["future.rar"], ItemKind::Unsupported);
         assert_eq!(
             entries
@@ -195,7 +198,7 @@ mod fixture_tests {
     }
 
     #[test]
-    fn fr_b08_webp_enumerates_folder_zip_and_cbz_without_mutating_sources() {
+    fn fr_b08_webp_enumerates_folder_zip_cbz_and_epub_without_mutating_sources() {
         let root = temporary_root("webp-enumeration");
         let comic = root.join("webp-comic");
         fs::create_dir_all(&comic).unwrap();
@@ -203,8 +206,10 @@ mod fixture_tests {
         fs::write(comic.join("2.WEBP"), b"two").unwrap();
         let zip = root.join("webp-volume.zip");
         let cbz = root.join("webp-volume.cbz");
+        let epub = root.join("webp-volume.epub");
         write_webp_archive(&zip);
         write_webp_archive(&cbz);
+        write_webp_archive(&epub);
         let before = source_snapshot(&root);
         let metadata_before = snapshot(&root);
 
@@ -224,6 +229,10 @@ mod fixture_tests {
                     crate::domain::ItemKind::Archive
                 ),
                 (
+                    "webp-volume.epub".to_owned(),
+                    crate::domain::ItemKind::Archive
+                ),
+                (
                     "webp-volume.zip".to_owned(),
                     crate::domain::ItemKind::Archive
                 ),
@@ -237,7 +246,7 @@ mod fixture_tests {
                 .collect::<Vec<_>>(),
             ["webp-comic/2.WEBP", "webp-comic/10.webp"]
         );
-        for archive in [&zip, &cbz] {
+        for archive in [&zip, &cbz, &epub] {
             assert_eq!(
                 enumerate_archive_pages(archive)
                     .unwrap()
@@ -349,6 +358,7 @@ mod fixture_tests {
         enumerate_folder_pages(&root, &root.join("FIX-NESTED-001")).unwrap();
         enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.zip")).unwrap();
         enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.cbz")).unwrap();
+        enumerate_archive_pages(&root.join("FIX-ZIP-001/standard.epub")).unwrap();
 
         let mut media = MediaTokenRegistry::new(Duration::from_secs(60));
         let file_token = media.issue(MediaGrant {
@@ -363,7 +373,7 @@ mod fixture_tests {
             mime_type: "image/jpeg",
             max_bytes: crate::api::MAX_IMAGE_BYTES,
             source: PageSource::ArchiveEntry {
-                archive: root.join("FIX-ZIP-001/standard.cbz"),
+                archive: root.join("FIX-ZIP-001/standard.epub"),
                 entry: "1.JPG".into(),
             },
         });

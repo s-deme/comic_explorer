@@ -2,7 +2,7 @@
 
 ## 目的と安全性
 
-このディレクトリは、MVPの表示順、画像形状、ZIP／CBZ、読書位置、原本非破壊、性能を実装前に固定する再生成可能なテストデータ仕様である。画像は固定シードから幾何模様と5×7ピクセル文字を描いて作り、ページ番号、フィクスチャID、寸法を目視できる。実作品、外部画像、生成AI画像、ネットワークを使用しない。
+このディレクトリは、MVPの表示順、画像形状、ZIP／CBZ／EPUB、読書位置、原本非破壊、性能を実装前に固定する再生成可能なテストデータ仕様である。画像は固定シードから幾何模様と5×7ピクセル文字を描いて作り、ページ番号、フィクスチャID、寸法を目視できる。実作品、外部画像、生成AI画像、ネットワークを使用しない。
 
 1×1の最小寸法画像だけは文字を収められないため、非対称の登録色ピクセルと
 マニフェストの寸法をオラクルにする。それ以外の正常画像には文字ラベルがある。
@@ -36,7 +36,7 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 - フィクスチャID、固定シード、生成器名・版、Python版
 - 相対ファイルパス、種別、画像形式・幅・高さ
 - 期待ページ順、期待表紙、期待ページ数を導ける順序、成功／エラー
-- 全ファイルおよびZIP／CBZ本体のSHA-256、開始前サイズ、固定mtime
+- 全ファイルおよびZIP／CBZ／EPUB本体のSHA-256、開始前サイズ、固定mtime
 - ZIPエントリの相対名、サイズ、CRC、圧縮方式、暗号化フラグ
 - 原本配下のディレクトリエントリ一覧
 
@@ -53,11 +53,11 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 | FIX-NESTED-001 | 再帰相対パス | `1.png, chapter/2.png, chapter/10.png, chapter/deep/11.png`／`1.png` | `.hidden*`は除外 |
 | FIX-IMAGE-001 | 縦JPEG/PNG、横JPEG/PNG、正方形、高解像度、1×1 | マニフェスト記載／`portrait.jpg` | 幅>高さだけ横長。EXIF Orientationは要件外で未収録 |
 | FIX-IMAGE-ERROR-001 | 破損JPEG/PNG、0 byte、拡張子偽装、読取拒否手順 | なし | per-file decode/access error。ACLは同梱手順で設定 |
-| FIX-ZIP-001 | Deflate/Stored、directory、日本語、大小文字、対象外、格納逆順 | `1.JPG, 章/2.PNG, 章/10.JPEG`／`1.JPG` | ZIPとCBZで同一 |
+| FIX-ZIP-001 | Deflate/Stored、directory、日本語、大小文字、対象外、格納逆順 | `1.JPG, 章/2.PNG, 章/10.JPEG`／`1.JPG` | ZIP、CBZ、EPUBで同一 |
 | FIX-ZIP-ERROR-001 | 空、画像なし、破損、暗号化フラグ、Zip Slip | なし | `empty`, `no-images`, `corrupt`, `encrypted`, `unsafe-entry`に分類 |
-| FIX-LIBRARY-001 | 通常／漫画folder、ZIP/CBZ、未対応書庫、空、深い階層、長名、同値metadata | 項目sort規則による | 漫画folderはEnterで移動、明示的な`読む`で閲覧 |
-| FIX-READING-001 | 12ページのfolder/ZIP/CBZ、保存・追加・削除 | `page1.png`〜`page12.png`／`page1.png` | 保存はpage7。同距離近傍は後方候補を優先 |
-| FIX-WEBP-001 | static WebP folder/ZIP/CBZ | `1-lossy.webp, 2-lossless.webp, 3-alpha.webp`／`1-lossy.webp` | fixed 1×1 lossy/lossless/alpha。正常系は`folder/`のみ、negativeは別の`errors/4-corrupt.webp`・`errors/5-animated.webp` |
+| FIX-LIBRARY-001 | 通常／漫画folder、ZIP/CBZ/EPUB、未対応書庫、空、深い階層、長名、同値metadata | 項目sort規則による | 漫画folderはEnterで移動、明示的な`読む`で閲覧 |
+| FIX-READING-001 | 12ページのfolder/ZIP/CBZ/EPUB、保存・追加・削除 | `page1.png`〜`page12.png`／`page1.png` | 保存はpage7。同距離近傍は後方候補を優先 |
+| FIX-WEBP-001 | static WebP folder/ZIP/CBZ/EPUB | `1-lossy.webp, 2-lossless.webp, 3-alpha.webp`／`1-lossy.webp` | fixed 1×1 lossy/lossless/alpha。正常系は`folder/`のみ、negativeは別の`errors/4-corrupt.webp`・`errors/5-animated.webp` |
 | FIX-PERFORMANCE-001 | 1,000／10,000項目、300ページfolder/CBZ | 数字3桁の自然順 | `--include-performance`時だけ生成 |
 
 ## 原本改変検出
