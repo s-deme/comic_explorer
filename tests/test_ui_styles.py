@@ -47,6 +47,14 @@ class UiStyleContractTests(unittest.TestCase):
             "pointer-events: none",
         )
 
+    def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:
+        self.assert_rule_contains(".viewer-stage", "background-size: 8px 8px")
+        self.assert_rule_contains(".viewer-stage", "background-color: #20211f")
+        self.assertIn(
+            "linear-gradient(45deg, #252625 25%, transparent 25%)",
+            STYLES,
+        )
+
     def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
         self.assert_rule_contains(
             ".viewer-end-of-volume-control", "display: inline-flex"

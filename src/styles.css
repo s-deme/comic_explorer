@@ -1084,6 +1084,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 0;
   overflow: hidden;
   place-items: center;
+  background-color: #20211f;
+  background-image:
+    linear-gradient(45deg, #252625 25%, transparent 25%),
+    linear-gradient(-45deg, #252625 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #252625 75%),
+    linear-gradient(-45deg, transparent 75%, #252625 75%);
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-size: 8px 8px;
 }
 .page-spread {
   z-index: 1;
