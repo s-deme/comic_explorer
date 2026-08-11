@@ -91,7 +91,7 @@ bookmark、読書位置はviewer modelを介して整合させる。
 全画面中のviewer toolbarはlayout領域を占有せず、画面上端へpointerを移動したときだけ表示し、画像領域へ離れると再び隠す。
 viewer-stageの単clickはpage移動へ割り当てず、double clickは設定に依存しない全画面表示・解除のtoggleとして扱う。
 viewer-stageはscrollbarを表示せず、表示領域を超える画像・連続layoutをpointer dragでpanする。drag中はpage送りswipeを発火しない。
-viewer-stageの背景には濃いグレーのCSS市松模様を使い、画像の余白と表示領域を明確にする。
+viewer-stageの背景には濃いグレーの大きめなCSS市松模様を使い、画像の余白と表示領域を明確にする。
 
 media URLにはhost pathを含めず、server-sideのsession/pageへ結び付いたopaque tokenを使う。
 Windowsは`http://comic.localhost/<token>`へplatform-mapし、query/fragment、traversal、absolute/drive/UNC、

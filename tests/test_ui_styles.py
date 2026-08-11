@@ -48,7 +48,11 @@ class UiStyleContractTests(unittest.TestCase):
         )
 
     def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:
-        self.assert_rule_contains(".viewer-stage", "background-size: 8px 8px")
+        self.assert_rule_contains(".viewer-stage", "background-size: 24px 24px")
+        self.assert_rule_contains(
+            ".viewer-stage",
+            "background-position: 0 0, 0 12px, 12px -12px, -12px 0",
+        )
         self.assert_rule_contains(".viewer-stage", "background-color: #20211f")
         self.assertIn(
             "linear-gradient(45deg, #252625 25%, transparent 25%)",
