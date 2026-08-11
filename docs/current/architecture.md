@@ -88,7 +88,8 @@ JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIME�
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
 通常のopenで対応archiveを選択した場合はviewerを全画面で開始し、明示した全画面・slideshow起動モードはそのまま優先する。
-全画面中のviewer toolbarはlayout領域を占有せず、画面上端へpointerを移動したときだけ表示し、画像領域へ離れると再び隠す。
+現在pageはtoolbarではなく、画像表示領域下部のrange slider式page移動barで総page数とともに示す。sliderはviewer modelの`go` commandへ接続し、任意のpageを表示する。
+全画面中のviewer toolbarとpage移動barはlayout領域を占有せず、toolbarは画面上端、page移動barは画面下端へpointerを移動したときだけ表示し、各controlから画像領域へ離れると再び隠す。
 viewer-stageの単clickはpage移動へ割り当てず、double clickは設定に依存しない全画面表示・解除のtoggleとして扱う。
 viewer-stageはscrollbarを表示せず、表示領域を超える画像・連続layoutをpointer dragでpanする。drag中はpage送りswipeを発火しない。
 page layoutの次表示候補は見開き全体をmedia取得・画像decodeまで先読みし、必要pageが揃うまで現在の表示を保持してから短いfadeで原子的に切り替える。

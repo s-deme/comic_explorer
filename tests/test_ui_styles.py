@@ -37,14 +37,24 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
-    def test_fullscreen_viewer_hides_toolbar_without_reserving_space(self) -> None:
+    def test_fullscreen_viewer_overlays_hidden_controls_without_reserving_space(self) -> None:
         self.assert_rule_contains(
-            '.viewer[data-fullscreen="true"][data-toolbar-visible="false"]',
-            "grid-template-rows: 0 minmax(0, 1fr)",
+            '.viewer[data-fullscreen="true"]',
+            "grid-template-rows: minmax(0, 1fr)",
         )
         self.assert_rule_contains(
             '.viewer[data-fullscreen="true"][data-toolbar-visible="false"] .viewer-toolbar',
             "pointer-events: none",
+        )
+        self.assert_rule_contains(
+            '.viewer[data-fullscreen="true"][data-page-navigator-visible="false"] .viewer-page-navigator',
+            "pointer-events: none",
+        )
+
+    def test_page_navigator_stretches_a_slider_across_the_viewer_bottom(self) -> None:
+        self.assert_rule_contains(".viewer-page-navigator", "display: flex")
+        self.assert_rule_contains(
+            '.viewer-page-navigator input[type="range"]', "flex: 1"
         )
 
     def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:

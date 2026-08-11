@@ -42,7 +42,7 @@ import {
   type EndOfVolumePolicy,
 } from "../catalog/end-of-volume";
 
-const FULLSCREEN_TOOLBAR_REVEAL_HEIGHT = 32;
+const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
 
 interface ViewerProps {
   session: ViewerSession;
@@ -142,6 +142,7 @@ export function Viewer({
     useState<ViewerLayoutMode>(initialLayoutMode);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
+  const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
@@ -288,6 +289,7 @@ export function Viewer({
       else await fullscreenAdapter.exit();
       if (next) fullscreenButtonRef.current?.blur();
       setFullscreenToolbarVisible(!next);
+      setFullscreenPageNavigatorVisible(!next);
       setFullscreen(next);
       if (!next) requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
       return true;
@@ -391,6 +393,7 @@ export function Viewer({
 
   useEffect(() => {
     setFullscreenToolbarVisible(!fullscreen);
+    setFullscreenPageNavigatorVisible(!fullscreen);
   }, [fullscreen]);
 
   useEffect(() => {
@@ -552,14 +555,22 @@ export function Viewer({
       data-layout-mode={layoutMode}
       data-fullscreen={fullscreen}
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
+      data-page-navigator-visible={!fullscreen || fullscreenPageNavigatorVisible}
       data-slideshow={slideshowIntervalMs !== undefined}
       onPointerMove={(event) => {
         if (
           fullscreen
           && !fullscreenToolbarVisible
-          && event.clientY <= FULLSCREEN_TOOLBAR_REVEAL_HEIGHT
+          && event.clientY <= FULLSCREEN_EDGE_REVEAL_HEIGHT
         ) {
           setFullscreenToolbarVisible(true);
+        }
+        if (
+          fullscreen
+          && !fullscreenPageNavigatorVisible
+          && event.clientY >= window.innerHeight - FULLSCREEN_EDGE_REVEAL_HEIGHT
+        ) {
+          setFullscreenPageNavigatorVisible(true);
         }
       }}
     >
@@ -578,7 +589,6 @@ export function Viewer({
         <strong>{session.displayName}</strong>
         <span>{state.mode === "single" ? "単ページ" : "見開き"}</span>
         <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>
-        <span>{progress}</span>
         <label className="viewer-layout-control">
           レイアウト
           <select
@@ -946,6 +956,32 @@ export function Viewer({
           />
         ))}
       </div>
+      <nav
+        className="viewer-page-navigator"
+        aria-label="ページ移動"
+        onPointerLeave={(event) => {
+          if (
+            fullscreen
+            && !(event.relatedTarget instanceof Node
+              && event.currentTarget.contains(event.relatedTarget))
+          ) {
+            setFullscreenPageNavigatorVisible(false);
+          }
+        }}
+      >
+        <input
+          type="range"
+          aria-label="ページ移動"
+          aria-valuetext={progress}
+          min="0"
+          max={Math.max(0, session.pages.length - 1)}
+          step="1"
+          value={state.index}
+          disabled={session.pages.length <= 1}
+          onChange={(event) => dispatch({ type: "go", index: Number(event.target.value) })}
+        />
+        <output aria-live="polite">{progress}</output>
+      </nav>
     </section>
   );
 }

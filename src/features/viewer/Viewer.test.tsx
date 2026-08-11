@@ -108,6 +108,35 @@ describe("Viewer settings", () => {
     expect(close).not.toHaveTextContent("一覧へ戻る");
   });
 
+  it("moves to any page from the bottom page navigator instead of the toolbar", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
+    expect(toolbar).not.toHaveTextContent("1 / 2");
+
+    const navigator = screen.getByRole("navigation", { name: "ページ移動" });
+    const slider = within(navigator).getByRole("slider", { name: "ページ移動" });
+    expect(slider).toHaveValue("0");
+    expect(slider).toHaveAttribute("aria-valuetext", "1 / 2");
+    expect(within(navigator).getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.change(slider, { target: { value: "1" } });
+
+    expect(slider).toHaveValue("1");
+    expect(slider).toHaveAttribute("aria-valuetext", "2 / 2");
+    expect(within(navigator).getByText("2 / 2")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
+  });
+
   it("lets the viewer toolbar change the end-of-volume policy", () => {
     const onEndOfVolumePolicyChange = vi.fn();
     render(
@@ -473,7 +502,7 @@ describe("Viewer settings", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("FT-B04-004 hides the fullscreen toolbar until the pointer reaches the top edge", async () => {
+  it("FT-B04-004 reveals fullscreen controls only at their matching screen edges", async () => {
     const adapter = {
       enter: vi.fn().mockResolvedValue(undefined),
       exit: vi.fn().mockResolvedValue(undefined),
@@ -496,12 +525,14 @@ describe("Viewer settings", () => {
     await waitFor(() =>
       expect(viewer).toHaveAttribute("data-toolbar-visible", "false"),
     );
+    expect(viewer).toHaveAttribute("data-page-navigator-visible", "false");
     expect(adapter.enter).toHaveBeenCalledTimes(1);
 
     fireEvent.pointerMove(viewer, { clientY: 0 });
     await waitFor(() =>
       expect(viewer).toHaveAttribute("data-toolbar-visible", "true"),
     );
+    expect(viewer).toHaveAttribute("data-page-navigator-visible", "false");
     expect(screen.getByRole("button", { name: "全画面表示を終了" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -512,6 +543,17 @@ describe("Viewer settings", () => {
     fireEvent.pointerLeave(toolbar!);
     await waitFor(() =>
       expect(viewer).toHaveAttribute("data-toolbar-visible", "false"),
+    );
+
+    fireEvent.pointerMove(viewer, { clientY: window.innerHeight - 1 });
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-page-navigator-visible", "true"),
+    );
+
+    const navigator = screen.getByRole("navigation", { name: "ページ移動" });
+    fireEvent.pointerLeave(navigator);
+    await waitFor(() =>
+      expect(viewer).toHaveAttribute("data-page-navigator-visible", "false"),
     );
 
     fireEvent.keyDown(window, { key: "Escape" });
