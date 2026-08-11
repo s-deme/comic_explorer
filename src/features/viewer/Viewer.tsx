@@ -83,6 +83,15 @@ interface LoupeState {
   imageHeight: number;
 }
 
+interface PointerDragState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  pannable: boolean;
+}
+
 export function Viewer({
   session,
   generation,
@@ -139,7 +148,8 @@ export function Viewer({
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
-  const pointerDownX = useRef<number | null>(null);
+  const pointerDragRef = useRef<PointerDragState | null>(null);
+  const [panning, setPanning] = useState(false);
   const layoutInitialized = useRef(false);
   const initialFullscreenRequested = useRef(false);
   const positionTimerRef = useRef<number | null>(null);
@@ -732,33 +742,73 @@ export function Viewer({
       <div
         ref={stageRef}
         className="viewer-stage"
-        onPointerMove={updateLoupe}
+        data-panning={panning}
+        onPointerMove={(event) => {
+          updateLoupe(event);
+          const drag = pointerDragRef.current;
+          if (!drag || drag.pointerId !== event.pointerId || !drag.pannable) return;
+          const spread = spreadRef.current;
+          if (!spread) return;
+          const deltaX = event.clientX - drag.lastX;
+          const deltaY = event.clientY - drag.lastY;
+          if (Math.abs(event.clientX - drag.startX) >= 4 || Math.abs(event.clientY - drag.startY) >= 4) {
+            setPanning(true);
+          }
+          spread.scrollLeft -= deltaX;
+          spread.scrollTop -= deltaY;
+          drag.lastX = event.clientX;
+          drag.lastY = event.clientY;
+          event.preventDefault();
+        }}
         onPointerLeave={() => setLoupe(null)}
         onPointerDown={(event) => {
-          pointerDownX.current = event.clientX;
+          const spread = spreadRef.current;
+          const pannable = spread !== null && (
+            spread.scrollWidth > spread.clientWidth
+            || spread.scrollHeight > spread.clientHeight
+          );
+          pointerDragRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            pannable,
+          };
+          if (pannable) event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
         onPointerUp={(event) => {
-          const start = pointerDownX.current;
-          pointerDownX.current = null;
-          if (start === null || Math.abs(event.clientX - start) < 48) return;
-          const action = event.clientX < start
+          const drag = pointerDragRef.current;
+          pointerDragRef.current = null;
+          setPanning(false);
+          if (!drag || drag.pointerId !== event.pointerId || drag.pannable) return;
+          if (Math.abs(event.clientX - drag.startX) < 48) return;
+          const action = event.clientX < drag.startX
             ? mouseGestures?.swipeLeft
             : mouseGestures?.swipeRight;
           applyMouseGesture(action);
+        }}
+        onPointerCancel={() => {
+          pointerDragRef.current = null;
+          setPanning(false);
         }}
         onDoubleClick={() => void requestFullscreen(!fullscreen)}
         onWheel={(event) => {
           if (event.ctrlKey) {
             event.preventDefault();
             applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
-          } else if (layoutMode === "horizontal_scroll") {
+          } else if (scrollLayout) {
             const spread = spreadRef.current;
             if (spread) {
-              const delta =
-                Math.abs(event.deltaX) > Math.abs(event.deltaY)
+              if (layoutMode === "horizontal_scroll") {
+                const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
                   ? event.deltaX
                   : event.deltaY;
-              spread.scrollLeft += delta;
+                spread.scrollLeft += delta;
+              } else {
+                spread.scrollLeft += event.deltaX;
+                spread.scrollTop += event.deltaY;
+              }
               event.preventDefault();
             }
           } else if (!scrollLayout) {

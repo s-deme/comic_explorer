@@ -1103,7 +1103,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     linear-gradient(-45deg, transparent 75%, #252625 75%);
   background-position: 0 0, 0 4px, 4px -4px, -4px 0;
   background-size: 8px 8px;
+  cursor: grab;
 }
+.viewer-stage[data-panning="true"] { cursor: grabbing; }
 .page-spread {
   z-index: 1;
   display: flex;
@@ -1111,11 +1113,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: calc(100% - 24px);
   min-width: 0;
   min-height: 0;
-  align-items: center;
-  justify-content: center;
+  align-items: safe center;
+  justify-content: safe center;
   gap: 8px;
   overflow: auto;
+  scrollbar-width: none;
 }
+.page-spread::-webkit-scrollbar { display: none; }
 .page-spread img {
   flex: 0 1 auto;
   width: auto;
@@ -1151,8 +1155,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   max-height: none;
 }
 .page-spread[data-scale-mode="custom"] img {
-  transform: scale(var(--viewer-custom-scale, 1));
-  transform-origin: center;
+  zoom: var(--viewer-custom-scale, 1);
 }
 .page-spread[data-layout-mode="vertical_scroll"] {
   align-items: center;

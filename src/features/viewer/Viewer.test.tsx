@@ -241,6 +241,49 @@ describe("Viewer settings", () => {
     );
   });
 
+  it("pans overflowing images by dragging without changing pages", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="custom"
+        initialScale={2}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        mouseGestures={{
+          swipeLeft: "nextPage",
+          swipeRight: "previousPage",
+          doubleClick: "none",
+        }}
+      />,
+    );
+
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    const spread = document.querySelector<HTMLElement>(".page-spread");
+    expect(stage).not.toBeNull();
+    expect(spread).not.toBeNull();
+    Object.defineProperties(spread!, {
+      clientWidth: { configurable: true, value: 500 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1000 },
+      scrollHeight: { configurable: true, value: 800 },
+    });
+    spread!.scrollLeft = 250;
+    spread!.scrollTop = 200;
+
+    fireEvent.pointerDown(stage!, { pointerId: 1, clientX: 200, clientY: 180 });
+    fireEvent.pointerMove(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
+    expect(spread).toHaveProperty("scrollLeft", 350);
+    expect(spread).toHaveProperty("scrollTop", 300);
+    expect(stage).toHaveAttribute("data-panning", "true");
+    fireEvent.pointerUp(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
+
+    expect(stage).toHaveAttribute("data-panning", "false");
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
   it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
     render(
       <Viewer
