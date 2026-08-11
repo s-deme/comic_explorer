@@ -520,7 +520,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-color: #6b9ed5;
   background: #eef6ff;
 }
-.catalog-item--reference_tile .thumbnail { min-height: 132px; }
+.catalog-item--reference_tile .thumbnail {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
 .catalog-item--small_thumbnail .thumbnail {
   justify-self: center;
   width: 64px;

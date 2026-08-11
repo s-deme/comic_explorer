@@ -96,6 +96,10 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".catalog-item--reference_tile", "grid-template-rows: minmax(0, 1fr) auto"
         )
+        self.assert_rule_contains(
+            ".catalog-item--reference_tile .thumbnail",
+            "overflow: hidden",
+        )
         self.assertIn(".thumbnail {\n  display: grid;\n  min-height: 0;", STYLES)
 
     def test_catalog_names_and_favorites_use_compact_controls(self) -> None:
