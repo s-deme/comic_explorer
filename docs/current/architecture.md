@@ -152,7 +152,7 @@ library shellは5分類menu、toolbar、address、folder/search side pane、cata
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
 cover/small/detail/reference tile、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。
-viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。settings、quick access、
+viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
 dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。
 巻末動作は閲覧している作品の文脈でviewer toolbarから変更し、app-local設定へ保存する。

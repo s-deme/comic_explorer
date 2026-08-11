@@ -138,6 +138,7 @@ export function Viewer({
   const [scale, setScale] = useState<ViewerScaleState>(() =>
     createViewerScaleState(initialScaleMode, initialScale, initialLoupeEnabled),
   );
+  const [displayedScale, setDisplayedScale] = useState(initialScale);
   const [layoutMode, setLayoutMode] =
     useState<ViewerLayoutMode>(initialLayoutMode);
   const [fullscreen, setFullscreen] = useState(false);
@@ -322,12 +323,57 @@ export function Viewer({
     onSettingsChange(state.mode, direction);
   }
 
+  function currentDisplayedScale(): number | undefined {
+    const spread = spreadRef.current;
+    const image = spread?.querySelector<HTMLImageElement>(
+      `img[data-page-index="${state.index}"]:not(.prefetch-page)`,
+    );
+    if (!image) return undefined;
+    const rect = image.getBoundingClientRect();
+    const widthScale = image.naturalWidth > 0 ? rect.width / image.naturalWidth : 0;
+    const heightScale = image.naturalHeight > 0 ? rect.height / image.naturalHeight : 0;
+    const measured = widthScale > 0 ? widthScale : heightScale;
+    return Number.isFinite(measured) && measured > 0 ? measured : undefined;
+  }
+
   function applyScale(action: ViewerScaleAction) {
-    const next = scaleReducer(scale, action);
+    const baseScale =
+      (action.type === "zoomIn" || action.type === "zoomOut")
+      && scale.mode !== "custom"
+        ? currentDisplayedScale()
+        : undefined;
+    const zoomAction =
+      action.type === "zoomIn" || action.type === "zoomOut"
+        ? { ...action, baseScale }
+        : action;
+    const next = scaleReducer(scale, zoomAction);
     setScale(next);
+    setDisplayedScale(next.scale);
     onScaleChange?.(next);
     if (!next.loupeEnabled) setLoupe(null);
   }
+
+  useLayoutEffect(() => {
+    if (scale.mode === "custom") {
+      setDisplayedScale(scale.scale);
+      return;
+    }
+    const updateDisplayedScale = () => {
+      const measured = currentDisplayedScale();
+      if (measured !== undefined) setDisplayedScale(measured);
+    };
+    updateDisplayedScale();
+    window.addEventListener("resize", updateDisplayedScale);
+    if (typeof ResizeObserver === "undefined" || !spreadRef.current) {
+      return () => window.removeEventListener("resize", updateDisplayedScale);
+    }
+    const observer = new ResizeObserver(updateDisplayedScale);
+    observer.observe(spreadRef.current);
+    return () => {
+      window.removeEventListener("resize", updateDisplayedScale);
+      observer.disconnect();
+    };
+  }, [fullscreen, landscape, layoutMode, readyPages, scale.mode, scale.scale, state.index, state.mode]);
 
   function updateLoupe(event: ReactPointerEvent<HTMLDivElement>) {
     if (!scale.loupeEnabled) return;
@@ -653,7 +699,7 @@ export function Viewer({
               if (Number.isFinite(next)) applyScale({ type: "scale", scale: next });
             }}
           />
-          <span aria-label="現在の倍率">{Math.round(scale.scale * 100)}%</span>
+          <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
         </label>
         <button
           className="viewer-icon-button"

@@ -57,17 +57,30 @@ describe("viewer page model", () => {
 });
 
 describe("FR-B01 scale model", () => {
-  it("FT-B01-001 clamps and rounds arbitrary倍率 at the shared boundaries", () => {
+  it("FT-B01-001 clamps arbitrary倍率 while retaining the displayed percentage", () => {
     expect(normalizeScale(Number.NaN)).toBe(1);
     expect(normalizeScale(MIN_SCALE - 1)).toBe(MIN_SCALE);
     expect(normalizeScale(MAX_SCALE + 1)).toBe(MAX_SCALE);
-    expect(normalizeScale(1.06)).toBe(1.1);
+    expect(normalizeScale(1.06)).toBe(1.06);
     expect(
       scaleReducer(createViewerScaleState("fit", 1, false), {
         type: "scale",
         scale: 2.37,
       }),
-    ).toEqual({ mode: "custom", scale: 2.4, loupeEnabled: false });
+    ).toEqual({ mode: "custom", scale: 2.37, loupeEnabled: false });
+  });
+
+  it("FT-B01-006 changes from the current fitted display scale and reverses it", () => {
+    const enlarged = scaleReducer(
+      createViewerScaleState("fit", 1, false),
+      { type: "zoomIn", baseScale: 0.58 },
+    );
+    expect(enlarged).toEqual({ mode: "custom", scale: 0.68, loupeEnabled: false });
+    expect(scaleReducer(enlarged, { type: "zoomOut" })).toEqual({
+      mode: "custom",
+      scale: 0.58,
+      loupeEnabled: false,
+    });
   });
 
   it("FT-B01-002 exposes common window, width, height and original fit modes", () => {

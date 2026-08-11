@@ -40,14 +40,13 @@ export interface ViewerScaleState {
 export type ViewerScaleAction =
   | { type: "mode"; mode: ScaleMode }
   | { type: "scale"; scale: number }
-  | { type: "zoomIn" }
-  | { type: "zoomOut" }
+  | { type: "zoomIn"; baseScale?: number }
+  | { type: "zoomOut"; baseScale?: number }
   | { type: "loupe"; enabled: boolean };
 
 export function normalizeScale(value: number): number {
   const safeValue = Number.isFinite(value) ? value : DEFAULT_SCALE;
-  const rounded = Math.round(safeValue / SCALE_STEP) * SCALE_STEP;
-  return Number(Math.min(MAX_SCALE, Math.max(MIN_SCALE, rounded)).toFixed(2));
+  return Number(Math.min(MAX_SCALE, Math.max(MIN_SCALE, safeValue)).toFixed(4));
 }
 
 export function createViewerScaleState(
@@ -71,13 +70,13 @@ export function scaleReducer(
       return {
         ...state,
         mode: "custom",
-        scale: normalizeScale(state.scale + SCALE_STEP),
+        scale: normalizeScale((action.baseScale ?? state.scale) + SCALE_STEP),
       };
     case "zoomOut":
       return {
         ...state,
         mode: "custom",
-        scale: normalizeScale(state.scale - SCALE_STEP),
+        scale: normalizeScale((action.baseScale ?? state.scale) - SCALE_STEP),
       };
     case "loupe":
       return { ...state, loupeEnabled: action.enabled };

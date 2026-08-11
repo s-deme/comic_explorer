@@ -247,6 +247,47 @@ describe("Viewer settings", () => {
     });
   });
 
+  it("zooms from the displayed fit percentage and restores it with the opposite control", () => {
+    const onScaleChange = vi.fn();
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onScaleChange={onScaleChange}
+        onClose={() => undefined}
+      />,
+    );
+
+    const image = document.querySelector<HTMLImageElement>(".page-spread img");
+    expect(image).not.toBeNull();
+    Object.defineProperties(image!, {
+      naturalWidth: { configurable: true, value: 1000 },
+      naturalHeight: { configurable: true, value: 1000 },
+    });
+    vi.spyOn(image!, "getBoundingClientRect").mockReturnValue({
+      width: 580,
+      height: 580,
+    } as DOMRect);
+    fireEvent.load(image!);
+
+    expect(screen.getByLabelText("現在の倍率")).toHaveTextContent("58%");
+    fireEvent.click(screen.getByRole("button", { name: "倍率を上げる" }));
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "0.68");
+    expect(screen.getByLabelText("現在の倍率")).toHaveTextContent("68%");
+
+    fireEvent.click(screen.getByRole("button", { name: "倍率を下げる" }));
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "0.58");
+    expect(screen.getByLabelText("現在の倍率")).toHaveTextContent("58%");
+    expect(onScaleChange).toHaveBeenLastCalledWith({
+      mode: "custom",
+      scale: 0.58,
+      loupeEnabled: false,
+    });
+  });
+
   it("keeps the chosen scale while moving between pages", async () => {
     render(
       <Viewer
