@@ -216,7 +216,6 @@ export function CatalogGrid({
               <span>種別</span>
               <span>サイズ</span>
               <span>更新日時</span>
-              <span>操作</span>
             </div>
           )}
           <div
@@ -241,10 +240,11 @@ export function CatalogGrid({
                   const kind = kindLabel(entry);
                   const size = formatSize(entry.byteSize);
                   const modified = formatModified(entry.modifiedMs);
-                  const canNavigate = entry.kind === "folder";
+                  const canNavigate =
+                    entry.kind === "folder" || entry.kind === "comicFolder";
                   const canRead =
-                    entry.kind === "comicFolder" || entry.kind === "archive"
-                    || entry.kind === "pdf" || entry.kind === "page";
+                    entry.kind === "archive" || entry.kind === "pdf"
+                    || entry.kind === "page";
                   const canFavorite =
                     entry.kind === "folder" || entry.kind === "comicFolder"
                     || entry.kind === "archive" || entry.kind === "pdf";
@@ -404,6 +404,7 @@ function Thumbnail({
   onNeeded: (entry: CatalogEntry) => void;
 }) {
   const eligible = entry.kind === "archive" || entry.kind === "comicFolder"
+    || entry.kind === "folder" && entry.hasFolderArchiveCover === true
     || entry.kind === "page" || isPdfEntry(entry);
   useEffect(() => {
     if (eligible && state.status === "loading") onNeeded(entry);
@@ -422,7 +423,37 @@ function Thumbnail({
       aria-hidden="true"
       data-thumbnail-state={eligible ? state.status : "placeholder"}
     >
-      {entry.kind === "archive" ? "▣" : isPdfEntry(entry) ? "PDF" : "▤"}
+      {entry.kind === "archive" ? <ArchivePlaceholderIcon />
+        : entry.kind === "folder" || entry.kind === "comicFolder" ? <FolderPlaceholderIcon />
+          : isPdfEntry(entry) ? "PDF" : "▤"}
     </span>
+  );
+}
+
+function FolderPlaceholderIcon() {
+  return (
+    <svg
+      className="thumbnail-icon thumbnail-icon--folder"
+      data-thumbnail-icon="folder"
+      viewBox="0 0 48 40"
+    >
+      <path className="thumbnail-icon__folder-back" d="M4 9h15l4 5h21v20H4z" />
+      <path className="thumbnail-icon__folder-front" d="M4 15h40v19H4z" />
+    </svg>
+  );
+}
+
+function ArchivePlaceholderIcon() {
+  return (
+    <svg
+      className="thumbnail-icon thumbnail-icon--archive"
+      data-thumbnail-icon="archive"
+      viewBox="0 0 48 40"
+    >
+      <path className="thumbnail-icon__archive-page" d="M11 3h19l8 8v26H11z" />
+      <path className="thumbnail-icon__archive-fold" d="M30 3v8h8" />
+      <path className="thumbnail-icon__archive-zipper" d="M24 13v18" />
+      <path className="thumbnail-icon__archive-teeth" d="M21 15h6M21 20h6M21 25h6M21 30h6" />
+    </svg>
   );
 }

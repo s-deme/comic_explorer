@@ -687,15 +687,15 @@ export function Viewer({
             <option value="custom">任意倍率</option>
           </select>
           <input
-            aria-label="任意倍率"
+            aria-label="任意倍率（%）"
             type="number"
-            min="0.25"
-            max="4"
-            step="0.1"
-            value={scale.scale}
+            min="25"
+            max="400"
+            step="1"
+            value={Math.round(scale.scale * 100)}
             disabled={scale.mode !== "custom"}
             onChange={(event) => {
-              const next = Number(event.target.value);
+              const next = Number(event.target.value) / 100;
               if (Number.isFinite(next)) applyScale({ type: "scale", scale: next });
             }}
           />

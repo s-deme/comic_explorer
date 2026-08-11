@@ -223,14 +223,18 @@ describe("Viewer settings", () => {
     const spread = document.querySelector(".page-spread");
     expect(spread).toHaveAttribute("data-scale-mode", "custom");
     expect(spread).toHaveAttribute("data-scale", "1.7");
-    expect(screen.getByRole("spinbutton", { name: "任意倍率" })).toHaveValue(1.7);
+    const scaleInput = screen.getByRole("spinbutton", { name: "任意倍率（%）" });
+    expect(scaleInput).toHaveValue(170);
+    expect(scaleInput).toHaveAttribute("min", "25");
+    expect(scaleInput).toHaveAttribute("max", "400");
+    expect(scaleInput).toHaveAttribute("step", "1");
 
     fireEvent.change(screen.getByRole("combobox", { name: "倍率モード" }), {
       target: { value: "width" },
     });
     expect(spread).toHaveAttribute("data-scale-mode", "width");
-    fireEvent.change(screen.getByRole("spinbutton", { name: "任意倍率" }), {
-      target: { value: "2.3" },
+    fireEvent.change(scaleInput, {
+      target: { value: "230" },
     });
     expect(spread).toHaveAttribute("data-scale-mode", "custom");
     expect(spread).toHaveAttribute("data-scale", "2.3");

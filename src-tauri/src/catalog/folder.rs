@@ -13,6 +13,8 @@ use crate::domain::{
 pub struct CatalogEntry {
     pub relative_path: RelativePath,
     pub kind: ItemKind,
+    #[serde(default)]
+    pub has_folder_archive_cover: bool,
     pub byte_size: Option<u64>,
     pub modified_ms: Option<u64>,
     pub archive_kind: Option<ArchiveKind>,
@@ -118,9 +120,12 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
                 FileKind::Unsupported => ItemKind::Unsupported,
             }
         };
+        let has_folder_archive_cover =
+            kind == ItemKind::Folder && has_multiple_supported_archive_children(&root, &path);
         entries.push(CatalogEntry {
             relative_path,
             kind,
+            has_folder_archive_cover,
             byte_size: metadata.is_file().then_some(metadata.len()),
             modified_ms: metadata
                 .modified()
@@ -199,6 +204,48 @@ fn contains_supported_image(root: &Path, directory: &Path) -> Result<bool, AppEr
     Ok(!pages.is_empty())
 }
 
+fn has_multiple_supported_archive_children(root: &Path, directory: &Path) -> bool {
+    let Ok(iterator) = fs::read_dir(directory) else {
+        return false;
+    };
+    let mut count = 0;
+    for result in iterator {
+        let Ok(entry) = result else {
+            continue;
+        };
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if is_hidden_name(&name) {
+            continue;
+        }
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if metadata.file_type().is_symlink() {
+            let Ok(canonical) = path.canonicalize() else {
+                continue;
+            };
+            if !canonical.starts_with(root) {
+                continue;
+            }
+        }
+        if !metadata.is_file() {
+            continue;
+        }
+        let archive_kind = archive_kind_for_name(&name);
+        let is_supported_archive = classify_file_name(&name) == FileKind::Archive
+            && archive_kind.is_some_and(ArchiveKind::reader_available);
+        if is_supported_archive {
+            count += 1;
+            if count >= 2 {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn canonical_directory(path: &Path) -> Result<PathBuf, AppError> {
     let canonical = path
         .canonicalize()
@@ -275,6 +322,33 @@ mod tests {
         assert_eq!(directory_kind(Err(error)), ItemKind::Folder);
         assert_eq!(directory_kind(Ok(false)), ItemKind::Folder);
         assert_eq!(directory_kind(Ok(true)), ItemKind::ComicFolder);
+    }
+
+    #[test]
+    fn marks_only_folders_with_multiple_direct_archives_for_a_cover_thumbnail() {
+        let root = temporary_root("folder-archive-cover");
+        let shelf = root.join("shelf");
+        let single = root.join("single");
+        let comic = root.join("comic");
+        fs::create_dir_all(&shelf).unwrap();
+        fs::create_dir_all(&single).unwrap();
+        fs::create_dir_all(&comic).unwrap();
+        fs::write(shelf.join("10.cbz"), b"ten").unwrap();
+        fs::write(shelf.join("2.cbz"), b"two").unwrap();
+        fs::write(single.join("1.cbz"), b"one").unwrap();
+        fs::write(comic.join("1.png"), b"page").unwrap();
+        fs::write(comic.join("2.cbz"), b"archive").unwrap();
+        fs::write(comic.join("3.cbz"), b"archive").unwrap();
+
+        let entries = enumerate_folder(&root, &root).unwrap();
+        let cover_candidates = entries
+            .iter()
+            .filter(|entry| entry.has_folder_archive_cover)
+            .map(|entry| entry.relative_path.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(cover_candidates, ["shelf"]);
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

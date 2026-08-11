@@ -33,6 +33,7 @@ export interface LibraryItem {
 export interface CatalogEntry {
   relativePath: RelativePath;
   kind: ItemKind;
+  hasFolderArchiveCover?: boolean;
   byteSize?: number;
   modifiedMs?: number;
   archiveKind?: "zip" | "cbz" | "epub" | "rar" | "cbr" | "sevenZip" | "cb7" | "lzh";

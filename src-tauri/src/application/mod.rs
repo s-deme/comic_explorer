@@ -3850,6 +3850,7 @@ mod shutdown_tests {
             CatalogEntry {
                 relative_path: RelativePath::parse(path).unwrap(),
                 kind: ItemKind::Archive,
+                has_folder_archive_cover: false,
                 byte_size: size_bytes,
                 modified_ms,
                 archive_kind: Some(crate::catalog::ArchiveKind::Cbz),
@@ -3961,6 +3962,7 @@ mod shutdown_tests {
         let entries = vec![crate::catalog::CatalogEntry {
             relative_path: RelativePath::parse("New/01.cbz").unwrap(),
             kind: ItemKind::Archive,
+            has_folder_archive_cover: false,
             byte_size: Some(12),
             modified_ms: Some(13),
             archive_kind: Some(crate::catalog::ArchiveKind::Cbz),

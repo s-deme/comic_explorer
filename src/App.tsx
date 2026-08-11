@@ -792,7 +792,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   useEffect(() => {
     const requestGeneration = generation.current;
     sortedEntries.forEach((entry, index) => {
-      if (entry.kind !== "archive" && entry.kind !== "comicFolder") return;
+      if (
+        entry.kind !== "archive"
+        && entry.kind !== "comicFolder"
+        && !(entry.kind === "folder" && entry.hasFolderArchiveCover === true)
+      ) return;
       if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
       if (thumbnails[entry.relativePath] !== undefined) return;
       const priority =
@@ -4503,16 +4507,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 </select>
               </label>
               <label>
-                任意倍率
+                任意倍率（%）
                 <input
                   type="number"
-                  aria-label="profile任意倍率"
-                  min="0.25"
-                  max="4"
-                  step="0.1"
-                  value={settingsDraft.scale}
+                  aria-label="profile任意倍率（%）"
+                  min="25"
+                  max="400"
+                  step="1"
+                  value={Math.round(settingsDraft.scale * 100)}
                   onChange={(event) => {
-                    const scale = Number(event.target.value);
+                    const scale = Number(event.target.value) / 100;
                     if (Number.isFinite(scale)) {
                       setSettingsDraft((current) => current === null ? current : { ...current, scale });
                     }

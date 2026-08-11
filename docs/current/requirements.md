@@ -46,12 +46,12 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
 | REQ-MVP-003 | folder treeの展開・選択と現在folderを同期する。 |
 | REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動をroot内で行う。 |
-| REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。 |
-| REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。いずれもfingerprintとcache鮮度を管理する。 |
+| REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。thumbnailを表示しないfolderとarchiveには、それぞれを判別できる専用iconを表示する。 |
+| REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。通常folderの直下に対応archiveが複数ある場合は、その自然順先頭archiveの表紙thumbnailをfolder項目に表示する。いずれも選択したsourceを含むfingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | catalog toolbar buttonから並べ替え、昇降順、一覧形式のmenuを操作し、viewer toolbarから巻末動作を操作して、設定を保存する。 |
 | REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
 | REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。対応書庫内の対応書庫は形式を混在でき、内側3階層・内側書庫64個・内側書庫の展開データ累計512 MiBを上限として再帰的に読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
-| REQ-MVP-010 | catalog項目はダブルクリックまたはkeyboardでviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
+| REQ-MVP-010 | catalogのfolder（漫画画像を含むfolderを含む）はダブルクリックまたはkeyboardでviewerを開かず、そのfolderへ移動する。archive、PDF、画像は同じ操作でviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。page layoutで縦が表示領域へ収まらない場合は上端から表示し、次page操作では未表示部分を下へ送って全体を閲覧した後に次pageへ進む。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |
@@ -70,7 +70,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 |---|---|---|
 | NFR-MVP-001 | 1TB、10,000 files、1,000作品、1冊300pageを想定し、遅延処理、virtualize、10GiB thumbnail LRUを使う。 | 10,000項目のWindows製品UI性能はBLOCKED。 |
 | NFR-MVP-002 | cold起動3秒、cached一覧1秒、prefetch済みpage 100ms、10,000項目検索1秒、idle 250MiBを基準PCで測る。 | 現行release候補の基準PC測定はBLOCKED。 |
-| NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、catalog cardは文字と操作欄を重ねず、tree labelは選択状態によらず背景と判別できる文字色で表示する。viewerの画像表示領域は濃いグレーの市松模様で画像領域を判別可能にする。catalogの小サムネイル、詳細リスト、表紙付きリスト、参照型タイルは利用可能なペイン幅に応じて列数または表示する詳細列を縮退し、横方向にはみ出し・重なりを起こさない。サムネイル系cardでは画像の縦横比にかかわらずファイル名用の領域を確保して画像と重ねず、種別ラベルを表示しない。ファイル名は本文より小さいcompactサイズで表示し、お気に入りtoggleはカードの操作欄に収まる小型buttonとする。設定画面を含む全dialogは共通のheader、余白、control、action、scroll表現を使い、狭い画面でもlabelと操作を重ねない。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
+| NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、catalog cardは文字と操作欄を重ねず、tree labelは選択状態によらず背景と判別できる文字色で表示する。viewerの画像表示領域は濃いグレーの市松模様で画像領域を判別可能にする。catalogの小サムネイル、詳細リスト、表紙付きリスト、参照型タイルは利用可能なペイン幅に応じて列数または表示する詳細列を縮退し、横方向にはみ出し・重なりを起こさない。サムネイル系cardでは画像の縦横比にかかわらずファイル名用の領域を確保して画像と重ねず、種別ラベルを表示しない。ファイル名は本文より小さいcompactサイズで表示し、お気に入りtoggleはサムネイルの左上に重ねる小型buttonとする。設定画面を含む全dialogは共通のheader、余白、control、action、scroll表現を使い、狭い画面でもlabelと操作を重ねない。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
 | NFR-MVP-004 | lockfile全依存を再配布可能licenseに限定し、SBOMとTHIRD-PARTY-NOTICESを同期する。 | 既知の禁止・unknown licenseは0。 |
 | NFR-MVP-005 | Windows 10 22H2 x64と対応中Windows 11 x64向けinstallerを生成する。 | clean VM install/uninstallはBLOCKED。 |
 | NFR-MVP-006 | 採用構成を再現可能なfixture、性能値、原本snapshot、配布検証で評価し、実測・推定・未測定を分ける。 | 外部環境の未測定を保持する。 |
@@ -83,7 +83,7 @@ Git履歴から参照する。
 
 | Feature | 要件ID | 状態追跡ID | 現行契約 |
 |---|---|---|---|
-| FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037 | 共通scale model、25%〜400%、fit幅/高さ/全体、原寸、状態維持、pointerルーペ、再起動復元。`+`/`-` は現在表示中の先頭pageの実表示倍率を基準に10%ずつ増減し、連続する逆方向操作で直前の表示倍率へ戻す。画像が表示領域を超えてもscrollbarを表示せず、pointer dragで任意の表示位置へpanできる。 |
+| FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037 | 共通scale model、25%〜400%、fit幅/高さ/全体、原寸、状態維持、正方形のpointerルーペ、再起動復元。任意倍率の入力欄は25〜400%の整数で表示・入力し、内部値と保存形式には換算した倍率を使う。`+`/`-` は現在表示中の先頭pageの実表示倍率を基準に10%ずつ増減し、連続する逆方向操作で直前の表示倍率へ戻す。画像が表示領域を超えてもscrollbarを表示せず、pointer dragで任意の表示位置へpanできる。 |
 | FR-B02 巻末動作 | REQ-FR-B02-001, REQ-FR-B02-002, REQ-FR-B02-003 | FUT-C-020, FUT-C-038, FUT-C-039, FUT-C-040, FUT-C-041 | viewer toolbarから`auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を安全に適用し、sortと設定を維持する。次巻・loop先は先頭page、巻頭からの前巻移動は末尾pageを開く。 |
 | FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `small_thumbnail`、`detail_list`、`cover_list`の操作・focus・永続化を共通modelで扱う。サムネイル系cardは種別ラベルを省き、画像とファイル名を別のlayout領域に置き、サムネイル領域をカードのrow内に収める。仮想化した各rowは表示形式ごとの単一設定から高さと縦間隔を適用し、サムネイル系の後続rowは直前rowの終端より後に配置する。`small_thumbnail`はサムネイルを上、ファイル名を下に配置し、`cover_list`と`reference_tile`も画像が次段へはみ出さないようにする。詳細リストでは種別を表示する。 |
 | FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。検索条件として、サブフォルダ、folder/file種別、固定した現在folderの検索範囲、sizeの以上/以下、更新日時の以降/以前/期間を指定でき、結果を移動時にも保持するか選べる。 |

@@ -77,11 +77,22 @@ class UiStyleContractTests(unittest.TestCase):
             ".viewer-end-of-volume-control", "white-space: nowrap"
         )
 
-    def test_catalog_cards_reserve_a_separate_action_region(self) -> None:
-        self.assert_rule_contains(".catalog-actions", "display: flex")
+    def test_viewer_loupe_uses_a_square_frame(self) -> None:
+        self.assert_rule_contains(".viewer-loupe", "width: 180px")
+        self.assert_rule_contains(".viewer-loupe", "height: 180px")
+        self.assert_rule_contains(".viewer-loupe", "border-radius: 0")
+
+    def test_catalog_cards_overlay_favorite_controls_without_a_separate_action_column(self) -> None:
+        self.assert_rule_contains(".catalog-actions", "position: absolute")
         self.assert_rule_contains(
             ".catalog-cell--detail_list",
-            "grid-template-columns: minmax(0, 1fr) auto",
+            "grid-template-columns: minmax(0, 1fr)",
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--cover_list .catalog-actions", "top: 8px"
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--small_thumbnail .catalog-actions", "left: 50%"
         )
 
     def test_thumbnail_cards_reserve_the_filename_below_a_bounded_image(self) -> None:
@@ -123,6 +134,17 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(".favorite-toggle", "width: 24px")
         self.assert_rule_contains(".favorite-toggle", "min-height: 24px")
+
+    def test_catalog_placeholder_icons_distinguish_folders_and_archives(self) -> None:
+        self.assert_rule_contains(".thumbnail-icon", "width: min(72%, 76px)")
+        self.assert_rule_contains(
+            ".thumbnail-icon--folder .thumbnail-icon__folder-front",
+            "fill: #f2c75b",
+        )
+        self.assert_rule_contains(
+            ".thumbnail-icon--archive .thumbnail-icon__archive-page",
+            "fill: #dce6f1",
+        )
 
     def test_catalog_layout_shrinks_without_a_fixed_page_width(self) -> None:
         self.assertNotIn("min-width: 1024px", STYLES)

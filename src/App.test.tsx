@@ -1966,7 +1966,28 @@ describe("application shell", () => {
       .getAllByRole("button")
       .find((button) => button.getAttribute("data-relative-path") === "webp-folder");
     expect(folderButton).toBeDefined();
-    fireEvent.keyDown(folderButton!, { key: "Enter", ctrlKey: true });
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "list-webp-folder" as never,
+      generation: 3 as never,
+      data: [{
+        relativePath: "webp-folder/1-lossy.webp" as never,
+        kind: "page",
+      }],
+    });
+    fireEvent.keyDown(folderButton!, { key: "Enter" });
+    await waitFor(() => expect(listMock).toHaveBeenLastCalledWith(
+      "webp-folder",
+      expect.any(Number),
+    ));
+    const folderGrid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const imageButton = within(folderGrid)
+      .getAllByRole("button")
+      .find((button) =>
+        button.getAttribute("data-relative-path") === "webp-folder/1-lossy.webp"
+      );
+    expect(imageButton).toBeDefined();
+    fireEvent.keyDown(imageButton!, { key: "Enter" });
     await screen.findByLabelText("webp-folder ビューワ");
     expect(await screen.findByAltText("webp-folder 1ページ"))
       .toHaveAttribute("src", "comic://localhost/webp-folder-0");
@@ -1980,10 +2001,22 @@ describe("application shell", () => {
       .toHaveAttribute("src", "comic://localhost/webp-folder-2");
 
     fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "list-root-after-webp" as never,
+      generation: 4 as never,
+      data: [folder, archive],
+    });
+    await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    fireEvent.click(screen.getByRole("button", { name: "戻る" }));
     await openTestComic("webp-book.cbz");
     expect(await screen.findByAltText("webp-book.cbz 1ページ"))
       .toHaveAttribute("src", "comic://localhost/webp-book.cbz-0");
-    expect(openMock).toHaveBeenNthCalledWith(1, "webp-folder", expect.any(Number));
+    expect(openMock).toHaveBeenNthCalledWith(
+      1,
+      "webp-folder/1-lossy.webp",
+      expect.any(Number),
+    );
     expect(openMock).toHaveBeenNthCalledWith(2, "webp-book.cbz", expect.any(Number));
   });
 
@@ -2260,6 +2293,14 @@ describe("application shell", () => {
       target: { value: "reference_tile" },
     });
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    const draftScale = within(dialog).getByRole("spinbutton", {
+      name: "profile任意倍率（%）",
+    });
+    expect(draftScale).toHaveValue(100);
+    expect(draftScale).toHaveAttribute("min", "25");
+    expect(draftScale).toHaveAttribute("max", "400");
+    expect(draftScale).toHaveAttribute("step", "1");
+    fireEvent.change(draftScale, { target: { value: "175" } });
     fireEvent.keyDown(within(dialog).getByLabelText("次ページショートカット"), {
       key: "j",
       ctrlKey: true,
@@ -2277,12 +2318,20 @@ describe("application shell", () => {
       target: { value: "reference_tile" },
     });
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    fireEvent.change(
+      within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
+      { target: { value: "175" } },
+    );
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledTimes(1);
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
-      expect.objectContaining({ catalogViewMode: "reference_tile", treeVisible: false }),
+      expect.objectContaining({
+        catalogViewMode: "reference_tile",
+        treeVisible: false,
+        scale: 1.75,
+      }),
       expect.any(Number),
     );
     expect(screen.getByLabelText("一覧表示形式"))

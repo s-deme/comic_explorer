@@ -1,5 +1,7 @@
 use crate::api::{MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
-use crate::domain::{AppError, ErrorCode, FileKind, ImageFormat, RelativePath, classify_file_name};
+use crate::domain::{
+    AppError, ErrorCode, FileKind, ImageFormat, ItemKind, RelativePath, classify_file_name,
+};
 use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 
@@ -52,18 +54,51 @@ pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppErr
         FileKind::Image => {
             read_image_thumbnail(&item_path, item, format!("image:{}", item.as_str()))
         }
-        FileKind::Unsupported => {
-            let pages = super::enumerate_folder_pages(&root, &item_path)?;
-            let cover = pages.first().ok_or_else(|| {
-                thumbnail_error(ErrorCode::NotFound, "Folder has no supported cover.")
-            })?;
-            read_image_thumbnail(
-                &root.join(cover.as_str()),
-                cover,
-                format!("folder:{}#{}", item.as_str(), cover.as_str()),
-            )
-        }
+        FileKind::Unsupported => read_folder_cover(&root, item, &item_path),
     }
+}
+
+fn read_folder_cover(
+    root: &Path,
+    item: &RelativePath,
+    item_path: &Path,
+) -> Result<CoverBytes, AppError> {
+    let archives = super::enumerate_folder(root, item_path)?
+        .into_iter()
+        .filter(|entry| entry.kind == ItemKind::Archive)
+        .collect::<Vec<_>>();
+    if archives.len() >= 2 {
+        let selected = &archives[0];
+        let mut cover = read_cover(root, &selected.relative_path)?;
+        let archive_set = archives
+            .iter()
+            .map(|entry| {
+                format!(
+                    "{}:size:{:?}:modified:{:?}",
+                    entry.relative_path.as_str(),
+                    entry.byte_size,
+                    entry.modified_ms
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("|");
+        cover.source_key = format!("folder-archive:{}#{}", item.as_str(), cover.source_key);
+        cover.fingerprint_detail = format!(
+            "archive-set:{archive_set};selected-source:{}",
+            cover.fingerprint_detail
+        );
+        return Ok(cover);
+    }
+
+    let pages = super::enumerate_folder_pages(root, item_path)?;
+    let cover = pages
+        .first()
+        .ok_or_else(|| thumbnail_error(ErrorCode::NotFound, "Folder has no supported cover."))?;
+    read_image_thumbnail(
+        &root.join(cover.as_str()),
+        cover,
+        format!("folder:{}#{}", item.as_str(), cover.as_str()),
+    )
 }
 
 fn read_image_thumbnail(
@@ -788,6 +823,37 @@ mod tests {
 
         assert_eq!(image.source_key, "image:comic-folder/1.png");
         assert!(!image.bytes.is_empty());
+    }
+
+    #[test]
+    fn folder_cover_uses_the_natural_first_direct_archive_when_multiple_exist() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let fixture_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-LIBRARY-001");
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-folder-archive-cover-{}-{nonce}",
+            std::process::id()
+        ));
+        let shelf = root.join("shelf");
+        std::fs::create_dir_all(&shelf).unwrap();
+        std::fs::copy(fixture_root.join("same-a.cbz"), shelf.join("10.cbz")).unwrap();
+        std::fs::copy(fixture_root.join("same-b.cbz"), shelf.join("2.cbz")).unwrap();
+
+        let cover = read_cover(&root, &RelativePath::parse("shelf").unwrap()).unwrap();
+
+        assert!(
+            cover
+                .source_key
+                .starts_with("folder-archive:shelf#archive:shelf/2.cbz#")
+        );
+        assert!(cover.fingerprint_detail.contains("shelf/2.cbz"));
+        assert!(cover.fingerprint_detail.contains("shelf/10.cbz"));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

@@ -328,7 +328,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     fireEvent.keyDown(window, { key: "N" });
     await waitFor(() => expect(screen.getByText("2 / 2")).toBeInTheDocument());
 
-    const scaleInput = screen.getByRole("spinbutton", { name: "任意倍率" });
+    const scaleInput = screen.getByRole("spinbutton", { name: "任意倍率（%）" });
     fireEvent.keyDown(scaleInput, { key: "N" });
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
 

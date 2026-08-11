@@ -60,7 +60,7 @@ backendのread-only workerが正規化したbasename、検索開始folder、再�
 cacheへ置き換えない。card形式はscroll containerの幅を観測して、
 各形式の上限を超えない範囲で行あたりの列数を決めるため、仮想行、keyboardの上下移動、focus復元が
 同じ列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
-primary情報と独立した操作欄を維持する。検索、mask、複数選択、property、
+primary情報と独立したお気に入りtoggleをサムネイル左上へ重ねて維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
 Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、
@@ -85,7 +85,7 @@ WinRTへ渡さない。暗号化PDF、0 page、破損PDF、render size/pixel上�
 BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
 解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。
 JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIMEをopaque media URLから渡す。
-pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、ルーペ、巻末policy、
+pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、正方形のルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
 通常のopenで対応archiveを選択した場合はviewerを全画面で開始し、明示した全画面・slideshow起動モードはそのまま優先する。
 現在pageはtoolbarではなく、画像表示領域下部のrange slider式page移動barで総page数とともに示す。sliderはviewer modelの`go` commandへ接続し、任意のpageを表示する。
@@ -108,7 +108,7 @@ shutdownは新規受付拒否、task cancel/join、読書位置flush、media gra
 
 ## thumbnailとcache
 
-thumbnailは漫画folder・対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。
+thumbnailは漫画folder・対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。通常folderの直下に対応archiveが複数ある場合は、同じ自然順で先頭のarchiveを選び、その表紙をfolder thumbnailとして使う。folder pathと選択archiveのsource fingerprintをcache keyへ含め、archiveの追加・削除・並び替えで古いthumbnailを再利用しない。
 BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止WebPはWIC codecに依存しない
 pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
 animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、
@@ -152,13 +152,13 @@ library shellは5分類menu、toolbar、address、folder/search side pane、cata
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
 cover/small/detail/reference tile、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。
-viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
+viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
 dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。
 巻末動作は閲覧している作品の文脈でviewer toolbarから変更し、app-local設定へ保存する。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
-pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。
+pointerのどちらからも同じcommandへ到達する。catalog cardのfolderとcomic folderはダブルクリックまたはEnterでそのfolderへ移動し、archive、PDF、画像だけをviewerへ開く。重複する読むbuttonは置かない。
 viewerのpointerによるpage移動はtoolbar、wheel、左右swipeに限定し、double clickは全画面切替へ固定する。
 サムネイル系cardは画像とファイル名を別のgrid領域に配置して画像の縦横比で名前を侵食させず、種別は詳細リストだけに表示する。
 shortcut編集はoptionsの統合設定だけから行い、helpは現在の割り当てをread-onlyで表示する。

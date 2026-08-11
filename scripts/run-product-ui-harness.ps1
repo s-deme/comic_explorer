@@ -195,7 +195,7 @@ function Wait-Evaluate([string]$Expression, [string]$Description) {
 
 function Get-ViewerPagePosition {
     $position = Invoke-Evaluate (
-        "(() => { const text = document.querySelector('.viewer-toolbar span:last-of-type')?.textContent || ''; " +
+        "(() => { const text = document.querySelector('.viewer-page-navigator output')?.textContent || ''; " +
         "const match = text.match(/(\d+)\s*\/\s*(\d+)/); return match ? " +
         "{page:Number(match[1]), count:Number(match[2])} : null; })()"
     )
@@ -205,7 +205,7 @@ function Get-ViewerPagePosition {
 
 function Wait-ViewerPage([int]$Expected, [string]$Description) {
     Wait-Evaluate (
-        "(() => { const match = (document.querySelector('.viewer-toolbar span:last-of-type')?.textContent || '')" +
+        "(() => { const match = (document.querySelector('.viewer-page-navigator output')?.textContent || '')" +
         ".match(/(\d+)\s*\//); return match && Number(match[1]) === $Expected; })()"
     ) $Description
 }
@@ -1938,11 +1938,11 @@ try {
     }
     if ($ShortcutOnly) {
         Invoke-Evaluate (
-            "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"
+            "document.querySelector('[aria-controls=options-menu]').click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('#help-menu') !== null" "shortcut help menu"
+        Wait-Evaluate "document.querySelector('#options-menu') !== null" "shortcut options menu"
         Invoke-Evaluate (
-            "document.querySelector('[data-product-id=shortcut-help-menu-item]').click(); true"
+            "document.querySelector('[data-product-id=settings-menu-item]').click(); true"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('[data-product-id=shortcut-dialog]') !== null && " +
@@ -1972,9 +1972,9 @@ try {
             "document.querySelector('[data-shortcut-save-status=saved]') !== null"
         ) "shortcut remap backend save completion"
         Invoke-Evaluate (
-            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
-            ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
-            "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+            "(() => { const item = document.querySelector(" +
+            "'.catalog-item[data-relative-path=`"1-valid.cbz`"]'); " +
+            "item.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); return true; })()"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') !== null" "custom shortcut viewer setup"
         $customStart = Get-ViewerPagePosition
@@ -1988,7 +1988,7 @@ try {
         Wait-ViewerPage $customExpected "custom shortcut viewer relative navigation"
         $customAfter = Get-ViewerPagePosition
         Invoke-Evaluate (
-            "window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); true"
+            "document.querySelector('[data-product-id=viewer-close]').click(); true"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') === null" "custom shortcut viewer close"
         Stop-Product $cold
@@ -1999,11 +1999,11 @@ try {
             "node.textContent.startsWith('127'))"
         ) "shortcut restart catalog"
         Invoke-Evaluate (
-            "document.querySelector('[data-product-id=help-menu-trigger]').click(); true"
+            "document.querySelector('[aria-controls=options-menu]').click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('#help-menu') !== null" "restart shortcut help menu"
+        Wait-Evaluate "document.querySelector('#options-menu') !== null" "restart shortcut options menu"
         Invoke-Evaluate (
-            "document.querySelector('[data-product-id=shortcut-help-menu-item]').click(); true"
+            "document.querySelector('[data-product-id=settings-menu-item]').click(); true"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('#shortcut-nextPage').value === 'N'"
@@ -2023,9 +2023,9 @@ try {
             "document.querySelector('[data-shortcut-save-status=saved]') !== null"
         ) "shortcut reset backend save completion"
         Invoke-Evaluate (
-            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
-            ".find((node) => node.dataset.relativePath === 'comic-folder'); item.click(); " +
-            "item.closest('.catalog-cell').querySelector('.read-action').click(); return true; })()"
+            "(() => { const item = document.querySelector(" +
+            "'.catalog-item[data-relative-path=`"1-valid.cbz`"]'); " +
+            "item.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); return true; })()"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') !== null" "reset shortcut viewer setup"
         $resetStart = Get-ViewerPagePosition

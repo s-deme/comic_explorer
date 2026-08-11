@@ -214,7 +214,7 @@ describe("CatalogGrid", () => {
     );
   });
 
-  it("opens supported kinds from the card without duplicate read buttons", () => {
+  it("moves into folders and opens only files from the card without duplicate read buttons", () => {
     const folder: CatalogEntry = {
       relativePath: "library" as never,
       kind: "folder",
@@ -262,17 +262,17 @@ describe("CatalogGrid", () => {
     fireEvent.doubleClick(screen.getByRole("button", { name: /^cover\.jpg、画像/ }));
     fireEvent.doubleClick(screen.getByRole("button", { name: /^document\.PDF、PDF/ }));
 
-    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledTimes(2);
     expect(onNavigate).toHaveBeenCalledWith(folder);
-    expect(onRead).toHaveBeenCalledTimes(4);
-    expect(onRead).toHaveBeenNthCalledWith(1, comicFolder);
-    expect(onRead).toHaveBeenNthCalledWith(2, archive);
-    expect(onRead).toHaveBeenNthCalledWith(3, image);
-    expect(onRead).toHaveBeenNthCalledWith(4, pdf);
+    expect(onNavigate).toHaveBeenCalledWith(comicFolder);
+    expect(onRead).toHaveBeenCalledTimes(3);
+    expect(onRead).toHaveBeenNthCalledWith(1, archive);
+    expect(onRead).toHaveBeenNthCalledWith(2, image);
+    expect(onRead).toHaveBeenNthCalledWith(3, pdf);
     expect(screen.queryByText("読む")).not.toBeInTheDocument();
   });
 
-  it("keeps long labels and card actions in separate layout regions", () => {
+  it("keeps the favorite toggle separate from the card's open control", () => {
     const archive: CatalogEntry = {
       relativePath: "Ginga FUJISAN Ryu vol 01 with a very long title.cbz" as never,
       kind: "archive",
@@ -304,6 +304,38 @@ describe("CatalogGrid", () => {
       .not.toBeInTheDocument();
   });
 
+  it.each(["small_thumbnail", "cover_list", "reference_tile", "detail_list"] as const)(
+    "%s places a favorite toggle beside, not inside, the card's open button",
+    (viewMode) => {
+      const archive: CatalogEntry = {
+        relativePath: "favorite-placement.cbz" as never,
+        kind: "archive",
+        archiveKind: "cbz",
+      };
+      render(
+        <CatalogGrid
+          entries={[archive]}
+          selectedPath={null}
+          onSelect={() => undefined}
+          onNavigate={() => undefined}
+          onRead={() => undefined}
+          onToggleFavorite={() => undefined}
+          viewMode={viewMode}
+        />,
+      );
+
+      const item = screen.getByRole("button", { name: /^favorite-placement/ });
+      const cell = item.closest(".catalog-cell");
+      expect(cell).not.toBeNull();
+      const favorite = within(cell as HTMLElement).getByRole("button", {
+        name: "お気に入りに追加",
+      });
+      expect(favorite).toHaveClass("favorite-toggle");
+      expect(item).not.toContainElement(favorite);
+      expect(favorite.parentElement).toHaveClass("catalog-actions");
+    },
+  );
+
   it.each(["small_thumbnail", "cover_list", "reference_tile"] as const)(
     "%s cards reserve the label for the file name and hide the file format",
     (viewMode) => {
@@ -326,11 +358,29 @@ describe("CatalogGrid", () => {
       const item = screen.getByRole("button", { name: /^tall-cover/ });
       expect(within(item).getByText("tall-cover with a very long title.cbz"))
         .toHaveClass("item-name");
-      expect(within(item).getByText("▣")).toHaveClass("thumbnail");
+      expect(item.querySelector('[data-thumbnail-icon="archive"]')).toBeInTheDocument();
       expect(within(item).queryByText("CBZ")).not.toBeInTheDocument();
       expect(item).toHaveAttribute("aria-label", expect.stringContaining("CBZ"));
     },
   );
+
+  it("uses distinct folder and archive icons for placeholder thumbnails", () => {
+    render(
+      <CatalogGrid
+        entries={[
+          { relativePath: "library" as never, kind: "folder" },
+          { relativePath: "volume.cbz" as never, kind: "archive", archiveKind: "cbz" },
+        ]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+      />,
+    );
+
+    expect(document.querySelector('[data-thumbnail-icon="folder"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-thumbnail-icon="archive"]')).toBeInTheDocument();
+  });
 
   it("shows an unsupported file's original extension and no read/favorite actions", () => {
     const unsupported: CatalogEntry = {
@@ -396,6 +446,36 @@ describe("CatalogGrid", () => {
       "comic://localhost/token",
     );
     expect(slot).toHaveAttribute("data-cache-hit", "true");
+  });
+
+  it("requests a normal folder thumbnail only when it has multiple direct archives", async () => {
+    const onNeeded = vi.fn();
+    render(
+      <CatalogGrid
+        entries={[
+          { relativePath: "plain-folder" as never, kind: "folder" },
+          {
+            relativePath: "series-folder" as never,
+            kind: "folder",
+            hasFolderArchiveCover: true,
+          },
+        ]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onThumbnailNeeded={onNeeded}
+      />,
+    );
+
+    expect(document.querySelectorAll(".thumbnail")[0])
+      .toHaveAttribute("data-thumbnail-state", "placeholder");
+    expect(document.querySelectorAll(".thumbnail")[1])
+      .toHaveAttribute("data-thumbnail-state", "loading");
+    await waitFor(() => expect(onNeeded).toHaveBeenCalledTimes(1));
+    expect(onNeeded).toHaveBeenCalledWith(expect.objectContaining({
+      relativePath: "series-folder",
+    }));
   });
 
   it("requests a thumbnail for an image displayed directly in the catalog", async () => {
