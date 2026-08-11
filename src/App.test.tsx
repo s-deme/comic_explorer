@@ -1158,6 +1158,64 @@ describe("application shell", () => {
     }
   });
 
+  it("opens the next comic at its first page and the previous comic at its last page", async () => {
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    const bookSession = (itemKey: string, pageCount: number, startIndex: number) => ({
+      itemKey,
+      displayName: itemKey,
+      pages: Array.from({ length: pageCount }, (_, index) => ({
+        id: `${itemKey}-${index}` as never,
+        relativePath: `${index + 1}.png` as never,
+        mediaUri: `data:image/png;base64,${itemKey}-${index}`,
+      })),
+      startIndex,
+    });
+    openMock
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "open-first" as never,
+        generation: 1 as never,
+        data: bookSession(first.relativePath, 2, 1),
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "open-second" as never,
+        generation: 2 as never,
+        data: bookSession(second.relativePath, 3, 2),
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "reopen-first" as never,
+        generation: 3 as never,
+        data: bookSession(first.relativePath, 3, 0),
+      });
+
+    await registerTestLibrary([first, second]);
+    await openTestComic(first.relativePath);
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+    expect(await screen.findByLabelText(`${second.relativePath} ビューワ`)).toBeInTheDocument();
+    expect(screen.getByText("1 / 3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "前ページ" }));
+    expect(await screen.findByLabelText(`${first.relativePath} ビューワ`)).toBeInTheDocument();
+    expect(screen.getByText("3 / 3")).toBeInTheDocument();
+  });
+
+  it("keeps the first comic open when there is no previous comic", async () => {
+    const only = testEntry("01-only.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(only.relativePath));
+    await registerTestLibrary([only]);
+    await openTestComic(only.relativePath);
+
+    fireEvent.click(screen.getByRole("button", { name: "前ページ" }));
+    expect(await screen.findByText("巻頭です。前の漫画はありません。"))
+      .toHaveAttribute("role", "status");
+    expect(screen.getByLabelText(`${only.relativePath} ビューワ`)).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returns to the library from the Viewer end callback for return_library", async () => {
     const first = testEntry("01-first.cbz");
     const second = testEntry("02-second.cbz");

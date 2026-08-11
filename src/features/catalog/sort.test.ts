@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { CatalogEntry, RelativePath } from "../../types/domain";
-import { naturalCompare, nextComicEntry, sortCatalogEntries } from "./sort";
+import { naturalCompare, nextComicEntry, previousComicEntry, sortCatalogEntries } from "./sort";
 
 function entry(
   relativePath: string,
@@ -85,5 +85,17 @@ describe("catalog sorting", () => {
     expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("next.pdf");
     expect(nextComicEntry(values, "later.zip")).toBeUndefined();
     expect(nextComicEntry(values, "missing.cbz")).toBeUndefined();
+  });
+
+  it("selects only the previous readable item in the established list order", () => {
+    const values = [
+      entry("first.pdf", { kind: "pdf", archiveKind: undefined }),
+      entry("plain-folder", { kind: "folder", archiveKind: undefined }),
+      entry("current.cbz", { archiveKind: "cbz" }),
+      entry("later.zip"),
+    ];
+    expect(previousComicEntry(values, "current.cbz")?.relativePath).toBe("first.pdf");
+    expect(previousComicEntry(values, "first.pdf")).toBeUndefined();
+    expect(previousComicEntry(values, "missing.cbz")).toBeUndefined();
   });
 });

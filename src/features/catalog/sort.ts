@@ -124,3 +124,19 @@ export function nextComicEntry(
       (entry) => entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf",
     );
 }
+
+export function previousComicEntry(
+  entries: readonly CatalogEntry[],
+  currentRelativePath: string,
+): CatalogEntry | undefined {
+  const current = entries.findIndex(
+    (entry) => entry.relativePath === currentRelativePath,
+  );
+  if (current < 0) return undefined;
+  return [...entries]
+    .slice(0, current)
+    .reverse()
+    .find(
+      (entry) => entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf",
+    );
+}

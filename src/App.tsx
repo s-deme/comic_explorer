@@ -65,6 +65,7 @@ import {
   type CatalogContextAction,
 } from "./features/catalog/CatalogContextMenu";
 import {
+  previousComicEntry,
   sortCatalogEntries,
   type SortField,
 } from "./features/catalog/sort";
@@ -2481,6 +2482,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   async function openComicEntry(
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
+    startAt: "restored" | "first" | "last" = "restored",
   ) {
     const resolvedLaunchMode = launchMode === "normal" && entry.kind === "archive"
       ? "fullscreen"
@@ -2497,7 +2499,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (response.status === "ok") {
         rememberRecent(entry);
         refreshBookmarks(response.data.itemKey);
-        setViewerSession(response.data);
+        setViewerSession({
+          ...response.data,
+          startIndex: startAt === "first"
+            ? 0
+            : startAt === "last"
+              ? Math.max(0, response.data.pages.length - 1)
+              : response.data.startIndex,
+        });
         setLoadState({ status: "ready" });
         void loadItemMetadata(response.data.itemKey);
       } else if (response.status === "error") {
@@ -2529,7 +2538,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       endOfVolumePolicyRef.current,
     );
     if (decision.kind === "open") {
-      openComicEntry(decision.entry);
+      openComicEntry(decision.entry, "normal", "first");
     } else if (decision.kind === "confirm") {
       setEndOfVolumeNotice(null);
       setPendingEndOfVolume(decision);
@@ -2544,6 +2553,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     }
   }
 
+  function handleStartOfVolume() {
+    if (viewerSession === null) return;
+    const previous = previousComicEntry(sortedEntries, viewerSession.itemKey);
+    if (previous === undefined) {
+      setEndOfVolumeNotice("巻頭です。前の漫画はありません。");
+      return;
+    }
+    void openComicEntry(previous, "normal", "last");
+  }
+
   if (viewerSession !== null) {
     return (
       <div
@@ -2551,7 +2570,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         data-viewer-detached={viewerDetached}
       >
         <Viewer
-          key={viewerSession.itemKey}
+          key={`${viewerSession.itemKey}:${viewerGeneration.current}`}
           session={viewerSession}
           generation={viewerGeneration.current}
           initialMode={viewMode}
@@ -2585,6 +2604,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           }}
           onClose={closeViewer}
           onNextItem={handleEndOfVolume}
+          onPreviousItem={handleStartOfVolume}
           endOfVolumePolicy={endOfVolumePolicy}
           onEndOfVolumePolicyChange={changeEndOfVolumePolicy}
           bookmarks={bookmarks}
@@ -2685,7 +2705,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             >
               <h2 id="end-of-volume-title">次の漫画を開きますか？</h2>
               <p>{pendingEndOfVolume.entry.relativePath}</p>
-              <button onClick={() => openComicEntry(pendingEndOfVolume.entry)}>
+              <button onClick={() => openComicEntry(pendingEndOfVolume.entry, "normal", "first")}>
                 次の漫画を開く
               </button>
               <button onClick={() => setPendingEndOfVolume(null)}>

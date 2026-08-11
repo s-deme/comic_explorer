@@ -49,6 +49,7 @@ interface ViewerProps {
   generation: number;
   onClose: () => void;
   onNextItem?: () => void;
+  onPreviousItem?: () => void;
   endOfVolumePolicy?: EndOfVolumePolicy;
   onEndOfVolumePolicyChange?: (policy: EndOfVolumePolicy) => void;
   initialMode: ViewMode;
@@ -97,6 +98,7 @@ export function Viewer({
   generation,
   onClose,
   onNextItem,
+  onPreviousItem,
   endOfVolumePolicy = "auto_next",
   onEndOfVolumePolicyChange,
   initialMode,
@@ -228,6 +230,14 @@ export function Viewer({
       pageCount: session.pages.length,
       landscape,
     });
+  }
+
+  function previous() {
+    if (state.index === 0) {
+      void flushReadingPosition().finally(() => onPreviousItem?.());
+      return;
+    }
+    dispatch({ type: "previous" });
   }
 
   useEffect(() => {
@@ -400,7 +410,7 @@ export function Viewer({
 
   function applyMouseGesture(action: MouseGestureBindings[keyof MouseGestureBindings] | undefined) {
     if (action === "nextPage") next();
-    else if (action === "previousPage") dispatch({ type: "previous" });
+    else if (action === "previousPage") previous();
     else if (action === "closeViewer") void close();
   }
 
@@ -426,7 +436,7 @@ export function Viewer({
           next();
           break;
         case "previousPage":
-          dispatch({ type: "previous" });
+          previous();
           break;
         case "singlePage":
           changeMode("single");
@@ -469,7 +479,7 @@ export function Viewer({
       <div className="page-error" role="alert">
         <h2>画像を読み込めません</h2>
         <p>{page.relativePath}</p>
-        <button onClick={() => dispatch({ type: "previous" })}>前ページ</button>
+        <button onClick={previous}>前ページ</button>
         <button data-product-id="viewer-error-next" onClick={next}>次ページ</button>
         <button onClick={close}>一覧へ戻る</button>
       </div>
@@ -609,7 +619,7 @@ export function Viewer({
           className="viewer-icon-button"
           aria-label="前ページ"
           title="前ページへ移動"
-          onClick={() => dispatch({ type: "previous" })}
+          onClick={previous}
         >
           <span aria-hidden="true">◀</span>
         </button>
@@ -845,7 +855,7 @@ export function Viewer({
             }
           } else if (!scrollLayout) {
             if (event.deltaY > 0) next();
-            else if (event.deltaY < 0) dispatch({ type: "previous" });
+            else if (event.deltaY < 0) previous();
           }
         }}
       >
