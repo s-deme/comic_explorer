@@ -320,6 +320,44 @@ describe("Viewer settings", () => {
     await waitFor(() => expect(screen.getByText("3-4 / 4")).toBeInTheDocument());
   });
 
+  it("starts tall pages at the top and advances downward before changing pages", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="original"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    markPrefetchedPagesReady();
+    const spread = document.querySelector<HTMLElement>(".page-spread");
+    expect(spread).not.toBeNull();
+    Object.defineProperties(spread!, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1100 },
+    });
+    spread!.scrollTop = 0;
+    spread!.scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+      const top = typeof options === "number" ? y : options?.top;
+      spread!.scrollTop = top ?? spread!.scrollTop;
+    }) as HTMLDivElement["scrollTo"];
+    const nextButton = screen.getByRole("button", { name: "次ページ" });
+
+    fireEvent.click(nextButton);
+    expect(spread).toHaveProperty("scrollTop", 360);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    fireEvent.click(nextButton);
+    expect(spread).toHaveProperty("scrollTop", 700);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    fireEvent.click(nextButton);
+
+    await waitFor(() => expect(screen.getByText("2 / 2")).toBeInTheDocument());
+    expect(spread).toHaveProperty("scrollTop", 0);
+  });
+
   it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
     render(
       <Viewer

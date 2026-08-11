@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import {
   loadPage,
@@ -211,7 +211,31 @@ export function Viewer({
     await saveReadingPosition(session, state.index, generation);
   }
 
+  function advanceVerticalOverflow(): boolean {
+    if (layoutMode !== "paged") return false;
+    const spread = spreadRef.current;
+    if (!spread) return false;
+    const maxScrollTop = Math.max(0, spread.scrollHeight - spread.clientHeight);
+    if (maxScrollTop <= 1 || spread.scrollTop >= maxScrollTop - 1) return false;
+    const nextScrollTop = Math.min(
+      maxScrollTop,
+      spread.scrollTop + Math.max(1, Math.floor(spread.clientHeight * 0.9)),
+    );
+    if (typeof spread.scrollTo === "function") {
+      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      spread.scrollTo({
+        top: nextScrollTop,
+        left: spread.scrollLeft,
+        behavior: reducedMotion ? "auto" : "smooth",
+      });
+    } else {
+      spread.scrollTop = nextScrollTop;
+    }
+    return true;
+  }
+
   function next() {
+    if (advanceVerticalOverflow()) return;
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
       void flushReadingPosition().finally(() =>
         onNextItem?.(),
@@ -231,6 +255,12 @@ export function Viewer({
       landscape,
     });
   }
+
+  useLayoutEffect(() => {
+    if (layoutMode !== "paged") return;
+    const spread = spreadRef.current;
+    if (spread) spread.scrollTop = 0;
+  }, [layoutMode, state.index]);
 
   function previous() {
     if (state.index === 0) {
