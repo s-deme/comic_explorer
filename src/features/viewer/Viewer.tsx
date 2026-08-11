@@ -128,6 +128,8 @@ export function Viewer({
   });
   const [landscape, setLandscape] = useState<Set<number>>(new Set());
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [readyPages, setReadyPages] = useState<Set<number>>(new Set());
+  const [pendingNextIndex, setPendingNextIndex] = useState<number | null>(null);
   const [mediaUris, setMediaUris] = useState<Record<number, string>>(() =>
     Object.fromEntries(session.pages.flatMap((page, index) => page.mediaUri ? [[index, page.mediaUri]] : [])),
   );
@@ -157,6 +159,18 @@ export function Viewer({
     () => visibleIndices(state, session.pages.length, landscape),
     [landscape, session.pages.length, state],
   );
+  const nextStartIndex = state.index + Math.max(1, visible.length);
+  const nextVisible = useMemo(() => {
+    if (nextStartIndex >= session.pages.length) return [];
+    if (
+      state.mode === "single"
+      || landscape.has(nextStartIndex)
+      || nextStartIndex + 1 >= session.pages.length
+    ) {
+      return [nextStartIndex];
+    }
+    return [nextStartIndex, nextStartIndex + 1];
+  }, [landscape, nextStartIndex, session.pages.length, state.mode]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -167,9 +181,8 @@ export function Viewer({
       layoutMode === "paged"
         ? [...visible]
         : session.pages.map((_, index) => index);
-    const nextIndex = state.index + Math.max(1, visible.length);
-    if (layoutMode === "paged" && nextIndex < session.pages.length) {
-      wanted.push(nextIndex);
+    if (layoutMode === "paged") {
+      wanted.push(...nextVisible);
     }
     wanted.forEach((index) => {
       if (mediaUris[index] || imageErrors.has(index)) return;
@@ -183,7 +196,7 @@ export function Viewer({
         })
         .catch(() => setImageErrors((current) => new Set(current).add(index)));
     });
-  }, [generation, imageErrors, layoutMode, mediaUris, session, state.index, visible]);
+  }, [generation, imageErrors, layoutMode, mediaUris, nextVisible, session, state.index, visible]);
 
   function cancelScheduledPositionSave() {
     if (positionTimerRef.current === null) return;
@@ -203,12 +216,30 @@ export function Viewer({
       );
       return;
     }
+    if (
+      layoutMode === "paged"
+      && nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))
+    ) {
+      setPendingNextIndex(nextStartIndex);
+      return;
+    }
     dispatch({
       type: "next",
       pageCount: session.pages.length,
       landscape,
     });
   }
+
+  useEffect(() => {
+    if (pendingNextIndex === null || pendingNextIndex !== nextStartIndex) return;
+    if (nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))) return;
+    setPendingNextIndex(null);
+    dispatch({
+      type: "next",
+      pageCount: session.pages.length,
+      landscape,
+    });
+  }, [imageErrors, landscape, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
@@ -448,6 +479,7 @@ export function Viewer({
         alt={`${session.displayName} ${index + 1}ページ`}
         data-page-index={index}
         onLoad={(event) => {
+          setReadyPages((current) => new Set(current).add(index));
           if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
             setLandscape((current) => new Set(current).add(index));
           }
@@ -857,14 +889,22 @@ export function Viewer({
             }
           />
         )}
-        {!scrollLayout && mediaUris[state.index + visible.length] && (
+        {!scrollLayout && nextVisible.map((index) => mediaUris[index] && (
           <img
+            key={session.pages[index].id}
             className="prefetch-page"
-            src={mediaUris[state.index + visible.length]}
+            src={mediaUris[index]}
             alt=""
             aria-hidden="true"
+            onLoad={(event) => {
+              setReadyPages((current) => new Set(current).add(index));
+              if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
+                setLandscape((current) => new Set(current).add(index));
+              }
+            }}
+            onError={() => setImageErrors((current) => new Set(current).add(index))}
           />
-        )}
+        ))}
       </div>
     </section>
   );

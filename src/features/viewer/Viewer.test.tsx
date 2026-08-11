@@ -37,6 +37,11 @@ const multiPageSession = {
   startIndex: 0,
 };
 
+function markPrefetchedPagesReady(): void {
+  document.querySelectorAll<HTMLImageElement>(".prefetch-page")
+    .forEach((image) => fireEvent.load(image));
+}
+
 describe("Viewer settings", () => {
   afterEach(() => {
     cleanup();
@@ -227,6 +232,7 @@ describe("Viewer settings", () => {
       />,
     );
 
+    markPrefetchedPagesReady();
     fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
     await waitFor(() =>
       expect(screen.getByText("2 / 2")).toBeInTheDocument(),
@@ -282,6 +288,36 @@ describe("Viewer settings", () => {
 
     expect(stage).toHaveAttribute("data-panning", "false");
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
+  it("keeps the current spread until every page in the next spread is ready", async () => {
+    const fourPageSession = {
+      ...multiPageSession,
+      pages: [
+        ...multiPageSession.pages,
+        { id: "page-3" as never, relativePath: "3.png" as never, mediaUri: "comic://localhost/three" },
+        { id: "page-4" as never, relativePath: "4.png" as never, mediaUri: "comic://localhost/four" },
+      ],
+    };
+    render(
+      <Viewer
+        session={fourPageSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="leftToRight"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    expect(screen.getByText("1-2 / 4")).toBeInTheDocument();
+    const prefetched = document.querySelectorAll<HTMLImageElement>(".prefetch-page");
+    expect(prefetched).toHaveLength(2);
+    fireEvent.load(prefetched[0]);
+    expect(screen.getByText("1-2 / 4")).toBeInTheDocument();
+    fireEvent.load(prefetched[1]);
+    await waitFor(() => expect(screen.getByText("3-4 / 4")).toBeInTheDocument());
   });
 
   it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
@@ -538,6 +574,7 @@ describe("Viewer settings", () => {
       expect(adapter.enter).toHaveBeenCalledTimes(1);
       expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow", "true");
       expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      markPrefetchedPagesReady();
       await act(async () => vi.advanceTimersByTime(600));
       expect(screen.getByText("2 / 2")).toBeInTheDocument();
     } finally {
@@ -612,6 +649,7 @@ describe("Viewer settings", () => {
 
     const stage = document.querySelector<HTMLElement>(".viewer-stage");
     expect(stage).not.toBeNull();
+    markPrefetchedPagesReady();
     fireEvent.pointerDown(stage!, { clientX: 100 });
     fireEvent.pointerUp(stage!, { clientX: 0 });
     expect(screen.getByText("2 / 2")).toBeInTheDocument();

@@ -105,6 +105,11 @@ vi.mock("./features/library/client", () => ({
   openFileItemWith: vi.fn(),
 }));
 
+function markViewerPrefetchReady(): void {
+  document.querySelectorAll<HTMLImageElement>(".prefetch-page")
+    .forEach((image) => fireEvent.load(image));
+}
+
 const registerMock = vi.mocked(registerLibraryRoot);
 const pickerMock = vi.mocked(pickLibraryRoot);
 const listMock = vi.mocked(listFolder);
@@ -779,6 +784,7 @@ describe("application shell", () => {
     );
     await openTestComic(entry.relativePath);
     const catalogLoadsBeforeAlt = listMock.mock.calls.length;
+    markViewerPrefetchReady();
 
     fireEvent.keyDown(window, { key: "f", altKey: true });
     fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
@@ -1910,6 +1916,7 @@ describe("application shell", () => {
     fireEvent.keyDown(window, { key: "PageDown" });
     const corrupt = await screen.findByRole("alert");
     expect(corrupt).toHaveTextContent("webp-folder/2-corrupt.webp");
+    markViewerPrefetchReady();
     fireEvent.click(within(corrupt).getByRole("button", { name: "次ページ" }));
     expect(await screen.findByAltText("webp-folder 3ページ"))
       .toHaveAttribute("src", "comic://localhost/webp-folder-2");

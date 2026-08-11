@@ -55,7 +55,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |
-| REQ-MVP-014 | keyboard、wheel、swipe、Escで閲覧でき、画像stageの単clickではpage移動せず、double clickで全画面表示と解除を切り替える。viewer toolbarの操作を説明付きicon buttonで提供する。対応archiveを通常openした場合は全画面で開始し、全画面中はviewer toolbarを隠して画面上端へpointerを移動したときだけ表示する。viewer generationの古い結果を捨てる。 |
+| REQ-MVP-014 | keyboard、wheel、swipe、Escで閲覧でき、画像stageの単clickではpage移動せず、double clickで全画面表示と解除を切り替える。viewer toolbarの操作を説明付きicon buttonで提供する。対応archiveを通常openした場合は全画面で開始し、全画面中はviewer toolbarを隠して画面上端へpointerを移動したときだけ表示する。見開き遷移は次の表示対象を先読みし、途中で1pageだけを表示せず見開き単位で滑らかに切り替える。viewer generationの古い結果を捨てる。 |
 | REQ-MVP-015 | page keyを基準に読書位置をapp-local SQLiteへ保存・復元し、破損DBから安全に回復する。 |
 | REQ-MVP-016 | 巻末では現在のcatalog sort順に従って次の漫画へ進む。 |
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。REQ-MVP-021の明示的file manager操作だけを例外とし、暗黙のrename、move、copy、create、deleteを行わない。 |

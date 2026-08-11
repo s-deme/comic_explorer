@@ -3,6 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
+function markViewerPrefetchReady(): void {
+  document.querySelectorAll<HTMLImageElement>(".prefetch-page")
+    .forEach((image) => fireEvent.load(image));
+}
+
 function openSettingsMenuItem() {
   fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
   fireEvent.click(
@@ -318,6 +323,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     render(<App />);
     await registerTestLibrary([entry]);
     await openTestComic("book.cbz");
+    markViewerPrefetchReady();
 
     fireEvent.keyDown(window, { key: "N" });
     await waitFor(() => expect(screen.getByText("2 / 2")).toBeInTheDocument());

@@ -1120,6 +1120,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   scrollbar-width: none;
 }
 .page-spread::-webkit-scrollbar { display: none; }
+.page-spread[data-layout-mode="paged"] > img {
+  animation: viewer-page-enter 120ms ease-out;
+}
+@keyframes viewer-page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-spread[data-layout-mode="paged"] > img { animation: none; }
+}
 .page-spread img {
   flex: 0 1 auto;
   width: auto;
