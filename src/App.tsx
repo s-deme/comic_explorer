@@ -137,9 +137,9 @@ import {
 } from "./features/workspace/display";
 import {
   APP_VERSION,
+  CONFIGURABLE_MOUSE_GESTURE_NAMES,
   DEFAULT_MOUSE_GESTURES,
   MOUSE_GESTURE_ACTIONS,
-  MOUSE_GESTURE_NAMES,
   normalizeMouseGestures,
   normalizeSettingsProfile,
   type MouseGestureBindings,
@@ -4549,7 +4549,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             <section className="settings-section" aria-label="マウスジェスチャー設定">
               <h3>マウスジェスチャー</h3>
               <div className="settings-gesture-grid">
-                {MOUSE_GESTURE_NAMES.map((name) => (
+                {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
                   <label key={name}>
                     <span>{name}</span>
                     <select
@@ -4559,7 +4559,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                         const action = event.target.value as MouseGestureBindings[typeof name];
                         const current = settingsDraft.mouseGestures;
                         const next = { ...current, [name]: action };
-                        const duplicate = action !== "none" && MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
+                        const duplicate = action !== "none" && CONFIGURABLE_MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
                         if (duplicate) {
                           setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
                           return;
@@ -4573,6 +4573,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   </label>
                 ))}
               </div>
+              <p>doubleClick: 全画面表示／解除（固定）</p>
             </section>
             {profileNotice !== null && <p role="status">{profileNotice}</p>}
             <div className="settings-actions">

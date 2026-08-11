@@ -2187,6 +2187,10 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     chooseAppMenuItem("オプション", "統合設定…");
     let dialog = screen.getByRole("dialog", { name: "統合設定" });
+    expect(within(dialog).queryByLabelText("doubleClickジェスチャー"))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getByText("doubleClick: 全画面表示／解除（固定）"))
+      .toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });

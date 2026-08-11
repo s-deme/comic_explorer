@@ -118,7 +118,7 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(conflict)).toBeNull();
   });
 
-  it("rejects missing, invalid, and conflicting mouse gesture bindings", () => {
+  it("rejects missing and invalid gesture fields while fixing legacy double click", () => {
     const missing = validProfile();
     delete (missing.mouseGestures as Partial<typeof missing.mouseGestures>).doubleClick;
     expect(normalizeSettingsProfile(missing)).toBeNull();
@@ -129,20 +129,23 @@ describe("settings profile", () => {
 
     const conflict = validProfile();
     conflict.mouseGestures.doubleClick = "nextPage";
-    expect(normalizeSettingsProfile(conflict)).toBeNull();
+    expect(normalizeSettingsProfile(conflict)?.mouseGestures).toEqual({
+      ...DEFAULT_MOUSE_GESTURES,
+      doubleClick: "none",
+    });
   });
 
-  it("rejects duplicate mouse gesture actions", () => {
+  it("rejects attempts to remap the fixed double click gesture", () => {
     expect(remapMouseGesture(DEFAULT_MOUSE_GESTURES, "doubleClick", "nextPage")).toEqual({
       ok: false,
-      reason: "conflict",
+      reason: "fixed",
     });
   });
 
   it("accepts a safe gesture update", () => {
-    expect(remapMouseGesture(DEFAULT_MOUSE_GESTURES, "doubleClick", "closeViewer")).toEqual({
+    expect(remapMouseGesture(DEFAULT_MOUSE_GESTURES, "swipeLeft", "closeViewer")).toEqual({
       ok: true,
-      bindings: { ...DEFAULT_MOUSE_GESTURES, doubleClick: "closeViewer" },
+      bindings: { ...DEFAULT_MOUSE_GESTURES, swipeLeft: "closeViewer" },
     });
   });
 });

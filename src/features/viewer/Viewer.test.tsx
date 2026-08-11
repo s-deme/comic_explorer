@@ -88,7 +88,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(11);
+    expect(buttons).toHaveLength(13);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -404,6 +404,44 @@ describe("Viewer settings", () => {
     expect(adapter.exit).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps stage clicks inert and toggles fullscreen with a double click", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    const onClose = vi.fn();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={onClose}
+        fullscreenAdapter={adapter}
+      />,
+    );
+
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    const viewer = screen.getByRole("region", { name: "Multi Page ビューワ" });
+    expect(stage).not.toBeNull();
+    expect(document.querySelector(".page-zone")).not.toBeInTheDocument();
+
+    fireEvent.click(stage!);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.doubleClick(stage!);
+    await waitFor(() => expect(viewer).toHaveAttribute("data-fullscreen", "true"));
+    expect(adapter.enter).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.doubleClick(stage!);
+    await waitFor(() => expect(viewer).toHaveAttribute("data-fullscreen", "false"));
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("FT-B04-004 reports an adapter error without claiming fullscreen", async () => {
     const adapter = {
       enter: vi.fn().mockRejectedValue(new Error("window unavailable")),
@@ -512,8 +550,7 @@ describe("Viewer settings", () => {
     expect(onToggleDetached).not.toHaveBeenCalled();
   });
 
-  it("FT-B19-003 connects configured gestures to page movement and close", async () => {
-    const onClose = vi.fn();
+  it("FT-B19-003 connects configured swipe gestures to page movement", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -521,11 +558,11 @@ describe("Viewer settings", () => {
         initialMode="single"
         initialDirection="rightToLeft"
         onSettingsChange={() => undefined}
-        onClose={onClose}
+        onClose={() => undefined}
         mouseGestures={{
           swipeLeft: "nextPage",
           swipeRight: "previousPage",
-          doubleClick: "closeViewer",
+          doubleClick: "none",
         }}
       />,
     );
@@ -538,7 +575,5 @@ describe("Viewer settings", () => {
     fireEvent.pointerDown(stage!, { clientX: 0 });
     fireEvent.pointerUp(stage!, { clientX: 100 });
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
-    fireEvent.doubleClick(stage!);
-    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 });

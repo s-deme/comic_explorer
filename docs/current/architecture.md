@@ -89,6 +89,7 @@ pageは相対page keyの自然順で管理する。単page、見開き、読み�
 bookmark、読書位置はviewer modelを介して整合させる。
 通常のopenで対応archiveを選択した場合はviewerを全画面で開始し、明示した全画面・slideshow起動モードはそのまま優先する。
 全画面中のviewer toolbarはlayout領域を占有せず、画面上端へpointerを移動したときだけ表示し、画像領域へ離れると再び隠す。
+viewer-stageの単clickはpage移動へ割り当てず、double clickは設定に依存しない全画面表示・解除のtoggleとして扱う。
 viewer-stageの背景には濃いグレーのCSS市松模様を使い、画像の余白と表示領域を明確にする。
 
 media URLにはhost pathを含めず、server-sideのsession/pageへ結び付いたopaque tokenを使う。
@@ -153,6 +154,7 @@ dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時�
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達し、catalog cardはダブルクリックまたはEnterで開いて重複する読むbuttonを置かない。
+viewerのpointerによるpage移動はtoolbar、wheel、左右swipeに限定し、double clickは全画面切替へ固定する。
 サムネイル系cardは画像とファイル名を別のgrid領域に配置して画像の縦横比で名前を侵食させず、種別は詳細リストだけに表示する。
 shortcut編集はoptionsの統合設定だけから行い、helpは現在の割り当てをread-onlyで表示する。
 stale responseは現在画面を置換せず、局所error後もretry、

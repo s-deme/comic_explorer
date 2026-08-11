@@ -31,6 +31,7 @@ export const MOUSE_GESTURE_ACTIONS = [
 export type MouseGestureAction = (typeof MOUSE_GESTURE_ACTIONS)[number];
 export const MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight", "doubleClick"] as const;
 export type MouseGestureName = (typeof MOUSE_GESTURE_NAMES)[number];
+export const CONFIGURABLE_MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight"] as const satisfies readonly MouseGestureName[];
 export type MouseGestureBindings = Record<MouseGestureName, MouseGestureAction>;
 
 export const DEFAULT_MOUSE_GESTURES: MouseGestureBindings = {
@@ -68,8 +69,10 @@ export function normalizeMouseGestures(value: unknown): MouseGestureBindings {
       result[name] = action as MouseGestureAction;
     }
   }
+  result.doubleClick = "none";
   const seen = new Set<MouseGestureAction>();
-  for (const action of Object.values(result)) {
+  for (const name of CONFIGURABLE_MOUSE_GESTURE_NAMES) {
+    const action = result[name];
     if (action === "none") continue;
     if (seen.has(action)) return { ...DEFAULT_MOUSE_GESTURES };
     seen.add(action);
@@ -79,13 +82,14 @@ export function normalizeMouseGestures(value: unknown): MouseGestureBindings {
 
 export type GestureUpdateResult =
   | { ok: true; bindings: MouseGestureBindings }
-  | { ok: false; reason: "conflict" };
+  | { ok: false; reason: "conflict" | "fixed" };
 
 export function remapMouseGesture(
   bindings: MouseGestureBindings,
   name: MouseGestureName,
   action: MouseGestureAction,
 ): GestureUpdateResult {
+  if (name === "doubleClick") return { ok: false, reason: "fixed" };
   if (action !== "none" && Object.entries(bindings).some(([candidate, value]) => candidate !== name && value === action)) {
     return { ok: false, reason: "conflict" };
   }
@@ -179,7 +183,12 @@ function strictMouseGestureBindings(value: unknown): MouseGestureBindings | null
   for (const name of MOUSE_GESTURE_NAMES) {
     if (!Object.prototype.hasOwnProperty.call(candidate, name)) return null;
     const action = enumValue(candidate[name], MOUSE_GESTURE_ACTIONS);
-    if (action === null || (action !== "none" && seen.has(action))) return null;
+    if (action === null) return null;
+    if (name === "doubleClick") {
+      result[name] = "none";
+      continue;
+    }
+    if (action !== "none" && seen.has(action)) return null;
     result[name] = action;
     if (action !== "none") seen.add(action);
   }

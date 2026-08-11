@@ -565,6 +565,22 @@ export function Viewer({
         </label>
         <button
           className="viewer-icon-button"
+          aria-label="前ページ"
+          title="前ページへ移動"
+          onClick={() => dispatch({ type: "previous" })}
+        >
+          <span aria-hidden="true">◀</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          aria-label="次ページ"
+          title="次ページへ移動"
+          onClick={next}
+        >
+          <span aria-hidden="true">▶</span>
+        </button>
+        <button
+          className="viewer-icon-button"
           aria-label="倍率を下げる"
           title="倍率を下げる"
           onClick={() => applyScale({ type: "zoomOut" })}
@@ -730,7 +746,7 @@ export function Viewer({
             : mouseGestures?.swipeRight;
           applyMouseGesture(action);
         }}
-        onDoubleClick={() => applyMouseGesture(mouseGestures?.doubleClick)}
+        onDoubleClick={() => void requestFullscreen(!fullscreen)}
         onWheel={(event) => {
           if (event.ctrlKey) {
             event.preventDefault();
@@ -751,19 +767,6 @@ export function Viewer({
           }
         }}
       >
-        {!scrollLayout && (
-          <button
-            className="page-zone page-zone-left"
-            aria-label={
-              state.direction === "rightToLeft" ? "次ページ" : "前ページ"
-            }
-            onClick={() =>
-              state.direction === "rightToLeft"
-                ? next()
-                : dispatch({ type: "previous" })
-            }
-          />
-        )}
         <div
           ref={spreadRef}
           className="page-spread"
@@ -801,19 +804,6 @@ export function Viewer({
                 backgroundSize: `${loupe.imageWidth * LOUPE_ZOOM}px ${loupe.imageHeight * LOUPE_ZOOM}px`,
                 backgroundPosition: `${LOUPE_SIZE / 2 - loupe.imageX * LOUPE_ZOOM}px ${LOUPE_SIZE / 2 - loupe.imageY * LOUPE_ZOOM}px`,
               } as CSSProperties
-            }
-          />
-        )}
-        {!scrollLayout && (
-          <button
-            className="page-zone page-zone-right"
-            aria-label={
-              state.direction === "rightToLeft" ? "前ページ" : "次ページ"
-            }
-            onClick={() =>
-              state.direction === "rightToLeft"
-                ? dispatch({ type: "previous" })
-                : next()
             }
           />
         )}

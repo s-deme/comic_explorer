@@ -1201,18 +1201,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   max-width: none;
   max-height: 100%;
 }
-.page-zone {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  bottom: 0;
-  width: 50%;
-  border: 0;
-  background: transparent;
-}
-.page-zone:hover { background: #ffffff0b; }
-.page-zone-left { left: 0; }
-.page-zone-right { right: 0; }
 .viewer-loupe {
   position: absolute;
   z-index: 4;
