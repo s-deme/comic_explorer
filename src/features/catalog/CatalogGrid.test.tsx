@@ -26,6 +26,38 @@ describe("CatalogGrid", () => {
     expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
   });
 
+  it.each([
+    ["small_thumbnail", 9, 176, 10],
+    ["detail_list", 2, 62, 0],
+    ["cover_list", 6, 288, 10],
+    ["reference_tile", 7, 248, 10],
+  ] as const)(
+    "%s positions the second virtual row after its configured gap",
+    (viewMode, entryCount, rowHeight, rowGap) => {
+      render(
+        <CatalogGrid
+          entries={entries(entryCount)}
+          selectedPath={null}
+          onSelect={() => undefined}
+          onNavigate={() => undefined}
+          onRead={() => undefined}
+          viewMode={viewMode}
+        />,
+      );
+
+      const rows = document.querySelectorAll(`.catalog-row--${viewMode}`);
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveStyle({
+        height: `${rowHeight}px`,
+        transform: "translateY(0px)",
+      });
+      expect(rows[1]).toHaveStyle({
+        height: `${rowHeight}px`,
+        transform: `translateY(${rowHeight + rowGap}px)`,
+      });
+    },
+  );
+
   it("recomputes virtual rows when the catalog width changes", async () => {
     const resizeCallbacks: Array<() => void> = [];
     class ResizeObserverMock {

@@ -75,7 +75,7 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--cover_list,\n.catalog-cell--small_thumbnail,\n.catalog-cell--reference_tile {\n  min-height: 0;",
             STYLES,
         )
-        self.assert_rule_contains(".catalog-row--small_thumbnail", "height: 176px")
+        self.assert_rule_contains(".catalog-row", "column-gap: 10px")
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail",
             "grid-template-columns: minmax(0, 1fr)",

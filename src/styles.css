@@ -426,23 +426,19 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   position: absolute;
   inset: 0 0 auto 0;
   display: grid;
-  gap: 10px;
+  column-gap: 10px;
 }
 .catalog-row--cover_list {
   grid-template-columns: repeat(var(--catalog-column-count), minmax(0, 1fr));
-  height: 288px;
 }
 .catalog-row--small_thumbnail {
   grid-template-columns: repeat(var(--catalog-column-count), minmax(0, 1fr));
-  height: 176px;
 }
 .catalog-row--detail_list {
   grid-template-columns: minmax(0, 1fr);
-  height: 62px;
 }
 .catalog-row--reference_tile {
   grid-template-columns: repeat(var(--catalog-column-count), minmax(0, 1fr));
-  height: 248px;
 }
 .catalog-list-header {
   display: grid;

@@ -29,12 +29,25 @@ export type ThumbnailViewState =
 
 const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
-  { maxColumnCount: number; minColumnWidth: number; rowHeight: number }
+  {
+    maxColumnCount: number;
+    minColumnWidth: number;
+    rowHeight: number;
+    rowGap: number;
+  }
 > = {
-  small_thumbnail: { maxColumnCount: 8, minColumnWidth: 104, rowHeight: 176 },
-  detail_list: { maxColumnCount: 1, minColumnWidth: 0, rowHeight: 62 },
-  cover_list: { maxColumnCount: 5, minColumnWidth: 150, rowHeight: 288 },
-  reference_tile: { maxColumnCount: 6, minColumnWidth: 132, rowHeight: 248 },
+  small_thumbnail: {
+    maxColumnCount: 8, minColumnWidth: 104, rowHeight: 176, rowGap: 10,
+  },
+  detail_list: {
+    maxColumnCount: 1, minColumnWidth: 0, rowHeight: 62, rowGap: 0,
+  },
+  cover_list: {
+    maxColumnCount: 5, minColumnWidth: 150, rowHeight: 288, rowGap: 10,
+  },
+  reference_tile: {
+    maxColumnCount: 6, minColumnWidth: 132, rowHeight: 248, rowGap: 10,
+  },
 };
 
 const CATALOG_HORIZONTAL_PADDING = 24;
@@ -129,6 +142,7 @@ export function CatalogGrid({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => modeConfig.rowHeight,
+    gap: modeConfig.rowGap,
     overscan: 2,
     initialRect: { width: 900, height: 720 },
     observeElementRect: (instance, callback) => {
@@ -215,7 +229,10 @@ export function CatalogGrid({
                 role="row"
                 aria-rowindex={virtualRow.index + 1}
                 key={virtualRow.key}
-                style={{ transform: `translateY(${virtualRow.start}px)` }}
+                style={{
+                  height: modeConfig.rowHeight,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
               >
                 {rows[virtualRow.index].map((entry, columnIndex) => {
                   const itemIndex =
