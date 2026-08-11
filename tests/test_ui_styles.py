@@ -71,6 +71,15 @@ class UiStyleContractTests(unittest.TestCase):
         )
 
     def test_thumbnail_cards_reserve_the_filename_below_a_bounded_image(self) -> None:
+        self.assert_rule_contains(".catalog-row--small_thumbnail", "height: 176px")
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail",
+            "grid-template-columns: minmax(0, 1fr)",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail",
+            "grid-template-rows: minmax(0, 1fr) auto",
+        )
         self.assert_rule_contains(".catalog-item--cover_list", "min-height: 0")
         self.assert_rule_contains(
             ".catalog-item--cover_list", "grid-template-rows: minmax(0, 1fr) auto"
@@ -80,6 +89,14 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-item--reference_tile", "grid-template-rows: minmax(0, 1fr) auto"
         )
         self.assertIn(".thumbnail {\n  display: grid;\n  min-height: 0;", STYLES)
+
+    def test_catalog_names_and_favorites_use_compact_controls(self) -> None:
+        self.assertIn(
+            ".item-name {\n  display: -webkit-box;\n  overflow: hidden;\n  margin-top: 7px;\n  font-size: .82rem;",
+            STYLES,
+        )
+        self.assert_rule_contains(".favorite-toggle", "width: 24px")
+        self.assert_rule_contains(".favorite-toggle", "min-height: 24px")
 
     def test_catalog_layout_shrinks_without_a_fixed_page_width(self) -> None:
         self.assertNotIn("min-width: 1024px", STYLES)

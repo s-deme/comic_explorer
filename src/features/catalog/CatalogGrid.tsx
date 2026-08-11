@@ -31,7 +31,7 @@ const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
   { maxColumnCount: number; minColumnWidth: number; rowHeight: number }
 > = {
-  small_thumbnail: { maxColumnCount: 8, minColumnWidth: 104, rowHeight: 142 },
+  small_thumbnail: { maxColumnCount: 8, minColumnWidth: 104, rowHeight: 176 },
   detail_list: { maxColumnCount: 1, minColumnWidth: 0, rowHeight: 62 },
   cover_list: { maxColumnCount: 5, minColumnWidth: 150, rowHeight: 288 },
   reference_tile: { maxColumnCount: 6, minColumnWidth: 132, rowHeight: 248 },
