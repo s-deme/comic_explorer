@@ -533,6 +533,9 @@ describe("application shell", () => {
 
     expect(screen.queryByLabelText("ライブラリルート")).not.toBeInTheDocument();
     expect(screen.getByRole("treeitem", { name: "PC" })).toBeInTheDocument();
+    expect(screen.getByText("現在のフォルダー")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ツリーをすべて閉じる" }))
+      .toBeInTheDocument();
     expect(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }))
       .toBeInTheDocument();
   });

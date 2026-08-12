@@ -368,10 +368,44 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .viewer-shell--detached .viewer { min-height: calc(100vh - 28px); }
 .folder-tree {
   position: relative;
-  overflow: auto;
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   color: #1f2328;
   background: #f7f8fa;
 }
+.folder-tree[hidden] { display: none; }
+.folder-tree-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 5px 5px 9px;
+  border-bottom: 1px solid #d9dde2;
+  background: #eef1f5;
+}
+.current-folder-path {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  margin: 0;
+}
+.current-folder-path span { color: #59636f; font-size: .7rem; }
+.current-folder-path strong {
+  overflow: hidden;
+  font-size: .78rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-tree-header button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+.tree-scroll { min-height: 0; overflow: auto; }
 .tree-splitter {
   width: 6px;
   cursor: col-resize;

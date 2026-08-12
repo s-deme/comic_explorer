@@ -44,7 +44,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 |---|---|
 | REQ-MVP-001 | library rootの登録画面や手入力設定を要求せず、起動直後からPC配下のWindows論理ドライブをサイドバーへ列挙する。ドライブ選択時はそのドライブを安全境界として閲覧を開始し、最後に使用したドライブをapp-local設定から復元できる。旧版でfolder単位のlibrary rootが保存されている場合は、そのドライブと階層へ自動移行する。 |
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
-| REQ-MVP-003 | folder treeはPC、論理ドライブ、folderの階層をExplorerと同様に表示し、ドライブおよびfolderの展開・選択と現在folderを同期する。別ドライブの選択時は安全境界とcatalogをそのドライブへ切り替える。 |
+| REQ-MVP-003 | folder treeはPC、論理ドライブ、folderの階層をExplorerと同様に表示し、ドライブおよびfolderの展開・選択と現在folderを同期する。利用者が開いたbranchは、current folderの移動、別driveとの往復、検索pane表示、treeの一時非表示では自動的に閉じず、明示的な個別折りたたみまたはtree上部の「すべて閉じる」で閉じる。tree上部には現在folderのExplorer形式absolute pathを表示する。別ドライブの選択時は安全境界とcatalogをそのドライブへ切り替える。 |
 | REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動を選択中ドライブ内で行う。addressにはWindows Explorerと同じ通常の絶対pathを表示し、内部canonical pathの拡張長接頭辞`\\?\`（UNCの場合は`\\?\UNC\`）を表示しない。address入力はWindows Explorerの「パスのコピー」による引用符付き絶対pathを受理し、slash・大文字小文字を正規化したうえでdriveとpath segment境界を厳密に判定する。別ドライブの絶対path入力時は安全境界をそのドライブへ切り替えて移動する。 |
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。thumbnailを表示しないfolderとarchiveには、それぞれを判別できる専用iconを表示する。 |
 | REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。通常folderの直下に対応archiveが複数ある場合は、その自然順先頭archiveの表紙thumbnailをfolder項目に表示する。いずれも選択したsourceを含むfingerprintとcache鮮度を管理する。 |

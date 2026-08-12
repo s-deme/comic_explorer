@@ -71,6 +71,120 @@ describe("FolderTree", () => {
     expect(onNavigate).toHaveBeenCalledWith("Other/Child");
   });
 
+  it("shows the current absolute folder at the top", async () => {
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected/Chapter"
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("現在のフォルダー")).toBeInTheDocument();
+    expect(screen.getByText("C:\\Selected\\Chapter")).toHaveAttribute(
+      "title",
+      "C:\\Selected\\Chapter",
+    );
+  });
+
+  it("keeps a user-expanded branch open across navigation and temporary hiding", async () => {
+    const { rerender } = render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Otherを展開する" }));
+    expect(await screen.findByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+
+    rerender(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath=""
+        hidden
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole("complementary", { name: "フォルダツリー" }))
+      .not.toBeInTheDocument();
+
+    rerender(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath=""
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Otherを折りたたむ" }))
+      .toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("collapses every drive and folder only through the explicit action", async () => {
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Otherを展開する" }));
+    expect(await screen.findByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "ツリーをすべて閉じる" }));
+
+    expect(screen.queryByRole("treeitem", { name: "Child" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ローカル ディスク.*を展開する/ }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("treeitem", { name: "PC" })).toBeInTheDocument();
+  });
+
+  it("keeps loaded branches open when switching away from and back to a drive", async () => {
+    const onSelectDrive = vi.fn();
+    const { rerender } = render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        onNavigate={() => undefined}
+        onSelectDrive={onSelectDrive}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Otherを展開する" }));
+    expect(await screen.findByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+    const childLoads = () => listMock.mock.calls.filter(([path]) => path === "Other").length;
+    expect(childLoads()).toBe(1);
+
+    rerender(
+      <FolderTree
+        libraryRoot="E:\\"
+        currentPath=""
+        onNavigate={() => undefined}
+        onSelectDrive={onSelectDrive}
+      />,
+    );
+    expect(await screen.findByText("E:\\")).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("treeitem", { name: "Child" }));
+    expect(onSelectDrive).toHaveBeenCalledWith("C:\\", "Other/Child");
+
+    rerender(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        onNavigate={() => undefined}
+        onSelectDrive={onSelectDrive}
+      />,
+    );
+    expect(screen.getByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+    expect(childLoads()).toBe(1);
+  });
+
   it("keeps a branch-local error without removing other nodes", async () => {
     listMock.mockImplementation(async (path) =>
       path === "Other"

@@ -3741,9 +3741,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           gridTemplateColumns: workspaceGridColumns(sidePaneVisible, treeWidth),
         }}
       >
+        <FolderTree
+          libraryRoot={libraryRoot}
+          currentPath={navigation.current}
+          hidden={!treeVisible || searchPaneOpen}
+          onNavigate={(path) => navigate(path)}
+          onSelectDrive={(path, relativePath) => selectDrive(path, relativePath)}
+        />
         {sidePaneVisible && (
           <>
-            {searchPaneOpen ? (
+            {searchPaneOpen && (
               <aside className="search-pane" aria-label="検索ペイン">
                 <header className="search-pane-heading">
                   <h2>検索</h2>
@@ -4131,13 +4138,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   </fieldset>
                 </section>
               </aside>
-            ) : (
-              <FolderTree
-                libraryRoot={libraryRoot}
-                currentPath={navigation.current}
-                onNavigate={(path) => navigate(path)}
-                onSelectDrive={(path) => selectDrive(path)}
-              />
             )}
             <div
               className="tree-splitter"

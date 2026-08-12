@@ -11,13 +11,15 @@ interface TreeNode {
   depth: number;
   kind: "pc" | "drive" | "folder";
   driveRoot?: string;
+  driveIdentity?: string;
 }
 
 interface FolderTreeProps {
   libraryRoot: string | null;
   currentPath: string;
+  hidden?: boolean;
   onNavigate: (relativePath: string) => void;
-  onSelectDrive: (absolutePath: string) => void | Promise<void>;
+  onSelectDrive: (absolutePath: string, relativePath?: string) => void | Promise<void>;
 }
 
 function leafName(path: string): string {
@@ -30,13 +32,30 @@ function normalizedDrive(path: string | null): string {
     : normalizeWindowsDisplayPath(path).toLocaleLowerCase("en-US");
 }
 
+function drivePathKey(drive: string, path: string): string {
+  return `${drive}\u0000${path}`;
+}
+
+function folderExpansionKey(drive: string, path: string): string {
+  return `folder:${drive}:${path}`;
+}
+
+function currentFolderAddress(libraryRoot: string | null, currentPath: string): string {
+  if (libraryRoot === null) return "PC";
+  const root = normalizeWindowsDisplayPath(libraryRoot);
+  if (currentPath === "") return root;
+  const separator = root.endsWith("\\") ? "" : "\\";
+  return `${root}${separator}${currentPath.replaceAll("/", "\\")}`;
+}
+
 export function FolderTree({
   libraryRoot,
   currentPath,
+  hidden = false,
   onNavigate,
   onSelectDrive,
 }: FolderTreeProps) {
-  const scrollRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
   const driveGeneration = useRef(0);
   const [drives, setDrives] = useState<WindowsDrive[]>([]);
@@ -47,29 +66,30 @@ export function FolderTree({
   const [loading, setLoading] = useState<Set<string>>(() => new Set());
   const activeDrive = normalizedDrive(libraryRoot);
 
-  async function loadChildren(path: string) {
-    if (libraryRoot === null) return;
-    setLoading((previous) => new Set(previous).add(path));
+  async function loadChildren(path: string, driveAtRequest = activeDrive) {
+    if (driveAtRequest === "") return;
+    const pathKey = drivePathKey(driveAtRequest, path);
+    setLoading((previous) => new Set(previous).add(pathKey));
     generation.current += 1;
     const response = await listTreeChildren(path, generation.current);
     setLoading((previous) => {
       const next = new Set(previous);
-      next.delete(path);
+      next.delete(pathKey);
       return next;
     });
     if (response.status === "ok") {
       setChildren((previous) => {
         const next = new Map(previous);
-        next.set(path, response.data.map((entry) => entry.relativePath));
+        next.set(pathKey, response.data.map((entry) => entry.relativePath));
         return next;
       });
       setErrors((previous) => {
         const next = new Map(previous);
-        next.delete(path);
+        next.delete(pathKey);
         return next;
       });
     } else if (response.status === "error") {
-      setErrors((previous) => new Map(previous).set(path, presentError(response.error)));
+      setErrors((previous) => new Map(previous).set(pathKey, presentError(response.error)));
     }
   }
 
@@ -89,12 +109,10 @@ export function FolderTree({
 
   useEffect(() => {
     generation.current += 1;
-    setChildren(new Map());
-    setErrors(new Map());
     setLoading(new Set());
     if (libraryRoot !== null) {
       setExpanded((previous) => new Set([...previous, `drive:${activeDrive}`]));
-      void loadChildren("");
+      if (!children.has(drivePathKey(activeDrive, ""))) void loadChildren("");
     }
   }, [activeDrive]);
 
@@ -108,10 +126,11 @@ export function FolderTree({
     setExpanded((previous) => new Set([
       ...previous,
       `drive:${activeDrive}`,
-      ...ancestors.map((path) => `folder:${path}`),
+      ...ancestors.map((path) => folderExpansionKey(activeDrive, path)),
     ]));
     for (const ancestor of ancestors) {
-      if (!children.has(ancestor) && !loading.has(ancestor)) {
+      const pathKey = drivePathKey(activeDrive, ancestor);
+      if (!children.has(pathKey) && !loading.has(pathKey)) {
         void loadChildren(ancestor);
       }
     }
@@ -127,16 +146,24 @@ export function FolderTree({
     }];
     if (!expanded.has("pc")) return flattened;
 
-    const appendFolders = (parent: string, depth: number) => {
-      for (const path of children.get(parent) ?? []) {
+    const appendFolders = (
+      driveIdentity: string,
+      driveRoot: string,
+      parent: string,
+      depth: number,
+    ) => {
+      for (const path of children.get(drivePathKey(driveIdentity, parent)) ?? []) {
+        const key = folderExpansionKey(driveIdentity, path);
         flattened.push({
-          key: `folder:${path}`,
+          key,
           path,
           name: leafName(path),
           depth,
           kind: "folder",
+          driveRoot,
+          driveIdentity,
         });
-        if (expanded.has(`folder:${path}`)) appendFolders(path, depth + 1);
+        if (expanded.has(key)) appendFolders(driveIdentity, driveRoot, path, depth + 1);
       }
     };
 
@@ -149,9 +176,10 @@ export function FolderTree({
         depth: 1,
         kind: "drive",
         driveRoot: drive.absolutePath,
+        driveIdentity,
       });
-      if (driveIdentity === activeDrive && expanded.has(`drive:${driveIdentity}`)) {
-        appendFolders("", 2);
+      if (expanded.has(`drive:${driveIdentity}`)) {
+        appendFolders(driveIdentity, drive.absolutePath, "", 2);
       }
     }
     return flattened;
@@ -178,85 +206,112 @@ export function FolderTree({
     },
   });
 
+  const folderAddress = currentFolderAddress(libraryRoot, currentPath);
+
   return (
-    <aside className="folder-tree" aria-label="フォルダツリー" ref={scrollRef}>
-      <div
-        role="tree"
-        aria-label="PCのフォルダ"
-        className="tree-canvas"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
-        {virtualizer.getVirtualItems().map((virtualNode) => {
-          const node = nodes[virtualNode.index];
-          const isExpanded = expanded.has(node.key);
-          const childCount = node.kind === "pc"
-            ? drives.length
-            : node.kind === "folder"
-              ? children.get(node.path)?.length
-              : undefined;
-          const isSelected = node.kind === "pc"
-            ? libraryRoot === null
-            : node.kind === "drive"
-              ? normalizedDrive(node.driveRoot ?? null) === activeDrive && currentPath === ""
-              : currentPath === node.path;
-          return (
-            <div
-              className="tree-row"
-              key={node.key}
-              style={{
-                transform: `translateY(${virtualNode.start}px)`,
-                paddingInlineStart: `${node.depth * 18}px`,
-              }}
-            >
-              <button
-                className="tree-expander"
-                aria-label={`${node.name}を${isExpanded ? "折りたたむ" : "展開する"}`}
-                aria-expanded={isExpanded}
-                disabled={childCount === 0}
-                onClick={() => {
-                  setExpanded((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(node.key)) next.delete(node.key);
-                    else next.add(node.key);
-                    return next;
-                  });
-                  if (node.kind === "drive" && node.driveRoot !== undefined && !isExpanded) {
-                    void onSelectDrive(node.driveRoot);
-                  } else if (node.kind === "folder" && !isExpanded && !children.has(node.path)) {
-                    void loadChildren(node.path);
-                  }
+    <aside className="folder-tree" aria-label="フォルダツリー" hidden={hidden}>
+      <header className="folder-tree-header">
+        <p className="current-folder-path">
+          <span>現在のフォルダー</span>
+          <strong title={folderAddress}>{folderAddress}</strong>
+        </p>
+        <button
+          type="button"
+          aria-label="ツリーをすべて閉じる"
+          title="開いているドライブとフォルダーをすべて閉じる"
+          onClick={() => setExpanded(new Set(["pc"]))}
+        >
+          <span aria-hidden="true">⊟</span>
+        </button>
+      </header>
+      <div className="tree-scroll" ref={scrollRef}>
+        <div
+          role="tree"
+          aria-label="PCのフォルダ"
+          className="tree-canvas"
+          style={{ height: virtualizer.getTotalSize() }}
+        >
+          {virtualizer.getVirtualItems().map((virtualNode) => {
+            const node = nodes[virtualNode.index];
+            const isExpanded = expanded.has(node.key);
+            const nodeDrive = node.driveIdentity ?? activeDrive;
+            const pathKey = drivePathKey(nodeDrive, node.path);
+            const childCount = node.kind === "pc"
+              ? drives.length
+              : node.kind === "folder"
+                ? children.get(pathKey)?.length
+                : undefined;
+            const isSelected = node.kind === "pc"
+              ? libraryRoot === null
+              : node.kind === "drive"
+                ? normalizedDrive(node.driveRoot ?? null) === activeDrive && currentPath === ""
+                : nodeDrive === activeDrive && currentPath === node.path;
+            return (
+              <div
+                className="tree-row"
+                key={node.key}
+                style={{
+                  transform: `translateY(${virtualNode.start}px)`,
+                  paddingInlineStart: `${node.depth * 18}px`,
                 }}
               >
-                {node.kind === "folder" && loading.has(node.path)
-                  ? "…"
-                  : isExpanded ? "▾" : "▸"}
-              </button>
-              <button
-                role="treeitem"
-                aria-level={node.depth + 1}
-                aria-selected={isSelected}
-                className="tree-node"
-                title={node.name}
-                onClick={() => {
-                  if (node.kind === "drive" && node.driveRoot !== undefined) {
-                    void onSelectDrive(node.driveRoot);
-                  } else if (node.kind === "folder") {
-                    onNavigate(node.path);
-                  }
-                }}
-              >
-                <span className={`tree-icon tree-icon--${node.kind}`} aria-hidden="true">
-                  {node.kind === "pc" ? "▣" : node.kind === "drive" ? "▰" : "■"}
-                </span>
-                {node.name}
-              </button>
-              {node.kind === "folder" && errors.has(node.path) && (
-                <span className="tree-error" title={errors.get(node.path)}>!</span>
-              )}
-            </div>
-          );
-        })}
-        {driveError !== null && <p className="tree-load-error" role="alert">{driveError}</p>}
+                <button
+                  className="tree-expander"
+                  aria-label={`${node.name}を${isExpanded ? "折りたたむ" : "展開する"}`}
+                  aria-expanded={isExpanded}
+                  disabled={childCount === 0}
+                  onClick={() => {
+                    setExpanded((previous) => {
+                      const next = new Set(previous);
+                      if (next.has(node.key)) next.delete(node.key);
+                      else next.add(node.key);
+                      return next;
+                    });
+                    if (node.kind === "drive" && node.driveRoot !== undefined && !isExpanded) {
+                      void onSelectDrive(node.driveRoot);
+                    } else if (node.kind === "folder" && !isExpanded && !children.has(pathKey)) {
+                      if (nodeDrive === activeDrive) {
+                        void loadChildren(node.path, nodeDrive);
+                      } else if (node.driveRoot !== undefined) {
+                        void onSelectDrive(node.driveRoot, node.path);
+                      }
+                    }
+                  }}
+                >
+                  {node.kind === "folder" && loading.has(pathKey)
+                    ? "…"
+                    : isExpanded ? "▾" : "▸"}
+                </button>
+                <button
+                  role="treeitem"
+                  aria-level={node.depth + 1}
+                  aria-selected={isSelected}
+                  className="tree-node"
+                  title={node.name}
+                  onClick={() => {
+                    if (node.kind === "drive" && node.driveRoot !== undefined) {
+                      void onSelectDrive(node.driveRoot);
+                    } else if (node.kind === "folder") {
+                      if (nodeDrive === activeDrive) onNavigate(node.path);
+                      else if (node.driveRoot !== undefined) {
+                        void onSelectDrive(node.driveRoot, node.path);
+                      }
+                    }
+                  }}
+                >
+                  <span className={`tree-icon tree-icon--${node.kind}`} aria-hidden="true">
+                    {node.kind === "pc" ? "▣" : node.kind === "drive" ? "▰" : "■"}
+                  </span>
+                  {node.name}
+                </button>
+                {node.kind === "folder" && errors.has(pathKey) && (
+                  <span className="tree-error" title={errors.get(pathKey)}>!</span>
+                )}
+              </div>
+            );
+          })}
+          {driveError !== null && <p className="tree-load-error" role="alert">{driveError}</p>}
+        </div>
       </div>
     </aside>
   );
