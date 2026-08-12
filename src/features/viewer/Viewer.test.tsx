@@ -1,11 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveReadingPosition } from "../library/client";
+import { loadPage, saveReadingPosition } from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
 import { Viewer } from "./Viewer";
 
-vi.mock("../library/client", () => ({ saveReadingPosition: vi.fn() }));
+vi.mock("../library/client", () => ({ loadPage: vi.fn(), saveReadingPosition: vi.fn() }));
 
 const session = {
   itemKey: "book.cbz",
@@ -46,10 +46,12 @@ function markPrefetchedPagesReady(): void {
 describe("Viewer settings", () => {
   afterEach(() => {
     cleanup();
+    vi.mocked(loadPage).mockReset();
     vi.mocked(saveReadingPosition).mockReset();
   });
 
   beforeEach(() => {
+    vi.mocked(loadPage).mockImplementation(() => new Promise(() => undefined));
     vi.mocked(saveReadingPosition).mockResolvedValue({
       status: "ok",
       requestId: "position" as never,
@@ -136,6 +138,39 @@ describe("Viewer settings", () => {
     expect(slider).toHaveAttribute("aria-valuetext", "2 / 2");
     expect(within(navigator).getByText("2 / 2")).toBeInTheDocument();
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
+  });
+
+  it("loads only the current page and four pages ahead in continuous layouts", async () => {
+    const unloadedSession = {
+      ...multiPageSession,
+      pages: Array.from({ length: 12 }, (_, index) => ({
+        id: `page-${index + 1}` as never,
+        relativePath: `${index + 1}.png` as never,
+        mediaUri: "",
+      })),
+    };
+    render(
+      <Viewer
+        session={unloadedSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="vertical_scroll"
+        initialDirection="leftToRight"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(5));
+    expect(vi.mocked(loadPage).mock.calls.map((call) => call[1])).toEqual([0, 1, 2, 3, 4]);
+
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "8" },
+    });
+
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(9));
+    expect(vi.mocked(loadPage).mock.calls.slice(5).map((call) => call[1]))
+      .toEqual([8, 9, 10, 11]);
   });
 
   it("lets the viewer toolbar change the end-of-volume policy", () => {

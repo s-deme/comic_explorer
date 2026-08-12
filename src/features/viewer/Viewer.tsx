@@ -48,6 +48,7 @@ import {
 } from "../catalog/end-of-volume";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
+const VIEWER_PREFETCH_AHEAD = 4;
 
 interface ViewerProps {
   session: ViewerSession;
@@ -163,10 +164,11 @@ export function Viewer({
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
+  const pageRequests = useRef(new Set<number>());
+  const scrollAnchorFrameRef = useRef<number | null>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
   const rightButtonHeldRef = useRef(false);
   const [panning, setPanning] = useState(false);
-  const layoutInitialized = useRef(false);
   const initialFullscreenRequested = useRef(false);
 
   useEffect(() => {
@@ -209,18 +211,29 @@ export function Viewer({
     const wanted =
       layoutMode === "paged"
         ? [...visible]
-        : session.pages.map((_, index) => index);
+        : Array.from(
+          {
+            length: Math.min(
+              session.pages.length,
+              state.index + VIEWER_PREFETCH_AHEAD + 1,
+            ) - state.index,
+          },
+          (_, offset) => state.index + offset,
+        );
     if (layoutMode === "paged") {
       wanted.push(...nextVisible);
     }
     wanted.forEach((index) => {
-      if (mediaUris[index] || imageErrors.has(index)) return;
+      if (mediaUris[index] || imageErrors.has(index) || pageRequests.current.has(index)) return;
+      pageRequests.current.add(index);
       void loadPage(session, index, generation, visible.includes(index) ? "visible" : "near")
         .then((response) => {
           if (response.status === "ok" && response.generation === generation) {
             setMediaUris((current) => ({ ...current, [index]: response.data.mediaUri }));
           } else if (response.status === "error") {
             setImageErrors((current) => new Set(current).add(index));
+          } else {
+            pageRequests.current.delete(index);
           }
         })
         .catch(() => setImageErrors((current) => new Set(current).add(index)));
@@ -480,10 +493,6 @@ export function Viewer({
   }, [slideshowIntervalMs, state.index, state.mode, visible.length]);
 
   useEffect(() => {
-    if (!layoutInitialized.current) {
-      layoutInitialized.current = true;
-      return;
-    }
     if (layoutMode === "paged") return;
     const anchor = stageRef.current?.querySelector<HTMLElement>(
       `[data-page-index="${state.index}"].viewer-page`,
@@ -492,6 +501,12 @@ export function Viewer({
     anchor.focus({ preventScroll: true });
     anchor.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layoutMode, state.index]);
+
+  useEffect(() => () => {
+    if (scrollAnchorFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollAnchorFrameRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     positionTimerRef.current = window.setTimeout(() => {
@@ -616,6 +631,39 @@ export function Viewer({
     state.direction === "rightToLeft"
       ? [...naturalScrollIndices].reverse()
       : naturalScrollIndices;
+  const scheduleScrollAnchorUpdate = () => {
+    if (layoutMode === "paged" || scrollAnchorFrameRef.current !== null) return;
+    scrollAnchorFrameRef.current = window.requestAnimationFrame(() => {
+      scrollAnchorFrameRef.current = null;
+      const spread = spreadRef.current;
+      if (!spread) return;
+      const viewport = spread.getBoundingClientRect();
+      const vertical = layoutMode === "vertical_scroll";
+      const viewportStart = vertical ? viewport.top : viewport.left;
+      const viewportEnd = vertical ? viewport.bottom : viewport.right;
+      let bestIndex: number | null = null;
+      let bestOverlap = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      spread.querySelectorAll<HTMLElement>(".viewer-page").forEach((page) => {
+        const bounds = page.getBoundingClientRect();
+        const start = vertical ? bounds.top : bounds.left;
+        const end = vertical ? bounds.bottom : bounds.right;
+        const overlap = Math.max(0, Math.min(end, viewportEnd) - Math.max(start, viewportStart));
+        if (overlap <= 0) return;
+        const distance = Math.abs(start - viewportStart);
+        const index = Number(page.dataset.pageIndex);
+        if (!Number.isInteger(index)) return;
+        if (overlap > bestOverlap || (overlap === bestOverlap && distance < bestDistance)) {
+          bestIndex = index;
+          bestOverlap = overlap;
+          bestDistance = distance;
+        }
+      });
+      if (bestIndex !== null && bestIndex !== state.index) {
+        dispatch({ type: "go", index: bestIndex });
+      }
+    });
+  };
   const renderPage = (index: number, withAnchor = false) => {
     const page = session.pages[index];
     const content = imageErrors.has(index) ? (
@@ -1059,6 +1107,7 @@ export function Viewer({
           data-page-anchor={state.index}
           data-loupe-enabled={scale.loupeEnabled}
           style={{ "--viewer-custom-scale": scale.scale } as CSSProperties}
+          onScroll={scheduleScrollAnchorUpdate}
         >
           {(scrollLayout ? scrollIndices : ordered).map((index) =>
             scrollLayout ? (

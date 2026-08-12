@@ -200,7 +200,7 @@ mod fixture_tests {
 
         assert_eq!(by_name["normal-folder"], ItemKind::Folder);
         assert_eq!(by_name["empty-folder"], ItemKind::Folder);
-        assert_eq!(by_name["comic-folder"], ItemKind::ComicFolder);
+        assert_eq!(by_name["comic-folder"], ItemKind::Folder);
         assert_eq!(by_name["volume.zip"], ItemKind::Archive);
         assert_eq!(by_name["volume.cbz"], ItemKind::Archive);
         assert_eq!(by_name["volume.epub"], ItemKind::Archive);
@@ -238,10 +238,7 @@ mod fixture_tests {
                 .map(|entry| (entry.relative_path.to_string(), entry.kind))
                 .collect::<Vec<_>>(),
             [
-                (
-                    "webp-comic".to_owned(),
-                    crate::domain::ItemKind::ComicFolder
-                ),
+                ("webp-comic".to_owned(), crate::domain::ItemKind::Folder),
                 (
                     "webp-volume.cbz".to_owned(),
                     crate::domain::ItemKind::Archive

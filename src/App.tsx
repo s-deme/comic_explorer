@@ -812,8 +812,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     sortedEntries.forEach((entry, index) => {
       if (
         entry.kind !== "archive"
-        && entry.kind !== "comicFolder"
-        && !(entry.kind === "folder" && entry.hasFolderArchiveCover === true)
       ) return;
       if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
       if (thumbnails[entry.relativePath] !== undefined) return;
@@ -4254,7 +4252,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               onRead={openComicEntry}
               onContextMenu={openCatalogContextMenu}
               thumbnailFor={(entry) => {
-                const managed = entry.kind === "archive" || entry.kind === "comicFolder"
+                const managed = entry.kind === "archive"
                   ? managedThumbnailFor(managedThumbnails, entry.relativePath)
                   : undefined;
                 return managed !== undefined

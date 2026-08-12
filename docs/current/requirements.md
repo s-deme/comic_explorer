@@ -47,7 +47,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-003 | folder treeはPC、論理ドライブ、folderの階層をExplorerと同様に表示し、ドライブおよびfolderの展開・選択と現在folderを同期する。利用者が開いたbranchは、current folderの移動、別driveとの往復、検索pane表示、treeの一時非表示では自動的に閉じず、明示的な個別折りたたみまたはtree上部の「すべて閉じる」で閉じる。tree上部には現在folderのExplorer形式absolute pathを表示する。別ドライブの選択時は安全境界とcatalogをそのドライブへ切り替える。 |
 | REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動を選択中ドライブ内で行う。addressにはWindows Explorerと同じ通常の絶対pathを表示し、内部canonical pathの拡張長接頭辞`\\?\`（UNCの場合は`\\?\UNC\`）を表示しない。address入力はWindows Explorerの「パスのコピー」による引用符付き絶対pathを受理し、slash・大文字小文字を正規化したうえでdriveとpath segment境界を厳密に判定する。別ドライブの絶対path入力時は安全境界をそのドライブへ切り替えて移動する。 |
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。thumbnailを表示しないfolderとarchiveには、それぞれを判別できる専用iconを表示する。全一覧形式でfile名の左端に種類iconを常時表示し、画像、folder（漫画folderを含む）、archive、PDF、未対応fileを表紙thumbnailの有無によらず判別できるようにする。 |
-| REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。通常folderの直下に対応archiveが複数ある場合は、その自然順先頭archiveの表紙thumbnailをfolder項目に表示する。いずれも選択したsourceを含むfingerprintとcache鮮度を管理する。 |
+| REQ-MVP-006 | 対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。folder一覧時は子孫画像や直下archiveを表紙候補として走査せず、folder項目には専用iconを表示する。thumbnailは選択したsourceを含むfingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | catalog toolbar buttonから並べ替え、昇降順、一覧形式のmenuを操作し、viewer toolbarから巻末動作を操作して、設定を保存する。一覧形式は詳細リスト、小サムネイル、表紙グリッド、カードグリッドの順に提示し、小サムネイル、表紙グリッド、カードグリッドそれぞれのthumbnail幅を設定画面から変更して保存・復元できる。 |
 | REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
 | REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。対応書庫内の対応書庫は形式を混在でき、内側3階層・内側書庫64個・内側書庫の展開データ累計512 MiBを上限として再帰的に読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
@@ -55,7 +55,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。page layoutで縦が表示領域へ収まらない場合は上端から表示し、次page操作では未表示部分を下へ送って全体を閲覧した後に次pageへ進む。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |
-| REQ-MVP-014 | keyboard、wheel、swipe、Escで閲覧でき、画像stageの単clickではpage移動せず、double clickで全画面表示と解除を切り替える。viewer toolbarの操作を説明付きicon buttonで提供する。現在pageはtoolbarに表示せず、画像表示領域の下部に現在位置と総page数を示すslider式のpage移動barを置き、任意のpageへ移動できる。対応archiveを通常openした場合は全画面で開始し、全画面中はviewer toolbarとpage移動barを隠して、toolbarは画面上端、page移動barは画面下端へpointerを移動したときだけ表示する。見開き遷移は次の表示対象を先読みし、途中で1pageだけを表示せず見開き単位で滑らかに切り替える。viewer generationの古い結果を捨てる。 |
+| REQ-MVP-014 | keyboard、wheel、swipe、Escで閲覧でき、画像stageの単clickではpage移動せず、double clickで全画面表示と解除を切り替える。viewer toolbarの操作を説明付きicon buttonで提供する。現在pageはtoolbarに表示せず、画像表示領域の下部に現在位置と総page数を示すslider式のpage移動barを置き、任意のpageへ移動できる。対応archiveを通常openした場合は全画面で開始し、全画面中はviewer toolbarとpage移動barを隠して、toolbarは画面上端、page移動barは画面下端へpointerを移動したときだけ表示する。viewerはopen時に全pageを画像として読み込まず、現在表示に必要なpageと最大4page先までを先読みする。見開き遷移は次の表示対象を先読みし、途中で1pageだけを表示せず見開き単位で滑らかに切り替える。viewer generationの古い結果を捨てる。 |
 | REQ-MVP-015 | page keyを基準に読書位置をapp-local SQLiteへ保存・復元し、破損DBから安全に回復する。 |
 | REQ-MVP-016 | 巻末では現在のcatalog sort順に従って次の漫画の1page目へ進む。巻頭で前pageへ戻る操作は同じsort順の前の漫画を末尾pageから開き、前の漫画がなければ現在表示を維持する。 |
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。REQ-MVP-021の明示的file manager操作だけを例外とし、暗黙のrename、move、copy、create、deleteを行わない。 |

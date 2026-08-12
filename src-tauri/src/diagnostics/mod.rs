@@ -169,12 +169,19 @@ fn scan_directory(
     let mut result = ScannedDirectory::default();
     let mut child_digests = Vec::with_capacity(entries.len());
 
-    for entry in entries {
+    for mut entry in entries {
         check_cancelled(cancellation)?;
         let path = root.join(entry.relative_path.as_str());
         let metadata = fs::symlink_metadata(&path).map_err(|source| io_error(&path, source))?;
         let content_hash = if metadata.is_dir() {
             let nested = scan_directory(root, &path, cancellation, state)?;
+            if nested
+                .entries
+                .iter()
+                .any(|child| child.snapshot.kind == ItemKind::Page)
+            {
+                entry.kind = ItemKind::ComicFolder;
+            }
             let hash = nested.content_hash;
             result.entries.extend(nested.entries);
             hash

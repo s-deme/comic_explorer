@@ -65,7 +65,9 @@ separatorとcaseを比較用に正規化してからdriveとpath segment境界�
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
 address表示ではExplorerと同じ通常pathへ変換する。
 
-catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。名前検索はfrontendで検索条件を構成し、
+catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder一覧は各項目のmetadataだけを読み、
+子孫画像の有無や直下archiveを表紙候補として走査しない。folderは内容にかかわらず専用iconで即時表示し、
+利用者が移動したfolderの内容だけを次の一覧要求で列挙する。名前検索はfrontendで検索条件を構成し、
 backendのread-only workerが正規化したbasename、検索開始folder、再帰、folder/file種別、size、mtimeを
 同時に評価する。固定した検索場所はroot相対pathとして再検証・canonicalizeし、root外symlinkや親directory
 への脱出を許可しない。検索結果の保持はfrontend表示状態だけに適用し、検索実行時のfilesystem再走査を
@@ -105,6 +107,8 @@ bookmark、読書位置はviewer modelを介して整合させる。
 viewer-stageの単clickはpage移動へ割り当てず、double clickは設定に依存しない全画面表示・解除のtoggleとして扱う。
 viewer-stageはscrollbarを表示せず、表示領域を超える画像・連続layoutをpointer dragでpanする。drag中はpage送りswipeを発火しない。
 page layoutの次表示候補は見開き全体をmedia取得・画像decodeまで先読みし、必要pageが揃うまで現在の表示を保持してから短いfadeで原子的に切り替える。
+viewerのpage要求は現在表示を起点とするbounded windowに限定し、連続layoutでも現在pageから最大4page先までだけを要求する。
+scrollやsliderでanchorが移動した時点でwindowを更新し、open直後に書庫全pageの展開・decode要求をqueueへ投入しない。
 page layoutで表示内容が縦方向へoverflowする場合、page開始時のscroll位置を上端へresetし、共通next commandはviewport単位の下方向panをpage遷移より優先する。scroll末尾到達後のnext commandで次pageへ切り替える。
 catalog sort順をまたぐviewer移動は、次巻を先頭page、前巻を末尾pageへ明示的に固定し、保存済みreading positionによる開始位置を上書きする。
 viewer-stageの背景には濃いグレーの大きめなCSS市松模様を使い、画像の余白と表示領域を明確にする。
@@ -120,7 +124,7 @@ shutdownは新規受付拒否、task cancel/join、読書位置flush、media gra
 
 ## thumbnailとcache
 
-thumbnailは漫画folder・対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。通常folderの直下に対応archiveが複数ある場合は、同じ自然順で先頭のarchiveを選び、その表紙をfolder thumbnailとして使う。folder pathと選択archiveのsource fingerprintをcache keyへ含め、archiveの追加・削除・並び替えで古いthumbnailを再利用しない。
+thumbnailは対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。folderには内容を走査するthumbnailを生成せず、専用iconを表示する。
 BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止WebPはWIC codecに依存しない
 pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
 animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、

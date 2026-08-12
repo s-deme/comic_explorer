@@ -522,7 +522,7 @@ describe("CatalogGrid", () => {
     expect(slot).toHaveAttribute("data-cache-hit", "true");
   });
 
-  it("requests a normal folder thumbnail only when it has multiple direct archives", async () => {
+  it("keeps folder icons without requesting thumbnails from their contents", async () => {
     const onNeeded = vi.fn();
     render(
       <CatalogGrid
@@ -545,11 +545,8 @@ describe("CatalogGrid", () => {
     expect(document.querySelectorAll(".thumbnail")[0])
       .toHaveAttribute("data-thumbnail-state", "placeholder");
     expect(document.querySelectorAll(".thumbnail")[1])
-      .toHaveAttribute("data-thumbnail-state", "loading");
-    await waitFor(() => expect(onNeeded).toHaveBeenCalledTimes(1));
-    expect(onNeeded).toHaveBeenCalledWith(expect.objectContaining({
-      relativePath: "series-folder",
-    }));
+      .toHaveAttribute("data-thumbnail-state", "placeholder");
+    await waitFor(() => expect(onNeeded).not.toHaveBeenCalled());
   });
 
   it("requests a thumbnail for an image displayed directly in the catalog", async () => {

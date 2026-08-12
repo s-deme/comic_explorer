@@ -29,20 +29,20 @@ codd:
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
-| Rust canonical | PASS | 2026-08-12、lib 155件 + shutdown process 1件、FAIL 0。Windows論理ドライブbitmaskの列挙、Explorer表示用pathからの`\\?\` / `\\?\UNC\`除去、16 commandと10 mouse bindingのstrict profile検証、旧8-key/3-gesture map移行、形式別thumbnail幅の64〜320px検証とSQLite再起動復元、検索のscope・種別・size・更新日時・固定場所の条件適用、catalogへ直接表示する画像自身のthumbnail生成を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
+| Rust canonical | PASS | 2026-08-13、lib 154件 + shutdown process 1件、FAIL 0。Windows論理ドライブbitmaskの列挙、Explorer表示用pathからの`\\?\` / `\\?\UNC\`除去、folder一覧が子孫画像・表紙候補を分類せずmetadataだけを返す境界と、明示的なlibrary診断では画像folderの作品判定を維持する境界、検索条件、viewer page worker、thumbnail、設定永続化を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
-| TypeScript/frontend | PASS | 2026-08-12、25 files / 257 tests PASS、FAIL 0。root登録画面を表示しない起動、PC配下のdrive表示とsidebar選択、drive切替、現在folder absolute pathのtree header、navigation・drive往復・検索pane・一時非表示をまたぐbranch展開保持、明示的な全折りたたみ、inactive driveの保持済みfolderからのdrive/path移動を含む。`\\?\` / `\\?\UNC\`を除去したaddress表示、引用符付きabsolute path移動、一覧形式の提示順・名称、形式別固定thumbnail寸法、全4形式でfile名左端へ表示する画像・folder・archive・PDF・汎用fileの種類icon、設定のatomic保存、profile移行、command、検索、viewer等の既存回帰とTypeScript typecheckもexit 0。 |
-| Python | PASS | 2026-08-12、49 tests PASS、FAIL 0。tree headerと独立scroll領域、設定dialog、catalog固定幅card、画像とファイル名の分離、固定幅種類iconと2行省略、狭幅時にもthumbnailを上書きしないstyle contract、現行status/verification間の5値consistencyもPASS。 |
+| TypeScript/frontend | PASS | 2026-08-13、25 files / 258 tests PASS、FAIL 0。root登録画面を表示しない起動、PC配下のdrive表示とsidebar選択、drive切替、現在folder absolute pathのtree header、navigation・drive往復・検索pane・一時非表示をまたぐbranch展開保持、明示的な全折りたたみ、folder thumbnail要求0、連続viewerで現在pageと最大4page先だけを要求するbounded prefetch、重複page要求の抑止を含む。一覧形式、種類icon、設定、profile移行、command、検索、viewer等の既存回帰とTypeScript typecheckもexit 0。 |
+| Python | PASS | 2026-08-13、49 tests PASS、FAIL 0。tree headerと独立scroll領域、設定dialog、catalog固定幅card、画像とファイル名の分離、固定幅種類iconと2行省略、狭幅時にもthumbnailを上書きしないstyle contract、現行status/verification間の5値consistencyもPASS。 |
 | standalone PDF | PASS / 製品観測BLOCKED | Windows.Data.Pdfで実PDFのpage列挙とPNG renderを直接検証。1 GiB source、10,000 pages、最大辺16,384 px、120,000,000 pixelsをrender前に制限し、暗号化・破損・access・missingのerror分類、root外symlink拒否、独立した`pdf`種別と画像選択境界をRust canonicalとfrontend testで検証した。release WebView2のviewer・thumbnail表示は未観測。 |
 | file manager | PASS / 製品観測BLOCKED | Windows Rust canonicalでrename、folder作成、copy、move、完全delete、CF_HDROPのcopy/cut round trip、root containment、reparse point・同名衝突・子孫destination拒否を実filesystem上で検証。frontend testで右click/keyboard menu、rename・delete接続、確認dialog、全画面・slideshow起動を検証した。release製品のnative folder picker、ごみ箱、Explorer、アプリ選択は未観測。 |
 | EPUB書庫 | PASS | ZIP互換Stored/DeflateのEPUBについて、大文字小文字を無視した分類、自然順画像列挙、catalog、WebP、media token、原本非破壊をWindows Rust canonicalと87-file fixtureで直接検証。HTML本文組版は対象外。 |
 | 対応書庫 | PASS | ZIP/CBZ/EPUB、RAR/CBR、7z/CB7、LZHについて、大文字小文字を無視した分類、自然順画像列挙、entry読取、catalog metadata、診断、原本非展開をWindows Rust canonicalで直接検証。ZIP内でCBZ/CB7/LZH/CBRを混在させた多重圧縮の列挙・読取、opaque page key、内側3階層と64書庫の上限も直接検証した。RARは単一volume・非暗号化RAR4/RAR5、7zはCopy/LZMA/LZMA2、LZHはStored/LH1/LH4〜LH7/LZS/LZ5を採用範囲とし、危険path、size/entry/再帰上限、未対応圧縮方式を拒否する。 |
-| frontend build/SBOM | PASS | 2026-08-12のWindows frontend buildは65 modulesをbuild、exit 0。SBOMは直近受理済み729 components、unknown/prohibited license 0。UnRAR、`sevenz-rust`、`delharc`を含むnoticeを同期済み。 |
+| frontend build/SBOM | PASS | 2026-08-13のWindows frontend buildは65 modulesをbuild、exit 0。SBOMは直近受理済み729 components、unknown/prohibited license 0。UnRAR、`sevenz-rust`、`delharc`を含むnoticeを同期済み。 |
 | release executable | PASS / 製品受入部分BLOCKED | 追加decoderを含むWindows release executableを再buildしexit 0。static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。animated GIF観測、P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |
 | 外部通信 | BLOCKED | code/依存境界はlocal-only。VM外部監視による完全観測は未実施。 |
-| CoDD | PASS（red 0） | 2026-08-12、scan 4 documents / 57 nodes / 129 edges。check red 0、verify exit 0、DAG red 3 PASS / 0 FAIL。構造的SKIP/VACUOUSとverification-node 0件は機能PASSへ加算しない。 |
+| CoDD | PASS（red 0） | 2026-08-13、scan 4 documents / 57 nodes / 129 edges。check red 0、verify exit 0、DAG red 3 PASS / 0 FAIL、source integrity 13 files。構造的SKIP/VACUOUSとverification-node 0件は機能PASSへ加算しない。 |
 
 ## MVP release case summary
 
