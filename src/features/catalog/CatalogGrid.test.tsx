@@ -22,15 +22,28 @@ describe("CatalogGrid", () => {
     expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(7);
     expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(5);
     expect(catalogColumnCountFor("cover_list", 700)).toBe(4);
-    expect(catalogColumnCountFor("reference_tile", 460)).toBe(2);
+    expect(catalogColumnCountFor("reference_tile", 700)).toBe(2);
+    expect(catalogColumnCountFor("reference_tile", 460)).toBe(1);
     expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
   });
 
   it("keeps configured thumbnail dimensions fixed while only the column count changes", () => {
     const sizes = { smallThumbnail: 160, coverList: 192, referenceTile: 176 };
-    expect(catalogLayoutFor("small_thumbnail", sizes)).toMatchObject({
-      thumbnailWidth: 160,
-      thumbnailHeight: 160,
+    expect(catalogLayoutFor("reference_tile", sizes)).toMatchObject({
+      thumbnailWidth: 176,
+      thumbnailHeight: 264,
+      cardWidth: 354,
+      rowHeight: 286,
+    });
+    expect(catalogColumnCountFor("reference_tile", 1_000, sizes)).toBe(2);
+    expect(catalogColumnCountFor("reference_tile", 700, sizes)).toBe(1);
+    expect(catalogLayoutFor("reference_tile", {
+      ...sizes,
+      referenceTile: 64,
+    })).toMatchObject({
+      thumbnailWidth: 64,
+      thumbnailHeight: 96,
+      rowHeight: 154,
     });
     expect(catalogColumnCountFor("small_thumbnail", 1_000, sizes)).toBe(5);
     expect(catalogColumnCountFor("small_thumbnail", 700, sizes)).toBe(3);
@@ -44,7 +57,7 @@ describe("CatalogGrid", () => {
     ["small_thumbnail", 9, 156, 10],
     ["detail_list", 2, 62, 0],
     ["cover_list", 6, 274, 10],
-    ["reference_tile", 7, 248, 10],
+    ["reference_tile", 3, 214, 10],
   ] as const)(
     "%s positions the second virtual row after its configured gap",
     (viewMode, entryCount, rowHeight, rowGap) => {
@@ -377,7 +390,7 @@ describe("CatalogGrid", () => {
     expect(cell?.querySelector(":scope > .catalog-item")).toBeInTheDocument();
   });
 
-  it.each(["small_thumbnail", "cover_list", "reference_tile"] as const)(
+  it.each(["small_thumbnail", "cover_list"] as const)(
     "%s cards reserve the label for the file name and hide the file format",
     (viewMode) => {
       const archive: CatalogEntry = {
@@ -405,6 +418,40 @@ describe("CatalogGrid", () => {
       expect(item).toHaveAttribute("aria-label", expect.stringContaining("CBZ"));
     },
   );
+
+  it("renders reference tiles as horizontal information cards", () => {
+    const modifiedMs = Date.UTC(2026, 7, 12, 3, 4, 5);
+    const archive: CatalogEntry = {
+      relativePath: "information-card.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+      byteSize: 1024 * 1024,
+      modifiedMs,
+    };
+    render(
+      <CatalogGrid
+        entries={[archive]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        viewMode="reference_tile"
+      />,
+    );
+
+    const item = screen.getByRole("button", { name: /^information-card/ });
+    const information = item.querySelector(".reference-tile-info");
+    expect(information).not.toBeNull();
+    expect(within(information as HTMLElement).getByText("information-card.cbz"))
+      .toHaveClass("item-name__text");
+    expect(within(information as HTMLElement).getByText("CBZ"))
+      .toHaveClass("reference-tile-kind");
+    expect(within(information as HTMLElement).getByText("1.0 MB"))
+      .toHaveClass("item-size");
+    expect(within(information as HTMLElement).getByText(new Date(modifiedMs).toLocaleString("ja-JP")))
+      .toHaveClass("item-modified");
+    expect(item.firstElementChild).toHaveClass("thumbnail");
+  });
 
   it("uses distinct folder and archive icons for placeholder thumbnails", () => {
     render(

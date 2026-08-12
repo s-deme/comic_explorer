@@ -73,11 +73,23 @@ export function catalogLayoutFor(
     ? thumbnailSizes.coverList
     : thumbnailSizes.referenceTile;
   const thumbnailHeight = Math.round(thumbnailWidth * 1.5);
+  if (viewMode === "reference_tile") {
+    const informationWidth = Math.max(
+      144,
+      Math.round(thumbnailWidth * 0.75),
+    );
+    return {
+      thumbnailWidth,
+      thumbnailHeight,
+      cardWidth: thumbnailWidth + informationWidth + 34,
+      rowHeight: Math.max(thumbnailHeight + 22, 154),
+    };
+  }
   return {
     thumbnailWidth,
     thumbnailHeight,
-    cardWidth: thumbnailWidth + (viewMode === "cover_list" ? 16 : 12),
-    rowHeight: thumbnailHeight + (viewMode === "cover_list" ? 58 : 56),
+    cardWidth: thumbnailWidth + 16,
+    rowHeight: thumbnailHeight + 58,
   };
 }
 
@@ -385,6 +397,18 @@ export function CatalogGrid({
                             </span>
                             <span className="item-metadata item-modified">
                               {modified}
+                            </span>
+                          </>
+                        ) : viewMode === "reference_tile" ? (
+                          <>
+                            {thumbnail}
+                            <span className="reference-tile-info">
+                              <ItemName entry={entry} name={name} />
+                              <span className="reference-tile-kind">{kind}</span>
+                              <span className="reference-tile-metadata">
+                                <span className="item-metadata item-size">{size}</span>
+                                <span className="item-metadata item-modified">{modified}</span>
+                              </span>
                             </span>
                           </>
                         ) : (

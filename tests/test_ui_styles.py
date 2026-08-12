@@ -109,10 +109,16 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".catalog-cell--small_thumbnail .catalog-actions", "left: 5px"
         )
+        self.assert_rule_contains(
+            ".catalog-cell--reference_tile .catalog-actions", "right: 10px"
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--reference_tile .catalog-actions", "left: auto"
+        )
 
     def test_thumbnail_cards_reserve_the_filename_below_a_bounded_image(self) -> None:
         self.assertIn(
-            ".catalog-cell--cover_list,\n.catalog-cell--small_thumbnail,\n.catalog-cell--reference_tile {\n  min-height: 0;",
+            ".catalog-cell--cover_list,\n.catalog-cell--small_thumbnail {\n  min-height: 0;",
             STYLES,
         )
         self.assert_rule_contains(".catalog-row", "column-gap: 10px")
@@ -152,11 +158,17 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".catalog-item--reference_tile", "min-height: 0")
         self.assert_rule_contains(
             ".catalog-item--reference_tile",
-            "grid-template-rows: var(--catalog-thumbnail-height) minmax(0, 1fr)",
+            "grid-template-columns: var(--catalog-thumbnail-width) minmax(0, 1fr)",
         )
         self.assert_rule_contains(
             ".catalog-item--reference_tile .thumbnail",
             "overflow: hidden",
+        )
+        self.assert_rule_contains(".reference-tile-info", "flex-direction: column")
+        self.assert_rule_contains(".reference-tile-info", "overflow: hidden")
+        self.assert_rule_contains(".reference-tile-metadata", "margin-top: auto")
+        self.assert_rule_contains(
+            ".catalog-item--reference_tile .item-name", "text-align: left"
         )
         self.assertIn(".thumbnail {\n  display: grid;\n  min-height: 0;", STYLES)
 

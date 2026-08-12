@@ -1473,7 +1473,7 @@ describe("application shell", () => {
     );
   });
 
-  it("FT-B03-001 switches all three catalog modes through the connected App", async () => {
+  it("FT-B03-001 switches all four catalog modes through the connected App", async () => {
     const entries = [
       testEntry("01-first.cbz"),
       testEntry("02-second.cbz"),
@@ -1490,6 +1490,7 @@ describe("application shell", () => {
     for (const [mode, label] of [
       ["small_thumbnail", "小サムネイル"],
       ["detail_list", "詳細リスト"],
+      ["reference_tile", "カードグリッド"],
       ["cover_list", "表紙グリッド"],
     ] as const) {
       chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
@@ -1505,6 +1506,10 @@ describe("application shell", () => {
     );
     expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
       "detail_list",
+      expect.any(Number),
+    );
+    expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
+      "reference_tile",
       expect.any(Number),
     );
   });
@@ -1536,6 +1541,7 @@ describe("application shell", () => {
     for (const [mode, label] of [
       ["cover_list", "表紙グリッド"],
       ["small_thumbnail", "小サムネイル"],
+      ["reference_tile", "カードグリッド"],
       ["detail_list", "詳細リスト"],
     ] as const) {
       chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
@@ -1546,7 +1552,7 @@ describe("application shell", () => {
       expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
         .toBeInTheDocument();
       const folderItem = screen.getByRole("button", { name: /^missing-metadata、フォルダ/ });
-      if (mode === "detail_list") {
+      if (mode === "detail_list" || mode === "reference_tile") {
         expect(within(folderItem).getByText("フォルダ")).toBeInTheDocument();
       } else {
         expect(within(folderItem).queryByText("フォルダ")).not.toBeInTheDocument();
