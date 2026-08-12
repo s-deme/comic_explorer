@@ -41,6 +41,7 @@ const VIEW_MODE_CONFIG: Record<
   detail_list: { rowGap: 0 },
   small_thumbnail: { rowGap: 10 },
   cover_list: { rowGap: 10 },
+  card_grid: { rowGap: 10 },
   reference_tile: { rowGap: 10 },
 };
 
@@ -71,7 +72,9 @@ export function catalogLayoutFor(
   }
   const thumbnailWidth = viewMode === "cover_list"
     ? thumbnailSizes.coverList
-    : thumbnailSizes.referenceTile;
+    : viewMode === "card_grid"
+      ? thumbnailSizes.cardGrid
+      : thumbnailSizes.referenceTile;
   const thumbnailHeight = Math.round(thumbnailWidth * 1.5);
   if (viewMode === "reference_tile") {
     const informationWidth = Math.max(
@@ -83,6 +86,14 @@ export function catalogLayoutFor(
       thumbnailHeight,
       cardWidth: thumbnailWidth + informationWidth + 34,
       rowHeight: Math.max(thumbnailHeight + 22, 154),
+    };
+  }
+  if (viewMode === "card_grid") {
+    return {
+      thumbnailWidth,
+      thumbnailHeight,
+      cardWidth: thumbnailWidth + 18,
+      rowHeight: thumbnailHeight + 18,
     };
   }
   return {
@@ -411,6 +422,8 @@ export function CatalogGrid({
                               </span>
                             </span>
                           </>
+                        ) : viewMode === "card_grid" ? (
+                          thumbnail
                         ) : (
                           <>
                             {thumbnail}

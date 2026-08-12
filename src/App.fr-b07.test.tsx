@@ -163,7 +163,7 @@ const defaultSettings: CatalogSettings = {
   sortDescending: false,
   endOfVolumePolicy: "auto_next",
   catalogViewMode: "cover_list",
-  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
+  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
   viewMode: "single",
   layoutMode: "paged",
   readingDirection: "rightToLeft",

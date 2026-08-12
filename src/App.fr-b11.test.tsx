@@ -109,7 +109,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       sortDescending: false,
       endOfVolumePolicy: "auto_next" as const,
       catalogViewMode: "cover_list" as const,
-      catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
+      catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
       viewMode: "single" as const,
       layoutMode: "paged" as const,
       readingDirection: "rightToLeft" as const,

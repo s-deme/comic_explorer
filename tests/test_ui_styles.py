@@ -110,6 +110,9 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--small_thumbnail .catalog-actions", "left: 5px"
         )
         self.assert_rule_contains(
+            ".catalog-cell--card_grid .catalog-actions", "left: 8px"
+        )
+        self.assert_rule_contains(
             ".catalog-cell--reference_tile .catalog-actions", "right: 10px"
         )
         self.assert_rule_contains(
@@ -154,6 +157,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".catalog-item--cover_list .thumbnail",
             "overflow: hidden",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--card_grid",
+            "grid-template-rows: var(--catalog-thumbnail-height)",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--card_grid .thumbnail",
+            "height: var(--catalog-thumbnail-height)",
         )
         self.assert_rule_contains(".catalog-item--reference_tile", "min-height: 0")
         self.assert_rule_contains(

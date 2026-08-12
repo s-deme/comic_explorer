@@ -3478,9 +3478,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             type="button"
             aria-label="カードグリッド"
             title="カードグリッド表示を切り替え"
-            aria-pressed={catalogViewMode === "reference_tile"}
-            data-product-id="toolbar-reference-tile"
-            onClick={() => changeCatalogViewMode(catalogViewMode === "reference_tile" ? "cover_list" : "reference_tile")}
+            aria-pressed={catalogViewMode === "card_grid"}
+            data-product-id="toolbar-card-grid"
+            onClick={() => changeCatalogViewMode(catalogViewMode === "card_grid" ? "cover_list" : "card_grid")}
           >
             ▦
           </button>

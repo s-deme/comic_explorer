@@ -160,7 +160,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   sortDescending: false,
   endOfVolumePolicy: "auto_next",
   catalogViewMode: "cover_list",
-  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
+  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
   viewMode: "single",
   layoutMode: "paged",
   readingDirection: "rightToLeft",
@@ -801,8 +801,8 @@ describe("application shell", () => {
       .toHaveAttribute("aria-checked", "true");
     expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙グリッド" }))
       .toHaveAttribute("aria-checked", "true");
-    expect(within(viewMenu).getAllByRole("menuitemradio").slice(-4).map((item) => item.textContent))
-      .toEqual(["詳細リスト", "小サムネイル", "表紙グリッド", "カードグリッド"]);
+    expect(within(viewMenu).getAllByRole("menuitemradio").slice(-5).map((item) => item.textContent))
+      .toEqual(["詳細リスト", "小サムネイル", "表紙グリッド", "カードグリッド", "情報カード"]);
     expect(saveSortMock).not.toHaveBeenCalled();
 
     fireEvent.keyDown(
@@ -907,7 +907,7 @@ describe("application shell", () => {
     expect(listMock).toHaveBeenCalledTimes(1);
 
     fireEvent.keyDown(back, { key: "End" });
-    const lastViewItem = within(viewMenu).getByRole("menuitemradio", { name: "カードグリッド" });
+    const lastViewItem = within(viewMenu).getByRole("menuitemradio", { name: "情報カード" });
     expect(lastViewItem).toHaveFocus();
     fireEvent.keyDown(lastViewItem, { key: "Home" });
     expect(back).toHaveFocus();
@@ -1473,7 +1473,7 @@ describe("application shell", () => {
     );
   });
 
-  it("FT-B03-001 switches all four catalog modes through the connected App", async () => {
+  it("FT-B03-001 switches all five catalog modes through the connected App", async () => {
     const entries = [
       testEntry("01-first.cbz"),
       testEntry("02-second.cbz"),
@@ -1490,7 +1490,8 @@ describe("application shell", () => {
     for (const [mode, label] of [
       ["small_thumbnail", "小サムネイル"],
       ["detail_list", "詳細リスト"],
-      ["reference_tile", "カードグリッド"],
+      ["card_grid", "カードグリッド"],
+      ["reference_tile", "情報カード"],
       ["cover_list", "表紙グリッド"],
     ] as const) {
       chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
@@ -1506,6 +1507,10 @@ describe("application shell", () => {
     );
     expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
       "detail_list",
+      expect.any(Number),
+    );
+    expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
+      "card_grid",
       expect.any(Number),
     );
     expect(saveCatalogViewModeMock).toHaveBeenCalledWith(
@@ -1541,7 +1546,8 @@ describe("application shell", () => {
     for (const [mode, label] of [
       ["cover_list", "表紙グリッド"],
       ["small_thumbnail", "小サムネイル"],
-      ["reference_tile", "カードグリッド"],
+      ["card_grid", "カードグリッド"],
+      ["reference_tile", "情報カード"],
       ["detail_list", "詳細リスト"],
     ] as const) {
       chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
@@ -1549,8 +1555,13 @@ describe("application shell", () => {
         expect(grid).toHaveAttribute("data-catalog-view-mode", mode),
       );
       expect(grid).toHaveAttribute("data-entry-count", "3");
-      expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
-        .toBeInTheDocument();
+      if (mode === "card_grid") {
+        expect(screen.queryByText("A very long comic name that remains available to keyboard users.cbz"))
+          .not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
+          .toBeInTheDocument();
+      }
       const folderItem = screen.getByRole("button", { name: /^missing-metadata、フォルダ/ });
       if (mode === "detail_list" || mode === "reference_tile") {
         expect(within(folderItem).getByText("フォルダ")).toBeInTheDocument();
@@ -2254,13 +2265,18 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
-    const draftCardSize = within(dialog).getByRole("spinbutton", {
+    const draftInformationCardSize = within(dialog).getByRole("spinbutton", {
+      name: "profile情報カードのサイズ（px）",
+    });
+    const draftCardGridSize = within(dialog).getByRole("spinbutton", {
       name: "profileカードグリッドのサイズ（px）",
     });
-    expect(draftCardSize).toHaveValue(128);
-    expect(draftCardSize).toHaveAttribute("min", "64");
-    expect(draftCardSize).toHaveAttribute("max", "320");
-    fireEvent.change(draftCardSize, { target: { value: "176" } });
+    expect(draftInformationCardSize).toHaveValue(128);
+    expect(draftCardGridSize).toHaveValue(216);
+    expect(draftCardGridSize).toHaveAttribute("min", "64");
+    expect(draftCardGridSize).toHaveAttribute("max", "320");
+    fireEvent.change(draftInformationCardSize, { target: { value: "176" } });
+    fireEvent.change(draftCardGridSize, { target: { value: "224" } });
     fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
@@ -2294,8 +2310,11 @@ describe("application shell", () => {
       target: { value: "reference_tile" },
     });
     fireEvent.change(within(dialog).getByRole("spinbutton", {
-      name: "profileカードグリッドのサイズ（px）",
+      name: "profile情報カードのサイズ（px）",
     }), { target: { value: "176" } });
+    fireEvent.change(within(dialog).getByRole("spinbutton", {
+      name: "profileカードグリッドのサイズ（px）",
+    }), { target: { value: "224" } });
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
@@ -2317,6 +2336,7 @@ describe("application shell", () => {
         catalogThumbnailSizes: {
           smallThumbnail: 104,
           coverList: 144,
+          cardGrid: 224,
           referenceTile: 176,
         },
         treeVisible: false,

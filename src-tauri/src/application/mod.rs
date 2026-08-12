@@ -289,6 +289,7 @@ pub struct CatalogSettings {
 pub struct CatalogThumbnailSizes {
     pub small_thumbnail: u16,
     pub cover_list: u16,
+    pub card_grid: u16,
     pub reference_tile: u16,
 }
 
@@ -339,6 +340,7 @@ const MAX_CATALOG_THUMBNAIL_SIZE: u16 = 320;
 const DEFAULT_CATALOG_THUMBNAIL_SIZES: CatalogThumbnailSizes = CatalogThumbnailSizes {
     small_thumbnail: 104,
     cover_list: 144,
+    card_grid: 216,
     reference_tile: 128,
 };
 
@@ -645,7 +647,7 @@ fn end_of_volume_policy(settings: &crate::state::Settings) -> String {
 fn catalog_view_mode(settings: &crate::state::Settings) -> String {
     if matches!(
         settings.catalog_view_mode.as_str(),
-        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
+        "small_thumbnail" | "detail_list" | "cover_list" | "card_grid" | "reference_tile"
     ) {
         settings.catalog_view_mode.clone()
     } else {
@@ -669,6 +671,10 @@ fn catalog_thumbnail_sizes(settings: &crate::state::Settings) -> CatalogThumbnai
         cover_list: valid_size(
             &settings.cover_list_thumbnail_size,
             DEFAULT_CATALOG_THUMBNAIL_SIZES.cover_list,
+        ),
+        card_grid: valid_size(
+            &settings.card_grid_thumbnail_size,
+            DEFAULT_CATALOG_THUMBNAIL_SIZES.card_grid,
         ),
         reference_tile: valid_size(
             &settings.reference_tile_thumbnail_size,
@@ -1575,7 +1581,7 @@ pub fn set_catalog_view_mode(
     }
     if !matches!(
         catalog_view_mode.as_str(),
-        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
+        "small_thumbnail" | "detail_list" | "cover_list" | "card_grid" | "reference_tile"
     ) {
         return Ok(error_response(
             &context,
@@ -1762,11 +1768,12 @@ fn validate_settings_profile(
         "auto_next" | "confirm_next" | "return_library" | "stop" | "loop"
     ) || !matches!(
         profile.catalog_view_mode.as_str(),
-        "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
+        "small_thumbnail" | "detail_list" | "cover_list" | "card_grid" | "reference_tile"
     ) || !matches!(profile.view_mode.as_str(), "single" | "spread")
         || ![
             profile.catalog_thumbnail_sizes.small_thumbnail,
             profile.catalog_thumbnail_sizes.cover_list,
+            profile.catalog_thumbnail_sizes.card_grid,
             profile.catalog_thumbnail_sizes.reference_tile,
         ]
         .into_iter()
@@ -1839,6 +1846,7 @@ pub fn set_settings_profile(
         settings.catalog_view_mode = profile.catalog_view_mode;
         settings.small_thumbnail_size = profile.catalog_thumbnail_sizes.small_thumbnail.to_string();
         settings.cover_list_thumbnail_size = profile.catalog_thumbnail_sizes.cover_list.to_string();
+        settings.card_grid_thumbnail_size = profile.catalog_thumbnail_sizes.card_grid.to_string();
         settings.reference_tile_thumbnail_size =
             profile.catalog_thumbnail_sizes.reference_tile.to_string();
         settings.view_mode = profile.view_mode;
@@ -3411,6 +3419,9 @@ mod shutdown_tests {
         settings.catalog_view_mode = "reference_tile".into();
         assert_eq!(catalog_view_mode(&settings), "reference_tile");
 
+        settings.catalog_view_mode = "card_grid".into();
+        assert_eq!(catalog_view_mode(&settings), "card_grid");
+
         settings.catalog_view_mode = "not-a-mode".into();
         assert_eq!(catalog_view_mode(&settings), "cover_list");
     }
@@ -3425,18 +3436,21 @@ mod shutdown_tests {
 
         settings.small_thumbnail_size = "160".into();
         settings.cover_list_thumbnail_size = "192".into();
+        settings.card_grid_thumbnail_size = "224".into();
         settings.reference_tile_thumbnail_size = "176".into();
         assert_eq!(
             catalog_thumbnail_sizes(&settings),
             CatalogThumbnailSizes {
                 small_thumbnail: 160,
                 cover_list: 192,
+                card_grid: 224,
                 reference_tile: 176,
             }
         );
 
         settings.small_thumbnail_size = "63".into();
         settings.cover_list_thumbnail_size = "invalid".into();
+        settings.card_grid_thumbnail_size = "321".into();
         settings.reference_tile_thumbnail_size = "321".into();
         assert_eq!(
             catalog_thumbnail_sizes(&settings),
@@ -3450,10 +3464,11 @@ mod shutdown_tests {
             sort_field: "name".into(),
             sort_descending: false,
             end_of_volume_policy: "auto_next".into(),
-            catalog_view_mode: "reference_tile".into(),
+            catalog_view_mode: "card_grid".into(),
             catalog_thumbnail_sizes: CatalogThumbnailSizes {
                 small_thumbnail: 104,
                 cover_list: 144,
+                card_grid: 216,
                 reference_tile: 128,
             },
             view_mode: "single".into(),

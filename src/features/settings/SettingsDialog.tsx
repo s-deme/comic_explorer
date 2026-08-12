@@ -191,7 +191,7 @@ export function SettingsDialog({
     {
       id: "catalog-view-mode",
       category: "catalog",
-      text: `一覧形式 表示 表紙 サムネイル 詳細 カード グリッド 横長 情報 属性 種別 サイズ 更新日時 ${CATALOG_VIEW_MODE_LABELS[draft.catalogViewMode]} レイアウトやファイル情報の詳しさを切り替えます`,
+      text: `一覧形式 表示 表紙 サムネイル 詳細 カード グリッド 大判 ファイル名なし 横長 情報 属性 種別 サイズ 更新日時 ${CATALOG_VIEW_MODE_LABELS[draft.catalogViewMode]} レイアウトやファイル情報の詳しさを切り替えます`,
     },
     {
       id: "small-thumbnail-size",
@@ -204,9 +204,14 @@ export function SettingsDialog({
       text: `表紙グリッド サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.coverList}px`,
     },
     {
+      id: "card-grid-thumbnail-size",
+      category: "catalog",
+      text: `カードグリッド 大判 表紙のみ ファイル名なし サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.cardGrid}px`,
+    },
+    {
       id: "reference-tile-thumbnail-size",
       category: "catalog",
-      text: `カードグリッド 横長 情報カード 表紙 サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.referenceTile}px`,
+      text: `情報カード 横長 属性 表紙 サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.referenceTile}px`,
     },
     {
       id: "viewer-view-mode",
@@ -407,7 +412,7 @@ export function SettingsDialog({
               <SettingRow
                 id="catalog-view-mode"
                 title="一覧形式"
-                description="詳細、コンパクトな表紙、表紙中心、属性付きの横長カードを切り替えます。"
+                description="詳細、コンパクトな表紙、名前付き表紙、大判表紙のみ、属性付き横長カードを切り替えます。"
                 hidden={rowHidden("catalog-view-mode")}
               >
                 <select
@@ -423,7 +428,8 @@ export function SettingsDialog({
               {([
                 ["small-thumbnail-size", "smallThumbnail", "小サムネイルのサイズ", "コンパクトな一覧のサムネイル幅です。"],
                 ["cover-list-thumbnail-size", "coverList", "表紙グリッドのサイズ", "表紙を中心に並べる一覧のサムネイル幅です。"],
-                ["reference-tile-thumbnail-size", "referenceTile", "カードグリッドのサイズ", "横長の情報カードで左側に表示する表紙の幅です。"],
+                ["card-grid-thumbnail-size", "cardGrid", "カードグリッドのサイズ", "ファイル名を表示しない大判表紙の幅です。"],
+                ["reference-tile-thumbnail-size", "referenceTile", "情報カードのサイズ", "横長の情報カードで左側に表示する表紙の幅です。"],
               ] as const).map(([id, field, title, description]) => (
                 <SettingRow key={id} id={id} title={title} description={description} hidden={rowHidden(id)}>
                   <div className="settings-number-control">

@@ -30,7 +30,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 2;
+export const SETTINGS_PROFILE_VERSION = 3;
 export const APP_VERSION = packageMetadata.version;
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
@@ -152,7 +152,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const catalogViewMode = enumValue(candidate.catalogViewMode, CATALOG_VIEW_MODES);
   const catalogThumbnailSizes = candidate.profileVersion === 1
     ? { ...DEFAULT_CATALOG_THUMBNAIL_SIZES }
-    : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
+    : candidate.profileVersion === 2
+      ? migrateV2CatalogThumbnailSizes(candidate.catalogThumbnailSizes)
+      : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
   const viewMode = enumValue(candidate.viewMode, ["single", "spread"] as const);
   const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
@@ -160,7 +162,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const shortcuts = strictShortcutBindings(candidate.shortcuts);
   const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
   if (
-    (candidate.profileVersion !== 1 && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
+    (candidate.profileVersion !== 1
+      && candidate.profileVersion !== 2
+      && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
     endOfVolumePolicy === null ||
@@ -213,13 +217,25 @@ function strictCatalogThumbnailSizes(value: unknown): CatalogThumbnailSizes | nu
     && size <= MAX_CATALOG_THUMBNAIL_SIZE;
   return valid(candidate.smallThumbnail)
     && valid(candidate.coverList)
+    && valid(candidate.cardGrid)
     && valid(candidate.referenceTile)
     ? {
         smallThumbnail: candidate.smallThumbnail,
         coverList: candidate.coverList,
+        cardGrid: candidate.cardGrid,
         referenceTile: candidate.referenceTile,
       }
     : null;
+}
+
+function migrateV2CatalogThumbnailSizes(value: unknown): CatalogThumbnailSizes | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const migrated = strictCatalogThumbnailSizes({
+    ...candidate,
+    cardGrid: DEFAULT_CATALOG_THUMBNAIL_SIZES.cardGrid,
+  });
+  return migrated;
 }
 
 function enumValue<T extends string>(

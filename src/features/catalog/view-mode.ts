@@ -2,6 +2,7 @@ export const CATALOG_VIEW_MODES = [
   "detail_list",
   "small_thumbnail",
   "cover_list",
+  "card_grid",
   "reference_tile",
 ] as const;
 
@@ -11,12 +12,14 @@ export const CATALOG_VIEW_MODE_LABELS: Record<CatalogViewMode, string> = {
   detail_list: "詳細リスト",
   small_thumbnail: "小サムネイル",
   cover_list: "表紙グリッド",
-  reference_tile: "カードグリッド",
+  card_grid: "カードグリッド",
+  reference_tile: "情報カード",
 };
 
 export interface CatalogThumbnailSizes {
   smallThumbnail: number;
   coverList: number;
+  cardGrid: number;
   referenceTile: number;
 }
 
@@ -26,6 +29,7 @@ export const MAX_CATALOG_THUMBNAIL_SIZE = 320;
 export const DEFAULT_CATALOG_THUMBNAIL_SIZES: CatalogThumbnailSizes = {
   smallThumbnail: 104,
   coverList: 144,
+  cardGrid: 216,
   referenceTile: 128,
 };
 
@@ -53,6 +57,10 @@ export function normalizeCatalogThumbnailSizes(value: unknown): CatalogThumbnail
     coverList: normalizeCatalogThumbnailSize(
       candidate.coverList,
       DEFAULT_CATALOG_THUMBNAIL_SIZES.coverList,
+    ),
+    cardGrid: normalizeCatalogThumbnailSize(
+      candidate.cardGrid,
+      DEFAULT_CATALOG_THUMBNAIL_SIZES.cardGrid,
     ),
     referenceTile: normalizeCatalogThumbnailSize(
       candidate.referenceTile,

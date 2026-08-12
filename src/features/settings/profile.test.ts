@@ -12,12 +12,12 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 2,
+    profileVersion: 3,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
     catalogViewMode: "cover_list",
-    catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
+    catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
     viewMode: "single",
     layoutMode: "paged",
     readingDirection: "rightToLeft",
@@ -56,20 +56,20 @@ describe("settings profile", () => {
   it("imports a strict known-version profile and excludes unknown fields", () => {
     const candidate = {
       ...validProfile(),
-      catalogViewMode: "reference_tile",
+      catalogViewMode: "card_grid",
       scale: 4,
       secretToken: "must-not-be-retained",
     };
     const profile = normalizeSettingsProfile(candidate);
     expect(profile).toEqual({
       ...validProfile(),
-      catalogViewMode: "reference_tile",
+      catalogViewMode: "card_grid",
       scale: 4,
     });
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 3, 99, "2", undefined])(
+  it.each([0, 4, 99, "3", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -83,13 +83,25 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
+  it("migrates a v2 profile with the new card-grid thumbnail size", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 2;
+    legacy.catalogThumbnailSizes = {
+      smallThumbnail: 104,
+      coverList: 144,
+      referenceTile: 128,
+    };
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
   it.each([
-    { smallThumbnail: 63, coverList: 144, referenceTile: 128 },
-    { smallThumbnail: 104, coverList: 321, referenceTile: 128 },
-    { smallThumbnail: 104, coverList: 144, referenceTile: 100.5 },
-    { smallThumbnail: "104", coverList: 144, referenceTile: 128 },
+    { smallThumbnail: 63, coverList: 144, cardGrid: 216, referenceTile: 128 },
+    { smallThumbnail: 104, coverList: 321, cardGrid: 216, referenceTile: 128 },
+    { smallThumbnail: 104, coverList: 144, cardGrid: 321, referenceTile: 128 },
+    { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 100.5 },
+    { smallThumbnail: "104", coverList: 144, cardGrid: 216, referenceTile: 128 },
     undefined,
-  ])("rejects invalid v2 catalog thumbnail sizes (%s)", (catalogThumbnailSizes) => {
+  ])("rejects invalid v3 catalog thumbnail sizes (%s)", (catalogThumbnailSizes) => {
     expect(normalizeSettingsProfile(withField("catalogThumbnailSizes", catalogThumbnailSizes)))
       .toBeNull();
   });

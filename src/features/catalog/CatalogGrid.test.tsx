@@ -22,13 +22,20 @@ describe("CatalogGrid", () => {
     expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(7);
     expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(5);
     expect(catalogColumnCountFor("cover_list", 700)).toBe(4);
+    expect(catalogColumnCountFor("card_grid", 700)).toBe(2);
     expect(catalogColumnCountFor("reference_tile", 700)).toBe(2);
     expect(catalogColumnCountFor("reference_tile", 460)).toBe(1);
     expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
   });
 
   it("keeps configured thumbnail dimensions fixed while only the column count changes", () => {
-    const sizes = { smallThumbnail: 160, coverList: 192, referenceTile: 176 };
+    const sizes = { smallThumbnail: 160, coverList: 192, cardGrid: 224, referenceTile: 176 };
+    expect(catalogLayoutFor("card_grid", sizes)).toMatchObject({
+      thumbnailWidth: 224,
+      thumbnailHeight: 336,
+      cardWidth: 242,
+      rowHeight: 354,
+    });
     expect(catalogLayoutFor("reference_tile", sizes)).toMatchObject({
       thumbnailWidth: 176,
       thumbnailHeight: 264,
@@ -57,6 +64,7 @@ describe("CatalogGrid", () => {
     ["small_thumbnail", 9, 156, 10],
     ["detail_list", 2, 62, 0],
     ["cover_list", 6, 274, 10],
+    ["card_grid", 4, 342, 10],
     ["reference_tile", 3, 214, 10],
   ] as const)(
     "%s positions the second virtual row after its configured gap",
@@ -331,7 +339,7 @@ describe("CatalogGrid", () => {
       .not.toBeInTheDocument();
   });
 
-  it.each(["small_thumbnail", "cover_list", "reference_tile", "detail_list"] as const)(
+  it.each(["small_thumbnail", "cover_list", "card_grid", "reference_tile", "detail_list"] as const)(
     "%s places a favorite toggle beside, not inside, the card's open button",
     (viewMode) => {
       const archive: CatalogEntry = {
@@ -451,6 +459,36 @@ describe("CatalogGrid", () => {
     expect(within(information as HTMLElement).getByText(new Date(modifiedMs).toLocaleString("ja-JP")))
       .toHaveClass("item-modified");
     expect(item.firstElementChild).toHaveClass("thumbnail");
+  });
+
+  it("renders card grids as large thumbnails without visible file information", () => {
+    const archive: CatalogEntry = {
+      relativePath: "cover-only.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+      byteSize: 1024 * 1024,
+      modifiedMs: Date.UTC(2026, 7, 12),
+    };
+    render(
+      <CatalogGrid
+        entries={[archive]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        viewMode="card_grid"
+      />,
+    );
+
+    const item = screen.getByRole("button", { name: /^cover-only\.cbz、CBZ/ });
+    expect(item).toHaveAttribute("title", "cover-only.cbz — CBZ");
+    expect(item.firstElementChild).toHaveClass("thumbnail");
+    expect(item.children).toHaveLength(1);
+    expect(item.querySelector(".item-name")).not.toBeInTheDocument();
+    expect(item.querySelector(".item-metadata")).not.toBeInTheDocument();
+    expect(within(item).queryByText("cover-only.cbz")).not.toBeInTheDocument();
+    expect(within(item).queryByText("CBZ")).not.toBeInTheDocument();
+    expect(within(item).queryByText("1.0 MB")).not.toBeInTheDocument();
   });
 
   it("uses distinct folder and archive icons for placeholder thumbnails", () => {

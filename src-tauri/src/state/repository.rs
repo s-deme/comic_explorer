@@ -63,6 +63,7 @@ pub struct Settings {
     pub catalog_view_mode: String,
     pub small_thumbnail_size: String,
     pub cover_list_thumbnail_size: String,
+    pub card_grid_thumbnail_size: String,
     pub reference_tile_thumbnail_size: String,
     pub view_mode: String,
     pub layout_mode: String,
@@ -97,6 +98,7 @@ impl Default for Settings {
             catalog_view_mode: "cover_list".into(),
             small_thumbnail_size: "104".into(),
             cover_list_thumbnail_size: "144".into(),
+            card_grid_thumbnail_size: "216".into(),
             reference_tile_thumbnail_size: "128".into(),
             view_mode: "single".into(),
             layout_mode: "paged".into(),
@@ -176,6 +178,7 @@ impl StateStore {
                 "catalogViewMode" => settings.catalog_view_mode = value,
                 "smallThumbnailSize" => settings.small_thumbnail_size = value,
                 "coverListThumbnailSize" => settings.cover_list_thumbnail_size = value,
+                "cardGridThumbnailSize" => settings.card_grid_thumbnail_size = value,
                 "referenceTileThumbnailSize" => settings.reference_tile_thumbnail_size = value,
                 "viewMode" => settings.view_mode = value,
                 "layoutMode" => settings.layout_mode = value,
@@ -227,6 +230,10 @@ impl StateStore {
             (
                 "coverListThumbnailSize",
                 settings.cover_list_thumbnail_size.clone(),
+            ),
+            (
+                "cardGridThumbnailSize",
+                settings.card_grid_thumbnail_size.clone(),
             ),
             (
                 "referenceTileThumbnailSize",
@@ -1084,7 +1091,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b17_reference_tile_and_settings_survive_reopen() {
+    fn fr_b17_catalog_card_modes_and_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1094,9 +1101,10 @@ mod tests {
                 sort_field: "modified".into(),
                 sort_descending: true,
                 end_of_volume_policy: "loop".into(),
-                catalog_view_mode: "reference_tile".into(),
+                catalog_view_mode: "card_grid".into(),
                 small_thumbnail_size: "120".into(),
                 cover_list_thumbnail_size: "176".into(),
+                card_grid_thumbnail_size: "224".into(),
                 reference_tile_thumbnail_size: "152".into(),
                 view_mode: "spread".into(),
                 layout_mode: "vertical_scroll".into(),
@@ -1161,7 +1169,9 @@ mod tests {
         assert_eq!(restored.scale_mode, "custom");
         assert_eq!(restored.scale, "1.7");
         assert_eq!(restored.end_of_volume_policy, "loop");
-        assert_eq!(restored.catalog_view_mode, "reference_tile");
+        assert_eq!(restored.catalog_view_mode, "card_grid");
+        assert_eq!(restored.card_grid_thumbnail_size, "224");
+        assert_eq!(restored.reference_tile_thumbnail_size, "152");
         assert_eq!(restored.layout_mode, "vertical_scroll");
         assert!(restored.loupe_enabled);
         assert!(!restored.tree_visible);

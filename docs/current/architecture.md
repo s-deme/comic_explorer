@@ -167,7 +167,7 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成り、root未選択時も
 shellを表示してside paneのPC配下からdriveを選択できる。
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
-詳細リスト、小サムネイル、表紙グリッド、カードグリッドの表示順、sort、search result、selection、loading/empty/error、context menu、
+詳細リスト、小サムネイル、表紙グリッド、カードグリッド、情報カードの表示順、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
@@ -180,7 +180,7 @@ dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入�
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達する。catalog cardのfolderとcomic folderはダブルクリックまたはEnterでそのfolderへ移動し、archive、PDF、画像だけをviewerへ開く。重複する読むbuttonは置かない。
 viewerのpointerによるpage移動はtoolbar、wheel、左右swipeに限定し、double clickは全画面切替へ固定する。
-サムネイル系cardは画像と文字を別のgrid領域に配置して画像の縦横比で名前を侵食させない。小サムネイルと表紙グリッドは縦型の画像優先layoutとして種別ラベルを省き、カードグリッドは横長の情報優先layoutとして左側の表紙と右側のファイル名、種別、サイズ、更新日時を明確に分ける。カードグリッドのお気に入りtoggleは情報領域の右上へ置き、他のサムネイル形式では表紙の左上へ置く。小サムネイル、表紙グリッド、カードグリッドはそれぞれ独立した保存済みthumbnail幅を使い、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。profile v2は3つの幅を必須fieldとして検証し、旧profile v1だけは形式別既定値を補って移行する。backendは同じ値を範囲検証してapp-local SQLiteへatomicに保存する。
+サムネイル系cardは画像と文字を別のgrid領域に配置して画像の縦横比で名前を侵食させない。小サムネイルと表紙グリッドは縦型の画像優先layoutとして種別ラベルを省く。カードグリッドは既定216px幅の大判表紙だけを2:3で配置し、視覚上のファイル名、種類icon、metadata領域を生成しない一方、項目のaccessible nameには名前・種別・サイズ・更新日時、titleには名前・種別を保持する。情報カード（既存内部値`reference_tile`）は横長の情報優先layoutとして左側の表紙と右側のファイル名、種別、サイズ、更新日時を明確に分ける。お気に入りtoggleは小サムネイル、表紙グリッド、カードグリッドでは表紙の左上、情報カードでは情報領域の右上へ置く。4つのサムネイル形式はそれぞれ独立した保存済みthumbnail幅を使い、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。profile v3は4つの幅を必須fieldとして検証し、旧profile v1には全既定値、v2には新しいカードグリッドの既定値を補って移行する。backendは同じ値を範囲検証してapp-local SQLiteへatomicに保存する。
 shortcut編集はoptionsの統合設定だけから行い、catalogとviewerのcommandをgroup、keyboard、割り当て済みmouse入力、
 説明の同一表で扱う。keyboardはcommand間と予約済みapp操作の衝突を拒否し、mouseはviewer stageで直接観測できる
 左右swipe、wheel、右button+wheel、middle/side buttonだけをcommandへ変換する。page layoutの通常wheel以外の

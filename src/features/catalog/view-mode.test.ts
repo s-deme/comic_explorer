@@ -9,11 +9,12 @@ import {
 } from "./view-mode";
 
 describe("catalog view mode", () => {
-  it("presents detail, small, cover grid and card grid in that order", () => {
+  it("presents detail, small, cover grid, card grid and information card in that order", () => {
     expect(CATALOG_VIEW_MODES).toEqual([
       "detail_list",
       "small_thumbnail",
       "cover_list",
+      "card_grid",
       "reference_tile",
     ]);
     expect(DEFAULT_CATALOG_VIEW_MODE).toBe("cover_list");
@@ -30,10 +31,12 @@ describe("catalog view mode", () => {
     expect(normalizeCatalogThumbnailSizes({
       smallThumbnail: 160,
       coverList: 63,
+      cardGrid: 224,
       referenceTile: 176,
     })).toEqual({
       smallThumbnail: 160,
       coverList: DEFAULT_CATALOG_THUMBNAIL_SIZES.coverList,
+      cardGrid: 224,
       referenceTile: 176,
     });
   });

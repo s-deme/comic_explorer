@@ -483,6 +483,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .catalog-row--cover_list {
   grid-template-columns: repeat(var(--catalog-column-count), var(--catalog-card-width));
 }
+.catalog-row--card_grid {
+  grid-template-columns: repeat(var(--catalog-column-count), var(--catalog-card-width));
+}
 .catalog-row--small_thumbnail {
   grid-template-columns: repeat(var(--catalog-column-count), var(--catalog-card-width));
 }
@@ -514,6 +517,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 4px;
 }
 .catalog-cell--reference_tile {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.catalog-cell--card_grid {
   min-height: 0;
   grid-template-rows: minmax(0, 1fr);
 }
@@ -559,6 +566,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-content: start;
   justify-items: stretch;
   padding: 5px;
+}
+.catalog-item--card_grid {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: var(--catalog-thumbnail-height);
+  justify-items: stretch;
+  padding: 8px;
+}
+.catalog-item--card_grid .thumbnail {
+  width: var(--catalog-thumbnail-width);
+  height: var(--catalog-thumbnail-height);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .catalog-item--reference_tile {
   height: 100%;
@@ -827,6 +848,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   top: 5px;
   left: 5px;
 }
+.catalog-cell--card_grid .catalog-actions { top: 8px; left: 8px; }
 .catalog-cell--reference_tile .catalog-actions { top: 10px; right: 10px; left: auto; }
 .catalog-cell--detail_list .catalog-actions {
   position: static;
