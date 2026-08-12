@@ -3,6 +3,7 @@ import { CatalogGrid } from "./features/catalog/CatalogGrid";
 import {
   navigationReducer,
   parentPath,
+  relativeAddressWithinRoot,
 } from "./features/navigation/navigation";
 import {
   listFolder,
@@ -3712,8 +3713,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         className="address-bar"
         onSubmit={(event) => {
           event.preventDefault();
-          const root = libraryRoot.replace(/[\\/]+$/, "");
-          if (!addressInput.toLowerCase().startsWith(root.toLowerCase())) {
+          const relative = relativeAddressWithinRoot(addressInput, libraryRoot);
+          if (relative === null) {
             setLoadState({
               status: "error",
               path: addressInput,
@@ -3721,10 +3722,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             });
             return;
           }
-          const relative = addressInput
-            .slice(root.length)
-            .replace(/^[\\/]+/, "")
-            .replaceAll("\\", "/");
           addressInputDirty.current = false;
           navigate(relative);
         }}

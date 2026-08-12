@@ -12,6 +12,33 @@ export type NavigationAction =
   | { type: "jumpForward"; index: number }
   | { type: "reset"; path: string };
 
+function normalizeWindowsAbsolutePath(path: string): string {
+  const trimmed = path.trim();
+  const unquoted = trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
+    ? trimmed.slice(1, -1)
+    : trimmed;
+  return unquoted.trim().replaceAll("/", "\\").replace(/\\+$/, "");
+}
+
+export function relativeAddressWithinRoot(
+  address: string,
+  libraryRoot: string,
+): string | null {
+  const normalizedAddress = normalizeWindowsAbsolutePath(address);
+  const normalizedRoot = normalizeWindowsAbsolutePath(libraryRoot);
+  const foldedAddress = normalizedAddress.toLocaleLowerCase("en-US");
+  const foldedRoot = normalizedRoot.toLocaleLowerCase("en-US");
+
+  if (foldedAddress === foldedRoot) return "";
+  if (!foldedAddress.startsWith(`${foldedRoot}\\`)) return null;
+
+  const relative = normalizedAddress.slice(normalizedRoot.length + 1);
+  if (relative.split("\\").some((segment) => segment === "." || segment === "..")) {
+    return null;
+  }
+  return relative.replaceAll("\\", "/");
+}
+
 export function navigationReducer(
   state: NavigationState,
   action: NavigationAction,

@@ -51,7 +51,8 @@ stale responseを構造的に区別する。
 登録rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
 comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
-明示refreshは同じnavigation stateを更新する。
+明示refreshは同じnavigation stateを更新する。addressのWindows絶対pathは外側の引用符を除去し、
+separatorとcaseを比較用に正規化してからrootとのpath segment境界を検証し、安全なroot相対pathへ変換する。
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。名前検索はfrontendで検索条件を構成し、
 backendのread-only workerが正規化したbasename、検索開始folder、再帰、folder/file種別、size、mtimeを

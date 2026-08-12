@@ -691,7 +691,7 @@ describe("application shell", () => {
     );
 
     fireEvent.change(screen.getByLabelText("アドレス"), {
-      target: { value: "C:\\Comics\\Series" },
+      target: { value: '"C:\\Comics\\Series"' },
     });
     fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));

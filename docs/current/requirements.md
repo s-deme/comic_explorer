@@ -45,7 +45,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-001 | 読取可能なlibrary rootを登録し、app-local設定から復元する。 |
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
 | REQ-MVP-003 | folder treeの展開・選択と現在folderを同期する。 |
-| REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動をroot内で行う。 |
+| REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動をroot内で行う。address入力はWindows Explorerの「パスのコピー」による引用符付き絶対pathを受理し、slash・大文字小文字を正規化したうえでlibrary rootとのpath segment境界を厳密に判定する。 |
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。thumbnailを表示しないfolderとarchiveには、それぞれを判別できる専用iconを表示する。 |
 | REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。通常folderの直下に対応archiveが複数ある場合は、その自然順先頭archiveの表紙thumbnailをfolder項目に表示する。いずれも選択したsourceを含むfingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | catalog toolbar buttonから並べ替え、昇降順、一覧形式のmenuを操作し、viewer toolbarから巻末動作を操作して、設定を保存する。 |

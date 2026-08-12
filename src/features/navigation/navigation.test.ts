@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { navigationReducer, parentPath } from "./navigation";
+import {
+  navigationReducer,
+  parentPath,
+  relativeAddressWithinRoot,
+} from "./navigation";
 
 describe("navigation state", () => {
   it("keeps back and forward history coherent", () => {
@@ -21,6 +25,21 @@ describe("navigation state", () => {
     expect(parentPath("Author/Series")).toBe("Author");
     expect(parentPath("Author")).toBe("");
     expect(parentPath("")).toBeNull();
+  });
+
+  it("accepts a quoted Windows Explorer path inside the library root", () => {
+    expect(relativeAddressWithinRoot(
+      '"E:\\F\\comic\\dl_comp\\[内藤騎之介×剣康之] 異世界のんびり農家 1-13"',
+      "E:\\F\\comic\\dl_comp",
+    )).toBe("[内藤騎之介×剣康之] 異世界のんびり農家 1-13");
+    expect(relativeAddressWithinRoot(' "C:/Comics/Series" ', "c:\\comics\\"))
+      .toBe("Series");
+  });
+
+  it("requires a path-segment boundary and refuses traversal outside the root", () => {
+    expect(relativeAddressWithinRoot("C:\\Comics2\\Series", "C:\\Comics")).toBeNull();
+    expect(relativeAddressWithinRoot("C:\\Comics\\..\\Outside", "C:\\Comics"))
+      .toBeNull();
   });
 
   it("jumps to an arbitrary back entry while preserving traversed entries as forward history", () => {
