@@ -408,6 +408,24 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tree-icon {
+  display: inline-block;
+  width: 20px;
+  margin-right: 4px;
+  color: #d5a000;
+  text-align: center;
+}
+.tree-icon--pc { color: #1689ae; }
+.tree-icon--drive { color: #66717c; }
+.tree-load-error { margin: 8px; color: #a01717; font-size: .78rem; }
+.drive-empty-state {
+  display: grid;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  color: #59636f;
+}
+.drive-empty-state h1 { margin: 0; color: #1f2328; font-size: 1.3rem; }
 .tree-node[aria-selected="true"] {
   color: #183b68;
   background: #dbeafe;

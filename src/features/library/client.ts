@@ -56,6 +56,19 @@ export async function restoreLibraryRoot(
   });
 }
 
+export interface WindowsDrive {
+  absolutePath: string;
+  name: string;
+}
+
+export async function listWindowsDrives(
+  generation: number,
+): Promise<ApiResponse<WindowsDrive[]>> {
+  return invoke("list_windows_drives", {
+    context: context(generation),
+  });
+}
+
 export interface CatalogSettings {
   sortField: "name" | "modified" | "size" | "kind";
   sortDescending: boolean;

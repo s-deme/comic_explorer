@@ -48,11 +48,19 @@ stale responseを構造的に区別する。
 
 ## catalogとnavigation
 
-登録rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
+起動時はlibrary root登録画面を介さず、Windowsの論理ドライブbitmaskをbackendで列挙して、frontendの
+folder treeへ`PC > drive > folder`として表示する。drive選択または別driveのabsolute address入力時は、
+そのdrive rootを既存のcanonical library rootへ設定してread-only catalog境界を切り替える。これにより
+Explorer型の操作を提供しつつ、検索、thumbnail、viewer、metadata、file操作が参照する単一root containmentを
+維持する。旧版のfolder単位rootは起動時にdrive rootとroot-relative pathへ分解して同じnavigationへ移行する。
+
+選択drive rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
 comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。addressのWindows絶対pathは外側の引用符を除去し、
-separatorとcaseを比較用に正規化してからrootとのpath segment境界を検証し、安全なroot相対pathへ変換する。
+separatorとcaseを比較用に正規化してからdriveとpath segment境界を検証し、安全なdrive相対pathへ変換する。
+Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
+address表示ではExplorerと同じ通常pathへ変換する。
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。名前検索はfrontendで検索条件を構成し、
 backendのread-only workerが正規化したbasename、検索開始folder、再帰、folder/file種別、size、mtimeを
@@ -149,7 +157,8 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 
 ## 画面状態と主要操作
 
-library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成る。
+library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成り、root未選択時も
+shellを表示してside paneのPC配下からdriveを選択できる。
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
 cover/small/detail/reference tile、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。

@@ -10,7 +10,7 @@ codd:
 
 ## 目的と正本
 
-Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風の画面で探索し、
+Comic Explorerは、Windows上のローカルドライブをExplorer風の画面で探索し、
 画像フォルダと対応書庫を安全に閲覧するデスクトップアプリである。本書は実装完了後の
 保守契約の正本であり、受入結果は[verification.md](verification.md)、現在状態は
 [status.md](status.md)、技術境界は[architecture.md](architecture.md)を正とする。
@@ -20,7 +20,7 @@ Comic Explorerは、Windows上のローカル漫画ライブラリをExplorer風
 
 ## 範囲
 
-対象は、登録したlibrary root内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
+対象は、サイドバーで選択したローカルドライブ内の階層移動、catalog、thumbnail、検索、viewer、読書位置・
 利用者metadata、app-local設定/cache、Windows配布である。BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、
 ICO、SVG、静止WebP、PDF、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを実装済み範囲とする。WICは画像形式ではなく、
 Windows標準codecが扱うraster画像のdecode基盤として利用する。AVIFには実装済みの安全な
@@ -42,10 +42,10 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 
 | 安定ID | 現行契約 |
 |---|---|
-| REQ-MVP-001 | 読取可能なlibrary rootを登録し、app-local設定から復元する。 |
+| REQ-MVP-001 | library rootの登録画面や手入力設定を要求せず、起動直後からPC配下のWindows論理ドライブをサイドバーへ列挙する。ドライブ選択時はそのドライブを安全境界として閲覧を開始し、最後に使用したドライブをapp-local設定から復元できる。旧版でfolder単位のlibrary rootが保存されている場合は、そのドライブと階層へ自動移行する。 |
 | REQ-MVP-002 | 固定metadataを要求せず任意のfolder階層を扱う。 |
-| REQ-MVP-003 | folder treeの展開・選択と現在folderを同期する。 |
-| REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動をroot内で行う。address入力はWindows Explorerの「パスのコピー」による引用符付き絶対pathを受理し、slash・大文字小文字を正規化したうえでlibrary rootとのpath segment境界を厳密に判定する。 |
+| REQ-MVP-003 | folder treeはPC、論理ドライブ、folderの階層をExplorerと同様に表示し、ドライブおよびfolderの展開・選択と現在folderを同期する。別ドライブの選択時は安全境界とcatalogをそのドライブへ切り替える。 |
+| REQ-MVP-004 | address入力、icon toolbarの戻る・進む・上へ・address移動、file menuの履歴移動を選択中ドライブ内で行う。addressにはWindows Explorerと同じ通常の絶対pathを表示し、内部canonical pathの拡張長接頭辞`\\?\`（UNCの場合は`\\?\UNC\`）を表示しない。address入力はWindows Explorerの「パスのコピー」による引用符付き絶対pathを受理し、slash・大文字小文字を正規化したうえでdriveとpath segment境界を厳密に判定する。別ドライブの絶対path入力時は安全境界をそのドライブへ切り替えて移動する。 |
 | REQ-MVP-005 | folder、漫画folder、対応archive、画像をcatalogに表示し、未対応fileの種別にはfile名の拡張子をそのまま表示する。thumbnailを表示しないfolderとarchiveには、それぞれを判別できる専用iconを表示する。 |
 | REQ-MVP-006 | 漫画folder・対応archive・PDFは自然順の先頭pageから表紙thumbnailを生成し、catalogに直接表示する対応画像はその画像自身のthumbnailを生成する。通常folderの直下に対応archiveが複数ある場合は、その自然順先頭archiveの表紙thumbnailをfolder項目に表示する。いずれも選択したsourceを含むfingerprintとcache鮮度を管理する。 |
 | REQ-MVP-007 | catalog toolbar buttonから並べ替え、昇降順、一覧形式のmenuを操作し、viewer toolbarから巻末動作を操作して、設定を保存する。 |
@@ -112,7 +112,7 @@ Git履歴から参照する。
 
 ## 全体受入シナリオ
 
-- E2E-MVP-001: root登録から画像folderを開き、単page/見開きで読み、再起動後に読書位置を復元する。
+- E2E-MVP-001: サイドバーのドライブ選択から画像folderを開き、単page/見開きで読み、再起動後にドライブと読書位置を復元する。起動時にlibrary root登録画面を表示せず、addressに`\\?\`を表示しない。
 - E2E-MVP-002: ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。

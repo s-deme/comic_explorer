@@ -36,6 +36,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             application::get_library_root,
+            application::list_windows_drives,
             application::get_catalog_settings,
             application::get_item_metadata,
             application::get_item_tags,

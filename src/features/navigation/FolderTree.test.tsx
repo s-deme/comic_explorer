@@ -1,17 +1,28 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listTreeChildren } from "../library/client";
+import { listTreeChildren, listWindowsDrives } from "../library/client";
 import { FolderTree } from "./FolderTree";
 
-vi.mock("../library/client", () => ({ listTreeChildren: vi.fn() }));
+vi.mock("../library/client", () => ({ listTreeChildren: vi.fn(), listWindowsDrives: vi.fn() }));
 const listMock = vi.mocked(listTreeChildren);
+const driveMock = vi.mocked(listWindowsDrives);
 
 describe("FolderTree", () => {
   afterEach(cleanup);
 
   beforeEach(() => {
     listMock.mockReset();
+    driveMock.mockReset();
+    driveMock.mockResolvedValue({
+      status: "ok",
+      requestId: "drives" as never,
+      generation: 1 as never,
+      data: [
+        { absolutePath: "C:\\", name: "ローカル ディスク (C:)" },
+        { absolutePath: "E:\\", name: "ボリューム (E:)" },
+      ],
+    });
     listMock.mockImplementation(async (path) => ({
       status: "ok",
       requestId: `tree-${path}` as never,
@@ -43,9 +54,10 @@ describe("FolderTree", () => {
     const onNavigate = vi.fn();
     render(
       <FolderTree
-        libraryRoot="C:\\Comics"
+        libraryRoot="C:\\"
         currentPath="Selected"
         onNavigate={onNavigate}
+        onSelectDrive={() => undefined}
       />,
     );
 
@@ -84,9 +96,10 @@ describe("FolderTree", () => {
     );
     render(
       <FolderTree
-        libraryRoot="C:\\Comics"
+        libraryRoot="C:\\"
         currentPath=""
         onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
       />,
     );
     fireEvent.click(
@@ -101,5 +114,22 @@ describe("FolderTree", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByRole("treeitem", { name: "Available" })).toBeInTheDocument();
+  });
+
+  it("shows PC drives and switches drives from the sidebar", async () => {
+    const onSelectDrive = vi.fn();
+    render(
+      <FolderTree
+        libraryRoot={null}
+        currentPath=""
+        onNavigate={() => undefined}
+        onSelectDrive={onSelectDrive}
+      />,
+    );
+
+    expect(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getByRole("treeitem", { name: /ボリューム \(E:\)/ }));
+    expect(onSelectDrive).toHaveBeenCalledWith("E:\\");
   });
 });

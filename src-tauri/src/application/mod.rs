@@ -256,6 +256,13 @@ pub struct LibraryRoot {
     pub absolute_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowsDrive {
+    pub absolute_path: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSettings {
@@ -765,12 +772,48 @@ pub fn get_library_root(
         .map_err(|_| "state poisoned")?
         .as_ref()
         .map(|path| LibraryRoot {
-            absolute_path: path.to_string_lossy().into_owned(),
+            absolute_path: library_root::display_path(path),
         });
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
         data: root,
+    })
+}
+
+#[tauri::command]
+pub fn list_windows_drives(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<WindowsDrive>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    #[cfg(target_os = "windows")]
+    let drives = match library_root::logical_drive_roots() {
+        Ok(drives) => drives,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    #[cfg(not(target_os = "windows"))]
+    let drives: Vec<PathBuf> = Vec::new();
+
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: drives
+            .into_iter()
+            .map(|path| {
+                let absolute_path = library_root::display_path(&path);
+                #[cfg(target_os = "windows")]
+                let name = library_root::drive_display_name(&path);
+                #[cfg(not(target_os = "windows"))]
+                let name = format!("ドライブ ({})", absolute_path.trim_end_matches('\\'));
+                WindowsDrive {
+                    absolute_path,
+                    name,
+                }
+            })
+            .collect(),
     })
 }
 
@@ -1868,7 +1911,7 @@ fn save_library_root(
         request_id: context.request_id.clone(),
         generation: context.generation,
         data: LibraryRoot {
-            absolute_path: canonical.to_string_lossy().into_owned(),
+            absolute_path: library_root::display_path(&canonical),
         },
     })
 }

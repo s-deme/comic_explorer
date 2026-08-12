@@ -45,6 +45,10 @@ vi.mock("./features/library/client", () => ({
   listFolder: vi.fn(),
   listReadingHistory: vi.fn(),
   listTreeChildren: vi.fn(),
+  listWindowsDrives: vi.fn(async () => ({
+    status: "ok", requestId: "drives", generation: 1,
+    data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
+  })),
   loadPage: vi.fn(),
   openComic: vi.fn(),
   pickLibraryRoot: vi.fn(),
@@ -124,13 +128,12 @@ function finding(status: string, severity: string, path: string) {
 }
 
 async function registerLibrary() {
-  registerMock.mockResolvedValue(response({ absolutePath: "C:\\Comics" }, "register") as never);
+  vi.mocked(restoreLibraryRoot).mockResolvedValue(
+    response({ absolutePath: "C:\\" }, "restore") as never,
+  );
+  registerMock.mockResolvedValue(response({ absolutePath: "C:\\" }, "register") as never);
   listFolderMock.mockResolvedValue(response([], "list") as never);
   render(<App />);
-  fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-    target: { value: "C:\\Comics" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "登録" }));
   await screen.findByRole("grid", { name: "現在のフォルダの項目" });
 }
 

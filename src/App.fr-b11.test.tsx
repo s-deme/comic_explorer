@@ -58,6 +58,10 @@ vi.mock("./features/library/client", () => ({
   pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
   listTreeChildren: vi.fn(),
+  listWindowsDrives: vi.fn(async () => ({
+    status: "ok", requestId: "drives", generation: 1,
+    data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
+  })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   addFavorite: vi.fn(),
@@ -142,11 +146,15 @@ function testSession(itemKey: string, pageCount = 1) {
 }
 
 async function registerTestLibrary(entries: CatalogEntry[]) {
+  restoreMock.mockResolvedValue({
+    status: "ok", requestId: "restore" as never, generation: 1 as never,
+    data: { absolutePath: "C:\\" },
+  });
   registerMock.mockResolvedValue({
     status: "ok",
     requestId: "register" as never,
     generation: 1 as never,
-    data: { absolutePath: "C:\\Comics" },
+    data: { absolutePath: "C:\\" },
   });
   listMock.mockResolvedValue({
     status: "ok",
@@ -154,10 +162,7 @@ async function registerTestLibrary(entries: CatalogEntry[]) {
     generation: 2 as never,
     data: entries,
   });
-  fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-    target: { value: "C:\\Comics" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "登録" }));
+  render(<App />);
   await screen.findByRole("grid", { name: "現在のフォルダの項目" });
 }
 
@@ -244,7 +249,6 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
   });
 
   it("FT-B11-001 remaps, rejects conflicts, and resets the production command mapping", async () => {
-    render(<App />);
     await registerTestLibrary([]);
     openSettingsMenuItem();
 
@@ -321,7 +325,6 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
   });
 
   it("FT-B11-006 connects a remapped catalog command to the application shell", async () => {
-    render(<App />);
     await registerTestLibrary([testEntry("book.cbz")]);
     openSettingsMenuItem();
     const dialog = screen.getByRole("dialog", { name: "統合設定" });
@@ -350,7 +353,6 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       generation: 1 as never,
       data: testSession("book.cbz", 2),
     });
-    render(<App />);
     await registerTestLibrary([entry]);
     await openTestComic("book.cbz");
     markViewerPrefetchReady();
@@ -378,7 +380,6 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     settingsMock.mockResolvedValue(
       settingsResponse({ nextPage: "N", previousPage: "N" }),
     );
-    render(<App />);
     await registerTestLibrary([]);
     openSettingsMenuItem();
     expect(
@@ -393,7 +394,6 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
 
     cleanup();
     settingsMock.mockResolvedValue(settingsResponse({ nextPage: "N" }));
-    render(<App />);
     await registerTestLibrary([]);
     openSettingsMenuItem();
     expect(

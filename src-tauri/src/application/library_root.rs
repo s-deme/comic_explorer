@@ -4,6 +4,65 @@ use std::path::{Path, PathBuf};
 
 use crate::domain::{AppError, ErrorCode};
 
+pub fn display_path(path: &Path) -> String {
+    let raw = path.to_string_lossy();
+    if let Some(path) = raw.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{path}");
+    }
+    raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_owned()
+}
+
+#[cfg(target_os = "windows")]
+pub fn logical_drive_roots() -> Result<Vec<PathBuf>, AppError> {
+    use windows::Win32::Storage::FileSystem::GetLogicalDrives;
+
+    let mask = unsafe { GetLogicalDrives() };
+    if mask == 0 {
+        return Err(AppError {
+            code: ErrorCode::Internal,
+            message: "Windowsのドライブ一覧を取得できませんでした。".into(),
+            target: None,
+            retryable: true,
+        });
+    }
+    Ok(drive_roots_from_mask(mask))
+}
+
+#[cfg(target_os = "windows")]
+pub fn drive_display_name(root: &Path) -> String {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW};
+    use windows::core::PCWSTR;
+
+    let wide: Vec<u16> = root.as_os_str().encode_wide().chain(Some(0)).collect();
+    let root_path = PCWSTR::from_raw(wide.as_ptr());
+    let mut volume_name = [0u16; 261];
+    let volume =
+        unsafe { GetVolumeInformationW(root_path, Some(&mut volume_name), None, None, None, None) }
+            .ok()
+            .and_then(|_| {
+                let length = volume_name.iter().position(|character| *character == 0)?;
+                (length > 0).then(|| String::from_utf16_lossy(&volume_name[..length]))
+            });
+    let kind = volume.unwrap_or_else(|| match unsafe { GetDriveTypeW(root_path) } {
+        2 => "リムーバブル ディスク".into(),
+        3 => "ローカル ディスク".into(),
+        4 => "ネットワーク ドライブ".into(),
+        5 => "DVD ドライブ".into(),
+        6 => "RAM ディスク".into(),
+        _ => "ドライブ".into(),
+    });
+    let drive = display_path(root).trim_end_matches('\\').to_owned();
+    format!("{kind} ({drive})")
+}
+
+fn drive_roots_from_mask(mask: u32) -> Vec<PathBuf> {
+    (0..26)
+        .filter(|index| mask & (1 << index) != 0)
+        .map(|index| PathBuf::from(format!("{}:\\", (b'A' + index as u8) as char)))
+        .collect()
+}
+
 pub fn validate_library_root(requested: &Path) -> Result<PathBuf, AppError> {
     let canonical = requested
         .canonicalize()
@@ -113,6 +172,27 @@ fn picker_error(error: impl std::fmt::Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hides_windows_extended_length_prefixes_from_display_paths() {
+        assert_eq!(
+            display_path(Path::new(r"\\?\D:\bit\dl_comp")),
+            r"D:\bit\dl_comp"
+        );
+        assert_eq!(
+            display_path(Path::new(r"\\?\UNC\server\share\comic")),
+            r"\\server\share\comic"
+        );
+        assert_eq!(display_path(Path::new(r"C:\Comics")), r"C:\Comics");
+    }
+
+    #[test]
+    fn expands_the_windows_logical_drive_bitmask_in_letter_order() {
+        assert_eq!(
+            drive_roots_from_mask((1 << 2) | (1 << 4)),
+            vec![PathBuf::from(r"C:\"), PathBuf::from(r"E:\")]
+        );
+    }
 
     #[test]
     fn canonicalizes_and_accepts_a_readable_directory() {

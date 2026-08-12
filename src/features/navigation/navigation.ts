@@ -12,27 +12,53 @@ export type NavigationAction =
   | { type: "jumpForward"; index: number }
   | { type: "reset"; path: string };
 
-function normalizeWindowsAbsolutePath(path: string): string {
+export function normalizeWindowsDisplayPath(path: string): string {
   const trimmed = path.trim();
   const unquoted = trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')
     ? trimmed.slice(1, -1)
     : trimmed;
-  return unquoted.trim().replaceAll("/", "\\").replace(/\\+$/, "");
+  const normalized = unquoted.trim().replaceAll("/", "\\");
+  const withoutExtendedPrefix = normalized.toLocaleLowerCase("en-US").startsWith("\\\\?\\unc\\")
+    ? `\\\\${normalized.slice(8)}`
+    : normalized.startsWith("\\\\?\\")
+      ? normalized.slice(4)
+      : normalized;
+  return /^[a-zA-Z]:\\+$/.test(withoutExtendedPrefix)
+    ? `${withoutExtendedPrefix[0]}:\\`
+    : withoutExtendedPrefix.replace(/\\+$/, "");
+}
+
+export interface WindowsDriveAddress {
+  driveRoot: string;
+  relativePath: string;
+}
+
+export function parseWindowsDriveAddress(address: string): WindowsDriveAddress | null {
+  const normalized = normalizeWindowsDisplayPath(address);
+  const match = /^([a-zA-Z]):(?:\\(.*))?$/.exec(normalized);
+  if (match === null) return null;
+  const segments = (match[2] ?? "").split("\\").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === "..")) return null;
+  return {
+    driveRoot: `${match[1].toLocaleUpperCase("en-US")}:\\`,
+    relativePath: segments.join("/"),
+  };
 }
 
 export function relativeAddressWithinRoot(
   address: string,
   libraryRoot: string,
 ): string | null {
-  const normalizedAddress = normalizeWindowsAbsolutePath(address);
-  const normalizedRoot = normalizeWindowsAbsolutePath(libraryRoot);
+  const normalizedAddress = normalizeWindowsDisplayPath(address);
+  const normalizedRoot = normalizeWindowsDisplayPath(libraryRoot);
   const foldedAddress = normalizedAddress.toLocaleLowerCase("en-US");
   const foldedRoot = normalizedRoot.toLocaleLowerCase("en-US");
 
   if (foldedAddress === foldedRoot) return "";
-  if (!foldedAddress.startsWith(`${foldedRoot}\\`)) return null;
+  const rootPrefix = foldedRoot.endsWith("\\") ? foldedRoot : `${foldedRoot}\\`;
+  if (!foldedAddress.startsWith(rootPrefix)) return null;
 
-  const relative = normalizedAddress.slice(normalizedRoot.length + 1);
+  const relative = normalizedAddress.slice(rootPrefix.length);
   if (relative.split("\\").some((segment) => segment === "." || segment === "..")) {
     return null;
   }

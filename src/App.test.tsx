@@ -66,6 +66,10 @@ vi.mock("./features/library/client", () => ({
   pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
   listTreeChildren: vi.fn(),
+  listWindowsDrives: vi.fn(async () => ({
+    status: "ok", requestId: "drives", generation: 1,
+    data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
+  })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   addFavorite: vi.fn(),
@@ -273,11 +277,17 @@ async function registerTestLibrary(
   entries: CatalogEntry[],
   fullscreenAdapter?: FullscreenAdapter,
 ) {
+  restoreMock.mockResolvedValue({
+    status: "ok",
+    requestId: "restore" as never,
+    generation: 1 as never,
+    data: { absolutePath: "C:\\" },
+  });
   registerMock.mockResolvedValue({
     status: "ok",
     requestId: "register" as never,
     generation: 1 as never,
-    data: { absolutePath: "C:\\Comics" },
+    data: { absolutePath: "C:\\" },
   });
   listMock.mockResolvedValue({
     status: "ok",
@@ -296,10 +306,6 @@ async function registerTestLibrary(
     },
   });
   render(<App fullscreenAdapter={fullscreenAdapter} />);
-  fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-    target: { value: "C:\\Comics" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "登録" }));
   await screen.findByRole("grid", { name: "現在のフォルダの項目" });
 }
 
@@ -521,23 +527,21 @@ describe("application shell", () => {
     expect(notice).not.toHaveTextContent("recovery");
   });
 
-  it("starts with an accessible library-root registration form", () => {
+  it("starts in the Explorer shell without a library-root registration form", async () => {
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Comic Explorer" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("ライブラリルート")).toHaveAttribute(
-      "required",
-    );
+    expect(screen.queryByLabelText("ライブラリルート")).not.toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: "PC" })).toBeInTheDocument();
+    expect(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }))
+      .toBeInTheDocument();
   });
 
-  it("keeps tree, address and catalog synchronized after registration", async () => {
+  it("keeps drive tree, address and catalog synchronized after sidebar selection", async () => {
     registerMock.mockResolvedValue({
       status: "ok",
       requestId: "request-1" as never,
       generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
+      data: { absolutePath: "C:\\" },
     });
     listMock.mockResolvedValue({
       status: "ok",
@@ -547,23 +551,26 @@ describe("application shell", () => {
     });
     render(<App />);
 
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    fireEvent.click(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"),
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"),
     );
     expect(
       screen.getByRole("complementary", { name: "フォルダツリー" }),
-    ).toHaveTextContent("Comics");
+    ).toHaveTextContent("ローカル ディスク (C:)");
     expect(
       screen.getByRole("grid", { name: "現在のフォルダの項目" }),
     ).toBeInTheDocument();
   });
 
-  it("registers the folder returned by the Windows folder picker", async () => {
+  it("opens the folder returned by the Windows folder picker without a root form", async () => {
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "register-drive" as never,
+      generation: 2 as never,
+      data: { absolutePath: "C:\\" },
+    });
     pickerMock.mockResolvedValue({
       status: "ok",
       requestId: "picker" as never,
@@ -578,14 +585,14 @@ describe("application shell", () => {
     });
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "フォルダを選択" }));
+    chooseAppMenuItem("ファイル", "フォルダーを開く…");
 
     await waitFor(() =>
       expect(screen.getByLabelText("アドレス")).toHaveValue(
         "C:\\Selected Comics",
       ),
     );
-    expect(registerMock).not.toHaveBeenCalled();
+    expect(registerMock).toHaveBeenCalledWith("C:\\", expect.any(Number));
   });
 
   it("renders a sanitized, recoverable folder error without removing navigation", async () => {
@@ -593,7 +600,7 @@ describe("application shell", () => {
       status: "ok",
       requestId: "request-1" as never,
       generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
+      data: { absolutePath: "C:\\" },
     });
     listMock.mockResolvedValue({
       status: "error",
@@ -606,11 +613,11 @@ describe("application shell", () => {
         retryable: true,
       },
     });
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
+    restoreMock.mockResolvedValue({
+      status: "ok", requestId: "restore-root" as never, generation: 1 as never,
+      data: { absolutePath: "C:\\Comics" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    render(<App />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "アクセスできません。権限または他のアプリによる使用状況を確認してください。",
@@ -620,28 +627,12 @@ describe("application shell", () => {
     expect(screen.getByTitle("戻る")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再試行" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "別のフォルダを選択" }),
+      screen.getByRole("button", { name: "別のフォルダーを開く" }),
     ).toBeInTheDocument();
   });
 
   it("resizes the tree by keyboard and restores help focus", async () => {
-    registerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-1" as never,
-      generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
-    });
-    listMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-2" as never,
-      generation: 2 as never,
-      data: [],
-    });
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    await registerTestLibrary([]);
 
     const splitter = await screen.findByRole("separator", {
       name: "フォルダツリーの幅",
@@ -668,14 +659,12 @@ describe("application shell", () => {
 
     fireEvent.keyDown(fileTrigger, { key: "Enter" });
     expect(fileTrigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics");
+    expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\");
 
-    const changeRoot = within(screen.getByRole("menu", { name: "ファイル" }))
-      .getByRole("menuitem", { name: "ライブラリを変更…" });
-    fireEvent.keyDown(changeRoot, { key: "Enter" });
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Comic Explorer" }),
-    ).toBeInTheDocument();
+    const openFolder = within(screen.getByRole("menu", { name: "ファイル" }))
+      .getByRole("menuitem", { name: "フォルダーを開く…" });
+    fireEvent.keyDown(openFolder, { key: "Enter" });
+    expect(pickerMock).toHaveBeenCalledTimes(1);
   });
 
   it("moves navigation history from the toolbar into the File menu and supports history jumps", async () => {
@@ -686,7 +675,7 @@ describe("application shell", () => {
     expect(within(fileMenu).getByText("履歴")).toBeInTheDocument();
     expect(within(fileMenu).getByText("移動履歴はありません")).toBeInTheDocument();
     fireEvent.keyDown(
-      within(fileMenu).getByRole("menuitem", { name: "ライブラリを変更…" }),
+      within(fileMenu).getByRole("menuitem", { name: "フォルダーを開く…" }),
       { key: "Escape" },
     );
 
@@ -702,18 +691,18 @@ describe("application shell", () => {
     await waitFor(() => expect(listMock).toHaveBeenCalledTimes(3));
 
     fileMenu = openAppMenu("ファイル");
-    expect(within(fileMenu).getByRole("menuitem", { name: "戻る: Series" }))
+    expect(within(fileMenu).getByRole("menuitem", { name: "戻る: Comics/Series" }))
       .toBeInTheDocument();
     fireEvent.click(
       within(fileMenu).getByRole("menuitem", { name: "戻る: ライブラリ" }),
     );
     await waitFor(() =>
-      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"),
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"),
     );
 
     fileMenu = openAppMenu("ファイル");
     fireEvent.click(
-      within(fileMenu).getByRole("menuitem", { name: "進む: Series/Volume" }),
+      within(fileMenu).getByRole("menuitem", { name: "進む: Comics/Series/Volume" }),
     );
     await waitFor(() =>
       expect(screen.getByLabelText("アドレス"))
@@ -947,7 +936,7 @@ describe("application shell", () => {
     expect(within(navigationMenu).getByRole("menuitem", { name: /上のフォルダへ/ }))
       .toHaveAttribute("aria-disabled", "false");
     fireEvent.click(within(navigationMenu).getByRole("menuitem", { name: /戻る/ }));
-    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"));
 
     navigationMenu = openAppMenu("表示");
     expect(within(navigationMenu).getByRole("menuitem", { name: /進む/ }))
@@ -960,7 +949,7 @@ describe("application shell", () => {
       expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
     );
     fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
-    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics"));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"));
     fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
     await waitFor(() =>
       expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"),
@@ -992,24 +981,7 @@ describe("application shell", () => {
       kind: "archive",
       archiveKind: "cbz",
     }));
-    registerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-1" as never,
-      generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
-    });
-    listMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-2" as never,
-      generation: 2 as never,
-      data: entries,
-    });
-    thumbnailMock.mockImplementation(() => new Promise(() => undefined));
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    await registerTestLibrary(entries);
 
     await waitFor(() => expect(thumbnailMock).toHaveBeenCalledTimes(45));
     const priorities = thumbnailMock.mock.calls.map((call) => call[3]);
@@ -1071,28 +1043,6 @@ describe("application shell", () => {
       ],
       startIndex: 0,
     });
-    registerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-1" as never,
-      generation: 1 as never,
-      data: { absolutePath: "C:\\Comics" },
-    });
-    listMock.mockResolvedValue({
-      status: "ok",
-      requestId: "request-2" as never,
-      generation: 2 as never,
-      data: [first, second],
-    });
-    thumbnailMock.mockResolvedValue({
-      status: "error",
-      requestId: "thumbnail" as never,
-      generation: 1 as never,
-      error: {
-        code: "NOT_FOUND",
-        message: "missing",
-        retryable: true,
-      },
-    });
     openMock
       .mockResolvedValueOnce({
         status: "ok",
@@ -1106,11 +1056,7 @@ describe("application shell", () => {
         generation: 2 as never,
         data: session(second.relativePath),
       });
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
-      target: { value: "C:\\Comics" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    await registerTestLibrary([first, second]);
     fireEvent.keyDown(
       await screen.findByRole("button", { name: /01-first/ }),
       { key: "Enter" },
@@ -1824,7 +1770,7 @@ describe("application shell", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series");
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Series");
       expect(screen.getByText("選択: Series/Volume.cbz")).toBeInTheDocument();
     });
     expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
@@ -2083,7 +2029,7 @@ describe("application shell", () => {
     chooseAppMenuItem("オプション", "お気に入り");
     let dialog = await screen.findByRole("dialog", { name: "お気に入り" });
     fireEvent.click(within(dialog).getAllByRole("button", { name: "開く" })[0]);
-    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Comics\\Series"));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Series"));
     expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
 
     chooseAppMenuItem("オプション", "お気に入り");
@@ -2249,7 +2195,7 @@ describe("application shell", () => {
     }
   });
 
-  it("FT-B14-002 discards an in-flight open when the library root changes", async () => {
+  it("FT-B14-002 discards an in-flight open when the selected drive changes", async () => {
     let resolveOpen!: (value: ReturnType<typeof viewerResponse>) => void;
     openMock.mockImplementationOnce(() => new Promise((resolve) => {
       resolveOpen = resolve;
@@ -2257,12 +2203,11 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("old.cbz")]);
     fireEvent.keyDown(screen.getByRole("button", { name: /^old\.cbz/ }), { key: "Enter" });
 
-    chooseAppMenuItem("ファイル", "ライブラリを変更…");
     registerMock.mockResolvedValueOnce({
       status: "ok",
       requestId: "register-new-root" as never,
       generation: 4 as never,
-      data: { absolutePath: "D:\\New Comics" },
+      data: { absolutePath: "D:\\" },
     });
     listMock.mockResolvedValueOnce({
       status: "ok",
@@ -2270,10 +2215,10 @@ describe("application shell", () => {
       generation: 5 as never,
       data: [testEntry("new.cbz")],
     });
-    fireEvent.change(screen.getByLabelText("ライブラリルート"), {
+    fireEvent.change(screen.getByLabelText("アドレス"), {
       target: { value: "D:\\New Comics" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "登録" }));
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
     await screen.findByRole("button", { name: /^new\.cbz/ });
 
     await act(async () => resolveOpen(viewerResponse("old.cbz")));

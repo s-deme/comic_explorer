@@ -2,6 +2,8 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CatalogGrid } from "./features/catalog/CatalogGrid";
 import {
   navigationReducer,
+  normalizeWindowsDisplayPath,
+  parseWindowsDriveAddress,
   parentPath,
   relativeAddressWithinRoot,
 } from "./features/navigation/navigation";
@@ -267,6 +269,12 @@ function diagnosticSeverityLabel(
   }
 }
 
+function absoluteLoadTarget(libraryRoot: string | null, path: string): string {
+  if (parseWindowsDriveAddress(path) !== null) return normalizeWindowsDisplayPath(path);
+  if (libraryRoot === null || path === "") return normalizeWindowsDisplayPath(libraryRoot ?? path);
+  return `${normalizeWindowsDisplayPath(libraryRoot).replace(/[\\/]+$/, "")}\\${path.replaceAll("/", "\\")}`;
+}
+
 export function App({ fullscreenAdapter }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
@@ -310,7 +318,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     sort: null,
     catalogView: null,
   });
-  const [rootInput, setRootInput] = useState("");
   const [libraryRoot, setLibraryRoot] = useState<string | null>(null);
   const [navigation, dispatch] = useReducer(navigationReducer, {
     current: "",
@@ -507,18 +514,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (!migration.ok) {
       setSelectionNotice("app-local collectionをこのlibraryへ移行できませんでした。");
     }
-  }
-
-  function deactivateLibraryRoot() {
-    viewerGeneration.current += 1;
-    setViewerSession(null);
-    managedThumbnailRoot.current = null;
-    replaceManagedThumbnails(createManagedThumbnailMap());
-    setLegacyThumbnailDataPresent(false);
-    setBookshelfPaths([]);
-    setBookmarks([]);
-    setRecentEntries([]);
-    setLibraryRoot(null);
   }
 
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
@@ -739,9 +734,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           response.status === "ok" &&
           response.data
         ) {
-          activateLibraryRoot(response.data.absolutePath);
-          dispatch({ type: "reset", path: "" });
-          await load("");
+          const restored = parseWindowsDriveAddress(response.data.absolutePath);
+          if (restored === null) {
+            activateLibraryRoot(response.data.absolutePath);
+            dispatch({ type: "reset", path: "" });
+            await load("");
+            return;
+          }
+          const driveResponse = await registerLibraryRoot(
+            restored.driveRoot,
+            ++generation.current,
+          );
+          if (driveResponse.status === "ok") {
+            activateLibraryRoot(driveResponse.data.absolutePath);
+            dispatch({ type: "reset", path: restored.relativePath });
+            await load(restored.relativePath);
+          }
         }
       })
       .catch(() => undefined)
@@ -750,9 +758,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   const absoluteAddress = useMemo(() => {
     if (libraryRoot === null || navigation.current === "") {
-      return libraryRoot ?? "";
+      return normalizeWindowsDisplayPath(libraryRoot ?? "");
     }
-    return `${libraryRoot.replace(/[\\/]+$/, "")}\\${navigation.current.replaceAll("/", "\\")}`;
+    return `${normalizeWindowsDisplayPath(libraryRoot).replace(/[\\/]+$/, "")}\\${navigation.current.replaceAll("/", "\\")}`;
   }, [libraryRoot, navigation.current]);
 
   useEffect(() => {
@@ -843,20 +851,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     }
   }
 
-  async function chooseRoot(event: React.FormEvent) {
-    event.preventDefault();
+  async function selectDrive(absolutePath: string, relativePath = "") {
     clearSearch();
     setDiagnosticReport(null);
     setDiagnosticNotice(null);
     generation.current += 1;
-    const response = await registerLibraryRoot(rootInput, generation.current);
+    const response = await registerLibraryRoot(absolutePath, generation.current);
     if (response.status === "ok") {
       addressInputDirty.current = false;
       activateLibraryRoot(response.data.absolutePath);
-      dispatch({ type: "reset", path: "" });
-      await load("");
+      dispatch({ type: "reset", path: relativePath });
+      await load(relativePath);
     } else if (response.status === "error") {
-      setLoadState({ status: "error", path: rootInput, message: presentError(response.error) });
+      setLoadState({ status: "error", path: absolutePath, message: presentError(response.error) });
     }
   }
 
@@ -1406,15 +1413,16 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     generation.current += 1;
     const response = await pickLibraryRoot(generation.current);
     if (response.status === "ok" && response.data) {
-      addressInputDirty.current = false;
-      setRootInput(response.data.absolutePath);
-      activateLibraryRoot(response.data.absolutePath);
-      dispatch({ type: "reset", path: "" });
-      await load("");
+      const address = parseWindowsDriveAddress(response.data.absolutePath);
+      if (address === null) {
+        setLoadState({ status: "error", path: response.data.absolutePath, message: "Windowsのローカルドライブを選択してください。" });
+        return;
+      }
+      await selectDrive(address.driveRoot, address.relativePath);
     } else if (response.status === "error") {
       setLoadState({
         status: "error",
-        path: rootInput,
+        path: "",
         message: presentError(response.error),
       });
     }
@@ -2163,42 +2171,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       .finally(() => thumbnailRequests.current.delete(entry.relativePath));
   }
 
-  if (libraryRoot === null) {
-    return (
-      <main className="setup-screen">
-        <div className="setup-card">
-          <h1>Comic Explorer</h1>
-          {recoveryNotice && (
-            <p role="status">
-              アプリデータを再初期化しました。漫画ファイルは変更していません。
-            </p>
-          )}
-          <p>漫画を保存しているローカルフォルダを登録してください。</p>
-          {restoring && <p role="status">保存した設定を確認しています。</p>}
-          <form onSubmit={chooseRoot}>
-            <label htmlFor="library-root">ライブラリルート</label>
-            <div className="setup-row">
-              <input
-                id="library-root"
-                value={rootInput}
-                onChange={(event) => setRootInput(event.target.value)}
-                placeholder="C:\Comics"
-                required
-              />
-              <button type="submit">登録</button>
-            </div>
-          </form>
-          <button className="picker-button" type="button" onClick={() => void chooseRootWithPicker()}>
-            フォルダを選択
-          </button>
-          {loadState.status === "error" && (
-            <p role="alert">{loadState.message}</p>
-          )}
-        </div>
-      </main>
-    );
-  }
-
   const selected = entries.find(
     (entry) => entry.relativePath === selectedPath,
   );
@@ -2801,9 +2773,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 tabIndex={0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(deactivateLibraryRoot)}
+                onClick={() => runMenuAction(chooseRootWithPicker)}
               >
-                ライブラリを変更…
+                フォルダーを開く…
               </button>
               <button
                 type="button"
@@ -3713,15 +3685,22 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         className="address-bar"
         onSubmit={(event) => {
           event.preventDefault();
-          const relative = relativeAddressWithinRoot(addressInput, libraryRoot);
-          if (relative === null) {
+          const target = parseWindowsDriveAddress(addressInput);
+          if (target === null) {
             setLoadState({
               status: "error",
               path: addressInput,
-              message: "ライブラリルート外へは移動できません。",
+              message: "Windowsの絶対パスを入力してください。",
             });
             return;
           }
+          if (libraryRoot === null || normalizeWindowsDisplayPath(target.driveRoot).toLocaleLowerCase("en-US")
+            !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")) {
+            void selectDrive(target.driveRoot, target.relativePath);
+            return;
+          }
+          const relative = relativeAddressWithinRoot(addressInput, libraryRoot);
+          if (relative === null) return;
           addressInputDirty.current = false;
           navigate(relative);
         }}
@@ -4147,6 +4126,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 libraryRoot={libraryRoot}
                 currentPath={navigation.current}
                 onNavigate={(path) => navigate(path)}
+                onSelectDrive={(path) => selectDrive(path)}
               />
             )}
             <div
@@ -4221,15 +4201,24 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               )}
             </section>
           )}
+          {libraryRoot === null && !restoring && searchState.status === "idle" && loadState.status === "idle" && (
+            <div className="drive-empty-state">
+              <h1>PC</h1>
+              <p>左のサイドバーからドライブを選択してください。</p>
+            </div>
+          )}
+          {restoring && libraryRoot === null && (
+            <p className="loading-state" role="status">保存した場所を確認しています。</p>
+          )}
           {searchState.status === "idle" && loadState.status === "loading" && (
             <p className="loading-state" role="status">
-              読み込み中: {loadState.path || libraryRoot}
+              読み込み中: {absoluteLoadTarget(libraryRoot, loadState.path)}
             </p>
           )}
           {searchState.status === "idle" && loadState.status === "error" ? (
             <div className="error-panel" role="alert">
               <h2>読み込みに失敗しました</h2>
-              <p>対象: {loadState.path || libraryRoot}</p>
+              <p>対象: {absoluteLoadTarget(libraryRoot, loadState.path)}</p>
               <p>{loadState.message}</p>
               <button onClick={() => void load(navigation.current)}>再試行</button>
               {entries.length > 0 && (
@@ -4241,9 +4230,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                 </button>
               )}
               {up !== null && <button onClick={() => navigate(up)}>親フォルダへ</button>}
-              <button onClick={() => void chooseRootWithPicker()}>別のフォルダを選択</button>
+              <button onClick={() => void chooseRootWithPicker()}>別のフォルダーを開く</button>
             </div>
-          ) : searchState.status === "idle" && loadState.status !== "error" ? (
+          ) : libraryRoot !== null && searchState.status === "idle" && loadState.status !== "error" ? (
             <CatalogGrid
               entries={visibleEntries}
               selectedPath={selectedPath}

@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import {
   navigationReducer,
+  normalizeWindowsDisplayPath,
+  parseWindowsDriveAddress,
   parentPath,
   relativeAddressWithinRoot,
 } from "./navigation";
@@ -40,6 +42,22 @@ describe("navigation state", () => {
     expect(relativeAddressWithinRoot("C:\\Comics2\\Series", "C:\\Comics")).toBeNull();
     expect(relativeAddressWithinRoot("C:\\Comics\\..\\Outside", "C:\\Comics"))
       .toBeNull();
+  });
+
+  it("keeps Windows extended-length syntax internal", () => {
+    expect(normalizeWindowsDisplayPath(String.raw`\\?\E:\bit\dl_comp`))
+      .toBe(String.raw`E:\bit\dl_comp`);
+    expect(normalizeWindowsDisplayPath(String.raw`\\?\UNC\server\share\comic`))
+      .toBe(String.raw`\\server\share\comic`);
+  });
+
+  it("parses an Explorer-style absolute address into a drive and relative path", () => {
+    expect(parseWindowsDriveAddress(' "e:/F/comic/dl_comp" ')).toEqual({
+      driveRoot: "E:\\",
+      relativePath: "F/comic/dl_comp",
+    });
+    expect(parseWindowsDriveAddress("E:\\comic\\..\\outside")).toBeNull();
+    expect(parseWindowsDriveAddress("comic\\folder")).toBeNull();
   });
 
   it("jumps to an arbitrary back entry while preserving traversed entries as forward history", () => {
