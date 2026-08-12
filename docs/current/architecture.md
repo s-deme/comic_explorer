@@ -72,7 +72,7 @@ backendのread-only workerが正規化したbasename、検索開始folder、再�
 cacheへ置き換えない。card形式はprofileに保存した形式別thumbnail幅から画像枠とcardの固定寸法を導出し、
 scroll containerの幅を観測して収まる列数だけを決める。ウィンドウ幅の変更ではthumbnailを拡縮しないため、
 仮想行、keyboardの上下移動、focus復元は同じ固定card幅から求めた列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
-primary情報と独立したお気に入りtoggleを、詳細リストでは左端の専用列、サムネイル系cardではサムネイル左上への重ね表示として維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。検索、mask、複数選択、property、
+primary情報と独立したお気に入りtoggleを、詳細リストでは左端の専用列、サムネイル系cardではサムネイル左上への重ね表示として維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。さらに全一覧形式のfile名先頭へcompactなinline SVG種類iconを置き、`page`を画像、`folder`と`comicFolder`をfolder、`archive`を圧縮file、`pdf`をPDF、`unsupported`を汎用fileへ写像する。種類iconは`aria-hidden`とし、既存の項目accessible nameで種別を通知する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
 Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、

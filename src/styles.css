@@ -609,7 +609,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   height: 44px;
   font-size: 1.3rem;
 }
-.catalog-item--detail_list .item-name { margin-top: 0; }
+.catalog-item--detail_list .item-name {
+  justify-content: flex-start;
+  margin-top: 0;
+}
 .item-metadata { min-width: 0; overflow-wrap: anywhere; }
 .item-size, .item-modified { color: #59636f; font-size: .82rem; }
 .catalog-item:hover { border-color: #aab4c0; background: #f2f6fb; }
@@ -672,14 +675,80 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   stroke-width: 3;
 }
 .item-name {
-  display: -webkit-box;
+  display: flex;
+  min-width: 0;
   overflow: hidden;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
   margin-top: 7px;
   font-size: .82rem;
   line-height: 1.25;
+}
+.item-name__text {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
+}
+.item-kind-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin-top: 1px;
+  overflow: visible;
+}
+.item-kind-icon__image-frame {
+  fill: #e5f3eb;
+  stroke: #397957;
+  stroke-width: 1.2;
+}
+.item-kind-icon__image-sun { fill: #e1a928; }
+.item-kind-icon__image-landscape { fill: #55a477; }
+.item-kind-icon__folder-back {
+  fill: #d69d31;
+  stroke: #805d1e;
+  stroke-linejoin: round;
+  stroke-width: 1;
+}
+.item-kind-icon__folder-front {
+  fill: #f2c75b;
+  stroke: #805d1e;
+  stroke-linejoin: round;
+  stroke-width: 1;
+}
+.item-kind-icon__document {
+  fill: #eef2f6;
+  stroke: #566778;
+  stroke-linejoin: round;
+  stroke-width: 1.1;
+}
+.item-kind-icon__fold {
+  fill: #fff;
+  stroke: #566778;
+  stroke-linejoin: round;
+  stroke-width: 1.1;
+}
+.item-kind-icon__archive-zipper {
+  fill: none;
+  stroke: #2374aa;
+  stroke-linecap: round;
+  stroke-width: 1.1;
+}
+.item-kind-icon__pdf-mark {
+  fill: none;
+  stroke: #c43d3d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1;
+}
+.item-kind-icon__file-lines {
+  fill: none;
+  stroke: #697989;
+  stroke-linecap: round;
+  stroke-width: 1;
 }
 .item-kind { color: #59636f; font-size: .76rem; }
 .catalog-actions {

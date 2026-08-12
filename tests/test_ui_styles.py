@@ -158,7 +158,23 @@ class UiStyleContractTests(unittest.TestCase):
 
     def test_catalog_names_and_favorites_use_compact_controls(self) -> None:
         self.assertIn(
-            ".item-name {\n  display: -webkit-box;\n  overflow: hidden;\n  margin-top: 7px;\n  font-size: .82rem;",
+            ".item-name {\n  display: flex;\n  min-width: 0;\n  overflow: hidden;",
+            STYLES,
+        )
+        self.assertIn(
+            ".item-name {\n  display: flex;\n  min-width: 0;\n  overflow: hidden;"
+            "\n  align-items: flex-start;\n  justify-content: center;\n  gap: 4px;",
+            STYLES,
+        )
+        self.assertIn(
+            ".item-name__text {\n  display: -webkit-box;\n  min-width: 0;"
+            "\n  overflow: hidden;\n  -webkit-box-orient: vertical;"
+            "\n  -webkit-line-clamp: 2;",
+            STYLES,
+        )
+        self.assertIn(
+            ".item-kind-icon {\n  width: 14px;\n  height: 14px;"
+            "\n  flex: 0 0 14px;",
             STYLES,
         )
         self.assert_rule_contains(".favorite-toggle", "width: 24px")

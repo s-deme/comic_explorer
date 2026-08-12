@@ -397,8 +397,9 @@ describe("CatalogGrid", () => {
       );
 
       const item = screen.getByRole("button", { name: /^tall-cover/ });
-      expect(within(item).getByText("tall-cover with a very long title.cbz"))
-        .toHaveClass("item-name");
+      const fileName = within(item).getByText("tall-cover with a very long title.cbz");
+      expect(fileName).toHaveClass("item-name__text");
+      expect(fileName.parentElement).toHaveClass("item-name");
       expect(item.querySelector('[data-thumbnail-icon="archive"]')).toBeInTheDocument();
       expect(within(item).queryByText("CBZ")).not.toBeInTheDocument();
       expect(item).toHaveAttribute("aria-label", expect.stringContaining("CBZ"));
@@ -422,6 +423,38 @@ describe("CatalogGrid", () => {
     expect(document.querySelector('[data-thumbnail-icon="folder"]')).toBeInTheDocument();
     expect(document.querySelector('[data-thumbnail-icon="archive"]')).toBeInTheDocument();
   });
+
+  it.each(["detail_list", "small_thumbnail", "cover_list", "reference_tile"] as const)(
+    "%s places a distinct kind icon at the start of every file name",
+    (viewMode) => {
+      const catalogEntries: Array<[CatalogEntry, string]> = [
+        [{ relativePath: "picture.png" as never, kind: "page" }, "image"],
+        [{ relativePath: "library" as never, kind: "folder" }, "folder"],
+        [{ relativePath: "comic" as never, kind: "comicFolder" }, "folder"],
+        [{ relativePath: "volume.cbz" as never, kind: "archive", archiveKind: "cbz" }, "archive"],
+        [{ relativePath: "manual.pdf" as never, kind: "pdf" }, "pdf"],
+        [{ relativePath: "notes.txt" as never, kind: "unsupported" }, "file"],
+      ];
+      render(
+        <CatalogGrid
+          entries={catalogEntries.map(([entry]) => entry)}
+          selectedPath={null}
+          onSelect={() => undefined}
+          onNavigate={() => undefined}
+          onRead={() => undefined}
+          viewMode={viewMode}
+        />,
+      );
+
+      catalogEntries.forEach(([entry, iconKind]) => {
+        const name = entry.relativePath;
+        const item = screen.getByRole("button", { name: new RegExp(`^${name}`) });
+        const label = within(item).getByText(name).closest(".item-name");
+        expect(label?.firstElementChild).toHaveAttribute("data-item-kind-icon", iconKind);
+        expect(label?.lastElementChild).toHaveClass("item-name__text");
+      });
+    },
+  );
 
   it("shows an unsupported file's original extension and no read/favorite actions", () => {
     const unsupported: CatalogEntry = {

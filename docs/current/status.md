@@ -39,7 +39,7 @@ codd:
 
 | 範囲 | 状態 | 備考 |
 |---|---|---|
-| REQ-MVP-001〜007, 009〜017, 019 | Implemented / PASS | root登録画面なしのExplorer shell、PC配下のWindows drive列挙・選択・切替、treeの現在folder表示・drive別展開保持・明示的な全折りたたみ、通常pathのaddress表示、catalog、viewer、読書位置、原本非破壊、error回復をWindows Rust canonicalとfrontend testで直接観測済み。 |
+| REQ-MVP-001〜007, 009〜017, 019 | Implemented / PASS | root登録画面なしのExplorer shell、PC配下のWindows drive列挙・選択・切替、treeの現在folder表示・drive別展開保持・明示的な全折りたたみ、通常pathのaddress表示、file名左端の種類別iconを含むcatalog、viewer、読書位置、原本非破壊、error回復をWindows Rust canonicalとfrontend testで直接観測済み。 |
 | REQ-MVP-008 | Implemented / BLOCKED | BMP/JPEG/GIF/TIFF/PNG/ICO/SVG/WebPの列挙、実decode、安全なviewer配信とWIC thumbnailはWindows testでPASS。release WebView2上のanimated GIF直接観測は未完了。 |
 | REQ-MVP-018 | Partial / BLOCKED | code上はlocal-onlyだが、隔離VM外部からのDNS/TCP/UDP監視が未実施。 |
 | REQ-MVP-020 | Implemented / BLOCKED | PDFの独立種別、Windows.Data.Pdfによるpage列挙・上限付きPNG render、thumbnail、favorite、巻末遷移、source/root/error境界はWindows Rust canonicalとfrontend testでPASS。release WebView2上のPDF viewer・thumbnail直接観測は未完了。 |

@@ -377,7 +377,7 @@ export function CatalogGrid({
                           <>
                             <span className="detail-primary">
                               {thumbnail}
-                              <span className="item-name">{name}</span>
+                              <ItemName entry={entry} name={name} />
                             </span>
                             <span className="item-kind">{kind}</span>
                             <span className="item-metadata item-size">
@@ -390,7 +390,7 @@ export function CatalogGrid({
                         ) : (
                           <>
                             {thumbnail}
-                            <span className="item-name">{name}</span>
+                            <ItemName entry={entry} name={name} />
                           </>
                         )}
                       </button>
@@ -428,6 +428,85 @@ export function CatalogGrid({
         </>
       )}
     </div>
+  );
+}
+
+function ItemName({ entry, name }: { entry: CatalogEntry; name: string }) {
+  return (
+    <span className="item-name">
+      <ItemKindIcon entry={entry} />
+      <span className="item-name__text">{name}</span>
+    </span>
+  );
+}
+
+function ItemKindIcon({ entry }: { entry: CatalogEntry }) {
+  if (entry.kind === "page") {
+    return (
+      <svg
+        className="item-kind-icon item-kind-icon--image"
+        data-item-kind-icon="image"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <rect className="item-kind-icon__image-frame" x="1.5" y="2.5" width="13" height="11" rx="1.25" />
+        <circle className="item-kind-icon__image-sun" cx="11.25" cy="5.75" r="1.25" />
+        <path className="item-kind-icon__image-landscape" d="m3.25 11 2.9-3 2.05 2 1.45-1.45L12.8 11.5H3.25z" />
+      </svg>
+    );
+  }
+  if (entry.kind === "folder" || entry.kind === "comicFolder") {
+    return (
+      <svg
+        className="item-kind-icon item-kind-icon--folder"
+        data-item-kind-icon="folder"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path className="item-kind-icon__folder-back" d="M1.5 4h5l1.5 1.75h6.5v7.75h-13z" />
+        <path className="item-kind-icon__folder-front" d="M1.5 6h13l-1 7.5h-12z" />
+      </svg>
+    );
+  }
+  if (entry.kind === "archive") {
+    return (
+      <svg
+        className="item-kind-icon item-kind-icon--archive"
+        data-item-kind-icon="archive"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path className="item-kind-icon__document" d="M3 1.5h6l4 4v9H3z" />
+        <path className="item-kind-icon__fold" d="M9 1.5v4h4" />
+        <path className="item-kind-icon__archive-zipper" d="M7.5 4.5h2M7.5 7h2M7.5 9.5h2M8.5 4.5v7.5" />
+      </svg>
+    );
+  }
+  if (entry.kind === "pdf") {
+    return (
+      <svg
+        className="item-kind-icon item-kind-icon--pdf"
+        data-item-kind-icon="pdf"
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+      >
+        <path className="item-kind-icon__document" d="M3 1.5h6l4 4v9H3z" />
+        <path className="item-kind-icon__fold" d="M9 1.5v4h4" />
+        <path className="item-kind-icon__pdf-mark" d="M5 11.75V8.5h1.4a1 1 0 0 1 0 2H5m3 1.25V8.5h1a1.6 1.6 0 0 1 0 3.25H8" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      className="item-kind-icon item-kind-icon--file"
+      data-item-kind-icon="file"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+    >
+      <path className="item-kind-icon__document" d="M3 1.5h6l4 4v9H3z" />
+      <path className="item-kind-icon__fold" d="M9 1.5v4h4" />
+      <path className="item-kind-icon__file-lines" d="M5 8h6M5 10.5h6M5 13h4" />
+    </svg>
   );
 }
 
