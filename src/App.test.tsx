@@ -2313,6 +2313,9 @@ describe("application shell", () => {
       key: "j",
       ctrlKey: true,
     });
+    fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
+      target: { value: "toggleDirection" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     expect(screen.getByLabelText("一覧表示形式"))
@@ -2333,6 +2336,10 @@ describe("application shell", () => {
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
     );
+    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^操作/ }));
+    fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
+      target: { value: "toggleDirection" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
@@ -2342,6 +2349,10 @@ describe("application shell", () => {
         catalogViewMode: "reference_tile",
         treeVisible: false,
         scale: 1.75,
+        mouseGestures: expect.objectContaining({
+          middleClick: "toggleDirection",
+          doubleClick: "toggleFullscreen",
+        }),
       }),
       expect.any(Number),
     );

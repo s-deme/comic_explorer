@@ -996,7 +996,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .settings-command-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(120px, .65fr) minmax(135px, .7fr) minmax(210px, 1.3fr) 58px;
+  grid-template-columns: minmax(72px, .42fr) minmax(120px, .72fr) minmax(110px, .62fr) minmax(110px, .72fr) minmax(220px, 1.5fr) 58px;
   align-items: center;
   gap: 10px;
   padding: 9px 8px;
@@ -1010,11 +1010,23 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-weight: 700;
 }
 .settings-command-row > label { color: #24364d; font-weight: 600; }
+.settings-command-group {
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #31587f !important;
+  background: #e4edf7;
+  font-size: .72rem !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .settings-command-row > span {
   color: #667489;
   font-size: .82rem;
   line-height: 1.45;
 }
+.settings-command-mouse { overflow-wrap: anywhere; }
+.settings-command-description small { display: block; margin-top: 3px; color: #7a8798; line-height: 1.35; }
 .settings-command-row > button { min-height: 30px; padding-inline: 8px; }
 .settings-subheading { margin-top: 26px !important; }
 .settings-fixed-value,
@@ -1210,9 +1222,17 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .settings-command-row {
     grid-template-columns: minmax(105px, .75fr) minmax(120px, 1fr) auto;
   }
-  .settings-command-row > span {
+  .settings-command-row > .settings-command-group { grid-column: 1; grid-row: 1; }
+  .settings-command-row > label { grid-column: 2; grid-row: 1; }
+  .settings-command-row > button { grid-column: 3; grid-row: 1; }
+  .settings-command-row > input { grid-column: 1 / -1; grid-row: 2; }
+  .settings-command-row > .settings-command-mouse {
     grid-column: 1 / -1;
-    grid-row: 2;
+    grid-row: 3;
+  }
+  .settings-command-row > .settings-command-description {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
   .settings-panel-heading { align-items: stretch; flex-direction: column; }
   .settings-actions p[role="status"] { order: 5; width: 100%; flex-basis: 100%; white-space: normal; }

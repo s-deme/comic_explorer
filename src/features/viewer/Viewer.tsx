@@ -31,11 +31,16 @@ import {
 import {
   customShortcutCommand,
   fallbackShortcutCommand,
+  isViewerShortcutCommand,
   normalizeShortcutBindings,
   type ShortcutBindings,
 } from "../input/shortcuts";
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
-import type { MouseGestureBindings } from "../settings/profile";
+import {
+  normalizeMouseGestures,
+  type MouseGestureAction,
+  type MouseGestureBindings,
+} from "../settings/profile";
 import {
   END_OF_VOLUME_POLICY_LABELS,
   normalizeEndOfVolumePolicy,
@@ -151,13 +156,33 @@ export function Viewer({
     () => normalizeShortcutBindings(shortcuts),
     [shortcuts],
   );
+  const activeMouseGestures = useMemo(
+    () => normalizeMouseGestures(mouseGestures),
+    [mouseGestures],
+  );
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
+  const rightButtonHeldRef = useRef(false);
   const [panning, setPanning] = useState(false);
   const layoutInitialized = useRef(false);
   const initialFullscreenRequested = useRef(false);
+
+  useEffect(() => {
+    const releaseRightButton = (event: PointerEvent) => {
+      if (event.button === 2) rightButtonHeldRef.current = false;
+    };
+    const resetRightButton = () => {
+      rightButtonHeldRef.current = false;
+    };
+    window.addEventListener("pointerup", releaseRightButton);
+    window.addEventListener("blur", resetRightButton);
+    return () => {
+      window.removeEventListener("pointerup", releaseRightButton);
+      window.removeEventListener("blur", resetRightButton);
+    };
+  }, []);
   const positionTimerRef = useRef<number | null>(null);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
@@ -487,10 +512,42 @@ export function Viewer({
     if (next !== null && next !== undefined) dispatch({ type: "go", index: next });
   }
 
-  function applyMouseGesture(action: MouseGestureBindings[keyof MouseGestureBindings] | undefined) {
-    if (action === "nextPage") next();
-    else if (action === "previousPage") previous();
-    else if (action === "closeViewer") void close();
+  function applyMouseGesture(action: MouseGestureAction | undefined) {
+    switch (action) {
+      case "nextPage":
+        next();
+        break;
+      case "previousPage":
+        previous();
+        break;
+      case "closeViewer":
+        void close();
+        break;
+      case "singlePage":
+        changeMode("single");
+        break;
+      case "spreadPage":
+        changeMode("spread");
+        break;
+      case "toggleDirection":
+        toggleDirection();
+        break;
+      case "zoomIn":
+        applyScale({ type: "zoomIn" });
+        break;
+      case "zoomOut":
+        applyScale({ type: "zoomOut" });
+        break;
+      case "toggleLoupe":
+        applyScale({ type: "loupe", enabled: !scale.loupeEnabled });
+        break;
+      case "toggleFullscreen":
+        void requestFullscreen(!fullscreen);
+        break;
+      case "none":
+      case undefined:
+        break;
+    }
   }
 
   useEffect(() => {
@@ -501,9 +558,10 @@ export function Viewer({
         else void close();
         return;
       }
-      const command =
-        customShortcutCommand(event, activeShortcuts) ??
-        fallbackShortcutCommand(event, state.direction);
+      const customCommand = customShortcutCommand(event, activeShortcuts);
+      const command = isViewerShortcutCommand(customCommand)
+        ? customCommand
+        : fallbackShortcutCommand(event, state.direction);
       if (command === undefined) return;
       event.preventDefault();
       switch (command) {
@@ -531,6 +589,12 @@ export function Viewer({
           break;
         case "zoomOut":
           applyScale({ type: "zoomOut" });
+          break;
+        case "toggleLoupe":
+          applyScale({ type: "loupe", enabled: !scale.loupeEnabled });
+          break;
+        case "toggleFullscreen":
+          void requestFullscreen(!fullscreen);
           break;
       }
     }
@@ -890,6 +954,25 @@ export function Viewer({
         }}
         onPointerLeave={() => setLoupe(null)}
         onPointerDown={(event) => {
+          if (event.button === 2) {
+            rightButtonHeldRef.current = true;
+            event.currentTarget.setPointerCapture?.(event.pointerId);
+            event.preventDefault();
+            return;
+          }
+          const buttonGesture = event.button === 1
+            ? activeMouseGestures.middleClick
+            : event.button === 3
+              ? activeMouseGestures.backButton
+              : event.button === 4
+                ? activeMouseGestures.forwardButton
+                : undefined;
+          if (buttonGesture !== undefined) {
+            event.preventDefault();
+            applyMouseGesture(buttonGesture);
+            return;
+          }
+          if (event.button !== 0) return;
           const spread = spreadRef.current;
           const pannable = spread !== null && (
             spread.scrollWidth > spread.clientWidth
@@ -906,23 +989,39 @@ export function Viewer({
           if (pannable) event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
         onPointerUp={(event) => {
+          if (event.button === 2) {
+            rightButtonHeldRef.current = false;
+            event.preventDefault();
+            return;
+          }
+          if (event.button !== 0) return;
           const drag = pointerDragRef.current;
           pointerDragRef.current = null;
           setPanning(false);
           if (!drag || drag.pointerId !== event.pointerId || drag.pannable) return;
           if (Math.abs(event.clientX - drag.startX) < 48) return;
           const action = event.clientX < drag.startX
-            ? mouseGestures?.swipeLeft
-            : mouseGestures?.swipeRight;
+            ? activeMouseGestures.swipeLeft
+            : activeMouseGestures.swipeRight;
           applyMouseGesture(action);
         }}
         onPointerCancel={() => {
+          rightButtonHeldRef.current = false;
           pointerDragRef.current = null;
           setPanning(false);
         }}
+        onContextMenu={(event) => event.preventDefault()}
         onDoubleClick={() => void requestFullscreen(!fullscreen)}
         onWheel={(event) => {
-          if (event.ctrlKey) {
+          const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
+          if (rightWheel && event.deltaY !== 0) {
+            event.preventDefault();
+            applyMouseGesture(
+              event.deltaY > 0
+                ? activeMouseGestures.rightWheelDown
+                : activeMouseGestures.rightWheelUp,
+            );
+          } else if (event.ctrlKey) {
             event.preventDefault();
             applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
           } else if (scrollLayout) {
@@ -939,9 +1038,13 @@ export function Viewer({
               }
               event.preventDefault();
             }
-          } else if (!scrollLayout) {
-            if (event.deltaY > 0) next();
-            else if (event.deltaY < 0) previous();
+          } else if (!scrollLayout && event.deltaY !== 0) {
+            event.preventDefault();
+            applyMouseGesture(
+              event.deltaY > 0
+                ? activeMouseGestures.wheelDown
+                : activeMouseGestures.wheelUp,
+            );
           }
         }}
       >

@@ -12,7 +12,10 @@ import {
 import {
   DEFAULT_SHORTCUTS,
   SHORTCUT_COMMANDS,
+  SHORTCUT_DESCRIPTIONS,
   SHORTCUT_FALLBACKS,
+  SHORTCUT_GROUP_LABELS,
+  SHORTCUT_GROUPS,
   SHORTCUT_LABELS,
   type ShortcutCommand,
 } from "../input/shortcuts";
@@ -75,15 +78,32 @@ const SCALE_MODE_LABELS: Record<ScaleMode, string> = {
 const GESTURE_LABELS: Record<MouseGestureName, string> = {
   swipeLeft: "左スワイプ",
   swipeRight: "右スワイプ",
+  wheelUp: "ホイール上",
+  wheelDown: "ホイール下",
+  rightWheelUp: "右ボタン＋ホイール上",
+  rightWheelDown: "右ボタン＋ホイール下",
+  middleClick: "中ボタン",
+  backButton: "戻るサイドボタン",
+  forwardButton: "進むサイドボタン",
   doubleClick: "ダブルクリック",
 };
 
-const GESTURE_ACTION_LABELS: Record<MouseGestureAction, string> = {
-  none: "割り当てなし",
-  nextPage: "次ページ",
-  previousPage: "前ページ",
-  closeViewer: "ビューワを閉じる",
+const GESTURE_DESCRIPTIONS: Record<MouseGestureName, string> = {
+  swipeLeft: "画像を左へ48px以上ドラッグしたときに実行します。",
+  swipeRight: "画像を右へ48px以上ドラッグしたときに実行します。",
+  wheelUp: "ページレイアウトでホイールを上へ回したときに実行します。",
+  wheelDown: "ページレイアウトでホイールを下へ回したときに実行します。",
+  rightWheelUp: "右ボタンを押しながらホイールを上へ回したときに実行します。",
+  rightWheelDown: "右ボタンを押しながらホイールを下へ回したときに実行します。",
+  middleClick: "画像表示領域でマウスの中ボタンを押したときに実行します。",
+  backButton: "マウスの戻るサイドボタンを押したときに実行します。",
+  forwardButton: "マウスの進むサイドボタンを押したときに実行します。",
+  doubleClick: "画像表示領域をダブルクリックしたときに全画面を切り替えます。",
 };
+
+function gestureActionLabel(action: MouseGestureAction): string {
+  return action === "none" ? "割り当てなし" : SHORTCUT_LABELS[action];
+}
 
 interface SearchEntry {
   id: string;
@@ -217,12 +237,12 @@ export function SettingsDialog({
     ...SHORTCUT_COMMANDS.map((command) => ({
       id: `shortcut-${command}`,
       category: "commands" as const,
-      text: `${SHORTCUT_LABELS[command]} ショートカット キー コマンド ${draft.shortcuts[command]} ${DEFAULT_SHORTCUTS[command]} ${SHORTCUT_FALLBACKS[command]}`,
+      text: `${SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]} ${SHORTCUT_LABELS[command]} ショートカット キー コマンド ${draft.shortcuts[command]} ${DEFAULT_SHORTCUTS[command]} ${SHORTCUT_FALLBACKS[command]} ${SHORTCUT_DESCRIPTIONS[command]} ${CONFIGURABLE_MOUSE_GESTURE_NAMES.filter((name) => draft.mouseGestures[name] === command).map((name) => GESTURE_LABELS[name]).join(" ")}`,
     })),
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
       category: "commands" as const,
-      text: `${GESTURE_LABELS[name]} マウス ジェスチャー ${GESTURE_ACTION_LABELS[draft.mouseGestures[name]]}`,
+      text: `${GESTURE_LABELS[name]} マウス ジェスチャー ${gestureActionLabel(draft.mouseGestures[name])} ${GESTURE_DESCRIPTIONS[name]}`,
     })),
     {
       id: "gesture-double-click",
@@ -461,12 +481,12 @@ export function SettingsDialog({
               <div className="settings-panel-heading">
                 <div>
                   <h3>コマンド設定</h3>
-                  <p>入力欄でキーを押して割り当てます。重複するキーは設定できません。</p>
+                  <p>入力欄でキーを押して割り当てます。重複キーとアプリの予約操作は設定できません。</p>
                 </div>
                 <button type="button" onClick={onResetAllShortcuts}>キーをすべて既定に戻す</button>
               </div>
               <div className="settings-command-header" aria-hidden="true">
-                <span>コマンド</span><span>割り当て</span><span>説明</span><span />
+                <span>グループ</span><span>コマンド</span><span>キー</span><span>マウス</span><span>説明</span><span />
               </div>
               {SHORTCUT_COMMANDS.map((command) => (
                 <div
@@ -476,6 +496,7 @@ export function SettingsDialog({
                   data-setting-id={`shortcut-${command}`}
                   hidden={rowHidden(`shortcut-${command}`)}
                 >
+                  <span className="settings-command-group">{SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]}</span>
                   <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
                   <input
                     id={`shortcut-${command}`}
@@ -484,7 +505,16 @@ export function SettingsDialog({
                     readOnly
                     onKeyDown={(event) => onShortcutKeyDown(command, event)}
                   />
-                  <span>既定: {DEFAULT_SHORTCUTS[command]}<br />代替操作: {SHORTCUT_FALLBACKS[command]}</span>
+                  <span className="settings-command-mouse">
+                    {CONFIGURABLE_MOUSE_GESTURE_NAMES
+                      .filter((name) => draft.mouseGestures[name] === command)
+                      .map((name) => GESTURE_LABELS[name])
+                      .join(" / ") || "—"}
+                  </span>
+                  <span className="settings-command-description">
+                    {SHORTCUT_DESCRIPTIONS[command]}
+                    <small>既定: {DEFAULT_SHORTCUTS[command]} / 代替: {SHORTCUT_FALLBACKS[command]}</small>
+                  </span>
                   <button type="button" aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`} onClick={() => onResetShortcut(command)}>戻す</button>
                 </div>
               ))}
@@ -494,15 +524,15 @@ export function SettingsDialog({
                   key={name}
                   id={`gesture-${name}`}
                   title={GESTURE_LABELS[name]}
-                  description="ビューワ上でのスワイプへ動作を割り当てます。"
+                  description={GESTURE_DESCRIPTIONS[name]}
                   hidden={rowHidden(`gesture-${name}`)}
                 >
                   <select aria-label={`${name}ジェスチャー`} value={draft.mouseGestures[name]} onChange={(event) => onMouseGestureChange(name, event.target.value as MouseGestureAction)}>
-                    {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{GESTURE_ACTION_LABELS[action]}</option>)}
+                    {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{gestureActionLabel(action)}</option>)}
                   </select>
                 </SettingRow>
               ))}
-              <SettingRow id="gesture-double-click" title="ダブルクリック" description="画像表示領域の全画面表示と解除に使用します。誤操作を避けるため変更できません。" hidden={rowHidden("gesture-double-click")}>
+              <SettingRow id="gesture-double-click" title="ダブルクリック" description={`${GESTURE_DESCRIPTIONS.doubleClick} 誤操作を避けるため変更できません。`} hidden={rowHidden("gesture-double-click")}>
                 <span className="settings-fixed-value">doubleClick: 全画面表示／解除（固定）</span>
               </SettingRow>
             </section>

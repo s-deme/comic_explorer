@@ -12,19 +12,14 @@ use super::{AppPaths, ReadingPosition, SourceFingerprint};
 const INITIAL_SCHEMA_VERSION: i64 = 1;
 const SCHEMA_VERSION: i64 = 4;
 
-const SHORTCUT_COMMANDS: [&str; 8] = [
-    "nextPage",
-    "previousPage",
-    "closeViewer",
-    "singlePage",
-    "spreadPage",
-    "toggleDirection",
-    "zoomIn",
-    "zoomOut",
-];
-
 fn default_shortcut_bindings() -> BTreeMap<String, String> {
     [
+        ("openSelected", "Enter"),
+        ("navigateBack", "Alt+ArrowLeft"),
+        ("navigateForward", "Alt+ArrowRight"),
+        ("navigateUp", "Alt+ArrowUp"),
+        ("refreshCatalog", "F5"),
+        ("toggleSearch", "Ctrl+F"),
         ("nextPage", "PageDown"),
         ("previousPage", "PageUp"),
         ("closeViewer", "Escape"),
@@ -33,6 +28,8 @@ fn default_shortcut_bindings() -> BTreeMap<String, String> {
         ("toggleDirection", "R"),
         ("zoomIn", "+"),
         ("zoomOut", "-"),
+        ("toggleLoupe", "L"),
+        ("toggleFullscreen", "F11"),
     ]
     .into_iter()
     .map(|(command, shortcut)| (command.to_owned(), shortcut.to_owned()))
@@ -43,7 +40,14 @@ fn default_mouse_gesture_bindings() -> BTreeMap<String, String> {
     [
         ("swipeLeft", "nextPage"),
         ("swipeRight", "previousPage"),
-        ("doubleClick", "none"),
+        ("wheelUp", "previousPage"),
+        ("wheelDown", "nextPage"),
+        ("rightWheelUp", "zoomIn"),
+        ("rightWheelDown", "zoomOut"),
+        ("middleClick", "none"),
+        ("backButton", "previousPage"),
+        ("forwardButton", "nextPage"),
+        ("doubleClick", "toggleFullscreen"),
     ]
     .into_iter()
     .map(|(gesture, action)| (gesture.to_owned(), action.to_owned()))

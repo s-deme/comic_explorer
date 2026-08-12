@@ -266,6 +266,13 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     expect(await within(dialog).findByRole("status")).toHaveTextContent("次ページ");
     expect(previousInput).toHaveValue("PageUp");
 
+    const searchInput = screen.getByRole("textbox", {
+      name: "検索ペインを切り替えるショートカット",
+    });
+    fireEvent.keyDown(searchInput, { key: "c", ctrlKey: true });
+    expect(await within(dialog).findByRole("status")).toHaveTextContent("ファイルのコピー");
+    expect(searchInput).toHaveValue("Ctrl+F");
+
     const apply = dialog.querySelector<HTMLButtonElement>(
       '[data-product-id="shortcut-apply"]',
     );
@@ -311,6 +318,27 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       expect.any(Number),
     );
     await waitFor(() => expect(resetDialog).not.toBeInTheDocument());
+  });
+
+  it("FT-B11-006 connects a remapped catalog command to the application shell", async () => {
+    render(<App />);
+    await registerTestLibrary([testEntry("book.cbz")]);
+    openSettingsMenuItem();
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const searchShortcut = within(dialog).getByRole("textbox", {
+      name: "検索ペインを切り替えるショートカット",
+    });
+    fireEvent.keyDown(searchShortcut, { key: "k", ctrlKey: true });
+    expect(searchShortcut).toHaveValue("Ctrl+K");
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+
+    const catalogItem = screen.getByRole("button", { name: /^book\.cbz/ });
+    catalogItem.focus();
+    fireEvent.keyDown(catalogItem, { key: "k", ctrlKey: true });
+    expect(screen.getByRole("complementary", { name: "検索ペイン" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(screen.queryByRole("complementary", { name: "検索ペイン" })).not.toBeInTheDocument();
   });
 
   it("FT-B11-004 keeps keyboard fallback, suppresses focused input, and stops at the Viewer/navigation boundary", async () => {

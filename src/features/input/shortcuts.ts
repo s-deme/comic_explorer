@@ -1,4 +1,13 @@
-export const SHORTCUT_COMMANDS = [
+export const CATALOG_SHORTCUT_COMMANDS = [
+  "openSelected",
+  "navigateBack",
+  "navigateForward",
+  "navigateUp",
+  "refreshCatalog",
+  "toggleSearch",
+] as const;
+
+export const LEGACY_SHORTCUT_COMMANDS = [
   "nextPage",
   "previousPage",
   "closeViewer",
@@ -9,10 +18,41 @@ export const SHORTCUT_COMMANDS = [
   "zoomOut",
 ] as const;
 
+export const VIEWER_SHORTCUT_COMMANDS = [
+  ...LEGACY_SHORTCUT_COMMANDS,
+  "toggleLoupe",
+  "toggleFullscreen",
+] as const;
+
+export const SHORTCUT_COMMANDS = [
+  ...CATALOG_SHORTCUT_COMMANDS,
+  ...VIEWER_SHORTCUT_COMMANDS,
+] as const;
+
+const MIGRATED_SHORTCUT_COMMANDS = [
+  ...CATALOG_SHORTCUT_COMMANDS,
+  "toggleLoupe",
+  "toggleFullscreen",
+] as const;
+
+const MIGRATION_SHORTCUT_FALLBACKS = [
+  ...Array.from({ length: 12 }, (_, index) => `Ctrl+Alt+F${index + 1}`),
+  ...Array.from({ length: 12 }, (_, index) => `Ctrl+Alt+Shift+F${index + 1}`),
+];
+
 export type ShortcutCommand = (typeof SHORTCUT_COMMANDS)[number];
+export type CatalogShortcutCommand = (typeof CATALOG_SHORTCUT_COMMANDS)[number];
+export type ViewerShortcutCommand = (typeof VIEWER_SHORTCUT_COMMANDS)[number];
 export type ShortcutBindings = Record<ShortcutCommand, string>;
+export type ShortcutGroup = "catalog" | "viewer";
 
 export const DEFAULT_SHORTCUTS: ShortcutBindings = {
+  openSelected: "Enter",
+  navigateBack: "Alt+ArrowLeft",
+  navigateForward: "Alt+ArrowRight",
+  navigateUp: "Alt+ArrowUp",
+  refreshCatalog: "F5",
+  toggleSearch: "Ctrl+F",
   nextPage: "PageDown",
   previousPage: "PageUp",
   closeViewer: "Escape",
@@ -21,9 +61,17 @@ export const DEFAULT_SHORTCUTS: ShortcutBindings = {
   toggleDirection: "R",
   zoomIn: "+",
   zoomOut: "-",
+  toggleLoupe: "L",
+  toggleFullscreen: "F11",
 };
 
 export const SHORTCUT_LABELS: Record<ShortcutCommand, string> = {
+  openSelected: "選択項目を開く",
+  navigateBack: "前の場所へ戻る",
+  navigateForward: "次の場所へ進む",
+  navigateUp: "上のフォルダへ",
+  refreshCatalog: "現在場所を更新",
+  toggleSearch: "検索ペインを切り替える",
   nextPage: "次ページ",
   previousPage: "前ページ",
   closeViewer: "ビューワを閉じる",
@@ -32,9 +80,17 @@ export const SHORTCUT_LABELS: Record<ShortcutCommand, string> = {
   toggleDirection: "読み方向",
   zoomIn: "倍率を上げる",
   zoomOut: "倍率を下げる",
+  toggleLoupe: "ルーペを切り替える",
+  toggleFullscreen: "全画面表示を切り替える",
 };
 
 export const SHORTCUT_FALLBACKS: Record<ShortcutCommand, string> = {
+  openSelected: "Enter（項目上）",
+  navigateBack: "Alt+←",
+  navigateForward: "Alt+→",
+  navigateUp: "Alt+↑",
+  refreshCatalog: "F5",
+  toggleSearch: "Ctrl+F",
   nextPage: "Space / 方向キー",
   previousPage: "方向キー",
   closeViewer: "Escape",
@@ -43,6 +99,64 @@ export const SHORTCUT_FALLBACKS: Record<ShortcutCommand, string> = {
   toggleDirection: "R",
   zoomIn: "+ / =",
   zoomOut: "- / _",
+  toggleLoupe: "L",
+  toggleFullscreen: "F11 / ダブルクリック",
+};
+
+export const SHORTCUT_GROUPS: Record<ShortcutCommand, ShortcutGroup> = {
+  openSelected: "catalog",
+  navigateBack: "catalog",
+  navigateForward: "catalog",
+  navigateUp: "catalog",
+  refreshCatalog: "catalog",
+  toggleSearch: "catalog",
+  nextPage: "viewer",
+  previousPage: "viewer",
+  closeViewer: "viewer",
+  singlePage: "viewer",
+  spreadPage: "viewer",
+  toggleDirection: "viewer",
+  zoomIn: "viewer",
+  zoomOut: "viewer",
+  toggleLoupe: "viewer",
+  toggleFullscreen: "viewer",
+};
+
+export const SHORTCUT_GROUP_LABELS: Record<ShortcutGroup, string> = {
+  catalog: "一覧操作",
+  viewer: "ビューワ",
+};
+
+export const SHORTCUT_DESCRIPTIONS: Record<ShortcutCommand, string> = {
+  openSelected: "一覧で選択しているフォルダまたは作品を開きます。",
+  navigateBack: "フォルダ移動履歴の前の場所へ戻ります。",
+  navigateForward: "戻る前に表示していた場所へ進みます。",
+  navigateUp: "現在位置の1つ上のフォルダへ移動します。",
+  refreshCatalog: "現在のフォルダを再読み込みします。",
+  toggleSearch: "フォルダツリーと検索ペインを切り替えます。",
+  nextPage: "次の表示ページへ進みます。縦長ページでは未表示部分を先に送ります。",
+  previousPage: "前の表示ページへ戻ります。",
+  closeViewer: "全画面を解除するか、ビューワを閉じて一覧へ戻ります。",
+  singlePage: "1ページ表示へ切り替えます。",
+  spreadPage: "見開き表示へ切り替えます。",
+  toggleDirection: "右開きと左開きを切り替えます。",
+  zoomIn: "現在の表示倍率を基準に画像を拡大します。",
+  zoomOut: "現在の表示倍率を基準に画像を縮小します。",
+  toggleLoupe: "ポインター位置を拡大するルーペを表示または非表示にします。",
+  toggleFullscreen: "ビューワの全画面表示と解除を切り替えます。",
+};
+
+export const RESERVED_SHORTCUTS: Readonly<Record<string, string>> = {
+  "Alt+F": "ファイルメニュー",
+  "Alt+E": "編集メニュー",
+  "Alt+V": "表示メニュー",
+  "Alt+O": "オプションメニュー",
+  "Alt+H": "ヘルプメニュー",
+  "Alt+F4": "アプリの終了",
+  "Ctrl+X": "ファイルの切り取り",
+  "Ctrl+C": "ファイルのコピー",
+  "Ctrl+V": "ファイルの貼り付け",
+  Delete: "ごみ箱へ移動",
 };
 
 const MODIFIERS = ["Ctrl", "Alt", "Shift", "Meta"] as const;
@@ -154,27 +268,66 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
-  const fallback = { ...DEFAULT_SHORTCUTS };
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT", "OPTION"].includes(target.tagName)
+  );
+}
+
+function isCatalogCommandTarget(target: EventTarget | null): boolean {
+  if (isEditableTarget(target)) return false;
+  if (!(target instanceof Element)) return true;
+  const button = target.closest("button");
+  return button === null || button.classList.contains("catalog-item");
+}
+
+export function validateShortcutBindings(value: unknown): ShortcutBindings | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return fallback;
+    return null;
   }
   const candidate = value as Record<string, unknown>;
-  const normalized = { ...fallback };
-  const seen = new Map<string, ShortcutCommand>();
-  for (const command of SHORTCUT_COMMANDS) {
+  const keys = Object.keys(candidate);
+  const fullShape = keys.length === SHORTCUT_COMMANDS.length
+    && keys.every((command) => SHORTCUT_COMMANDS.includes(command as ShortcutCommand));
+  const legacyShape = keys.length === LEGACY_SHORTCUT_COMMANDS.length
+    && keys.every((command) => LEGACY_SHORTCUT_COMMANDS.includes(
+      command as typeof LEGACY_SHORTCUT_COMMANDS[number],
+    ));
+  if (!fullShape && !legacyShape) return null;
+  const normalized = {} as ShortcutBindings;
+  const seen = new Set<string>();
+  const sourceCommands = legacyShape ? LEGACY_SHORTCUT_COMMANDS : SHORTCUT_COMMANDS;
+  for (const command of sourceCommands) {
     const raw = candidate[command];
-    if (raw === undefined) continue;
     const shortcut = normalizeShortcut(raw);
-    if (shortcut === null) return fallback;
+    if (
+      shortcut === null
+      || RESERVED_SHORTCUTS[shortcut] !== undefined
+      || seen.has(shortcut)
+    ) return null;
     normalized[command] = shortcut;
+    seen.add(shortcut);
   }
-  for (const command of SHORTCUT_COMMANDS) {
-    const shortcut = normalized[command];
-    if (seen.has(shortcut)) return fallback;
-    seen.set(shortcut, command);
+  if (legacyShape) {
+    let fallbackIndex = 0;
+    for (const command of MIGRATED_SHORTCUT_COMMANDS) {
+      let shortcut = DEFAULT_SHORTCUTS[command];
+      while (seen.has(shortcut)) {
+        shortcut = MIGRATION_SHORTCUT_FALLBACKS[fallbackIndex] ?? "";
+        fallbackIndex += 1;
+        if (shortcut === "") return null;
+      }
+      normalized[command] = shortcut;
+      seen.add(shortcut);
+    }
   }
   return normalized;
+}
+
+export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
+  return validateShortcutBindings(value) ?? { ...DEFAULT_SHORTCUTS };
 }
 
 export function resetShortcutBindings(): ShortcutBindings {
@@ -183,7 +336,12 @@ export function resetShortcutBindings(): ShortcutBindings {
 
 export type RemapShortcutResult =
   | { ok: true; bindings: ShortcutBindings }
-  | { ok: false; reason: "invalid" | "conflict"; conflict?: ShortcutCommand };
+  | {
+      ok: false;
+      reason: "invalid" | "conflict" | "reserved";
+      conflict?: ShortcutCommand;
+      reservedLabel?: string;
+    };
 
 export function remapShortcut(
   bindings: ShortcutBindings,
@@ -192,6 +350,10 @@ export function remapShortcut(
 ): RemapShortcutResult {
   const shortcut = normalizeShortcut(value);
   if (shortcut === null) return { ok: false, reason: "invalid" };
+  const reservedLabel = RESERVED_SHORTCUTS[shortcut];
+  if (reservedLabel !== undefined) {
+    return { ok: false, reason: "reserved", reservedLabel };
+  }
   const conflict = SHORTCUT_COMMANDS.find(
     (candidate) => candidate !== command && bindings[candidate] === shortcut,
   );
@@ -212,6 +374,57 @@ export function customShortcutCommand(
   const pressed = eventShortcut(event);
   if (pressed === null) return undefined;
   return SHORTCUT_COMMANDS.find((command) => bindings[command] === pressed);
+}
+
+export function customCatalogShortcutCommand(
+  event: KeyboardEvent,
+  bindings: ShortcutBindings,
+): CatalogShortcutCommand | undefined {
+  if (!isCatalogCommandTarget(event.target)) return undefined;
+  const pressed = eventShortcut(event);
+  if (pressed === null) return undefined;
+  return CATALOG_SHORTCUT_COMMANDS.find(
+    (command) => bindings[command] === pressed,
+  );
+}
+
+export function isCatalogShortcutCommand(
+  command: ShortcutCommand | undefined,
+): command is CatalogShortcutCommand {
+  return command !== undefined && CATALOG_SHORTCUT_COMMANDS.includes(
+    command as CatalogShortcutCommand,
+  );
+}
+
+export function isViewerShortcutCommand(
+  command: ShortcutCommand | undefined,
+): command is ViewerShortcutCommand {
+  return command !== undefined && VIEWER_SHORTCUT_COMMANDS.includes(
+    command as ViewerShortcutCommand,
+  );
+}
+
+export function fallbackCatalogShortcutCommand(
+  event: KeyboardEvent,
+): CatalogShortcutCommand | undefined {
+  if (!isCatalogCommandTarget(event.target)) return undefined;
+  const pressed = eventShortcut(event);
+  switch (pressed) {
+    case "Enter":
+      return "openSelected";
+    case "Alt+ArrowLeft":
+      return "navigateBack";
+    case "Alt+ArrowRight":
+      return "navigateForward";
+    case "Alt+ArrowUp":
+      return "navigateUp";
+    case "F5":
+      return "refreshCatalog";
+    case "Ctrl+F":
+      return "toggleSearch";
+    default:
+      return undefined;
+  }
 }
 
 export function fallbackShortcutCommand(
@@ -240,6 +453,11 @@ export function fallbackShortcutCommand(
     case "-":
     case "_":
       return "zoomOut";
+    case "l":
+    case "L":
+      return "toggleLoupe";
+    case "F11":
+      return "toggleFullscreen";
     case "ArrowLeft":
       return direction === "rightToLeft" ? "nextPage" : "previousPage";
     case "ArrowRight":

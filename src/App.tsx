@@ -90,7 +90,9 @@ import {
   DEFAULT_SHORTCUTS,
   SHORTCUT_COMMANDS,
   SHORTCUT_LABELS,
+  customCatalogShortcutCommand,
   eventShortcut,
+  fallbackCatalogShortcutCommand,
   normalizeShortcutBindings,
   remapShortcut,
   resetShortcutBindings,
@@ -133,7 +135,6 @@ import {
 } from "./features/workspace/display";
 import {
   APP_VERSION,
-  CONFIGURABLE_MOUSE_GESTURE_NAMES,
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
   normalizeMouseGestures,
@@ -572,16 +573,48 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   useEffect(() => {
     function handleMnemonic(event: KeyboardEvent) {
-      if (event.key === "F5" && libraryRoot !== null && viewerSession === null) {
-        event.preventDefault();
-        refreshCatalog();
-        return;
-      }
+      if (event.defaultPrevented) return;
       const target = event.target;
       const editing = target instanceof HTMLInputElement
         || target instanceof HTMLTextAreaElement
         || target instanceof HTMLSelectElement
         || (target instanceof HTMLElement && target.isContentEditable);
+      if (!editing && libraryRoot !== null && viewerSession === null) {
+        const command = customCatalogShortcutCommand(event, shortcuts)
+          ?? fallbackCatalogShortcutCommand(event);
+        if (command !== undefined) {
+          event.preventDefault();
+          setActiveMenu(null);
+          setActiveToolbarMenu(null);
+          switch (command) {
+            case "openSelected":
+              openSelectedEntry();
+              break;
+            case "navigateBack": {
+              const destination = navigation.back.at(-1);
+              if (destination !== undefined) navigate(destination, "back");
+              break;
+            }
+            case "navigateForward": {
+              const destination = navigation.forward[0];
+              if (destination !== undefined) navigate(destination, "forward");
+              break;
+            }
+            case "navigateUp": {
+              const destination = parentPath(navigation.current);
+              if (destination !== null) navigate(destination);
+              break;
+            }
+            case "refreshCatalog":
+              refreshCatalog();
+              break;
+            case "toggleSearch":
+              setSearchPaneOpen((current) => !current);
+              break;
+          }
+          return;
+        }
+      }
       if (!editing && libraryRoot !== null && viewerSession === null && !event.altKey) {
         const commandKey = event.key.toLowerCase();
         if ((event.ctrlKey || event.metaKey) && (commandKey === "x" || commandKey === "c")) {
@@ -619,36 +652,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       }
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       if (libraryRoot === null || viewerSession !== null) return;
-      if (event.key === "ArrowLeft") {
-        const target = navigation.back.at(-1);
-        if (target !== undefined) {
-          event.preventDefault();
-          setActiveMenu(null);
-          setActiveToolbarMenu(null);
-          navigate(target, "back");
-        }
-        return;
-      }
-      if (event.key === "ArrowRight") {
-        const target = navigation.forward[0];
-        if (target !== undefined) {
-          event.preventDefault();
-          setActiveMenu(null);
-          setActiveToolbarMenu(null);
-          navigate(target, "forward");
-        }
-        return;
-      }
-      if (event.key === "ArrowUp") {
-        const target = parentPath(navigation.current);
-        if (target !== null) {
-          event.preventDefault();
-          setActiveMenu(null);
-          setActiveToolbarMenu(null);
-          navigate(target);
-        }
-        return;
-      }
       const menuId = MENU_MNEMONICS[event.key.toLowerCase()];
       if (menuId === undefined) return;
       event.preventDefault();
@@ -682,7 +685,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, activeToolbarMenu, libraryRoot, navigation, selectedPath, selectedPaths, viewerSession]);
+  }, [activeMenu, activeToolbarMenu, entries, libraryRoot, navigation, selectedPath, selectedPaths, shortcuts, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -2066,6 +2069,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setProfileNotice(
         result.reason === "conflict"
           ? `${SHORTCUT_LABELS[result.conflict ?? command]} と同じキーは割り当てできません。`
+          : result.reason === "reserved"
+            ? `${result.reservedLabel ?? "アプリの予約操作"} で使用しているキーは割り当てできません。`
           : "このキーは割り当てできません。",
       );
       return;
@@ -2100,13 +2105,6 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   function updateDraftMouseGesture(name: MouseGestureName, action: MouseGestureAction) {
     if (settingsDraft === null || name === "doubleClick") return;
     const current = settingsDraft.mouseGestures;
-    const duplicate = action !== "none" && CONFIGURABLE_MOUSE_GESTURE_NAMES.some(
-      (candidate) => candidate !== name && current[candidate] === action,
-    );
-    if (duplicate) {
-      setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
-      return;
-    }
     setProfileNotice(null);
     setSettingsDraft({
       ...settingsDraft,

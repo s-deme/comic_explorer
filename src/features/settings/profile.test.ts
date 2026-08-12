@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SHORTCUTS } from "../input/shortcuts";
+import { DEFAULT_SHORTCUTS, LEGACY_SHORTCUT_COMMANDS } from "../input/shortcuts";
 import packageMetadata from "../../../package.json";
 import {
   APP_VERSION,
@@ -137,12 +137,37 @@ describe("settings profile", () => {
     (invalid.mouseGestures as Record<string, string>).doubleClick = "openMenu";
     expect(normalizeSettingsProfile(invalid)).toBeNull();
 
-    const conflict = validProfile();
-    conflict.mouseGestures.doubleClick = "nextPage";
-    expect(normalizeSettingsProfile(conflict)?.mouseGestures).toEqual({
+    const fixed = validProfile();
+    fixed.mouseGestures.doubleClick = "nextPage";
+    fixed.mouseGestures.middleClick = "nextPage";
+    expect(normalizeSettingsProfile(fixed)?.mouseGestures).toEqual({
       ...DEFAULT_MOUSE_GESTURES,
-      doubleClick: "none",
+      middleClick: "nextPage",
     });
+  });
+
+  it("migrates the exact legacy shortcut and swipe maps without accepting arbitrary partial maps", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.shortcuts = Object.fromEntries(
+      LEGACY_SHORTCUT_COMMANDS.map((command) => [
+        command,
+        command === "nextPage" ? "N" : DEFAULT_SHORTCUTS[command],
+      ]),
+    );
+    legacy.mouseGestures = {
+      swipeLeft: "previousPage",
+      swipeRight: "nextPage",
+      doubleClick: "none",
+    };
+    const migrated = normalizeSettingsProfile(legacy);
+    expect(migrated?.shortcuts.nextPage).toBe("N");
+    expect(migrated?.shortcuts.toggleSearch).toBe("Ctrl+F");
+    expect(migrated?.mouseGestures.wheelDown).toBe("nextPage");
+    expect(migrated?.mouseGestures.doubleClick).toBe("toggleFullscreen");
+
+    const partial = validProfile();
+    delete (partial.mouseGestures as Partial<typeof partial.mouseGestures>).middleClick;
+    expect(normalizeSettingsProfile(partial)).toBeNull();
   });
 
   it("rejects attempts to remap the fixed double click gesture", () => {

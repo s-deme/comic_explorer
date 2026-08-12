@@ -209,6 +209,12 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".settings-row", "grid-template-columns: minmax(260px, 1fr) minmax(180px, 310px)"
         )
+        self.assert_rule_contains(
+            ".settings-command-row", "grid-template-columns: minmax(72px, .42fr)"
+        )
+        self.assert_rule_contains(
+            ".settings-command-description small", "display: block"
+        )
         self.assert_rule_contains(".settings-actions", "background: #fff")
 
 

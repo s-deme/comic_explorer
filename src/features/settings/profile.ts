@@ -1,7 +1,7 @@
 import {
   DEFAULT_SHORTCUTS,
-  SHORTCUT_COMMANDS,
-  normalizeShortcut,
+  VIEWER_SHORTCUT_COMMANDS,
+  validateShortcutBindings,
   type ShortcutBindings,
 } from "../input/shortcuts";
 import {
@@ -29,22 +29,38 @@ import packageMetadata from "../../../package.json";
 export const SETTINGS_PROFILE_VERSION = 1;
 export const APP_VERSION = packageMetadata.version;
 
-export const MOUSE_GESTURE_ACTIONS = [
-  "none",
-  "nextPage",
-  "previousPage",
-  "closeViewer",
-] as const;
+export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
 export type MouseGestureAction = (typeof MOUSE_GESTURE_ACTIONS)[number];
-export const MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight", "doubleClick"] as const;
+export const LEGACY_MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight", "doubleClick"] as const;
+export const MOUSE_GESTURE_NAMES = [
+  "swipeLeft",
+  "swipeRight",
+  "wheelUp",
+  "wheelDown",
+  "rightWheelUp",
+  "rightWheelDown",
+  "middleClick",
+  "backButton",
+  "forwardButton",
+  "doubleClick",
+] as const;
 export type MouseGestureName = (typeof MOUSE_GESTURE_NAMES)[number];
-export const CONFIGURABLE_MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight"] as const satisfies readonly MouseGestureName[];
+export const CONFIGURABLE_MOUSE_GESTURE_NAMES = MOUSE_GESTURE_NAMES.filter(
+  (name) => name !== "doubleClick",
+) as Exclude<MouseGestureName, "doubleClick">[];
 export type MouseGestureBindings = Record<MouseGestureName, MouseGestureAction>;
 
 export const DEFAULT_MOUSE_GESTURES: MouseGestureBindings = {
   swipeLeft: "nextPage",
   swipeRight: "previousPage",
-  doubleClick: "none",
+  wheelUp: "previousPage",
+  wheelDown: "nextPage",
+  rightWheelUp: "zoomIn",
+  rightWheelDown: "zoomOut",
+  middleClick: "none",
+  backButton: "previousPage",
+  forwardButton: "nextPage",
+  doubleClick: "toggleFullscreen",
 };
 
 export interface SettingsProfile {
@@ -91,26 +107,27 @@ export function normalizeMouseGestures(value: unknown): MouseGestureBindings {
   const result = { ...DEFAULT_MOUSE_GESTURES };
   if (value === null || typeof value !== "object" || Array.isArray(value)) return result;
   const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  const fullShape = keys.length === MOUSE_GESTURE_NAMES.length
+    && keys.every((name) => MOUSE_GESTURE_NAMES.includes(name as MouseGestureName));
+  const legacyShape = keys.length === LEGACY_MOUSE_GESTURE_NAMES.length
+    && keys.every((name) => LEGACY_MOUSE_GESTURE_NAMES.includes(
+      name as typeof LEGACY_MOUSE_GESTURE_NAMES[number],
+    ));
+  if (!fullShape && !legacyShape) return result;
   for (const name of MOUSE_GESTURE_NAMES) {
     const action = candidate[name];
     if (typeof action === "string" && MOUSE_GESTURE_ACTIONS.includes(action as MouseGestureAction)) {
       result[name] = action as MouseGestureAction;
     }
   }
-  result.doubleClick = "none";
-  const seen = new Set<MouseGestureAction>();
-  for (const name of CONFIGURABLE_MOUSE_GESTURE_NAMES) {
-    const action = result[name];
-    if (action === "none") continue;
-    if (seen.has(action)) return { ...DEFAULT_MOUSE_GESTURES };
-    seen.add(action);
-  }
+  result.doubleClick = "toggleFullscreen";
   return result;
 }
 
 export type GestureUpdateResult =
   | { ok: true; bindings: MouseGestureBindings }
-  | { ok: false; reason: "conflict" | "fixed" };
+  | { ok: false; reason: "fixed" };
 
 export function remapMouseGesture(
   bindings: MouseGestureBindings,
@@ -118,9 +135,6 @@ export function remapMouseGesture(
   action: MouseGestureAction,
 ): GestureUpdateResult {
   if (name === "doubleClick") return { ok: false, reason: "fixed" };
-  if (action !== "none" && Object.entries(bindings).some(([candidate, value]) => candidate !== name && value === action)) {
-    return { ok: false, reason: "conflict" };
-  }
   return { ok: true, bindings: { ...bindings, [name]: action } };
 }
 
@@ -189,36 +203,30 @@ function enumValue<T extends string>(
 }
 
 function strictShortcutBindings(value: unknown): ShortcutBindings | null {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-  const candidate = value as Record<string, unknown>;
-  const result = {} as ShortcutBindings;
-  const seen = new Set<string>();
-  for (const command of SHORTCUT_COMMANDS) {
-    if (!Object.prototype.hasOwnProperty.call(candidate, command)) return null;
-    const shortcut = normalizeShortcut(candidate[command]);
-    if (shortcut === null || seen.has(shortcut)) return null;
-    result[command] = shortcut;
-    seen.add(shortcut);
-  }
-  return result;
+  return validateShortcutBindings(value);
 }
 
 function strictMouseGestureBindings(value: unknown): MouseGestureBindings | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  const fullShape = keys.length === MOUSE_GESTURE_NAMES.length
+    && keys.every((name) => MOUSE_GESTURE_NAMES.includes(name as MouseGestureName));
+  const legacyShape = keys.length === LEGACY_MOUSE_GESTURE_NAMES.length
+    && keys.every((name) => LEGACY_MOUSE_GESTURE_NAMES.includes(name as typeof LEGACY_MOUSE_GESTURE_NAMES[number]));
+  if (!fullShape && !legacyShape) return null;
   const result = {} as MouseGestureBindings;
-  const seen = new Set<MouseGestureAction>();
   for (const name of MOUSE_GESTURE_NAMES) {
-    if (!Object.prototype.hasOwnProperty.call(candidate, name)) return null;
-    const action = enumValue(candidate[name], MOUSE_GESTURE_ACTIONS);
+    const raw = Object.prototype.hasOwnProperty.call(candidate, name)
+      ? candidate[name]
+      : DEFAULT_MOUSE_GESTURES[name];
+    const action = enumValue(raw, MOUSE_GESTURE_ACTIONS);
     if (action === null) return null;
     if (name === "doubleClick") {
-      result[name] = "none";
+      result[name] = "toggleFullscreen";
       continue;
     }
-    if (action !== "none" && seen.has(action)) return null;
     result[name] = action;
-    if (action !== "none") seen.add(action);
   }
   return result;
 }

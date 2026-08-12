@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveReadingPosition } from "../library/client";
+import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
 import { Viewer } from "./Viewer";
 
 vi.mock("../library/client", () => ({ saveReadingPosition: vi.fn() }));
@@ -333,9 +334,9 @@ describe("Viewer settings", () => {
         onSettingsChange={() => undefined}
         onClose={() => undefined}
         mouseGestures={{
+          ...DEFAULT_MOUSE_GESTURES,
           swipeLeft: "nextPage",
           swipeRight: "previousPage",
-          doubleClick: "none",
         }}
       />,
     );
@@ -608,6 +609,34 @@ describe("Viewer settings", () => {
     expect(adapter.exit).toHaveBeenCalledTimes(1);
   });
 
+  it("connects configurable loupe and fullscreen keyboard commands", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        fullscreenAdapter={adapter}
+      />,
+    );
+
+    fireEvent.keyDown(window, { key: "l" });
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-loupe-enabled", "true");
+    fireEvent.keyDown(window, { key: "F11" });
+    await waitFor(() => expect(adapter.enter).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("region", { name: "Book ビューワ" })).toHaveAttribute(
+      "data-fullscreen",
+      "true",
+    );
+  });
+
   it("keeps stage clicks inert and toggles fullscreen with a double click", async () => {
     const adapter = {
       enter: vi.fn().mockResolvedValue(undefined),
@@ -755,7 +784,7 @@ describe("Viewer settings", () => {
     expect(onToggleDetached).not.toHaveBeenCalled();
   });
 
-  it("FT-B19-003 connects configured swipe gestures to page movement", () => {
+  it("FT-B19-003 connects swipe, wheel, chord, middle, and side-button gestures", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -765,9 +794,10 @@ describe("Viewer settings", () => {
         onSettingsChange={() => undefined}
         onClose={() => undefined}
         mouseGestures={{
+          ...DEFAULT_MOUSE_GESTURES,
           swipeLeft: "nextPage",
           swipeRight: "previousPage",
-          doubleClick: "none",
+          middleClick: "toggleDirection",
         }}
       />,
     );
@@ -781,5 +811,23 @@ describe("Viewer settings", () => {
     fireEvent.pointerDown(stage!, { clientX: 0 });
     fireEvent.pointerUp(stage!, { clientX: 100 });
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.wheel(stage!, { deltaY: 120 });
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    fireEvent.wheel(stage!, { deltaY: -120 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.pointerDown(stage!, { button: 4 });
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    fireEvent.pointerDown(stage!, { button: 3 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.pointerDown(stage!, { button: 1 });
+    expect(screen.getByText("左開き")).toBeInTheDocument();
+
+    fireEvent.pointerDown(stage!, { button: 2 });
+    fireEvent.wheel(stage!, { deltaY: -120, buttons: 2 });
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
+    fireEvent.pointerUp(stage!, { button: 2 });
   });
 });

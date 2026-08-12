@@ -29,11 +29,11 @@ codd:
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
-| Rust canonical | PASS | 2026-08-11、lib 150件 + shutdown process 1件、FAIL 0。検索のscope・種別・size・更新日時・固定場所の条件適用、catalogへ直接表示する画像自身のthumbnail生成を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
+| Rust canonical | PASS | 2026-08-12、lib 152件 + shutdown process 1件、FAIL 0。16 commandと10 mouse bindingのstrict profile検証、旧8-key/3-gesture map移行、検索のscope・種別・size・更新日時・固定場所の条件適用、catalogへ直接表示する画像自身のthumbnail生成を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
-| TypeScript/frontend | PASS | 2026-08-12、24 files / 228 tests PASS、FAIL 0。設定の5カテゴリnavigation、名前・説明・現在値を対象にする横断検索、説明付き設定行、command表、全設定を既定値へ戻すdraft操作、既存のatomic適用・profile入出力・shortcut conflictを含む。対応書庫表示、検索、viewer、catalog等の既存回帰とTypeScript typecheckもexit 0。 |
-| Python | PASS | 2026-08-12、49 tests PASS、FAIL 0。設定dialogの固定header/body/action、カテゴリnavigation、説明付きrow、狭幅1列化を含むstyle contract、現行status/verification間の5値consistencyもPASS。 |
+| TypeScript/frontend | PASS | 2026-08-12、25 files / 236 tests PASS、FAIL 0。設定の5カテゴリnavigation、名前・説明・現在値を対象にする横断検索、group/command/key/mouse/説明のcommand表、予約・重複key拒否、catalog/viewer command実行、9種類の変更可能mouse入力、固定double click、旧設定移行と新既定値との衝突回避、atomic適用・profile入出力を含む。対応書庫表示、検索、viewer、catalog等の既存回帰とTypeScript typecheckもexit 0。 |
+| Python | PASS | 2026-08-12、49 tests PASS、FAIL 0。設定dialogの固定header/body/action、カテゴリnavigation、6列command表、説明付きrow、狭幅1列化を含むstyle contract、現行status/verification間の5値consistencyもPASS。 |
 | standalone PDF | PASS / 製品観測BLOCKED | Windows.Data.Pdfで実PDFのpage列挙とPNG renderを直接検証。1 GiB source、10,000 pages、最大辺16,384 px、120,000,000 pixelsをrender前に制限し、暗号化・破損・access・missingのerror分類、root外symlink拒否、独立した`pdf`種別と画像選択境界をRust canonicalとfrontend testで検証した。release WebView2のviewer・thumbnail表示は未観測。 |
 | file manager | PASS / 製品観測BLOCKED | Windows Rust canonicalでrename、folder作成、copy、move、完全delete、CF_HDROPのcopy/cut round trip、root containment、reparse point・同名衝突・子孫destination拒否を実filesystem上で検証。frontend testで右click/keyboard menu、rename・delete接続、確認dialog、全画面・slideshow起動を検証した。release製品のnative folder picker、ごみ箱、Explorer、アプリ選択は未観測。 |
 | EPUB書庫 | PASS | ZIP互換Stored/DeflateのEPUBについて、大文字小文字を無視した分類、自然順画像列挙、catalog、WebP、media token、原本非破壊をWindows Rust canonicalと87-file fixtureで直接検証。HTML本文組版は対象外。 |
@@ -42,7 +42,7 @@ codd:
 | release executable | PASS / 製品受入部分BLOCKED | 追加decoderを含むWindows release executableを再buildしexit 0。static WebP、search、favorite、tag、memo/history/rating等のaccepted product laneはPASS。animated GIF観測、P5/P6/P8/P10と全外部release gateへ波及しない。 |
 | 原本非破壊 | PASS（測定済みlane） | accepted product harnessでlibrary source tree差分0。未実行laneを含む全操作の無条件PASSではない。 |
 | 外部通信 | BLOCKED | code/依存境界はlocal-only。VM外部監視による完全観測は未実施。 |
-| CoDD | PASS（red 0） | 2026-08-12、scan 4 documents / 56 nodes / 126 edges。check red 0、verify exit 0、DAG red 3 PASS / 0 FAIL。構造的SKIP/VACUOUSとverification-node 0件は機能PASSへ加算しない。 |
+| CoDD | PASS（red 0） | 2026-08-12、scan 4 documents / 57 nodes / 128 edges。check red 0、verify exit 0、DAG red 3 PASS / 0 FAIL。構造的SKIP/VACUOUSとverification-node 0件は機能PASSへ加算しない。 |
 
 ## MVP release case summary
 
@@ -59,8 +59,8 @@ codd:
 
 ## Feature受入要約
 
-- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、FR-B11のkeyboard範囲。
-- BLOCKED/PARTIAL: B08のanimated GIF製品観測とAVIF decode、B11のtouch/gamepad、B17、B18、B20、B21、B22の製品表示・native shell観測。
+- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、FR-B11のkeyboard・mouse範囲。
+- BLOCKED/PARTIAL: B08のanimated GIF製品観測とAVIF decode、B11の任意軌跡gesture/touch/gamepad、B17、B18、B20、B21、B22の製品表示・native shell観測。
 - Windows release WebView2を直接観測したlaneと、Vitest/jsdom・Rust contractだけのlaneを区別する。
 - focused testのexcluded-by-pattern、構造的SKIP、vacuous check、advisoryをPASS件数へ加えない。
 
