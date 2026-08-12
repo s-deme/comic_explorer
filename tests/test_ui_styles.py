@@ -136,6 +136,10 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-item--small_thumbnail .thumbnail",
             "height: var(--catalog-thumbnail-height)",
         )
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail .thumbnail",
+            "overflow: hidden",
+        )
         self.assert_rule_contains(".catalog-item--cover_list", "min-height: 0")
         self.assert_rule_contains(
             ".catalog-item--cover_list",

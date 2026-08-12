@@ -583,6 +583,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   justify-self: stretch;
   width: var(--catalog-thumbnail-width);
   height: var(--catalog-thumbnail-height);
+  overflow: hidden;
   font-size: 1.7rem;
 }
 .catalog-item--small_thumbnail .item-name {
