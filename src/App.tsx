@@ -109,7 +109,10 @@ import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
 import {
   CATALOG_VIEW_MODE_LABELS,
   CATALOG_VIEW_MODES,
+  DEFAULT_CATALOG_THUMBNAIL_SIZES,
   DEFAULT_CATALOG_VIEW_MODE,
+  type CatalogThumbnailSizes,
+  normalizeCatalogThumbnailSizes,
   normalizeCatalogViewMode,
   type CatalogViewMode,
 } from "./features/catalog/view-mode";
@@ -140,6 +143,7 @@ import {
   APP_VERSION,
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
+  SETTINGS_PROFILE_VERSION,
   normalizeMouseGestures,
   normalizeSettingsProfile,
   type MouseGestureAction,
@@ -362,6 +366,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [sortDescending, setSortDescending] = useState(false);
   const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>(
     DEFAULT_CATALOG_VIEW_MODE,
+  );
+  const [catalogThumbnailSizes, setCatalogThumbnailSizes] = useState<CatalogThumbnailSizes>(
+    () => ({ ...DEFAULT_CATALOG_THUMBNAIL_SIZES }),
   );
   const persistedCatalogViewMode = useRef<CatalogViewMode>(DEFAULT_CATALOG_VIEW_MODE);
   const [endOfVolumePolicy, setEndOfVolumePolicy] =
@@ -696,6 +703,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           const restoredCatalogViewMode = normalizeCatalogViewMode(response.data.catalogViewMode);
           persistedCatalogViewMode.current = restoredCatalogViewMode;
           setCatalogViewMode(restoredCatalogViewMode);
+          setCatalogThumbnailSizes(normalizeCatalogThumbnailSizes(response.data.catalogThumbnailSizes));
           if (
             !endOfVolumePolicyUserChanged.current &&
             policyRevisionAtRequest === endOfVolumePolicyRevision.current
@@ -1943,11 +1951,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
 
   function currentSettingsProfile(): SettingsProfile {
     return {
-      profileVersion: 1,
+      profileVersion: SETTINGS_PROFILE_VERSION,
       sortField,
       sortDescending,
       endOfVolumePolicy,
       catalogViewMode,
+      catalogThumbnailSizes: { ...catalogThumbnailSizes },
       viewMode,
       layoutMode,
       readingDirection,
@@ -1997,6 +2006,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setEndOfVolumePolicy(normalized.endOfVolumePolicy);
       setCatalogViewMode(normalized.catalogViewMode);
       persistedCatalogViewMode.current = normalized.catalogViewMode;
+      setCatalogThumbnailSizes(normalized.catalogThumbnailSizes);
       setViewMode(normalized.viewMode);
       setLayoutMode(normalized.layoutMode);
       setReadingDirection(normalized.readingDirection);
@@ -3468,8 +3478,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           <button type="button" aria-label="本棚を表示" title="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}>▤</button>
           <button
             type="button"
-            aria-label="参照型タイル"
-            title="参照型タイル表示を切り替え"
+            aria-label="カードグリッド"
+            title="カードグリッド表示を切り替え"
             aria-pressed={catalogViewMode === "reference_tile"}
             data-product-id="toolbar-reference-tile"
             onClick={() => changeCatalogViewMode(catalogViewMode === "reference_tile" ? "cover_list" : "reference_tile")}
@@ -4238,6 +4248,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               selectedPath={selectedPath}
               selectedPaths={selectedPaths}
               viewMode={catalogViewMode}
+              thumbnailSizes={catalogThumbnailSizes}
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}

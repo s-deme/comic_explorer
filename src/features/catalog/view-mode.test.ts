@@ -2,15 +2,17 @@
 import { describe, expect, it } from "vitest";
 import {
   CATALOG_VIEW_MODES,
+  DEFAULT_CATALOG_THUMBNAIL_SIZES,
   DEFAULT_CATALOG_VIEW_MODE,
+  normalizeCatalogThumbnailSizes,
   normalizeCatalogViewMode,
 } from "./view-mode";
 
 describe("catalog view mode", () => {
-  it("keeps the C0 enum and cover-list default stable", () => {
+  it("presents detail, small, cover grid and card grid in that order", () => {
     expect(CATALOG_VIEW_MODES).toEqual([
-      "small_thumbnail",
       "detail_list",
+      "small_thumbnail",
       "cover_list",
       "reference_tile",
     ]);
@@ -23,4 +25,16 @@ describe("catalog view mode", () => {
       expect(normalizeCatalogViewMode(value)).toBe("cover_list");
     },
   );
+
+  it("normalizes each thumbnail size independently", () => {
+    expect(normalizeCatalogThumbnailSizes({
+      smallThumbnail: 160,
+      coverList: 63,
+      referenceTile: 176,
+    })).toEqual({
+      smallThumbnail: 160,
+      coverList: DEFAULT_CATALOG_THUMBNAIL_SIZES.coverList,
+      referenceTile: 176,
+    });
+  });
 });

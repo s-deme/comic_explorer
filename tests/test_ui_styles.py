@@ -119,7 +119,7 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail",
-            "grid-template-rows: 112px auto",
+            "grid-template-rows: var(--catalog-thumbnail-height) minmax(0, 1fr)",
         )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail",
@@ -127,15 +127,16 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail .thumbnail",
-            "width: 100%",
+            "width: var(--catalog-thumbnail-width)",
         )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail .thumbnail",
-            "height: 112px",
+            "height: var(--catalog-thumbnail-height)",
         )
         self.assert_rule_contains(".catalog-item--cover_list", "min-height: 0")
         self.assert_rule_contains(
-            ".catalog-item--cover_list", "grid-template-rows: minmax(0, 1fr) auto"
+            ".catalog-item--cover_list",
+            "grid-template-rows: var(--catalog-thumbnail-height) minmax(0, 1fr)",
         )
         self.assert_rule_contains(
             ".catalog-item--cover_list .thumbnail",
@@ -143,7 +144,8 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(".catalog-item--reference_tile", "min-height: 0")
         self.assert_rule_contains(
-            ".catalog-item--reference_tile", "grid-template-rows: minmax(0, 1fr) auto"
+            ".catalog-item--reference_tile",
+            "grid-template-rows: var(--catalog-thumbnail-height) minmax(0, 1fr)",
         )
         self.assert_rule_contains(
             ".catalog-item--reference_tile .thumbnail",
@@ -175,8 +177,9 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".virtual-canvas", "min-width: 0")
         self.assert_rule_contains(
             ".catalog-row--cover_list",
-            "repeat(var(--catalog-column-count), minmax(0, 1fr))",
+            "repeat(var(--catalog-column-count), var(--catalog-card-width))",
         )
+        self.assertNotIn("@container (max-width: 420px)", STYLES)
         self.assertIn("@container (max-width: 720px)", STYLES)
 
     def test_search_options_group_conditions_without_overflow(self) -> None:

@@ -160,6 +160,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   sortDescending: false,
   endOfVolumePolicy: "auto_next",
   catalogViewMode: "cover_list",
+  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
   viewMode: "single",
   layoutMode: "paged",
   readingDirection: "rightToLeft",
@@ -795,8 +796,10 @@ describe("application shell", () => {
     expect(nameSort).toHaveAttribute("aria-checked", "true");
     expect(within(viewMenu).getByRole("menuitemradio", { name: "昇順" }))
       .toHaveAttribute("aria-checked", "true");
-    expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙付きリスト" }))
+    expect(within(viewMenu).getByRole("menuitemradio", { name: "表紙グリッド" }))
       .toHaveAttribute("aria-checked", "true");
+    expect(within(viewMenu).getAllByRole("menuitemradio").slice(-4).map((item) => item.textContent))
+      .toEqual(["詳細リスト", "小サムネイル", "表紙グリッド", "カードグリッド"]);
     expect(saveSortMock).not.toHaveBeenCalled();
 
     fireEvent.keyDown(
@@ -901,7 +904,7 @@ describe("application shell", () => {
     expect(listMock).toHaveBeenCalledTimes(1);
 
     fireEvent.keyDown(back, { key: "End" });
-    const lastViewItem = within(viewMenu).getByRole("menuitemradio", { name: "参照型タイル" });
+    const lastViewItem = within(viewMenu).getByRole("menuitemradio", { name: "カードグリッド" });
     expect(lastViewItem).toHaveFocus();
     fireEvent.keyDown(lastViewItem, { key: "Home" });
     expect(back).toHaveFocus();
@@ -1484,7 +1487,7 @@ describe("application shell", () => {
     for (const [mode, label] of [
       ["small_thumbnail", "小サムネイル"],
       ["detail_list", "詳細リスト"],
-      ["cover_list", "表紙付きリスト"],
+      ["cover_list", "表紙グリッド"],
     ] as const) {
       chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
       await waitFor(() => {
@@ -1528,7 +1531,7 @@ describe("application shell", () => {
     const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
 
     for (const [mode, label] of [
-      ["cover_list", "表紙付きリスト"],
+      ["cover_list", "表紙グリッド"],
       ["small_thumbnail", "小サムネイル"],
       ["detail_list", "詳細リスト"],
     ] as const) {
@@ -1619,7 +1622,7 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     const selector = screen.getByLabelText("一覧表示形式");
 
-    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "参照型タイル");
+    chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "カードグリッド");
 
     await waitFor(() =>
       expect(selector).toHaveAttribute("data-catalog-view-mode", "cover_list"),
@@ -2242,6 +2245,13 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
+    const draftCardSize = within(dialog).getByRole("spinbutton", {
+      name: "profileカードグリッドのサイズ（px）",
+    });
+    expect(draftCardSize).toHaveValue(128);
+    expect(draftCardSize).toHaveAttribute("min", "64");
+    expect(draftCardSize).toHaveAttribute("max", "320");
+    fireEvent.change(draftCardSize, { target: { value: "176" } });
     fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
@@ -2274,6 +2284,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
+    fireEvent.change(within(dialog).getByRole("spinbutton", {
+      name: "profileカードグリッドのサイズ（px）",
+    }), { target: { value: "176" } });
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
@@ -2292,6 +2305,11 @@ describe("application shell", () => {
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
         catalogViewMode: "reference_tile",
+        catalogThumbnailSizes: {
+          smallThumbnail: 104,
+          coverList: 144,
+          referenceTile: 176,
+        },
         treeVisible: false,
         scale: 1.75,
         mouseGestures: expect.objectContaining({
@@ -2303,6 +2321,8 @@ describe("application shell", () => {
     );
     expect(screen.getByLabelText("一覧表示形式"))
       .toHaveAttribute("data-catalog-view-mode", "reference_tile");
+    expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
+      .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   });
 

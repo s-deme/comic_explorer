@@ -2,7 +2,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CatalogEntry } from "../../types/domain";
 import { itemKindLabel } from "./kind-label";
-import type { CatalogViewMode } from "./view-mode";
+import {
+  DEFAULT_CATALOG_THUMBNAIL_SIZES,
+  type CatalogThumbnailSizes,
+  type CatalogViewMode,
+} from "./view-mode";
 
 interface CatalogGridProps {
   entries: CatalogEntry[];
@@ -12,6 +16,7 @@ interface CatalogGridProps {
   onNavigate: (entry: CatalogEntry) => void;
   onRead: (entry: CatalogEntry) => void;
   viewMode?: CatalogViewMode;
+  thumbnailSizes?: CatalogThumbnailSizes;
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
   isFavorite?: (entry: CatalogEntry) => boolean;
@@ -30,42 +35,66 @@ export type ThumbnailViewState =
 const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
   {
-    maxColumnCount: number;
-    minColumnWidth: number;
-    rowHeight: number;
     rowGap: number;
   }
 > = {
-  small_thumbnail: {
-    maxColumnCount: 8, minColumnWidth: 104, rowHeight: 176, rowGap: 10,
-  },
-  detail_list: {
-    maxColumnCount: 1, minColumnWidth: 0, rowHeight: 62, rowGap: 0,
-  },
-  cover_list: {
-    maxColumnCount: 5, minColumnWidth: 150, rowHeight: 288, rowGap: 10,
-  },
-  reference_tile: {
-    maxColumnCount: 6, minColumnWidth: 132, rowHeight: 248, rowGap: 10,
-  },
+  detail_list: { rowGap: 0 },
+  small_thumbnail: { rowGap: 10 },
+  cover_list: { rowGap: 10 },
+  reference_tile: { rowGap: 10 },
 };
 
 const CATALOG_HORIZONTAL_PADDING = 24;
 const CATALOG_COLUMN_GAP = 10;
 
+interface CatalogLayout {
+  thumbnailWidth: number;
+  thumbnailHeight: number;
+  cardWidth: number;
+  rowHeight: number;
+}
+
+export function catalogLayoutFor(
+  viewMode: CatalogViewMode,
+  thumbnailSizes: CatalogThumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
+): CatalogLayout {
+  if (viewMode === "detail_list") {
+    return { thumbnailWidth: 42, thumbnailHeight: 44, cardWidth: 0, rowHeight: 62 };
+  }
+  if (viewMode === "small_thumbnail") {
+    return {
+      thumbnailWidth: thumbnailSizes.smallThumbnail,
+      thumbnailHeight: thumbnailSizes.smallThumbnail,
+      cardWidth: thumbnailSizes.smallThumbnail + 10,
+      rowHeight: thumbnailSizes.smallThumbnail + 52,
+    };
+  }
+  const thumbnailWidth = viewMode === "cover_list"
+    ? thumbnailSizes.coverList
+    : thumbnailSizes.referenceTile;
+  const thumbnailHeight = Math.round(thumbnailWidth * 1.5);
+  return {
+    thumbnailWidth,
+    thumbnailHeight,
+    cardWidth: thumbnailWidth + (viewMode === "cover_list" ? 16 : 12),
+    rowHeight: thumbnailHeight + (viewMode === "cover_list" ? 58 : 56),
+  };
+}
+
 export function catalogColumnCountFor(
   viewMode: CatalogViewMode,
   scrollWidth: number | null,
+  thumbnailSizes: CatalogThumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
 ): number {
-  const { maxColumnCount, minColumnWidth } = VIEW_MODE_CONFIG[viewMode];
-  if (scrollWidth === null || scrollWidth <= 0) return maxColumnCount;
-  if (maxColumnCount === 1) return 1;
+  if (viewMode === "detail_list") return 1;
+  const { cardWidth } = catalogLayoutFor(viewMode, thumbnailSizes);
+  const measuredWidth = scrollWidth === null || scrollWidth <= 0 ? 900 : scrollWidth;
 
-  const availableWidth = Math.max(0, scrollWidth - CATALOG_HORIZONTAL_PADDING);
+  const availableWidth = Math.max(0, measuredWidth - CATALOG_HORIZONTAL_PADDING);
   const fittingColumns = Math.floor(
-    (availableWidth + CATALOG_COLUMN_GAP) / (minColumnWidth + CATALOG_COLUMN_GAP),
+    (availableWidth + CATALOG_COLUMN_GAP) / (cardWidth + CATALOG_COLUMN_GAP),
   );
-  return Math.max(1, Math.min(maxColumnCount, fittingColumns));
+  return Math.max(1, fittingColumns);
 }
 
 function displayName(entry: CatalogEntry): string {
@@ -100,6 +129,7 @@ export function CatalogGrid({
   onNavigate,
   onRead,
   viewMode = "cover_list",
+  thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
   isFavorite = () => false,
@@ -110,7 +140,8 @@ export function CatalogGrid({
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
-  const columnCount = catalogColumnCountFor(viewMode, scrollWidth);
+  const layout = catalogLayoutFor(viewMode, thumbnailSizes);
+  const columnCount = catalogColumnCountFor(viewMode, scrollWidth, thumbnailSizes);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -141,7 +172,7 @@ export function CatalogGrid({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => modeConfig.rowHeight,
+    estimateSize: () => layout.rowHeight,
     gap: modeConfig.rowGap,
     overscan: 2,
     initialRect: { width: 900, height: 720 },
@@ -199,7 +230,12 @@ export function CatalogGrid({
       data-catalog-view-mode={viewMode}
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
-      style={{ "--catalog-column-count": String(columnCount) } as CSSProperties}
+      style={{
+        "--catalog-column-count": String(columnCount),
+        "--catalog-card-width": `${layout.cardWidth}px`,
+        "--catalog-thumbnail-width": `${layout.thumbnailWidth}px`,
+        "--catalog-thumbnail-height": `${layout.thumbnailHeight}px`,
+      } as CSSProperties}
       onContextMenu={(event) => {
         if ((event.target as Element).closest("[data-relative-path]") !== null) return;
         event.preventDefault();
@@ -230,7 +266,7 @@ export function CatalogGrid({
                 aria-rowindex={virtualRow.index + 1}
                 key={virtualRow.key}
                 style={{
-                  height: modeConfig.rowHeight,
+                  height: layout.rowHeight,
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >

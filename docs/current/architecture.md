@@ -66,9 +66,9 @@ catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。名
 backendのread-only workerが正規化したbasename、検索開始folder、再帰、folder/file種別、size、mtimeを
 同時に評価する。固定した検索場所はroot相対pathとして再検証・canonicalizeし、root外symlinkや親directory
 への脱出を許可しない。検索結果の保持はfrontend表示状態だけに適用し、検索実行時のfilesystem再走査を
-cacheへ置き換えない。card形式はscroll containerの幅を観測して、
-各形式の上限を超えない範囲で行あたりの列数を決めるため、仮想行、keyboardの上下移動、focus復元が
-同じ列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
+cacheへ置き換えない。card形式はprofileに保存した形式別thumbnail幅から画像枠とcardの固定寸法を導出し、
+scroll containerの幅を観測して収まる列数だけを決める。ウィンドウ幅の変更ではthumbnailを拡縮しないため、
+仮想行、keyboardの上下移動、focus復元は同じ固定card幅から求めた列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
 primary情報と独立したお気に入りtoggleを、詳細リストでは左端の専用列、サムネイル系cardではサムネイル左上への重ね表示として維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
@@ -160,7 +160,7 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 library shellは5分類menu、toolbar、address、folder/search side pane、catalog、status barから成り、root未選択時も
 shellを表示してside paneのPC配下からdriveを選択できる。
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
-cover/small/detail/reference tile、sort、search result、selection、loading/empty/error、context menu、
+詳細リスト、小サムネイル、表紙グリッド、カードグリッドの表示順、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
@@ -173,7 +173,7 @@ dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入�
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、
 pointerのどちらからも同じcommandへ到達する。catalog cardのfolderとcomic folderはダブルクリックまたはEnterでそのfolderへ移動し、archive、PDF、画像だけをviewerへ開く。重複する読むbuttonは置かない。
 viewerのpointerによるpage移動はtoolbar、wheel、左右swipeに限定し、double clickは全画面切替へ固定する。
-サムネイル系cardは画像とファイル名を別のgrid領域に配置して画像の縦横比で名前を侵食させず、種別は詳細リストだけに表示する。小サムネイルは固定幅のportrait枠へ狭めずcard内幅へ追従し、boundedな画像領域の直後へファイル名を配置して、横長画像の表示幅と縦方向の余白を両立する。
+サムネイル系cardは画像とファイル名を別のgrid領域に配置して画像の縦横比で名前を侵食させず、種別は詳細リストだけに表示する。小サムネイル、表紙グリッド、カードグリッドはそれぞれ独立した保存済みthumbnail幅を使い、画像枠の直後に固定したファイル名領域を配置する。profile v2は3つの幅を必須fieldとして検証し、旧profile v1だけは形式別既定値を補って移行する。backendは同じ値を範囲検証してapp-local SQLiteへatomicに保存する。
 shortcut編集はoptionsの統合設定だけから行い、catalogとviewerのcommandをgroup、keyboard、割り当て済みmouse入力、
 説明の同一表で扱う。keyboardはcommand間と予約済みapp操作の衝突を拒否し、mouseはviewer stageで直接観測できる
 左右swipe、wheel、右button+wheel、middle/side buttonだけをcommandへ変換する。page layoutの通常wheel以外の

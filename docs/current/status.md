@@ -54,7 +54,7 @@ codd:
 |---|---|---|---|
 | FR-B01 | 表示倍率 | Implemented / PASS | — |
 | FR-B02 | 巻末policy | Implemented / PASS | — |
-| FR-B03 | catalog表示形式 | Implemented / PASS | — |
+| FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッドの順序・名称、形式別固定thumbnail幅、ファイル名非重複、profile v1移行とSQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
 | FR-B05 | 名前検索 | Implemented / PASS | 10,000項目/1秒はNFR gate。 |
 | FR-B06 | quick access・favorite保存 | Implemented / PASS | — |
 | FR-B07 | memo・history・rating | Implemented / PASS | — |

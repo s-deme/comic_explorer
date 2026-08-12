@@ -14,7 +14,7 @@ import type {
 } from "../../types/domain";
 import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
-import type { CatalogViewMode } from "../catalog/view-mode";
+import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
 import type { MouseGestureBindings, SettingsProfile } from "../settings/profile";
@@ -74,6 +74,7 @@ export interface CatalogSettings {
   sortDescending: boolean;
   endOfVolumePolicy: EndOfVolumePolicy;
   catalogViewMode: CatalogViewMode;
+  catalogThumbnailSizes: CatalogThumbnailSizes;
   viewMode: "single" | "spread";
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
@@ -131,6 +132,7 @@ export async function saveSettingsProfile(
       sortDescending: profile.sortDescending,
       endOfVolumePolicy: profile.endOfVolumePolicy,
       catalogViewMode: profile.catalogViewMode,
+      catalogThumbnailSizes: profile.catalogThumbnailSizes,
       viewMode: profile.viewMode,
       layoutMode: profile.layoutMode,
       readingDirection: profile.readingDirection,

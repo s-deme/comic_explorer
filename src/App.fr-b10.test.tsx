@@ -160,6 +160,7 @@ describe("FR-B10 connected tag management", () => {
         sortDescending: false,
         endOfVolumePolicy: "auto_next",
         catalogViewMode: "cover_list",
+        catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
         viewMode: "single",
         layoutMode: "paged",
         readingDirection: "rightToLeft",

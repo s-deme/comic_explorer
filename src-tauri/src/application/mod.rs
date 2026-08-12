@@ -270,6 +270,7 @@ pub struct CatalogSettings {
     pub sort_descending: bool,
     pub end_of_volume_policy: String,
     pub catalog_view_mode: String,
+    pub catalog_thumbnail_sizes: CatalogThumbnailSizes,
     pub view_mode: String,
     pub layout_mode: String,
     pub reading_direction: String,
@@ -283,6 +284,14 @@ pub struct CatalogSettings {
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogThumbnailSizes {
+    pub small_thumbnail: u16,
+    pub cover_list: u16,
+    pub reference_tile: u16,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsProfileInput {
@@ -290,6 +299,7 @@ pub struct SettingsProfileInput {
     pub sort_descending: bool,
     pub end_of_volume_policy: String,
     pub catalog_view_mode: String,
+    pub catalog_thumbnail_sizes: CatalogThumbnailSizes,
     pub view_mode: String,
     pub layout_mode: String,
     pub reading_direction: String,
@@ -324,6 +334,13 @@ pub struct FavoriteEntry {
 
 const MIN_VIEWER_SCALE: f64 = 0.25;
 const MAX_VIEWER_SCALE: f64 = 4.0;
+const MIN_CATALOG_THUMBNAIL_SIZE: u16 = 64;
+const MAX_CATALOG_THUMBNAIL_SIZE: u16 = 320;
+const DEFAULT_CATALOG_THUMBNAIL_SIZES: CatalogThumbnailSizes = CatalogThumbnailSizes {
+    small_thumbnail: 104,
+    cover_list: 144,
+    reference_tile: 128,
+};
 
 const LEGACY_SHORTCUT_COMMANDS: [&str; 8] = [
     "nextPage",
@@ -636,6 +653,30 @@ fn catalog_view_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn catalog_thumbnail_sizes(settings: &crate::state::Settings) -> CatalogThumbnailSizes {
+    fn valid_size(value: &str, fallback: u16) -> u16 {
+        value
+            .parse::<u16>()
+            .ok()
+            .filter(|size| (MIN_CATALOG_THUMBNAIL_SIZE..=MAX_CATALOG_THUMBNAIL_SIZE).contains(size))
+            .unwrap_or(fallback)
+    }
+    CatalogThumbnailSizes {
+        small_thumbnail: valid_size(
+            &settings.small_thumbnail_size,
+            DEFAULT_CATALOG_THUMBNAIL_SIZES.small_thumbnail,
+        ),
+        cover_list: valid_size(
+            &settings.cover_list_thumbnail_size,
+            DEFAULT_CATALOG_THUMBNAIL_SIZES.cover_list,
+        ),
+        reference_tile: valid_size(
+            &settings.reference_tile_thumbnail_size,
+            DEFAULT_CATALOG_THUMBNAIL_SIZES.reference_tile,
+        ),
+    }
+}
+
 fn viewer_layout_mode(settings: &crate::state::Settings) -> String {
     if matches!(
         settings.layout_mode.as_str(),
@@ -652,6 +693,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale_mode = viewer_scale_mode(&settings);
     let end_of_volume_policy = end_of_volume_policy(&settings);
     let catalog_view_mode = catalog_view_mode(&settings);
+    let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
@@ -661,6 +703,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         sort_descending: settings.sort_descending,
         end_of_volume_policy,
         catalog_view_mode,
+        catalog_thumbnail_sizes,
         view_mode: settings.view_mode,
         layout_mode,
         reading_direction: settings.reading_direction,
@@ -1721,6 +1764,13 @@ fn validate_settings_profile(
         profile.catalog_view_mode.as_str(),
         "small_thumbnail" | "detail_list" | "cover_list" | "reference_tile"
     ) || !matches!(profile.view_mode.as_str(), "single" | "spread")
+        || ![
+            profile.catalog_thumbnail_sizes.small_thumbnail,
+            profile.catalog_thumbnail_sizes.cover_list,
+            profile.catalog_thumbnail_sizes.reference_tile,
+        ]
+        .into_iter()
+        .all(|size| (MIN_CATALOG_THUMBNAIL_SIZE..=MAX_CATALOG_THUMBNAIL_SIZE).contains(&size))
         || !matches!(
             profile.layout_mode.as_str(),
             "paged" | "vertical_scroll" | "horizontal_scroll"
@@ -1787,6 +1837,10 @@ pub fn set_settings_profile(
         settings.sort_descending = profile.sort_descending;
         settings.end_of_volume_policy = profile.end_of_volume_policy;
         settings.catalog_view_mode = profile.catalog_view_mode;
+        settings.small_thumbnail_size = profile.catalog_thumbnail_sizes.small_thumbnail.to_string();
+        settings.cover_list_thumbnail_size = profile.catalog_thumbnail_sizes.cover_list.to_string();
+        settings.reference_tile_thumbnail_size =
+            profile.catalog_thumbnail_sizes.reference_tile.to_string();
         settings.view_mode = profile.view_mode;
         settings.layout_mode = profile.layout_mode;
         settings.reading_direction = profile.reading_direction;
@@ -3362,12 +3416,46 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(
+            catalog_thumbnail_sizes(&settings),
+            DEFAULT_CATALOG_THUMBNAIL_SIZES
+        );
+
+        settings.small_thumbnail_size = "160".into();
+        settings.cover_list_thumbnail_size = "192".into();
+        settings.reference_tile_thumbnail_size = "176".into();
+        assert_eq!(
+            catalog_thumbnail_sizes(&settings),
+            CatalogThumbnailSizes {
+                small_thumbnail: 160,
+                cover_list: 192,
+                reference_tile: 176,
+            }
+        );
+
+        settings.small_thumbnail_size = "63".into();
+        settings.cover_list_thumbnail_size = "invalid".into();
+        settings.reference_tile_thumbnail_size = "321".into();
+        assert_eq!(
+            catalog_thumbnail_sizes(&settings),
+            DEFAULT_CATALOG_THUMBNAIL_SIZES
+        );
+    }
+
+    #[test]
     fn fr_b19_settings_profile_validates_all_atomic_bindings() {
         let mut profile = SettingsProfileInput {
             sort_field: "name".into(),
             sort_descending: false,
             end_of_volume_policy: "auto_next".into(),
             catalog_view_mode: "reference_tile".into(),
+            catalog_thumbnail_sizes: CatalogThumbnailSizes {
+                small_thumbnail: 104,
+                cover_list: 144,
+                reference_tile: 128,
+            },
             view_mode: "single".into(),
             layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
@@ -3383,6 +3471,13 @@ mod shutdown_tests {
         let (shortcuts, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(shortcuts, profile.shortcuts);
         assert_eq!(gestures, profile.mouse_gestures);
+
+        profile.catalog_thumbnail_sizes.small_thumbnail = 63;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.catalog_thumbnail_sizes.small_thumbnail = 104;
 
         profile
             .mouse_gestures

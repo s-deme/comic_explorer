@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
-import { CatalogGrid, catalogColumnCountFor } from "./CatalogGrid";
+import { CatalogGrid, catalogColumnCountFor, catalogLayoutFor } from "./CatalogGrid";
 
 function entries(count: number): CatalogEntry[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -19,17 +19,31 @@ describe("CatalogGrid", () => {
   });
 
   it("reduces card columns to the available catalog width", () => {
-    expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(8);
-    expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(6);
+    expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(7);
+    expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(5);
     expect(catalogColumnCountFor("cover_list", 700)).toBe(4);
-    expect(catalogColumnCountFor("reference_tile", 460)).toBe(3);
+    expect(catalogColumnCountFor("reference_tile", 460)).toBe(2);
     expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
   });
 
+  it("keeps configured thumbnail dimensions fixed while only the column count changes", () => {
+    const sizes = { smallThumbnail: 160, coverList: 192, referenceTile: 176 };
+    expect(catalogLayoutFor("small_thumbnail", sizes)).toMatchObject({
+      thumbnailWidth: 160,
+      thumbnailHeight: 160,
+    });
+    expect(catalogColumnCountFor("small_thumbnail", 1_000, sizes)).toBe(5);
+    expect(catalogColumnCountFor("small_thumbnail", 700, sizes)).toBe(3);
+    expect(catalogLayoutFor("small_thumbnail", sizes)).toMatchObject({
+      thumbnailWidth: 160,
+      thumbnailHeight: 160,
+    });
+  });
+
   it.each([
-    ["small_thumbnail", 9, 176, 10],
+    ["small_thumbnail", 9, 156, 10],
     ["detail_list", 2, 62, 0],
-    ["cover_list", 6, 288, 10],
+    ["cover_list", 6, 274, 10],
     ["reference_tile", 7, 248, 10],
   ] as const)(
     "%s positions the second virtual row after its configured gap",

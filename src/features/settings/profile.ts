@@ -7,6 +7,10 @@ import {
 import {
   CATALOG_VIEW_MODES,
   DEFAULT_CATALOG_VIEW_MODE,
+  DEFAULT_CATALOG_THUMBNAIL_SIZES,
+  MAX_CATALOG_THUMBNAIL_SIZE,
+  MIN_CATALOG_THUMBNAIL_SIZE,
+  type CatalogThumbnailSizes,
   type CatalogViewMode,
 } from "../catalog/view-mode";
 import {
@@ -26,7 +30,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 1;
+export const SETTINGS_PROFILE_VERSION = 2;
 export const APP_VERSION = packageMetadata.version;
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
@@ -69,6 +73,7 @@ export interface SettingsProfile {
   sortDescending: boolean;
   endOfVolumePolicy: EndOfVolumePolicy;
   catalogViewMode: CatalogViewMode;
+  catalogThumbnailSizes: CatalogThumbnailSizes;
   viewMode: ViewMode;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
@@ -89,6 +94,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     sortDescending: false,
     endOfVolumePolicy: DEFAULT_END_OF_VOLUME_POLICY,
     catalogViewMode: DEFAULT_CATALOG_VIEW_MODE,
+    catalogThumbnailSizes: { ...DEFAULT_CATALOG_THUMBNAIL_SIZES },
     viewMode: "single",
     layoutMode: "paged",
     readingDirection: "rightToLeft",
@@ -144,6 +150,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const sortField = enumValue(candidate.sortField, ["name", "modified", "size", "kind"] as const);
   const endOfVolumePolicy = enumValue(candidate.endOfVolumePolicy, END_OF_VOLUME_POLICIES);
   const catalogViewMode = enumValue(candidate.catalogViewMode, CATALOG_VIEW_MODES);
+  const catalogThumbnailSizes = candidate.profileVersion === 1
+    ? { ...DEFAULT_CATALOG_THUMBNAIL_SIZES }
+    : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
   const viewMode = enumValue(candidate.viewMode, ["single", "spread"] as const);
   const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
@@ -151,11 +160,12 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const shortcuts = strictShortcutBindings(candidate.shortcuts);
   const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
   if (
-    candidate.profileVersion !== SETTINGS_PROFILE_VERSION ||
+    (candidate.profileVersion !== 1 && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
     endOfVolumePolicy === null ||
     catalogViewMode === null ||
+    catalogThumbnailSizes === null ||
     viewMode === null ||
     layoutMode === null ||
     readingDirection === null ||
@@ -179,6 +189,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     sortDescending: candidate.sortDescending,
     endOfVolumePolicy,
     catalogViewMode,
+    catalogThumbnailSizes,
     viewMode,
     layoutMode,
     readingDirection,
@@ -191,6 +202,24 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     shortcuts,
     mouseGestures,
   };
+}
+
+function strictCatalogThumbnailSizes(value: unknown): CatalogThumbnailSizes | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const valid = (size: unknown): size is number => typeof size === "number"
+    && Number.isInteger(size)
+    && size >= MIN_CATALOG_THUMBNAIL_SIZE
+    && size <= MAX_CATALOG_THUMBNAIL_SIZE;
+  return valid(candidate.smallThumbnail)
+    && valid(candidate.coverList)
+    && valid(candidate.referenceTile)
+    ? {
+        smallThumbnail: candidate.smallThumbnail,
+        coverList: candidate.coverList,
+        referenceTile: candidate.referenceTile,
+      }
+    : null;
 }
 
 function enumValue<T extends string>(

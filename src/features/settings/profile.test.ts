@@ -12,11 +12,12 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 1,
+    profileVersion: 2,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
     catalogViewMode: "cover_list",
+    catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, referenceTile: 128 },
     viewMode: "single",
     layoutMode: "paged",
     readingDirection: "rightToLeft",
@@ -46,6 +47,7 @@ describe("settings profile", () => {
     const first = createDefaultSettingsProfile();
     const second = createDefaultSettingsProfile();
     expect(first).toEqual(validProfile());
+    first.catalogThumbnailSizes.smallThumbnail = 200;
     first.shortcuts.nextPage = "N";
     first.mouseGestures.swipeLeft = "none";
     expect(second).toEqual(validProfile());
@@ -67,12 +69,30 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 2, 99, "1", undefined])(
+  it.each([0, 3, 99, "2", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
     },
   );
+
+  it("migrates a v1 profile with the default thumbnail sizes", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 1;
+    delete legacy.catalogThumbnailSizes;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it.each([
+    { smallThumbnail: 63, coverList: 144, referenceTile: 128 },
+    { smallThumbnail: 104, coverList: 321, referenceTile: 128 },
+    { smallThumbnail: 104, coverList: 144, referenceTile: 100.5 },
+    { smallThumbnail: "104", coverList: 144, referenceTile: 128 },
+    undefined,
+  ])("rejects invalid v2 catalog thumbnail sizes (%s)", (catalogThumbnailSizes) => {
+    expect(normalizeSettingsProfile(withField("catalogThumbnailSizes", catalogThumbnailSizes)))
+      .toBeNull();
+  });
 
   it.each([
     ["sortField", "created"],

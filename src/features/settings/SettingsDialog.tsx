@@ -7,6 +7,9 @@ import { type SortField } from "../catalog/sort";
 import {
   CATALOG_VIEW_MODE_LABELS,
   CATALOG_VIEW_MODES,
+  MAX_CATALOG_THUMBNAIL_SIZE,
+  MIN_CATALOG_THUMBNAIL_SIZE,
+  normalizeCatalogThumbnailSize,
   normalizeCatalogViewMode,
 } from "../catalog/view-mode";
 import {
@@ -188,7 +191,22 @@ export function SettingsDialog({
     {
       id: "catalog-view-mode",
       category: "catalog",
-      text: `一覧形式 表示 表紙 サムネイル 詳細 参照型 ${CATALOG_VIEW_MODE_LABELS[draft.catalogViewMode]} 表紙の大きさやファイル情報の詳しさを切り替えます`,
+      text: `一覧形式 表示 表紙 サムネイル 詳細 カード グリッド ${CATALOG_VIEW_MODE_LABELS[draft.catalogViewMode]} レイアウトやファイル情報の詳しさを切り替えます`,
+    },
+    {
+      id: "small-thumbnail-size",
+      category: "catalog",
+      text: `小サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.smallThumbnail}px`,
+    },
+    {
+      id: "cover-list-thumbnail-size",
+      category: "catalog",
+      text: `表紙グリッド サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.coverList}px`,
+    },
+    {
+      id: "reference-tile-thumbnail-size",
+      category: "catalog",
+      text: `カードグリッド サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.referenceTile}px`,
     },
     {
       id: "viewer-view-mode",
@@ -389,7 +407,7 @@ export function SettingsDialog({
               <SettingRow
                 id="catalog-view-mode"
                 title="一覧形式"
-                description="表紙の大きさや、ファイル情報の詳しさを切り替えます。"
+                description="詳細、コンパクトな表紙、表紙中心、枠付きカードのレイアウトを切り替えます。"
                 hidden={rowHidden("catalog-view-mode")}
               >
                 <select
@@ -402,6 +420,34 @@ export function SettingsDialog({
                   ))}
                 </select>
               </SettingRow>
+              {([
+                ["small-thumbnail-size", "smallThumbnail", "小サムネイルのサイズ", "コンパクトな一覧のサムネイル幅です。"],
+                ["cover-list-thumbnail-size", "coverList", "表紙グリッドのサイズ", "表紙を中心に並べる一覧のサムネイル幅です。"],
+                ["reference-tile-thumbnail-size", "referenceTile", "カードグリッドのサイズ", "枠付きカード一覧のサムネイル幅です。"],
+              ] as const).map(([id, field, title, description]) => (
+                <SettingRow key={id} id={id} title={title} description={description} hidden={rowHidden(id)}>
+                  <div className="settings-number-control">
+                    <input
+                      type="number"
+                      aria-label={`profile${title}（px）`}
+                      min={MIN_CATALOG_THUMBNAIL_SIZE}
+                      max={MAX_CATALOG_THUMBNAIL_SIZE}
+                      step="8"
+                      value={draft.catalogThumbnailSizes[field]}
+                      onChange={(event) => update({
+                        catalogThumbnailSizes: {
+                          ...draft.catalogThumbnailSizes,
+                          [field]: normalizeCatalogThumbnailSize(
+                            Number(event.target.value),
+                            draft.catalogThumbnailSizes[field],
+                          ),
+                        },
+                      })}
+                    />
+                    <span>px</span>
+                  </div>
+                </SettingRow>
+              ))}
             </section>
 
             <section className="settings-panel" aria-label="ビューワ設定" hidden={panelHidden("viewer")}>
