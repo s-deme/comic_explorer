@@ -92,7 +92,7 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--cover_list .catalog-actions", "top: 8px"
         )
         self.assert_rule_contains(
-            ".catalog-cell--small_thumbnail .catalog-actions", "left: 50%"
+            ".catalog-cell--small_thumbnail .catalog-actions", "left: 5px"
         )
 
     def test_thumbnail_cards_reserve_the_filename_below_a_bounded_image(self) -> None:
@@ -107,7 +107,19 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail",
-            "grid-template-rows: minmax(0, 1fr) auto",
+            "grid-template-rows: 112px auto",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail",
+            "align-content: start",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail .thumbnail",
+            "width: 100%",
+        )
+        self.assert_rule_contains(
+            ".catalog-item--small_thumbnail .thumbnail",
+            "height: 112px",
         )
         self.assert_rule_contains(".catalog-item--cover_list", "min-height: 0")
         self.assert_rule_contains(

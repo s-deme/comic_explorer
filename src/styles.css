@@ -496,7 +496,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .catalog-item--small_thumbnail {
   height: 100%;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: 112px auto;
+  align-content: start;
   justify-items: stretch;
   padding: 5px;
 }
@@ -523,9 +524,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow: hidden;
 }
 .catalog-item--small_thumbnail .thumbnail {
-  justify-self: center;
-  width: 64px;
-  height: 94px;
+  justify-self: stretch;
+  width: 100%;
+  height: 112px;
   font-size: 1.7rem;
 }
 .catalog-item--small_thumbnail .item-name {
@@ -637,8 +638,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .catalog-cell--cover_list .catalog-actions { top: 8px; left: 8px; }
 .catalog-cell--small_thumbnail .catalog-actions {
   top: 5px;
-  left: 50%;
-  transform: translateX(-32px);
+  left: 5px;
 }
 .catalog-cell--reference_tile .catalog-actions { top: 6px; left: 6px; }
 .catalog-cell--detail_list .catalog-actions { top: 4px; left: 8px; }
@@ -674,11 +674,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
   .catalog-item--small_thumbnail .thumbnail {
-    width: 44px;
-    height: 64px;
+    width: 100%;
+    height: 96px;
     font-size: 1.2rem;
   }
-  .catalog-cell--small_thumbnail .catalog-actions { transform: translateX(-22px); }
 }
 
 @media (max-width: 900px) {
