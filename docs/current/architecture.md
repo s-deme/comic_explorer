@@ -60,7 +60,7 @@ backendのread-only workerが正規化したbasename、検索開始folder、再�
 cacheへ置き換えない。card形式はscroll containerの幅を観測して、
 各形式の上限を超えない範囲で行あたりの列数を決めるため、仮想行、keyboardの上下移動、focus復元が
 同じ列数に従う。詳細リストはcatalog paneのcontainer queryで更新日時、種別・サイズの順に非表示へ縮退し、
-primary情報と独立したお気に入りtoggleをサムネイル左上へ重ねて維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。検索、mask、複数選択、property、
+primary情報と独立したお気に入りtoggleを、詳細リストでは左端の専用列、サムネイル系cardではサムネイル左上への重ね表示として維持する。thumbnail未生成のfolderとarchiveには、inline SVGのtab付きfolder iconと積層書庫iconを表示して区別する。検索、mask、複数選択、property、
 CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既存catalog identityと
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
 Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、

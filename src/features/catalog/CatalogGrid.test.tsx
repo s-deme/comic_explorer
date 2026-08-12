@@ -336,6 +336,33 @@ describe("CatalogGrid", () => {
     },
   );
 
+  it("reserves the first detail-list column for favorite toggles", () => {
+    render(
+      <CatalogGrid
+        entries={[{
+          relativePath: "favorite-column.cbz" as never,
+          kind: "archive",
+          archiveKind: "cbz",
+        }]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onToggleFavorite={() => undefined}
+        viewMode="detail_list"
+      />,
+    );
+
+    const header = document.querySelector(".catalog-list-header");
+    expect(header).not.toBeNull();
+    expect(header?.children).toHaveLength(5);
+    expect(header?.firstElementChild).toHaveClass("catalog-favorite-column");
+    const cell = screen.getByRole("button", { name: /^favorite-column/ })
+      .closest(".catalog-cell--detail_list");
+    expect(cell?.querySelector(":scope > .catalog-actions")).toBeInTheDocument();
+    expect(cell?.querySelector(":scope > .catalog-item")).toBeInTheDocument();
+  });
+
   it.each(["small_thumbnail", "cover_list", "reference_tile"] as const)(
     "%s cards reserve the label for the file name and hide the file format",
     (viewMode) => {

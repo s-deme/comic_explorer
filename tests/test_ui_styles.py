@@ -82,11 +82,23 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-loupe", "height: 180px")
         self.assert_rule_contains(".viewer-loupe", "border-radius: 0")
 
-    def test_catalog_cards_overlay_favorite_controls_without_a_separate_action_column(self) -> None:
+    def test_catalog_favorite_controls_use_mode_specific_placement(self) -> None:
         self.assert_rule_contains(".catalog-actions", "position: absolute")
         self.assert_rule_contains(
             ".catalog-cell--detail_list",
-            "grid-template-columns: minmax(0, 1fr)",
+            "grid-template-columns: 32px minmax(0, 1fr)",
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--detail_list > .catalog-item",
+            "grid-column: 2",
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--detail_list .catalog-actions",
+            "position: static",
+        )
+        self.assert_rule_contains(
+            ".catalog-cell--detail_list .catalog-actions",
+            "grid-column: 1",
         )
         self.assert_rule_contains(
             ".catalog-cell--cover_list .catalog-actions", "top: 8px"

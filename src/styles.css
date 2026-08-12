@@ -442,7 +442,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .catalog-list-header {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 120px 140px 180px;
+  grid-template-columns: 32px minmax(0, 2fr) 120px 140px 180px;
   gap: 8px;
   min-width: 0;
   padding: 0 8px 5px;
@@ -463,12 +463,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 4px;
 }
 .catalog-cell--detail_list {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
   align-items: center;
 }
 .catalog-cell > .catalog-item {
   grid-row: 1 / -1;
   grid-column: 1 / -1;
+}
+.catalog-cell--detail_list > .catalog-item {
+  grid-row: 1;
+  grid-column: 2;
 }
 .catalog-item {
   display: grid;
@@ -641,24 +645,30 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   left: 5px;
 }
 .catalog-cell--reference_tile .catalog-actions { top: 6px; left: 6px; }
-.catalog-cell--detail_list .catalog-actions { top: 4px; left: 8px; }
+.catalog-cell--detail_list .catalog-actions {
+  position: static;
+  grid-row: 1;
+  grid-column: 1;
+  justify-self: center;
+}
 
 @container (max-width: 720px) {
   .catalog-list-header {
-    grid-template-columns: minmax(0, 2fr) minmax(96px, 1fr) minmax(76px, .7fr);
+    grid-template-columns: 32px minmax(0, 2fr) minmax(96px, 1fr) minmax(76px, .7fr);
   }
   .catalog-item--detail_list {
     grid-template-columns: minmax(0, 2fr) minmax(96px, 1fr) minmax(76px, .7fr);
   }
-  .catalog-list-header > span:nth-child(4),
+  .catalog-list-header > span:nth-child(5),
   .catalog-item--detail_list .item-modified { display: none; }
 }
 
 @container (max-width: 500px) {
-  .catalog-list-header { grid-template-columns: minmax(0, 1fr); }
+  .catalog-list-header { grid-template-columns: 32px minmax(0, 1fr); }
   .catalog-item--detail_list { grid-template-columns: minmax(0, 1fr); }
-  .catalog-list-header > span:nth-child(2),
   .catalog-list-header > span:nth-child(3),
+  .catalog-list-header > span:nth-child(4),
+  .catalog-list-header > span:nth-child(5),
   .catalog-item--detail_list .item-kind,
   .catalog-item--detail_list .item-size { display: none; }
   .catalog-item--detail_list .thumbnail {

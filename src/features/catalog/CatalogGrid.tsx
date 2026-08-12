@@ -212,6 +212,7 @@ export function CatalogGrid({
         <>
           {viewMode === "detail_list" && (
             <div className="catalog-list-header" aria-hidden="true">
+              <span className="catalog-favorite-column" />
               <span>名前</span>
               <span>種別</span>
               <span>サイズ</span>
