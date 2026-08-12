@@ -3,6 +3,7 @@ import { DEFAULT_SHORTCUTS } from "../input/shortcuts";
 import packageMetadata from "../../../package.json";
 import {
   APP_VERSION,
+  createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
   normalizeSettingsProfile,
   remapMouseGesture,
@@ -39,6 +40,15 @@ function withField(field: string, value: unknown): Record<string, unknown> {
 describe("settings profile", () => {
   it("uses package metadata as the application version source of truth", () => {
     expect(APP_VERSION).toBe(packageMetadata.version);
+  });
+
+  it("creates a complete independent default draft for the settings reset action", () => {
+    const first = createDefaultSettingsProfile();
+    const second = createDefaultSettingsProfile();
+    expect(first).toEqual(validProfile());
+    first.shortcuts.nextPage = "N";
+    first.mouseGestures.swipeLeft = "none";
+    expect(second).toEqual(validProfile());
   });
 
   it("imports a strict known-version profile and excludes unknown fields", () => {

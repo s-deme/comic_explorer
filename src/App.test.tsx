@@ -2285,14 +2285,21 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     chooseAppMenuItem("オプション", "統合設定…");
     let dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    expect(within(categories).getByRole("button", { name: /^一覧表示/ }))
+      .toHaveAttribute("aria-current", "page");
+    fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
     expect(within(dialog).queryByLabelText("doubleClickジェスチャー"))
       .not.toBeInTheDocument();
     expect(within(dialog).getByText("doubleClick: 全画面表示／解除（固定）"))
       .toBeInTheDocument();
+    fireEvent.click(within(categories).getByRole("button", { name: /^一覧表示/ }));
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
+    fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
     const draftScale = within(dialog).getByRole("spinbutton", {
       name: "profile任意倍率（%）",
     });
@@ -2301,6 +2308,7 @@ describe("application shell", () => {
     expect(draftScale).toHaveAttribute("max", "400");
     expect(draftScale).toHaveAttribute("step", "1");
     fireEvent.change(draftScale, { target: { value: "175" } });
+    fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
     fireEvent.keyDown(within(dialog).getByLabelText("次ページショートカット"), {
       key: "j",
       ctrlKey: true,
@@ -2314,10 +2322,13 @@ describe("application shell", () => {
 
     chooseAppMenuItem("オプション", "統合設定…");
     dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const reopenedCategories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
+    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2339,6 +2350,34 @@ describe("application shell", () => {
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   });
 
+  it("FT-B19-006 searches categorized settings and resets the whole draft", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+
+    fireEvent.change(within(dialog).getByRole("searchbox", { name: "設定を検索" }), {
+      target: { value: "次ページ" },
+    });
+    expect(within(dialog).getByRole("textbox", { name: "次ページショートカット" }))
+      .toBeVisible();
+    expect(within(dialog).getByLabelText("profile一覧形式")).not.toBeVisible();
+    expect(within(dialog).getByText(/件の設定/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "設定検索をクリア" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
+    expect(within(dialog).getByLabelText("profileフォルダツリー")).not.toBeChecked();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "すべて既定に戻す" }));
+    expect(within(dialog).getByLabelText("profileフォルダツリー")).toBeChecked();
+    expect(within(dialog).getByRole("status")).toHaveTextContent("適用するまで現在の設定は変わりません");
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(screen.getByRole("complementary", { name: "フォルダツリー" })).toBeInTheDocument();
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+  });
+
   it("FT-B19-002 exports a safe profile and imports it only into the settings draft", async () => {
     const createDescriptor = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
     const revokeDescriptor = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
@@ -2355,6 +2394,7 @@ describe("application shell", () => {
       await registerTestLibrary([]);
       chooseAppMenuItem("オプション", "統合設定…");
       const dialog = screen.getByRole("dialog", { name: "統合設定" });
+      fireEvent.click(within(dialog).getByRole("button", { name: /^プロファイル/ }));
       fireEvent.click(within(dialog).getByRole("button", { name: "profileを書き出す" }));
       expect(click).toHaveBeenCalledOnce();
       expect(within(dialog).getByText(/設定profileのダウンロードを開始しました/))
@@ -2372,6 +2412,7 @@ describe("application shell", () => {
       });
 
       expect(await within(dialog).findByText(/設定profileを読み込みました/)).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole("button", { name: /^一覧表示/ }));
       expect(within(dialog).getByLabelText("profile一覧形式")).toHaveValue("reference_tile");
       expect(within(dialog).getByLabelText("profile並べ替え")).toHaveValue("size");
       expect(screen.getByLabelText("一覧表示形式"))

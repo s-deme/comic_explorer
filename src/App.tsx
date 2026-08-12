@@ -85,15 +85,10 @@ import type {
   ViewerScaleState,
   ViewerLayoutMode,
 } from "./features/viewer/model";
-import {
-  normalizeViewerLayoutMode,
-  VIEWER_LAYOUT_MODE_LABELS,
-  VIEWER_LAYOUT_MODES,
-} from "./features/viewer/model";
+import { normalizeViewerLayoutMode } from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
   SHORTCUT_COMMANDS,
-  SHORTCUT_FALLBACKS,
   SHORTCUT_LABELS,
   eventShortcut,
   normalizeShortcutBindings,
@@ -139,13 +134,16 @@ import {
 import {
   APP_VERSION,
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
+  createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
-  MOUSE_GESTURE_ACTIONS,
   normalizeMouseGestures,
   normalizeSettingsProfile,
+  type MouseGestureAction,
   type MouseGestureBindings,
+  type MouseGestureName,
   type SettingsProfile,
 } from "./features/settings/profile";
+import { SettingsDialog } from "./features/settings/SettingsDialog";
 import {
   addBookshelfItemResult,
   listBookmarks,
@@ -2097,6 +2095,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     if (settingsDraft === null) return;
     setProfileNotice(null);
     setSettingsDraft({ ...settingsDraft, shortcuts: resetShortcutBindings() });
+  }
+
+  function updateDraftMouseGesture(name: MouseGestureName, action: MouseGestureAction) {
+    if (settingsDraft === null || name === "doubleClick") return;
+    const current = settingsDraft.mouseGestures;
+    const duplicate = action !== "none" && CONFIGURABLE_MOUSE_GESTURE_NAMES.some(
+      (candidate) => candidate !== name && current[candidate] === action,
+    );
+    if (duplicate) {
+      setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
+      return;
+    }
+    setProfileNotice(null);
+    setSettingsDraft({
+      ...settingsDraft,
+      mouseGestures: { ...current, [name]: action },
+    });
+  }
+
+  function resetAllDraftSettings() {
+    setSettingsDraft(createDefaultSettingsProfile());
+    setProfileNotice("すべての設定を既定値へ戻しました。適用するまで現在の設定は変わりません。");
   }
 
   function queueThumbnail(
@@ -4364,271 +4384,25 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         </div>
       )}
       {settingsOpen && settingsDraft !== null && (
-        <div className="dialog-backdrop">
-          <section
-            className="settings-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="統合設定"
-            data-product-id="shortcut-dialog"
-          >
-            <header className="dialog-heading">
-              <p className="dialog-kicker">環境設定</p>
-              <h2>統合設定</h2>
-              <p className="dialog-description">
-                画面表示と操作方法を設定します。設定プロファイルにはライブラリの場所や端末固有の情報は含まれません。
-              </p>
-            </header>
-            <section className="settings-section" aria-label="基本設定">
-              <h3>基本設定</h3>
-              <div className="settings-grid">
-              <label>
-                並べ替え
-                <select
-                  aria-label="profile並べ替え"
-                  value={settingsDraft.sortField}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    sortField: event.target.value as SortField,
-                  })}
-                >
-                  <option value="name">名前</option>
-                  <option value="modified">更新日時</option>
-                  <option value="size">サイズ</option>
-                  <option value="kind">種類</option>
-                </select>
-              </label>
-              <label>
-                降順
-                <input
-                  type="checkbox"
-                  aria-label="profile降順"
-                  checked={settingsDraft.sortDescending}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    sortDescending: event.target.checked,
-                  })}
-                />
-              </label>
-              <label>
-                一覧形式
-                <select
-                  aria-label="profile一覧形式"
-                  value={settingsDraft.catalogViewMode}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    catalogViewMode: normalizeCatalogViewMode(event.target.value),
-                  })}
-                >
-                  {CATALOG_VIEW_MODES.map((mode) => <option key={mode} value={mode}>{CATALOG_VIEW_MODE_LABELS[mode]}</option>)}
-                </select>
-              </label>
-              <label>
-                閲覧モード
-                <select
-                  aria-label="profile閲覧モード"
-                  value={settingsDraft.viewMode}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    viewMode: event.target.value as SettingsProfile["viewMode"],
-                  })}
-                >
-                  <option value="single">単ページ</option>
-                  <option value="spread">見開き</option>
-                </select>
-              </label>
-              <label>
-                閲覧レイアウト
-                <select
-                  aria-label="profile閲覧レイアウト"
-                  value={settingsDraft.layoutMode}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    layoutMode: normalizeViewerLayoutMode(event.target.value),
-                  })}
-                >
-                  {VIEWER_LAYOUT_MODES.map((mode) => <option key={mode} value={mode}>{VIEWER_LAYOUT_MODE_LABELS[mode]}</option>)}
-                </select>
-              </label>
-              <label>
-                巻末動作
-                <select
-                  aria-label="profile巻末動作"
-                  value={settingsDraft.endOfVolumePolicy}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    endOfVolumePolicy: normalizeEndOfVolumePolicy(event.target.value),
-                  })}
-                >
-                  {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => <option key={policy} value={policy}>{label}</option>)}
-                </select>
-              </label>
-              <label>
-                読み方向
-                <select
-                  aria-label="profile読み方向"
-                  value={settingsDraft.readingDirection}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    readingDirection: event.target.value as SettingsProfile["readingDirection"],
-                  })}
-                >
-                  <option value="rightToLeft">右開き</option>
-                  <option value="leftToRight">左開き</option>
-                </select>
-              </label>
-              <label>
-                ルーペ
-                <input
-                  type="checkbox"
-                  aria-label="profileルーペ"
-                  checked={settingsDraft.loupeEnabled}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    loupeEnabled: event.target.checked,
-                  })}
-                />
-              </label>
-              <label>
-                倍率モード
-                <select
-                  aria-label="profile倍率モード"
-                  value={settingsDraft.scaleMode}
-                  onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                    ...current,
-                    scaleMode: event.target.value as ScaleMode,
-                  })}
-                >
-                  <option value="fit">全体フィット</option>
-                  <option value="width">横幅フィット</option>
-                  <option value="height">高さフィット</option>
-                  <option value="original">原寸</option>
-                  <option value="custom">任意倍率</option>
-                </select>
-              </label>
-              <label>
-                任意倍率（%）
-                <input
-                  type="number"
-                  aria-label="profile任意倍率（%）"
-                  min="25"
-                  max="400"
-                  step="1"
-                  value={Math.round(settingsDraft.scale * 100)}
-                  onChange={(event) => {
-                    const scale = Number(event.target.value) / 100;
-                    if (Number.isFinite(scale)) {
-                      setSettingsDraft((current) => current === null ? current : { ...current, scale });
-                    }
-                  }}
-                />
-              </label>
-              {([
-                ["treeVisible", "フォルダツリー"],
-                ["menuBarVisible", "メニューバー"],
-                ["toolbarVisible", "ツールバー"],
-              ] as const).map(([field, label]) => (
-                <label key={field}>
-                  {label}
-                  <input
-                    type="checkbox"
-                    aria-label={`profile${label}`}
-                    checked={settingsDraft[field]}
-                    onChange={(event) => setSettingsDraft((current) => current === null ? current : {
-                      ...current,
-                      [field]: event.target.checked,
-                    })}
-                  />
-                </label>
-              ))}
-              </div>
-            </section>
-            <section className="settings-section" aria-label="ショートカット設定">
-              <h3>ショートカット</h3>
-              <p className="settings-section-description">
-                入力欄でキーを押して割り当てます。「適用」を押すまで現在の操作には反映されません。
-              </p>
-              {SHORTCUT_COMMANDS.map((command) => (
-                <div key={command} data-shortcut-command={command}>
-                  <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
-                  <input
-                    id={`shortcut-${command}`}
-                    aria-label={`${SHORTCUT_LABELS[command]}ショートカット`}
-                    value={settingsDraft.shortcuts[command]}
-                    readOnly
-                    onKeyDown={(event) => captureDraftShortcut(command, event)}
-                  />
-                  <span>既定: {DEFAULT_SHORTCUTS[command]} / フォールバック: {SHORTCUT_FALLBACKS[command]}</span>
-                  <button
-                    type="button"
-                    aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`}
-                    onClick={() => resetDraftShortcut(command)}
-                  >
-                    既定に戻す
-                  </button>
-                </div>
-              ))}
-              <button type="button" onClick={resetAllDraftShortcuts}>すべて既定に戻す</button>
-            </section>
-            <section className="settings-section" aria-label="マウスジェスチャー設定">
-              <h3>マウスジェスチャー</h3>
-              <div className="settings-gesture-grid">
-                {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
-                  <label key={name}>
-                    <span>{name}</span>
-                    <select
-                      aria-label={`${name}ジェスチャー`}
-                      value={settingsDraft.mouseGestures[name]}
-                      onChange={(event) => {
-                        const action = event.target.value as MouseGestureBindings[typeof name];
-                        const current = settingsDraft.mouseGestures;
-                        const next = { ...current, [name]: action };
-                        const duplicate = action !== "none" && CONFIGURABLE_MOUSE_GESTURE_NAMES.some((candidate) => candidate !== name && current[candidate] === action);
-                        if (duplicate) {
-                          setProfileNotice("同じマウスジェスチャー動作は複数へ割り当てできません。");
-                          return;
-                        }
-                        setProfileNotice(null);
-                        setSettingsDraft({ ...settingsDraft, mouseGestures: next });
-                      }}
-                    >
-                      {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{action}</option>)}
-                    </select>
-                  </label>
-                ))}
-              </div>
-              <p>doubleClick: 全画面表示／解除（固定）</p>
-            </section>
-            {profileNotice !== null && <p role="status">{profileNotice}</p>}
-            <div className="settings-actions">
-              <button type="button" onClick={exportSettingsProfile}>profileを書き出す</button>
-              <label className="file-button">
-                profileを読み込む
-                <input type="file" accept="application/json,.json" onChange={importSettingsProfile} />
-              </label>
-              <button
-                type="button"
-                data-product-id="shortcut-apply"
-                disabled={settingsSaving}
-                onClick={() => void applySettingsProfile(settingsDraft)}
-              >
-                適用
-              </button>
-              <button
-                type="button"
-                data-product-id="shortcut-dialog-close"
-                disabled={settingsSaving}
-                onClick={() => {
-                  setSettingsOpen(false);
-                  setSettingsDraft(null);
-                  setProfileNotice(null);
-                }}
-              >
-                キャンセル
-              </button>
-            </div>
-          </section>
-        </div>
+        <SettingsDialog
+          draft={settingsDraft}
+          saving={settingsSaving}
+          notice={profileNotice}
+          onDraftChange={setSettingsDraft}
+          onApply={() => void applySettingsProfile(settingsDraft)}
+          onCancel={() => {
+            setSettingsOpen(false);
+            setSettingsDraft(null);
+            setProfileNotice(null);
+          }}
+          onExport={exportSettingsProfile}
+          onImport={importSettingsProfile}
+          onShortcutKeyDown={captureDraftShortcut}
+          onResetShortcut={resetDraftShortcut}
+          onResetAllShortcuts={resetAllDraftShortcuts}
+          onMouseGestureChange={updateDraftMouseGesture}
+          onResetAllSettings={resetAllDraftSettings}
+        />
       )}
       {thumbnailManagerOpen && (
         <div className="dialog-backdrop">

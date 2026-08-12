@@ -154,7 +154,10 @@ cover/small/detail/reference tile、sort、search result、selection、loading/e
 rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
-dialogまたはmenuから開き、settingsは意味単位のsectionと狭幅時の1列layoutで表示する。
+dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入力、profileのカテゴリnavigationと、
+名前・説明・現在値を対象にした検索で意味単位のsectionを切り替える。各設定は説明付きのrowとして表示し、
+狭幅時はnavigationと内容を1列layoutにする。既定値復元、profile import、個別編集は同じdraftを更新し、
+明示的な適用時だけ既存のatomic profile保存へ渡す。
 巻末動作は閲覧している作品の文脈でviewer toolbarから変更し、app-local設定へ保存する。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、

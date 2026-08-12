@@ -1,10 +1,16 @@
 import {
+  DEFAULT_SHORTCUTS,
   SHORTCUT_COMMANDS,
   normalizeShortcut,
   type ShortcutBindings,
 } from "../input/shortcuts";
-import { CATALOG_VIEW_MODES, type CatalogViewMode } from "../catalog/view-mode";
 import {
+  CATALOG_VIEW_MODES,
+  DEFAULT_CATALOG_VIEW_MODE,
+  type CatalogViewMode,
+} from "../catalog/view-mode";
+import {
+  DEFAULT_SCALE,
   MAX_SCALE,
   MIN_SCALE,
   VIEWER_LAYOUT_MODES,
@@ -13,6 +19,7 @@ import {
   type ViewMode,
 } from "../viewer/model";
 import {
+  DEFAULT_END_OF_VOLUME_POLICY,
   END_OF_VOLUME_POLICIES,
   type EndOfVolumePolicy,
 } from "../catalog/end-of-volume";
@@ -57,6 +64,27 @@ export interface SettingsProfile {
   toolbarVisible: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
+}
+
+export function createDefaultSettingsProfile(): SettingsProfile {
+  return {
+    profileVersion: SETTINGS_PROFILE_VERSION,
+    sortField: "name",
+    sortDescending: false,
+    endOfVolumePolicy: DEFAULT_END_OF_VOLUME_POLICY,
+    catalogViewMode: DEFAULT_CATALOG_VIEW_MODE,
+    viewMode: "single",
+    layoutMode: "paged",
+    readingDirection: "rightToLeft",
+    scaleMode: "fit",
+    scale: DEFAULT_SCALE,
+    loupeEnabled: false,
+    treeVisible: true,
+    menuBarVisible: true,
+    toolbarVisible: true,
+    shortcuts: { ...DEFAULT_SHORTCUTS },
+    mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
+  };
 }
 
 export function normalizeMouseGestures(value: unknown): MouseGestureBindings {

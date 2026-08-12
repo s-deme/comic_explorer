@@ -199,9 +199,17 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             '.dialog-backdrop > [role="dialog"]', "max-height: calc(100vh - 32px)"
         )
-        self.assert_rule_contains(".settings-section", "border: 1px solid #dce3ec")
-        self.assert_rule_contains(".settings-actions", "position: sticky")
-        self.assert_rule_contains(".settings-grid", "grid-template-columns: repeat(2, minmax(0, 1fr))")
+        self.assert_rule_contains(
+            ".dialog-backdrop > .settings-dialog", "grid-template-rows: auto minmax(0, 1fr) auto"
+        )
+        self.assert_rule_contains(
+            ".settings-dialog-body", "grid-template-columns: 242px minmax(0, 1fr)"
+        )
+        self.assert_rule_contains(".settings-navigation", "background: #202a38")
+        self.assert_rule_contains(
+            ".settings-row", "grid-template-columns: minmax(260px, 1fr) minmax(180px, 310px)"
+        )
+        self.assert_rule_contains(".settings-actions", "background: #fff")
 
 
 if __name__ == "__main__":

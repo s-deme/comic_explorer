@@ -70,7 +70,7 @@ codd:
 | FR-B16 / P4 | filter・CSV | Implemented / PASS | — |
 | FR-B17 / P5 | reference shell | Implemented / BLOCKED | release DPI/visualと製品復元gate未測定。 |
 | FR-B18 / P6 | workspace・tray | Implemented / BLOCKED | notification area、native hide/show/focus、lifecycle未測定。 |
-| FR-B19 / P7 | settings・help | Implemented / PASS | — |
+| FR-B19 / P7 | settings・help | Implemented / PASS | 設定5カテゴリ、横断検索、説明付きrow、全設定のdraft resetをWindows frontend testで検証済み。 |
 | FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
 | FR-B21 | standalone PDF | Implemented / BLOCKED | Windows.Data.Pdfの実renderと上限・分類・root containmentはPASS。release WebView2のviewer・thumbnailは未測定。 |
 | FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、context menu・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorer、アプリ選択の製品直接観測は未測定。 |

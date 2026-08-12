@@ -15,6 +15,8 @@ function openSettingsMenuItem() {
       name: "統合設定…",
     }),
   );
+  const dialog = screen.getByRole("dialog", { name: "統合設定" });
+  fireEvent.click(within(dialog).getByRole("button", { name: /^操作/ }));
 }
 
 function openGeneralHelp() {
@@ -296,7 +298,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     );
     await waitFor(() => expect(resetNextInput).toHaveValue("PageDown"));
     expect(saveSettingsMock).toHaveBeenCalledTimes(1);
-    expect(resetDialog).toHaveTextContent("画面表示と操作方法を設定します");
+    expect(resetDialog).toHaveTextContent("表示と操作を、使い方に合わせて調整します");
 
     const resetApply = resetDialog.querySelector<HTMLButtonElement>(
       '[data-product-id="shortcut-apply"]',
