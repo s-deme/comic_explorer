@@ -1,5 +1,12 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import type { CatalogEntry } from "../../types/domain";
 import { itemKindLabel } from "./kind-label";
 import {
@@ -10,6 +17,8 @@ import {
 
 interface CatalogGridProps {
   entries: CatalogEntry[];
+  currentFolderPath?: string;
+  loadedFolderPath?: string | null;
   selectedPath: string | null;
   selectedPaths?: string[];
   onSelect: (entry: CatalogEntry, action?: "toggle" | "range") => void;
@@ -145,8 +154,16 @@ function formatModified(value: number | undefined): string {
   return new Date(value).toLocaleString("ja-JP");
 }
 
+function isAncestorFolder(ancestor: string, descendant: string): boolean {
+  if (ancestor === descendant) return false;
+  if (ancestor === "") return descendant.length > 0;
+  return descendant.startsWith(`${ancestor}/`);
+}
+
 export function CatalogGrid({
   entries,
+  currentFolderPath = "",
+  loadedFolderPath = currentFolderPath,
   selectedPath,
   selectedPaths,
   onSelect,
@@ -162,6 +179,9 @@ export function CatalogGrid({
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const folderScrollPositions = useRef(new Map<string, number>());
+  const previousFolderPath = useRef(currentFolderPath);
+  const pendingScrollRestoration = useRef<{ path: string; scrollTop: number } | null>(null);
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
   const layout = catalogLayoutFor(viewMode, thumbnailSizes);
@@ -215,6 +235,38 @@ export function CatalogGrid({
       return () => observer.disconnect();
     },
   });
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const previous = previousFolderPath.current;
+    if (!element || previous === currentFolderPath) return;
+
+    folderScrollPositions.current.set(previous, element.scrollTop);
+    const movingToAncestor = isAncestorFolder(currentFolderPath, previous);
+    pendingScrollRestoration.current = {
+      path: currentFolderPath,
+      scrollTop: movingToAncestor
+        ? folderScrollPositions.current.get(currentFolderPath) ?? 0
+        : 0,
+    };
+    previousFolderPath.current = currentFolderPath;
+
+    if (!movingToAncestor) element.scrollTop = 0;
+  }, [currentFolderPath]);
+
+  useLayoutEffect(() => {
+    const pending = pendingScrollRestoration.current;
+    const element = scrollRef.current;
+    if (
+      !element
+      || pending === null
+      || pending.path !== currentFolderPath
+      || loadedFolderPath !== currentFolderPath
+    ) return;
+
+    element.scrollTop = pending.scrollTop;
+    pendingScrollRestoration.current = null;
+  }, [currentFolderPath, entries, loadedFolderPath]);
 
   function moveFocus(
     currentIndex: number,

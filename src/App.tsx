@@ -331,6 +331,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [addressInput, setAddressInput] = useState("");
   const addressInputDirty = useRef(false);
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
+  const [loadedCatalogPath, setLoadedCatalogPath] = useState<string | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(
     createManagedThumbnailMap,
@@ -510,6 +511,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     viewerGeneration.current += 1;
     setViewerSession(null);
     setLibraryRoot(root);
+    setLoadedCatalogPath(null);
     managedThumbnailRoot.current = root;
     const storage = browserStorage();
     replaceManagedThumbnails(loadManagedThumbnailsForLibrary(storage, root));
@@ -832,6 +834,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
         setEntries(response.data);
+        setLoadedCatalogPath(relativePath);
         const available = new Set<string>(response.data.map((entry) => entry.relativePath));
         const nextSelection = selectionPathsToRestore.filter((path) => available.has(path));
         setSelectedPaths(nextSelection);
@@ -4242,7 +4245,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
             </div>
           ) : libraryRoot !== null && searchState.status === "idle" && loadState.status !== "error" ? (
             <CatalogGrid
+              key={libraryRoot}
               entries={visibleEntries}
+              currentFolderPath={navigation.current}
+              loadedFolderPath={loadedCatalogPath}
               selectedPath={selectedPath}
               selectedPaths={selectedPaths}
               viewMode={catalogViewMode}

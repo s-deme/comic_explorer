@@ -59,7 +59,8 @@ Explorer型の操作を提供しつつ、検索、thumbnail、viewer、metadata�
 選択drive rootはbackendでcanonicalizeし、すべての相対pathがroot内に留まることを検証する。folder、
 comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
-明示refreshは同じnavigation stateを更新する。treeの展開集合と取得済み子nodeはdrive identityを含むkeyで保持し、
+明示refreshは同じnavigation stateを更新する。catalogのscroll位置はdriveごとのmount内でfolder別に保持し、親から子への移動では
+子catalogを先頭表示し、子から祖先へ戻る場合は対象folderの一覧取得完了後に保存位置を復元する。treeの展開集合と取得済み子nodeはdrive identityを含むkeyで保持し、
 drive切替時にも別driveの展開を破棄しない。検索paneまたはtree表示設定で隠す場合もtree componentはmountを維持し、
 復帰時に利用者が開いたbranchを再表示する。treeは24pxのvirtual row、16px単位の階層indent兼展開記号列、
 左paddingなしで続く14pxの種類icon列、約11pxのlabelを使って密に配置する。tree headerは現在folderのExplorer形式absolute pathと、PC直下を残して

@@ -198,6 +198,83 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("starts child folders at the top and restores the saved parent scroll after loading", () => {
+    const rootEntries = entries(100);
+    const childEntries = entries(10);
+    const callbacks = {
+      onSelect: () => undefined,
+      onNavigate: () => undefined,
+      onRead: () => undefined,
+    };
+    const { rerender } = render(
+      <CatalogGrid
+        entries={rootEntries}
+        currentFolderPath=""
+        loadedFolderPath=""
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+    grid.scrollTop = 480;
+
+    rerender(
+      <CatalogGrid
+        entries={rootEntries}
+        currentFolderPath="series"
+        loadedFolderPath=""
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    expect(grid).toHaveProperty("scrollTop", 0);
+
+    rerender(
+      <CatalogGrid
+        entries={childEntries}
+        currentFolderPath="series"
+        loadedFolderPath="series"
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    expect(grid).toHaveProperty("scrollTop", 0);
+    grid.scrollTop = 120;
+
+    rerender(
+      <CatalogGrid
+        entries={childEntries}
+        currentFolderPath=""
+        loadedFolderPath="series"
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    expect(grid).toHaveProperty("scrollTop", 120);
+
+    rerender(
+      <CatalogGrid
+        entries={rootEntries}
+        currentFolderPath=""
+        loadedFolderPath=""
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    expect(grid).toHaveProperty("scrollTop", 480);
+
+    rerender(
+      <CatalogGrid
+        entries={rootEntries}
+        currentFolderPath="series"
+        loadedFolderPath=""
+        selectedPath={null}
+        {...callbacks}
+      />,
+    );
+    expect(grid).toHaveProperty("scrollTop", 0);
+  });
+
   it("selects a keyboard-focused item before Ctrl+Enter opens it", () => {
     const onSelect = vi.fn();
     const onRead = vi.fn();

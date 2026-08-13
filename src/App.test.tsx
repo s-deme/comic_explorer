@@ -714,6 +714,40 @@ describe("application shell", () => {
     );
   });
 
+  it("starts a child catalog at the top and restores the parent catalog scroll", async () => {
+    const folder: CatalogEntry = {
+      relativePath: "0-series" as never,
+      kind: "folder",
+    };
+    const rootEntries = [folder, ...Array.from({ length: 60 }, (_, index) =>
+      testEntry(`book-${index}.cbz`))];
+    const childEntries = Array.from({ length: 20 }, (_, index) =>
+      testEntry(`0-series/volume-${index}.cbz`));
+    await registerTestLibrary(rootEntries);
+    listMock.mockImplementation(async (path) => ({
+      status: "ok",
+      requestId: `list-${path || "root"}` as never,
+      generation: 2 as never,
+      data: path === "0-series" ? childEntries : rootEntries,
+    }));
+
+    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+    grid.scrollTop = 480;
+    fireEvent.doubleClick(within(grid).getByRole("button", { name: /^0-series、フォルダ/ }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\0-series"),
+    );
+    expect(grid).toHaveProperty("scrollTop", 0);
+    grid.scrollTop = 160;
+
+    fireEvent.click(screen.getByRole("button", { name: "上のフォルダへ" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"),
+    );
+    expect(grid).toHaveProperty("scrollTop", 480);
+  });
+
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
     await registerTestLibrary([]);
 

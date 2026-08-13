@@ -17,7 +17,7 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-12 JST
+- 最終更新日: 2026-08-13 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commitの実装と、本ドキュメント統合差分
@@ -32,7 +32,7 @@ codd:
 | Rust canonical | PASS | 2026-08-13、lib 154件 + shutdown process 1件、FAIL 0。Windows論理ドライブbitmaskの列挙、Explorer表示用pathからの`\\?\` / `\\?\UNC\`除去、folder一覧がmetadataだけを返す境界、folder thumbnailが直下画像を自然順で選びサブfolder画像とarchiveを候補にしない境界、明示的なlibrary診断では画像folderの作品判定を維持する境界、検索条件、viewer page worker、thumbnail、設定永続化を含む。`cargo fmt --check`と`cargo check --locked`もexit 0。 |
 | Rust P8 focused | PASS / feature部分BLOCKED | 2026-08-10、22 PASS / 0 FAIL / 0 ignored。GIF/AVIF container testであり製品decodeのPASSではない。 |
 | 追加画像形式 | PASS / animated GIF製品観測BLOCKED | BMP/GIF/TIFF/ICOの実ピクセルdecode、SVGの静止・外部resource無効rasterize、folder/archive列挙、MIME/signature、PNG viewer配信、WIC JPEG thumbnailをWindows Rust canonicalで直接検証。release WebView2のanimated GIF再生は未観測。 |
-| TypeScript/frontend | PASS | 2026-08-13、25 files / 264 tests PASS、FAIL 0。root登録画面を表示しない起動、PC配下のdrive表示とsidebar選択、24px単位のvirtual tree rowと16px階層indent、drive切替、現在folder absolute pathのtree header、navigation・drive往復・検索pane・一時非表示をまたぐbranch展開保持、明示的な全折りたたみ、folder thumbnail要求と画像なし時の専用icon fallback、連続viewerで現在pageと最大4page先だけを要求するbounded prefetch、重複page要求の抑止を含む。外枠・内側余白なしでthumbnailと同寸、行列4px間隔、overlay選択となる大判表紙だけのカードグリッド、左側の固定表紙と右側の名前・種別・サイズ・更新日時を持つ情報カード、全5一覧形式の切替、4形式別のthumbnail幅、profile v1/v2からv3への移行、既存の種類icon、設定、command、検索、viewer回帰、TypeScript typecheckもexit 0。 |
+| TypeScript/frontend | PASS | 2026-08-13、25 files / 266 tests PASS、FAIL 0。root登録画面を表示しない起動、PC配下のdrive表示とsidebar選択、24px単位のvirtual tree rowと16px階層indent、drive切替、現在folder absolute pathのtree header、親から子へのcatalog移動時の先頭表示と子から親へ戻る際の保存scroll位置復元、navigation・drive往復・検索pane・一時非表示をまたぐbranch展開保持、明示的な全折りたたみ、folder thumbnail要求と画像なし時の専用icon fallback、連続viewerで現在pageと最大4page先だけを要求するbounded prefetch、重複page要求の抑止を含む。外枠・内側余白なしでthumbnailと同寸、行列4px間隔、overlay選択となる大判表紙だけのカードグリッド、左側の固定表紙と右側の名前・種別・サイズ・更新日時を持つ情報カード、全5一覧形式の切替、4形式別のthumbnail幅、profile v1/v2からv3への移行、既存の種類icon、設定、command、検索、viewer回帰、TypeScript typecheckもexit 0。 |
 | Python | PASS | 2026-08-13、50 tests PASS、FAIL 0。releaseだけにWindows GUI subsystemを指定してdebug consoleを維持するentry point契約、約11px文字・24px行高・16px展開記号列・左paddingなし・14px icon列のcompact tree、tree headerと独立scroll領域、設定dialog、catalog固定幅card、表紙グリッドの画像・ファイル名分離、外枠・内側余白なしで4px間隔となる大判カードグリッドのthumbnail専用領域・overlay選択・左上favorite、情報カードの横長2領域と右上favorite、固定幅種類iconと省略、狭幅時にもthumbnailを上書きしないstyle contract、現行status/verification間の5値consistencyもPASS。 |
 | standalone PDF | PASS / 製品観測BLOCKED | Windows.Data.Pdfで実PDFのpage列挙とPNG renderを直接検証。1 GiB source、10,000 pages、最大辺16,384 px、120,000,000 pixelsをrender前に制限し、暗号化・破損・access・missingのerror分類、root外symlink拒否、独立した`pdf`種別と画像選択境界をRust canonicalとfrontend testで検証した。release WebView2のviewer・thumbnail表示は未観測。 |
 | file manager | PASS / 製品観測BLOCKED | Windows Rust canonicalでrename、folder作成、copy、move、完全delete、CF_HDROPのcopy/cut round trip、root containment、reparse point・同名衝突・子孫destination拒否を実filesystem上で検証。frontend testで右click/keyboard menu、rename・delete接続、確認dialog、全画面・slideshow起動を検証した。release製品のnative folder picker、ごみ箱、Explorer、アプリ選択は未観測。 |
