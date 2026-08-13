@@ -1,8 +1,14 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listTreeChildren, listWindowsDrives, type WindowsDrive } from "../library/client";
+import type { FileClipboardStatus } from "../library/client";
 import { presentError } from "../errors/presentation";
 import { normalizeWindowsDisplayPath } from "./navigation";
+import {
+  TreeContextMenu,
+  type TreeFileAction,
+  type TreeFileTarget,
+} from "./TreeContextMenu";
 
 interface TreeNode {
   key: string;
@@ -19,7 +25,17 @@ interface FolderTreeProps {
   currentPath: string;
   hidden?: boolean;
   onNavigate: (relativePath: string) => void;
-  onSelectDrive: (absolutePath: string, relativePath?: string) => void | Promise<void>;
+  onSelectDrive: (absolutePath: string, relativePath?: string) => unknown | Promise<unknown>;
+  clipboard?: FileClipboardStatus;
+  fileOperationBusy?: boolean;
+  onFileAction?: (action: TreeFileAction, target: TreeFileTarget) => void;
+  onRefreshFileClipboard?: () => void;
+}
+
+interface TreeMenuState {
+  target: TreeFileTarget;
+  x: number;
+  y: number;
 }
 
 const TREE_ROW_HEIGHT = 24;
@@ -57,6 +73,10 @@ export function FolderTree({
   hidden = false,
   onNavigate,
   onSelectDrive,
+  clipboard = { available: false, cut: false, items: 0 },
+  fileOperationBusy = false,
+  onFileAction = () => undefined,
+  onRefreshFileClipboard = () => undefined,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
@@ -67,6 +87,7 @@ export function FolderTree({
   const [children, setChildren] = useState<Map<string, string[]>>(() => new Map());
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
   const [loading, setLoading] = useState<Set<string>>(() => new Set());
+  const [contextMenu, setContextMenu] = useState<TreeMenuState | null>(null);
   const activeDrive = normalizedDrive(libraryRoot);
 
   async function loadChildren(path: string, driveAtRequest = activeDrive) {
@@ -211,6 +232,30 @@ export function FolderTree({
 
   const folderAddress = currentFolderAddress(libraryRoot, currentPath);
 
+  function fileTarget(node: TreeNode): TreeFileTarget | null {
+    if (
+      (node.kind !== "drive" && node.kind !== "folder")
+      || node.driveRoot === undefined
+    ) return null;
+    return {
+      driveRoot: node.driveRoot,
+      relativePath: node.path,
+      kind: node.kind,
+      name: node.name,
+    };
+  }
+
+  function openContextMenu(target: TreeFileTarget, x: number, y: number) {
+    const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
+    const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
+    setContextMenu({
+      target,
+      x: Math.max(4, Math.min(x, viewportWidth - 328)),
+      y: Math.max(4, Math.min(y, viewportHeight - 150)),
+    });
+    onRefreshFileClipboard();
+  }
+
   return (
     <aside className="folder-tree" aria-label="フォルダツリー" hidden={hidden}>
       <header className="folder-tree-header">
@@ -289,8 +334,41 @@ export function FolderTree({
                   role="treeitem"
                   aria-level={node.depth + 1}
                   aria-selected={isSelected}
+                  aria-keyshortcuts={node.kind === "folder"
+                    ? "Shift+F10 Control+X Control+C Control+V"
+                    : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
                   className="tree-node"
                   title={node.name}
+                  onContextMenu={(event) => {
+                    const target = fileTarget(node);
+                    if (target === null) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openContextMenu(target, event.clientX, event.clientY);
+                  }}
+                  onKeyDown={(event) => {
+                    const target = fileTarget(node);
+                    if (target === null) return;
+                    if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                      event.preventDefault();
+                      const bounds = event.currentTarget.getBoundingClientRect();
+                      openContextMenu(target, bounds.left + 24, bounds.top + 24);
+                      return;
+                    }
+                    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+                    const shortcut = event.key.toLowerCase();
+                    const action = shortcut === "x"
+                      ? "cut"
+                      : shortcut === "c"
+                        ? "copy"
+                        : shortcut === "v" ? "paste" : null;
+                    if (
+                      action === null
+                      || ((action === "cut" || action === "copy") && target.kind !== "folder")
+                    ) return;
+                    event.preventDefault();
+                    onFileAction(action, target);
+                  }}
                   onClick={() => {
                     if (node.kind === "drive" && node.driveRoot !== undefined) {
                       void onSelectDrive(node.driveRoot);
@@ -316,6 +394,20 @@ export function FolderTree({
           {driveError !== null && <p className="tree-load-error" role="alert">{driveError}</p>}
         </div>
       </div>
+      {contextMenu !== null && (
+        <TreeContextMenu
+          target={contextMenu.target}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          clipboard={clipboard}
+          busy={fileOperationBusy}
+          onAction={(action, target) => {
+            setContextMenu(null);
+            onFileAction(action, target);
+          }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </aside>
   );
 }

@@ -103,6 +103,10 @@ import {
   type ShortcutCommand,
 } from "./features/input/shortcuts";
 import { FolderTree } from "./features/navigation/FolderTree";
+import type {
+  TreeFileAction,
+  TreeFileTarget,
+} from "./features/navigation/TreeContextMenu";
 import type { CatalogEntry } from "./types/domain";
 import type { ApiResponse } from "./types/api";
 import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
@@ -584,6 +588,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         || target instanceof HTMLTextAreaElement
         || target instanceof HTMLSelectElement
         || (target instanceof HTMLElement && target.isContentEditable);
+      const insideFolderTree = target instanceof Element
+        && target.closest('[role="tree"]') !== null;
       if (!editing && libraryRoot !== null && viewerSession === null) {
         const command = customCatalogShortcutCommand(event, shortcuts)
           ?? fallbackCatalogShortcutCommand(event);
@@ -620,7 +626,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           return;
         }
       }
-      if (!editing && libraryRoot !== null && viewerSession === null && !event.altKey) {
+      if (
+        !editing
+        && !insideFolderTree
+        && libraryRoot !== null
+        && viewerSession === null
+        && !event.altKey
+      ) {
         const commandKey = event.key.toLowerCase();
         if ((event.ctrlKey || event.metaKey) && (commandKey === "x" || commandKey === "c")) {
           if (selectedPaths.length === 0) return;
@@ -860,7 +872,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     }
   }
 
-  async function selectDrive(absolutePath: string, relativePath = "") {
+  async function selectDrive(absolutePath: string, relativePath = ""): Promise<boolean> {
     clearSearch();
     setDiagnosticReport(null);
     setDiagnosticNotice(null);
@@ -871,9 +883,11 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       activateLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: relativePath });
       await load(relativePath);
+      return true;
     } else if (response.status === "error") {
       setLoadState({ status: "error", path: absolutePath, message: presentError(response.error) });
     }
+    return false;
   }
 
   function refreshCatalog() {
@@ -1242,6 +1256,51 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     } finally {
       if (requestGeneration === fileOperationGeneration.current) setFileOperationBusy(false);
     }
+  }
+
+  async function handleTreeFileAction(
+    action: TreeFileAction,
+    target: TreeFileTarget,
+  ) {
+    const activeDrive = normalizeWindowsDisplayPath(libraryRoot ?? "")
+      .toLocaleLowerCase("en-US");
+    const targetDrive = normalizeWindowsDisplayPath(target.driveRoot)
+      .toLocaleLowerCase("en-US");
+    const sameDrive = activeDrive !== "" && activeDrive === targetDrive;
+    const browsePath = action === "paste"
+      ? target.relativePath
+      : parentPath(target.relativePath) ?? "";
+    if (!sameDrive && !await selectDrive(target.driveRoot, browsePath)) return;
+
+    if (action === "cut" || action === "copy") {
+      if (target.kind !== "folder") return;
+      const cut = action === "cut";
+      const succeeded = await runFileOperation(
+        (requestGeneration) => setFileClipboard(
+          [target.relativePath],
+          cut,
+          requestGeneration,
+        ),
+        (result) => `${result.affected}件を${cut ? "切り取り" : "コピー"}ました。Windows Explorerにも貼り付けできます。`,
+        { refresh: false },
+      );
+      if (succeeded) setFileClipboardStatus({ available: true, cut, items: 1 });
+      return;
+    }
+
+    const succeeded = await runFileOperation(
+      (requestGeneration) => pasteFileItems(target.relativePath, requestGeneration),
+      (result) => `${result.affected}件を「${target.name}」へ貼り付けました。`,
+      { refresh: false },
+    );
+    if (succeeded) {
+      if (!sameDrive || navigation.current === target.relativePath) {
+        await load(target.relativePath);
+      } else {
+        navigate(target.relativePath);
+      }
+    }
+    void refreshFileClipboardStatus();
   }
 
   function addPathToBookshelf(path: string) {
@@ -3748,6 +3807,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           hidden={!treeVisible || searchPaneOpen}
           onNavigate={(path) => navigate(path)}
           onSelectDrive={(path, relativePath) => selectDrive(path, relativePath)}
+          clipboard={fileClipboard}
+          fileOperationBusy={fileOperationBusy}
+          onFileAction={(action, target) => void handleTreeFileAction(action, target)}
+          onRefreshFileClipboard={() => void refreshFileClipboardStatus()}
         />
         {sidePaneVisible && (
           <>

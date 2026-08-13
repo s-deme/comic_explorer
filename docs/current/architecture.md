@@ -84,6 +84,8 @@ CSV、recent、bookmark、bookshelf、favorite、tag、memo/history/ratingは既
 root namespaceを再利用する。右clickまたはcontext-menu keyで選択を確定し、open、fullscreen、
 Explorer表示、Windowsのアプリ選択、本棚、file cut/copy/paste、folderへのcopy/move、path copy、
 folder作成、ごみ箱delete、rename、property、確認付き完全deleteを同じcontext menuから起動する。
+folder treeはfolder nodeの右click、Shift+F10、Ctrl+X/C/Vを同じfile-operation portへ接続し、drive nodeでは
+drive rootへのpasteだけを許可する。別driveのnodeを操作するときは先にcanonical library rootをそのdriveへ切り替える。
 
 ## viewerとmedia
 
@@ -159,7 +161,7 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
   paste元はCF_HDROPとして利用者が明示したpathだけを受け入れ、絶対pathをfrontend responseへ返さない。
 - copy/move/pasteは同名targetを上書きせず、reparse point、source自身または子孫への操作、重複sourceを拒否する。
 - 通常deleteはWindowsごみ箱へ送り、完全deleteはUIが対象名と復元不能性を確認した後だけ実行する。
-- clipboard cut/copyはCF_HDROPとPreferred DropEffectを設定し、paste成功後だけcut clipboardを消費する。
+- clipboard cut/copyはCF_HDROPとPreferred DropEffectを設定してWindows Explorerと相互運用し、paste成功後だけcut clipboardを消費する。
 - archive entry名をlibrary側host pathへ結合せず、暗号化、未対応compression、traversal、再帰深度・個数・size上限超過を読む前またはstream境界で拒否する。
 - cache、DB、profile、export、temp、recovery、logはlibrary root外だけに置く。
 - CSVへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。明示的なpath copyだけはOS操作用の絶対pathをclipboardへ出す。

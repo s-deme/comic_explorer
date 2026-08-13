@@ -68,7 +68,10 @@ vi.mock("./features/library/client", () => ({
   listTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({
     status: "ok", requestId: "drives", generation: 1,
-    data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
+    data: [
+      { absolutePath: "C:\\", name: "ローカル ディスク (C:)" },
+      { absolutePath: "E:\\", name: "ボリューム (E:)" },
+    ],
   })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
@@ -2575,6 +2578,66 @@ describe("application shell", () => {
     await waitFor(() => expect(deleteFileItemsMock).toHaveBeenCalledWith(
       ["books/new.cbz"],
       false,
+      expect.any(Number),
+    ));
+  });
+
+  it("connects folder-tree copy and paste to the Windows file clipboard", async () => {
+    treeMock.mockImplementation(async (path) => ({
+      status: "ok",
+      requestId: `tree-${path || "root"}` as never,
+      generation: 1 as never,
+      data: path === ""
+        ? [{ relativePath: "Target" as never, kind: "folder" as const }]
+        : [],
+    }));
+    await registerTestLibrary([]);
+    const target = await screen.findByRole("treeitem", { name: "Target" });
+
+    fireEvent.contextMenu(target, { clientX: 80, clientY: 60 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "フォルダツリーの操作" }))
+      .getByRole("menuitem", { name: /コピー.*Ctrl\+C/ }));
+    await waitFor(() => expect(setFileClipboardMock).toHaveBeenCalledWith(
+      ["Target"],
+      false,
+      expect.any(Number),
+    ));
+    expect(await screen.findByText(/Windows Explorerにも貼り付けできます/))
+      .toBeInTheDocument();
+
+    fireEvent.contextMenu(target, { clientX: 80, clientY: 60 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "フォルダツリーの操作" }))
+      .getByRole("menuitem", { name: /貼り付け/ }));
+    await waitFor(() => expect(pasteFileItemsMock).toHaveBeenCalledWith(
+      "Target",
+      expect.any(Number),
+    ));
+  });
+
+  it("switches the safe drive boundary before pasting at a tree drive root", async () => {
+    await registerTestLibrary([]);
+    registerMock.mockImplementation(async (absolutePath) => ({
+      status: "ok",
+      requestId: `register-${absolutePath}` as never,
+      generation: 1 as never,
+      data: { absolutePath },
+    }));
+
+    const drive = await screen.findByRole("treeitem", { name: /ボリューム \(E:\)/ });
+    fireEvent.contextMenu(drive, { clientX: 80, clientY: 60 });
+    const menu = screen.getByRole("menu", { name: "フォルダツリーの操作" });
+    expect(within(menu).getByRole("menuitem", { name: /切り取り/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    const paste = within(menu).getByRole("menuitem", { name: /貼り付け/ });
+    await waitFor(() => expect(paste).toHaveAttribute("aria-disabled", "false"));
+    fireEvent.click(paste);
+
+    await waitFor(() => expect(registerMock).toHaveBeenLastCalledWith(
+      "E:\\",
+      expect.any(Number),
+    ));
+    await waitFor(() => expect(pasteFileItemsMock).toHaveBeenCalledWith(
+      "",
       expect.any(Number),
     ));
   });

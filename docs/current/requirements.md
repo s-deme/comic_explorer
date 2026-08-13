@@ -27,7 +27,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 分類・拒否境界があるが、製品decodeの受入は未完了である。
 
 対象外は、クラウド同期、外部書誌取得、telemetry、外部データ送信、library原本への自動変更である。
-明示的な利用者操作に限り、catalog context menuからOS全体を対象とするfile manager操作を提供する。
+明示的な利用者操作に限り、catalogおよびfolder treeのcontext menuからOS全体を対象とするfile manager操作を提供する。
 
 ## 恒久安全原則
 
@@ -62,7 +62,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-018 | 外部通信、telemetry、crash upload、書誌取得、cloud同期を行わない。 |
 | REQ-MVP-019 | 項目単位のaccess、missing、corrupt、unsupported errorから別操作へ復帰できる。 |
 | REQ-MVP-020 | standalone PDF（`.pdf`）をcatalogの独立したPDF種別から1冊として開き、Windows標準PDF APIで各pageを上限付き画像へ変換して既存viewerの単page・見開き・読書位置・thumbnail・favorite・巻末遷移へ接続する。PDF本体は1 GiB、page数は10,000、renderは最大辺16,384 pxかつ120,000,000 pixelsを上限とし、library root外へ展開・変換保存しない。非対応の暗号化PDF、破損PDF、空PDF、root外symlinkは分類した局所errorとする。 |
-| REQ-MVP-021 | catalog context menuからrename、任意folderへのmove/copy、folder作成、ごみ箱delete、確認付き完全delete、Explorer表示、Windowsのアプリ選択、OS clipboardのCF_HDROPによるcut/copy/pasteを行う。相対sourceはcanonical library root内に限定し、folder pickerとOS clipboardで利用者が明示した外部pathだけを入出力に許可する。同名衝突、root外symlink、source自身または子孫へのmove/copy、不正名、欠落、access拒否、途中失敗を分類して通知し、成功後はcatalogを再列挙する。 |
+| REQ-MVP-021 | catalog context menuからrename、任意folderへのmove/copy、folder作成、ごみ箱delete、確認付き完全delete、Explorer表示、Windowsのアプリ選択、OS clipboardのCF_HDROPによるcut/copy/pasteを行う。folder treeのfolder nodeではcontext menu、Shift+F10、Ctrl+X/C/Vからcut/copy/pasteを行い、drive nodeではrootへのpasteを行う。アプリがclipboardへ設定したcut/copyはWindows Explorerへ貼り付けでき、Explorerが設定したfile clipboardもアプリ内folderへ貼り付けできる。相対sourceはcanonical library root内に限定し、folder pickerとOS clipboardで利用者が明示した外部pathだけを入出力に許可する。同名衝突、root外symlink、source自身または子孫へのmove/copy、不正名、欠落、access拒否、途中失敗を分類して通知し、成功後はcatalogを再列挙する。 |
 
 ## MVP非機能要件
 
@@ -116,7 +116,7 @@ Git履歴から参照する。
 - E2E-MVP-002: ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZHを閲覧してcacheと読書位置を生成しても、原本tree、hash、mtimeが一致する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
-- E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、選択した対象だけが変更され、成功後のcatalogへ結果が反映される。
+- E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、folder treeのfolderまたはdrive nodeからcut/copy/pasteを行う。選択した対象だけが変更され、アプリとWindows Explorerの双方向pasteおよび成功後のcatalog反映を確認する。
 
 ## 非採用と将来候補の境界
 

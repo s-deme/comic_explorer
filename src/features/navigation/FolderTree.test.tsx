@@ -268,4 +268,74 @@ describe("FolderTree", () => {
       paddingInlineStart: "16px",
     });
   });
+
+  it("opens file operations from right click and keyboard on folder nodes", async () => {
+    const onFileAction = vi.fn();
+    const onRefreshFileClipboard = vi.fn();
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        clipboard={{ available: true, cut: false, items: 2 }}
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+        onFileAction={onFileAction}
+        onRefreshFileClipboard={onRefreshFileClipboard}
+      />,
+    );
+
+    const folder = await screen.findByRole("treeitem", { name: "Other" });
+    fireEvent.contextMenu(folder, { clientX: 80, clientY: 60 });
+    const menu = screen.getByRole("menu", { name: "フォルダツリーの操作" });
+    expect(onRefreshFileClipboard).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("menuitem", { name: /切り取り.*Ctrl\+X/ })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: /コピー.*Ctrl\+C/ })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: /貼り付け（2件）.*Ctrl\+V/ })).toBeEnabled();
+    fireEvent.click(screen.getByRole("menuitem", { name: /コピー.*Ctrl\+C/ }));
+    expect(onFileAction).toHaveBeenCalledWith("copy", {
+      driveRoot: "C:\\",
+      relativePath: "Other",
+      kind: "folder",
+      name: "Other",
+    });
+
+    fireEvent.keyDown(folder, { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "フォルダツリーの操作" })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("menu", { name: "フォルダツリーの操作" }), {
+      key: "Escape",
+    });
+    fireEvent.keyDown(folder, { key: "x", ctrlKey: true });
+    fireEvent.keyDown(folder, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(folder, { key: "v", ctrlKey: true });
+    expect(onFileAction.mock.calls.slice(-3).map(([action]) => action))
+      .toEqual(["cut", "copy", "paste"]);
+  });
+
+  it("allows paste but not cut or copy on drive nodes", async () => {
+    const onFileAction = vi.fn();
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath=""
+        clipboard={{ available: true, cut: true, items: 1 }}
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+        onFileAction={onFileAction}
+      />,
+    );
+
+    const drive = await screen.findByRole("treeitem", { name: /ボリューム \(E:\)/ });
+    fireEvent.contextMenu(drive);
+    expect(screen.getByRole("menuitem", { name: /切り取り/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: /コピー/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(screen.getByRole("menuitem", { name: /貼り付け（1件）/ }));
+    expect(onFileAction).toHaveBeenCalledWith("paste", {
+      driveRoot: "E:\\",
+      relativePath: "",
+      kind: "drive",
+      name: "ボリューム (E:)",
+    });
+  });
 });
