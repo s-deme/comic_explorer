@@ -52,7 +52,7 @@ codd:
 
 | Lane | 対象 | 現在状態 | 未完了境界 |
 |---|---|---|---|
-| FR-B01 | 表示倍率 | Implemented / PASS | page layoutの横幅フィットは左右の固定余白なしでviewer stage全幅を使い、見開きではpage間gapだけを残すことをWindows testで検証済み。 |
+| FR-B01 | 表示倍率 | Implemented / PASS | page layoutの横幅フィットはviewer stage全幅・全高を使い、見開きではpage間gapだけを残す。stageより低い画像の上下中央配置と、高い画像を上端から下端まで末尾の固定余白なしでscrollできるstyle contractをWindows testで検証済み。 |
 | FR-B02 | 巻末policy | Implemented / PASS | — |
 | FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッド、情報カードの順序・名称、4形式別の固定thumbnail幅、表紙中心の縦型grid、外枠と内側余白を省いて4px間隔で並べる大判表紙だけのカードグリッド、属性付き横長情報カードの区別、ファイル名非重複、profile v1/v2からv3への移行とSQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
 | FR-B05 | 名前検索 | Implemented / PASS | 10,000項目/1秒はNFR gate。 |

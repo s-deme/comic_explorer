@@ -80,10 +80,18 @@ class UiStyleContractTests(unittest.TestCase):
             STYLES,
         )
 
-    def test_paged_width_fit_uses_the_full_viewer_stage_width(self) -> None:
+    def test_paged_width_fit_uses_full_stage_and_safe_vertical_margins(self) -> None:
         self.assert_rule_contains(
             '.page-spread[data-layout-mode="paged"][data-scale-mode="width"]',
             "width: 100%",
+        )
+        self.assert_rule_contains(
+            '.page-spread[data-layout-mode="paged"][data-scale-mode="width"]',
+            "height: 100%",
+        )
+        self.assert_rule_contains(
+            '.page-spread[data-layout-mode="paged"][data-scale-mode="width"] > img',
+            "margin-block: auto",
         )
         self.assert_rule_contains(".page-spread", "gap: 8px")
 

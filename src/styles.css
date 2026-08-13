@@ -1615,6 +1615,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .page-spread::-webkit-scrollbar { display: none; }
 .page-spread[data-layout-mode="paged"][data-scale-mode="width"] {
   width: 100%;
+  height: 100%;
+}
+.page-spread[data-layout-mode="paged"][data-scale-mode="width"] > img {
+  margin-block: auto;
 }
 .page-spread[data-layout-mode="paged"] > img {
   animation: viewer-page-enter 120ms ease-out;

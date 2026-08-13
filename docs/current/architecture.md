@@ -177,7 +177,7 @@ shellを表示してside paneのPC配下からdriveを選択できる。
 toolbarの検索buttonはfolder treeと、名前検索・basename maskをまとめたsearch paneを切り替える。catalogは
 詳細リスト、小サムネイル、表紙グリッド、カードグリッド、情報カードの表示順、sort、search result、selection、loading/empty/error、context menu、
 rename/create/delete確認dialog、file-operation結果を区別する。
-viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。page layoutの横幅フィットはpage-spreadをstage全幅へ広げ、単pageは全幅、見開きはpage間gapを除く左右半分ずつを使う。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
+viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。page layoutの横幅フィットはpage-spreadをstage全幅・全高へ広げ、単pageは全幅、見開きはpage間gapを除く左右半分ずつを使う。画像のblock方向auto marginにより、stageより低い画像は上下中央へ置き、高い画像はauto marginを0として上端から下端まで余計な末尾余白なしでscrollさせる。任意倍率のUIは25〜400%の整数を内部scaleへ換算して表示・保存する。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
 dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入力、profileのカテゴリnavigationと、
 名前・説明・現在値を対象にした検索で意味単位のsectionを切り替える。各設定は説明付きのrowとして表示し、
