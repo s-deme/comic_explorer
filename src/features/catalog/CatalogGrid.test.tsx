@@ -22,7 +22,7 @@ describe("CatalogGrid", () => {
     expect(catalogColumnCountFor("small_thumbnail", 1_000)).toBe(7);
     expect(catalogColumnCountFor("small_thumbnail", 700)).toBe(5);
     expect(catalogColumnCountFor("cover_list", 700)).toBe(4);
-    expect(catalogColumnCountFor("card_grid", 700)).toBe(2);
+    expect(catalogColumnCountFor("card_grid", 700)).toBe(3);
     expect(catalogColumnCountFor("reference_tile", 700)).toBe(2);
     expect(catalogColumnCountFor("reference_tile", 460)).toBe(1);
     expect(catalogColumnCountFor("detail_list", 320)).toBe(1);
@@ -33,8 +33,8 @@ describe("CatalogGrid", () => {
     expect(catalogLayoutFor("card_grid", sizes)).toMatchObject({
       thumbnailWidth: 224,
       thumbnailHeight: 336,
-      cardWidth: 242,
-      rowHeight: 354,
+      cardWidth: 224,
+      rowHeight: 336,
     });
     expect(catalogLayoutFor("reference_tile", sizes)).toMatchObject({
       thumbnailWidth: 176,
@@ -64,7 +64,7 @@ describe("CatalogGrid", () => {
     ["small_thumbnail", 9, 156, 10],
     ["detail_list", 2, 62, 0],
     ["cover_list", 6, 274, 10],
-    ["card_grid", 4, 342, 10],
+    ["card_grid", 5, 324, 4],
     ["reference_tile", 3, 214, 10],
   ] as const)(
     "%s positions the second virtual row after its configured gap",
@@ -481,7 +481,12 @@ describe("CatalogGrid", () => {
     );
 
     const item = screen.getByRole("button", { name: /^cover-only\.cbz、CBZ/ });
+    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
     expect(item).toHaveAttribute("title", "cover-only.cbz — CBZ");
+    expect(grid).toHaveStyle({
+      "--catalog-card-width": "216px",
+      "--catalog-column-gap": "4px",
+    });
     expect(item.firstElementChild).toHaveClass("thumbnail");
     expect(item.children).toHaveLength(1);
     expect(item.querySelector(".item-name")).not.toBeInTheDocument();

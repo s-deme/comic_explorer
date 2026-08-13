@@ -478,7 +478,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   position: absolute;
   inset: 0 0 auto 0;
   display: grid;
-  column-gap: 10px;
+  column-gap: var(--catalog-column-gap);
 }
 .catalog-row--cover_list {
   grid-template-columns: repeat(var(--catalog-column-count), var(--catalog-card-width));
@@ -568,11 +568,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 5px;
 }
 .catalog-item--card_grid {
+  position: relative;
   height: 100%;
   min-height: 0;
   grid-template-rows: var(--catalog-thumbnail-height);
   justify-items: stretch;
-  padding: 8px;
+  padding: 0;
+  border: 0;
 }
 .catalog-item--card_grid .thumbnail {
   width: var(--catalog-thumbnail-width);
@@ -693,6 +695,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-color: #1769c2;
   background: #dbeafe;
 }
+.catalog-item--card_grid:hover,
+.catalog-item--card_grid[data-selected="true"] {
+  border-color: transparent;
+  background: transparent;
+}
+.catalog-item--card_grid::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: transparent;
+  content: "";
+  pointer-events: none;
+}
+.catalog-item--card_grid:hover::after { background: #1769c20d; }
+.catalog-item--card_grid[data-selected="true"]::after { background: #1769c229; }
 .catalog-item--reference_tile:hover {
   border-color: #6b9ed5;
   background: #f4f9ff;
@@ -848,7 +865,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   top: 5px;
   left: 5px;
 }
-.catalog-cell--card_grid .catalog-actions { top: 8px; left: 8px; }
+.catalog-cell--card_grid .catalog-actions { top: 0; left: 0; }
 .catalog-cell--reference_tile .catalog-actions { top: 10px; right: 10px; left: auto; }
 .catalog-cell--detail_list .catalog-actions {
   position: static;
@@ -1433,6 +1450,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 @media (prefers-contrast: more) {
   .catalog-item[data-selected="true"] { border-width: 3px; }
+  .catalog-item--card_grid[data-selected="true"] { border-width: 0; }
+  .catalog-item--card_grid[data-selected="true"]::after { background: #1769c252; }
 }
 
 .viewer {

@@ -110,7 +110,7 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--small_thumbnail .catalog-actions", "left: 5px"
         )
         self.assert_rule_contains(
-            ".catalog-cell--card_grid .catalog-actions", "left: 8px"
+            ".catalog-cell--card_grid .catalog-actions", "left: 0"
         )
         self.assert_rule_contains(
             ".catalog-cell--reference_tile .catalog-actions", "right: 10px"
@@ -124,7 +124,9 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--cover_list,\n.catalog-cell--small_thumbnail {\n  min-height: 0;",
             STYLES,
         )
-        self.assert_rule_contains(".catalog-row", "column-gap: 10px")
+        self.assert_rule_contains(
+            ".catalog-row", "column-gap: var(--catalog-column-gap)"
+        )
         self.assert_rule_contains(
             ".catalog-item--small_thumbnail",
             "grid-template-columns: minmax(0, 1fr)",
@@ -162,9 +164,15 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-item--card_grid",
             "grid-template-rows: var(--catalog-thumbnail-height)",
         )
+        self.assert_rule_contains(".catalog-item--card_grid", "padding: 0")
+        self.assert_rule_contains(".catalog-item--card_grid", "border: 0")
         self.assert_rule_contains(
             ".catalog-item--card_grid .thumbnail",
             "height: var(--catalog-thumbnail-height)",
+        )
+        self.assert_rule_contains(
+            '.catalog-item--card_grid[data-selected="true"]::after',
+            "background: #1769c229",
         )
         self.assert_rule_contains(".catalog-item--reference_tile", "min-height: 0")
         self.assert_rule_contains(

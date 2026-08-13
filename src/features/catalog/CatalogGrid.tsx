@@ -36,17 +36,17 @@ const VIEW_MODE_CONFIG: Record<
   CatalogViewMode,
   {
     rowGap: number;
+    columnGap: number;
   }
 > = {
-  detail_list: { rowGap: 0 },
-  small_thumbnail: { rowGap: 10 },
-  cover_list: { rowGap: 10 },
-  card_grid: { rowGap: 10 },
-  reference_tile: { rowGap: 10 },
+  detail_list: { rowGap: 0, columnGap: 10 },
+  small_thumbnail: { rowGap: 10, columnGap: 10 },
+  cover_list: { rowGap: 10, columnGap: 10 },
+  card_grid: { rowGap: 4, columnGap: 4 },
+  reference_tile: { rowGap: 10, columnGap: 10 },
 };
 
 const CATALOG_HORIZONTAL_PADDING = 24;
-const CATALOG_COLUMN_GAP = 10;
 
 interface CatalogLayout {
   thumbnailWidth: number;
@@ -92,8 +92,8 @@ export function catalogLayoutFor(
     return {
       thumbnailWidth,
       thumbnailHeight,
-      cardWidth: thumbnailWidth + 18,
-      rowHeight: thumbnailHeight + 18,
+      cardWidth: thumbnailWidth,
+      rowHeight: thumbnailHeight,
     };
   }
   return {
@@ -111,11 +111,12 @@ export function catalogColumnCountFor(
 ): number {
   if (viewMode === "detail_list") return 1;
   const { cardWidth } = catalogLayoutFor(viewMode, thumbnailSizes);
+  const { columnGap } = VIEW_MODE_CONFIG[viewMode];
   const measuredWidth = scrollWidth === null || scrollWidth <= 0 ? 900 : scrollWidth;
 
   const availableWidth = Math.max(0, measuredWidth - CATALOG_HORIZONTAL_PADDING);
   const fittingColumns = Math.floor(
-    (availableWidth + CATALOG_COLUMN_GAP) / (cardWidth + CATALOG_COLUMN_GAP),
+    (availableWidth + columnGap) / (cardWidth + columnGap),
   );
   return Math.max(1, fittingColumns);
 }
@@ -255,6 +256,7 @@ export function CatalogGrid({
       data-entry-count={entries.length}
       style={{
         "--catalog-column-count": String(columnCount),
+        "--catalog-column-gap": `${modeConfig.columnGap}px`,
         "--catalog-card-width": `${layout.cardWidth}px`,
         "--catalog-thumbnail-width": `${layout.thumbnailWidth}px`,
         "--catalog-thumbnail-height": `${layout.thumbnailHeight}px`,
