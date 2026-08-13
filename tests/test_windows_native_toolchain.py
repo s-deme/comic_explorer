@@ -569,6 +569,35 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             'throw "WebP product harness changed the source directory tree."', source
         )
 
+    def test_pdf_product_gate_decodes_thumbnail_and_viewer_from_canonical_path(self) -> None:
+        source = (ROOT / "scripts/run-product-ui-harness.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("[switch]$PdfOnly", source)
+        self.assertIn("if ($PdfOnly)", source)
+        self.assertIn('$pdfName = "0-$([char]0x65E5)$([char]0x672C)$([char]0x8A9E).pdf"', source)
+        self.assertIn('Join-Path $library $pdfName', source)
+        for stage in (
+            '"pdf thumbnail completion"',
+            '"pdf viewer page decode"',
+            '"pdf viewer close"',
+        ):
+            self.assertIn(stage, source)
+        for observable in (
+            "naturalWidth > 0",
+            "naturalHeight > 0",
+            'test = "FT-B21-001"',
+            "canonicalPathThumbnailDecoded = $true",
+            "canonicalPathViewerDecoded = $true",
+            "unicodeFileName = $true",
+            "sourceDifferenceCount = 0",
+        ):
+            self.assertIn(observable, source)
+        self.assertIn(
+            'throw "PDF product harness changed the source tree or created adjacent files."',
+            source,
+        )
+
     def test_wsl_bridge_follows_final_json_exit_code(self) -> None:
         source = (ROOT / "scripts/run-feature-verification-wsl.sh").read_text(
             encoding="utf-8"

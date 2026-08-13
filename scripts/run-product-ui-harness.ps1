@@ -9,7 +9,8 @@ param(
     [switch]$SearchOnly,
     [switch]$QuickAccessOnly,
     [switch]$FavoritePersistenceOnly,
-    [switch]$WebpOnly
+    [switch]$WebpOnly,
+    [switch]$PdfOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -755,6 +756,16 @@ if ($WebpOnly) {
         }
     }
 }
+$pdfName = "0-$([char]0x65E5)$([char]0x672C)$([char]0x8A9E).pdf"
+$pdfPath = Join-Path $library $pdfName
+if ($PdfOnly) {
+    [IO.File]::WriteAllBytes(
+        $pdfPath,
+        [Convert]::FromBase64String(
+            "JVBERi0xLjQKJf////8KMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAxMDAgMTAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCA+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDAgPj4Kc3RyZWFtCgplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwIG4gCjAwMDAwMDAwNjQgMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjI1IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNSAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKMjc0CiUlRU9GCg=="
+        )
+    )
+}
 $sourceFiles = @(
     (Join-Path $library "1-valid.cbz"),
     (Join-Path $library "2-corrupt.zip"),
@@ -780,6 +791,9 @@ if ($WebpOnly) {
         $webpCbz
     )
 }
+if ($PdfOnly) {
+    $sourceFiles += $pdfPath
+}
 $before = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
 $beforeTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
     ForEach-Object {
@@ -802,7 +816,7 @@ $favoriteMovedArchive = Join-Path $favoriteMovedDirectory "1-valid.cbz"
 $favoriteMissingComic = Join-Path $evidenceRoot "missing-comic-folder"
 $favoriteMovedArchiveActive = $false
 $favoriteMissingComicActive = $false
-$expectedRootEntryCount = if ($WebpOnly) { 130 } else { 127 }
+$expectedRootEntryCount = if ($WebpOnly) { 130 } elseif ($PdfOnly) { 128 } else { 127 }
 try {
     $cold = Start-Product
     Wait-Evaluate (
@@ -971,6 +985,62 @@ try {
             animatedLocalErrorRecovered = $true
             otherComicRecovered = $true
             networkOrCodecInstall = $false
+            sourceDifferenceCount = 0
+        } | ConvertTo-Json -Compress
+        return
+    }
+    if ($PdfOnly) {
+        $pdfRelativePath = $pdfName
+        $pdfRelativePathJson = $pdfRelativePath | ConvertTo-Json -Compress
+        Wait-Evaluate (
+            "(() => { const item = document.querySelector('.catalog-item[data-kind=pdf]'); " +
+            "const thumbnail = item?.closest('.catalog-cell')?.querySelector('.thumbnail'); " +
+            "const image = thumbnail?.querySelector('img'); return item?.dataset.kind === 'pdf' && " +
+            "((image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0) || " +
+            "thumbnail?.dataset.thumbnailState === 'error'); })()"
+        ) "pdf thumbnail completion"
+        $pdfThumbnail = Invoke-Evaluate (
+            "(() => { const item = document.querySelector('.catalog-item[data-kind=pdf]'); " +
+            "const thumbnail = item?.closest('.catalog-cell')?.querySelector('.thumbnail'); " +
+            "const image = thumbnail?.querySelector('img'); return { " +
+            "ok: item?.dataset.kind === 'pdf' && image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0, " +
+            "kind: item?.dataset.kind || null, state: thumbnail?.dataset.thumbnailState || null, " +
+            "naturalWidth: image?.naturalWidth || 0, naturalHeight: image?.naturalHeight || 0 }; })()"
+        )
+        if (!$pdfThumbnail.ok) {
+            throw "PDF thumbnail did not decode: $($pdfThumbnail | ConvertTo-Json -Compress)"
+        }
+        Invoke-Evaluate (
+            "(() => { const item = document.querySelector('.catalog-item[data-kind=pdf]'); if (!item) return false; " +
+            "item.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
+        ) | Out-Null
+        Wait-Evaluate (
+            "document.querySelector('.viewer .viewer-toolbar strong')?.textContent === $pdfRelativePathJson && " +
+            "document.querySelector('.page-spread img:not(.prefetch-page)')?.complete && " +
+            "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
+            "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
+        ) "pdf viewer page decode"
+        Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('.viewer') === null" "pdf viewer close"
+        $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
+        if (Compare-Object $before $after) {
+            throw "PDF product harness changed source files."
+        }
+        $afterTree = Get-ChildItem $library -File -Recurse | Sort-Object FullName |
+            ForEach-Object {
+                "$($_.FullName.Substring($library.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
+            }
+        if (Compare-Object $beforeTree $afterTree) {
+            throw "PDF product harness changed the source tree or created adjacent files."
+        }
+        Stop-Product $cold
+        $cold = $null
+        @{
+            status = "ok"
+            test = "FT-B21-001"
+            canonicalPathThumbnailDecoded = $true
+            canonicalPathViewerDecoded = $true
+            unicodeFileName = $true
             sourceDifferenceCount = 0
         } | ConvertTo-Json -Compress
         return

@@ -100,8 +100,8 @@ entry数・展開後entry size・展開後合計size上限超過は読取前ま�
 catalogの画像を直接開く経路も親folderをviewer itemとして同じfolder page群を列挙し、選択pageから開始する。
 standalone PDFはWindows.Data.Pdfのread-only `PdfDocument`としてpage countを列挙し、選択pageのDIP寸法から最大辺と
 pixel上限内の出力寸法を先に算出して`PdfPageRenderOptions`へ指定し、boundedなPNGをviewerへ渡す。PDF page keyはbackend専用の
-opaque keyとし、PDF本体をlibraryへ展開・変換保存しない。sourceはcanonicalizeしてroot包含を検証し、1 GiBを超えるfileは
-WinRTへ渡さない。暗号化PDF、0 page、破損PDF、render size/pixel上限超過は分類したcatalogまたはpage単位errorで拒否する。書庫内PDFは現行契約の
+opaque keyとし、PDF本体をlibraryへ展開・変換保存しない。sourceはcanonicalizeしたpathでroot包含を検証し、WinRTの`StorageFile`境界でだけ
+`\\?\`または`\\?\UNC\`接頭辞を通常のWindows pathへ戻す。1 GiBを超えるfileはWinRTへ渡さない。暗号化PDF、0 page、破損PDF、render size/pixel上限超過は分類したcatalogまたはpage単位errorで拒否する。書庫内PDFは現行契約の
 対応entryではなくunsupportedとして扱う。
 BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証してPNGへ変換し、SVGはscriptを
 解釈せず外部・埋め込みimage resolverを無効化した`resvg`でPNG化してからWebView2へ渡す。

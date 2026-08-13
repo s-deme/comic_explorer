@@ -218,7 +218,8 @@ fn load_document(path: &Path) -> Result<windows::Data::Pdf::PdfDocument, AppErro
     use windows::core::HSTRING;
 
     validate_pdf_source(path)?;
-    let path = HSTRING::from(path.to_string_lossy().as_ref());
+    let storage_path = windows_storage_path(path);
+    let path = HSTRING::from(storage_path.as_str());
     let file = StorageFile::GetFileFromPathAsync(&path)
         .map_err(|error| pdf_error("Could not open the PDF file", error))?
         .join()
@@ -227,6 +228,15 @@ fn load_document(path: &Path) -> Result<windows::Data::Pdf::PdfDocument, AppErro
         .map_err(|error| pdf_error("Could not load the PDF document", error))?
         .join()
         .map_err(|error| pdf_error("Could not load the PDF document", error))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_storage_path(path: &Path) -> String {
+    let raw = path.to_string_lossy();
+    if let Some(path) = raw.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{path}");
+    }
+    raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_owned()
 }
 
 #[cfg(target_os = "windows")]
@@ -375,7 +385,24 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn minimal_pdf_enumerates_and_renders_to_bounded_png() {
+    fn winrt_storage_paths_remove_only_extended_length_prefixes() {
+        assert_eq!(
+            windows_storage_path(Path::new(r"\\?\D:\Comics\book.pdf")),
+            r"D:\Comics\book.pdf"
+        );
+        assert_eq!(
+            windows_storage_path(Path::new(r"\\?\UNC\server\share\book.pdf")),
+            r"\\server\share\book.pdf"
+        );
+        assert_eq!(
+            windows_storage_path(Path::new(r"D:\Comics\book.pdf")),
+            r"D:\Comics\book.pdf"
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn canonical_pdf_opens_and_renders_for_viewer_and_thumbnail() {
         let path = std::env::temp_dir().join(format!(
             "comic-explorer-pdf-{}-{}.pdf",
             std::process::id(),
@@ -385,12 +412,22 @@ mod tests {
                 .as_nanos()
         ));
         fs::write(&path, minimal_pdf()).unwrap();
+        let canonical = path.canonicalize().unwrap();
+        assert!(canonical.to_string_lossy().starts_with(r"\\?\"));
 
-        let pages = enumerate_pdf_pages(&path).unwrap();
+        let pages = enumerate_pdf_pages(&canonical).unwrap();
         assert_eq!(pages.len(), 1);
-        let rendered = render_pdf_page(&path, &pages[0]).unwrap();
+        let rendered = render_pdf_page(&canonical, &pages[0]).unwrap();
         assert!(rendered.starts_with(b"\x89PNG\r\n\x1a\n"));
 
+        let item = RelativePath::parse(path.file_name().unwrap().to_string_lossy()).unwrap();
+        let cover = crate::catalog::read_cover(path.parent().unwrap(), &item).unwrap();
+        assert!(cover.bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+        let thumbnail = path.with_extension("jpg");
+        crate::catalog::encode_wic_jpeg(&cover.bytes, &thumbnail).unwrap();
+        assert!(fs::read(&thumbnail).unwrap().starts_with(&[0xff, 0xd8]));
+
+        fs::remove_file(thumbnail).unwrap();
         fs::remove_file(path).unwrap();
     }
 

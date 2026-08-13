@@ -61,7 +61,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存の前後でlibrary原本を非破壊に保つ。REQ-MVP-021の明示的file manager操作だけを例外とし、暗黙のrename、move、copy、create、deleteを行わない。 |
 | REQ-MVP-018 | 外部通信、telemetry、crash upload、書誌取得、cloud同期を行わない。 |
 | REQ-MVP-019 | 項目単位のaccess、missing、corrupt、unsupported errorから別操作へ復帰できる。 |
-| REQ-MVP-020 | standalone PDF（`.pdf`）をcatalogの独立したPDF種別から1冊として開き、Windows標準PDF APIで各pageを上限付き画像へ変換して既存viewerの単page・見開き・読書位置・thumbnail・favorite・巻末遷移へ接続する。PDF本体は1 GiB、page数は10,000、renderは最大辺16,384 pxかつ120,000,000 pixelsを上限とし、library root外へ展開・変換保存しない。非対応の暗号化PDF、破損PDF、空PDF、root外symlinkは分類した局所errorとする。 |
+| REQ-MVP-020 | standalone PDF（`.pdf`）をcatalogの独立したPDF種別から1冊として開き、Windows標準PDF APIで各pageを上限付き画像へ変換して既存viewerの単page・見開き・読書位置・thumbnail・favorite・巻末遷移へ接続する。root包含確認後のWindows canonical path（拡張長接頭辞`\\?\`を含む）からも同じPDFを列挙・renderできること。PDF本体は1 GiB、page数は10,000、renderは最大辺16,384 pxかつ120,000,000 pixelsを上限とし、library root外へ展開・変換保存しない。非対応の暗号化PDF、破損PDF、空PDF、root外symlinkは分類した局所errorとする。 |
 | REQ-MVP-021 | catalog context menuからrename、任意folderへのmove/copy、folder作成、ごみ箱delete、確認付き完全delete、Explorer表示、Windowsのアプリ選択、OS clipboardのCF_HDROPによるcut/copy/pasteを行う。folder treeのfolder nodeではcontext menu、Shift+F10、Ctrl+X/C/Vからcut/copy/pasteを行い、drive nodeではrootへのpasteを行う。アプリがclipboardへ設定したcut/copyはWindows Explorerへ貼り付けでき、Explorerが設定したfile clipboardもアプリ内folderへ貼り付けできる。相対sourceはcanonical library root内に限定し、folder pickerとOS clipboardで利用者が明示した外部pathだけを入出力に許可する。同名衝突、root外symlink、source自身または子孫へのmove/copy、不正名、欠落、access拒否、途中失敗を分類して通知し、成功後はcatalogを再列挙する。 |
 
 ## MVP非機能要件
@@ -133,4 +133,4 @@ FR-B04は現行の採用laneとして定義されていない。欠番を新機�
 
 | Feature | 要件ID | 現行契約 |
 |---|---|---|
-| FR-B21 PDF viewer | REQ-MVP-020, REQ-FR-B21-001, REQ-FR-B21-002, REQ-FR-B21-003 | `.pdf`をcatalogの`pdf`種別で表示し、standalone documentのpage数を列挙する。各pageは寸法を検証してからWindows.Data.Pdfへboundedな出力寸法を指定してPNG renderし、既存viewer、thumbnail、favorite、巻末遷移、読書位置を利用する。PDFは書庫内entryや書庫として再帰解釈せず、暗号化・破損・0 page・過大source/render・root外symlinkを分類して拒否する。 |
+| FR-B21 PDF viewer | REQ-MVP-020, REQ-FR-B21-001, REQ-FR-B21-002, REQ-FR-B21-003 | `.pdf`をcatalogの`pdf`種別で表示し、standalone documentのpage数を列挙する。root包含確認で得たWindows canonical pathをWindows.Data.Pdfが受理できる通常pathへ変換し、各pageは寸法を検証してからboundedな出力寸法を指定してPNG renderし、既存viewer、thumbnail、favorite、巻末遷移、読書位置を利用する。PDFは書庫内entryや書庫として再帰解釈せず、暗号化・破損・0 page・過大source/render・root外symlinkを分類して拒否する。 |
