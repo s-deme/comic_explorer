@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use rusqlite::params;
 
@@ -11,9 +12,46 @@ use super::{AppPaths, StateStore};
 
 pub const CACHE_HARD_CAP_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 
+#[derive(Clone, Default)]
+pub struct ThumbnailPins {
+    pinned: Arc<Mutex<HashSet<String>>>,
+}
+
+impl ThumbnailPins {
+    pub fn pin(&self, content_hash: &str) -> Result<(), AppError> {
+        validate_hash(content_hash)?;
+        self.pinned
+            .lock()
+            .map_err(|_| cache_error("thumbnail pin state is poisoned"))?
+            .insert(content_hash.into());
+        Ok(())
+    }
+
+    pub fn unpin(&self, content_hash: &str) {
+        if let Ok(mut pinned) = self.pinned.lock() {
+            pinned.remove(content_hash);
+        }
+    }
+
+    pub fn clear(&self) -> Result<(), AppError> {
+        self.pinned
+            .lock()
+            .map_err(|_| cache_error("thumbnail pin state is poisoned"))?
+            .clear();
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<HashSet<String>, AppError> {
+        self.pinned
+            .lock()
+            .map(|pinned| pinned.clone())
+            .map_err(|_| cache_error("thumbnail pin state is poisoned"))
+    }
+}
+
 pub struct ThumbnailCache {
     root: PathBuf,
-    pinned: HashSet<String>,
+    pins: ThumbnailPins,
 }
 
 impl ThumbnailCache {
@@ -22,8 +60,12 @@ impl ThumbnailCache {
         fs::create_dir_all(&root).map_err(cache_error)?;
         Ok(Self {
             root,
-            pinned: HashSet::new(),
+            pins: ThumbnailPins::default(),
         })
+    }
+
+    pub fn pins(&self) -> ThumbnailPins {
+        self.pins.clone()
     }
 
     pub fn path_for(&self, content_hash: &str) -> Result<PathBuf, AppError> {
@@ -117,20 +159,19 @@ impl ThumbnailCache {
     }
 
     pub fn pin(&mut self, content_hash: &str) -> Result<(), AppError> {
-        validate_hash(content_hash)?;
-        self.pinned.insert(content_hash.into());
-        Ok(())
+        self.pins.pin(content_hash)
     }
 
     pub fn unpin(&mut self, content_hash: &str) {
-        self.pinned.remove(content_hash);
+        self.pins.unpin(content_hash);
     }
 
-    pub fn clear_pins(&mut self) {
-        self.pinned.clear();
+    pub fn clear_pins(&mut self) -> Result<(), AppError> {
+        self.pins.clear()
     }
 
     pub fn evict_to_limit(&self, store: &StateStore, limit_bytes: u64) -> Result<u64, AppError> {
+        let pinned = self.pins.snapshot()?;
         let mut statement = store
             .connection()
             .prepare(
@@ -156,7 +197,7 @@ impl ThumbnailCache {
             if total <= limit_bytes {
                 break;
             }
-            if self.pinned.contains(&hash) {
+            if pinned.contains(&hash) {
                 continue;
             }
             let path = self.root.join(relative);

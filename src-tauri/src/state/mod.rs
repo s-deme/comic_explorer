@@ -5,7 +5,7 @@ mod reading_position;
 mod repository;
 mod thumbnail;
 
-pub use cache::{CACHE_HARD_CAP_BYTES, ThumbnailCache};
+pub use cache::{CACHE_HARD_CAP_BYTES, ThumbnailCache, ThumbnailPins};
 pub use fingerprint::SourceFingerprint;
 pub use paths::AppPaths;
 pub use reading_position::{ReadingPosition, resolve_reading_position};

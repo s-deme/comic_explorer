@@ -27,7 +27,7 @@ use crate::domain::{
     classify_file_name, item_id_for, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
-use crate::state::{AppPaths, FavoriteRecord, StateStore, ThumbnailPipeline};
+use crate::state::{AppPaths, FavoriteRecord, StateStore, ThumbnailPins, ThumbnailPipeline};
 use library_root::validate_library_root;
 
 pub struct AppState {
@@ -37,6 +37,7 @@ pub struct AppState {
     viewer: Arc<Mutex<NavigationCoordinator>>,
     store: Arc<Mutex<Option<StateStore>>>,
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
+    thumbnail_pins: ThumbnailPins,
     thumbnail_workers: PriorityTaskPool,
     page_workers: PriorityTaskPool,
     file_operations: Arc<Mutex<()>>,
@@ -107,6 +108,10 @@ impl Default for AppState {
                 Ok((Some(store), library_root, Some(pipeline), recovered))
             })
             .unwrap_or((None, None, None, false));
+        let thumbnail_pins = thumbnails
+            .as_ref()
+            .map(ThumbnailPipeline::pins)
+            .unwrap_or_default();
         Self {
             library_root: Mutex::new(library_root),
             navigation: Mutex::new(NavigationCoordinator::default()),
@@ -114,6 +119,7 @@ impl Default for AppState {
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(store)),
             thumbnails: Arc::new(Mutex::new(thumbnails)),
+            thumbnail_pins,
             thumbnail_workers: PriorityTaskPool::new(2, 64),
             page_workers: PriorityTaskPool::new(2, 16),
             file_operations: Arc::new(Mutex::new(())),
@@ -2015,14 +2021,7 @@ pub async fn list_folder(
         .lock()
         .map_err(|_| "state poisoned")?
         .begin(context.generation);
-    if let Some(pipeline) = state
-        .thumbnails
-        .lock()
-        .map_err(|_| "state poisoned")?
-        .as_mut()
-    {
-        pipeline.replace_pins(&[]).map_err(|error| error.message)?;
-    }
+    reset_thumbnail_pins_for_navigation(&state.thumbnail_pins).map_err(|error| error.message)?;
     let requested_directory = root.join(relative_path.as_str());
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -2176,6 +2175,7 @@ pub async fn get_thumbnail(
         .map_err(|_| "state poisoned")?
         .cancellation_for(context.generation);
     let pipelines = state.thumbnails.clone();
+    let thumbnail_pins = state.thumbnail_pins.clone();
     let stores = state.store.clone();
     let worker_item = item.clone();
     let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -2190,7 +2190,11 @@ pub async fn get_thumbnail(
                 retry,
                 unix_millis(),
             );
-            if !cancellation.is_cancelled() {
+            if cancellation.is_cancelled() {
+                if let Ok(thumbnail) = &result {
+                    thumbnail_pins.unpin(&thumbnail.content_hash);
+                }
+            } else {
                 let _ = sender.send(result);
             }
         })
@@ -2216,6 +2220,9 @@ pub async fn get_thumbnail(
         .map_err(|_| "state poisoned")?
         .is_current(context.generation)
     {
+        if let Ok(thumbnail) = &result {
+            state.thumbnail_pins.unpin(&thumbnail.content_hash);
+        }
         return Ok(Response::Cancelled {
             request_id: context.request_id,
             generation: context.generation,
@@ -2521,6 +2528,10 @@ fn enumerate_folder_port(
     } else {
         result
     }
+}
+
+fn reset_thumbnail_pins_for_navigation(pins: &ThumbnailPins) -> Result<(), AppError> {
+    pins.clear()
 }
 
 fn search_library_port(
@@ -3608,6 +3619,7 @@ mod shutdown_tests {
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
+            thumbnail_pins: ThumbnailPins::default(),
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
             file_operations: Arc::new(Mutex::new(())),
@@ -3652,6 +3664,7 @@ mod shutdown_tests {
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
+            thumbnail_pins: ThumbnailPins::default(),
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
             file_operations: Arc::new(Mutex::new(())),
@@ -3867,6 +3880,37 @@ mod shutdown_tests {
             .code,
             ErrorCode::Cancelled
         );
+    }
+
+    #[test]
+    fn folder_navigation_does_not_wait_for_the_thumbnail_pipeline_lock() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-navigation-thumbnail-lock-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let paths = AppPaths::under(root.clone());
+        let pipeline = ThumbnailPipeline::new(&paths).unwrap();
+        let pins = pipeline.pins();
+        pins.pin(&"01".repeat(32)).unwrap();
+        let pipeline = Arc::new(Mutex::new(Some(pipeline)));
+        let pipeline_guard = pipeline.lock().unwrap();
+        let (completed_tx, completed_rx) = std::sync::mpsc::channel();
+
+        let reset = std::thread::spawn(move || {
+            completed_tx
+                .send(reset_thumbnail_pins_for_navigation(&pins))
+                .unwrap();
+        });
+
+        completed_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("pin reset must not acquire the busy thumbnail pipeline")
+            .unwrap();
+        drop(pipeline_guard);
+        reset.join().unwrap();
+        drop(pipeline);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -68,7 +68,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 
 | 安定ID | 現行契約 | 未完了境界 |
 |---|---|---|
-| NFR-MVP-001 | 1TB、10,000 files、1,000作品、1冊300pageを想定し、遅延処理、virtualize、10GiB thumbnail LRUを使う。 | 10,000項目のWindows製品UI性能はBLOCKED。 |
+| NFR-MVP-001 | 1TB、10,000 files、1,000作品、1冊300pageを想定し、遅延処理、virtualize、10GiB thumbnail LRUを使う。folder移動では一覧の列挙と表示をthumbnail生成・cache保守の完了待ちから分離し、placeholderを先に表示してthumbnailを非同期に更新する。新しいfolderへ移動した場合は古いthumbnail要求をcancelし、cancel不能な生成中処理やpin解除が完了するまでfolder一覧を開く操作を待たせない。 | 10,000項目のWindows製品UI性能はBLOCKED。 |
 | NFR-MVP-002 | cold起動3秒、cached一覧1秒、prefetch済みpage 100ms、10,000項目検索1秒、idle 250MiBを基準PCで測る。 | 現行release候補の基準PC測定はBLOCKED。 |
 | NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、catalog cardは文字と操作欄を重ねず、tree labelは選択状態によらず背景と判別できる文字色で表示する。viewerの画像表示領域は濃いグレーの市松模様で画像領域を判別可能にする。catalogの全5一覧形式は利用可能なペイン幅に応じて列数または表示する詳細列を縮退し、横方向にはみ出し・重なりを起こさない。小サムネイルと表紙グリッドでは画像の縦横比にかかわらずファイル名用の領域を画像とは別に確保し、文字を画像へ重ねず、種別ラベルを表示しない。カードグリッドは表紙グリッドより大きい既定thumbnailだけを縦横比2:3で表示し、ファイル名・種類icon・metadata用の視覚領域を設けない。情報カードでは横長cardの左に表紙、右にファイル名、種別、サイズ、更新日時を独立した情報領域として配置し、欠落metadataは安全な代替表示にする。小サムネイルでは画像をサムネイル枠の下端でclipし、ファイル名領域へ描画しない。サムネイル系4形式のthumbnail寸法は保存された形式別設定だけから決定し、ウィンドウやcatalogペインの幅変更では拡縮しない。ファイル名は本文より小さいcompactサイズで表示し、左端の種類iconを文字の省略や折返しから独立させる。お気に入りtoggleは小サムネイル、表紙グリッド、カードグリッドではサムネイルの左上、情報カードでは情報領域の右上、詳細リストでは左端の専用列に表示する小型buttonとする。設定画面を含む全dialogは共通のheader、余白、control、action、scroll表現を使い、狭い画面でもlabelと操作を重ねない。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
 | NFR-MVP-004 | lockfile全依存を再配布可能licenseに限定し、SBOMとTHIRD-PARTY-NOTICESを同期する。 | 既知の禁止・unknown licenseは0。 |

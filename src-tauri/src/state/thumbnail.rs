@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::catalog::read_cover;
 use crate::domain::{AppError, ErrorCode, RelativePath};
 
-use super::{AppPaths, CACHE_HARD_CAP_BYTES, StateStore, ThumbnailCache};
+use super::{AppPaths, CACHE_HARD_CAP_BYTES, StateStore, ThumbnailCache, ThumbnailPins};
 
 const NEGATIVE_CACHE_TTL_MS: i64 = 30_000;
 
@@ -29,6 +29,10 @@ impl ThumbnailPipeline {
             temp: paths.temp.clone(),
             negative: HashMap::new(),
         })
+    }
+
+    pub fn pins(&self) -> ThumbnailPins {
+        self.cache.pins()
     }
 
     #[cfg(target_os = "windows")]
@@ -95,7 +99,7 @@ impl ThumbnailPipeline {
     }
 
     pub fn replace_pins(&mut self, content_hashes: &[String]) -> Result<(), AppError> {
-        self.cache.clear_pins();
+        self.cache.clear_pins()?;
         for hash in content_hashes {
             self.cache.pin(hash)?;
         }

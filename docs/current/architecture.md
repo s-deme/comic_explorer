@@ -69,7 +69,10 @@ separatorとcaseを比較用に正規化してからdriveとpath segment境界�
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
 address表示ではExplorerと同じ通常pathへ変換する。
 
-catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder一覧は各項目のmetadataだけを読み、
+catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder移動は先に古いgenerationをcancelして
+metadata一覧を返し、placeholderを表示した後でthumbnail要求を非同期に投入する。navigation時のpin解除は
+生成・decode・cache書込を直列化するthumbnail pipelineとは独立した短時間の同期境界で行い、生成中の
+thumbnailやcache保守の完了をfolder一覧の応答条件にしない。folder一覧は各項目のmetadataだけを読み、
 子孫画像の有無や直下archiveを表紙候補として走査しない。表示対象になったfolderだけをthumbnail workerが
 直下1階層に限定して列挙し、対応画像を自然順で並べた先頭を表紙にする。直下画像がない場合は専用iconへ
 局所的にfallbackし、利用者が移動したfolderの内容は次の一覧要求で改めて列挙する。名前検索はfrontendで検索条件を構成し、
