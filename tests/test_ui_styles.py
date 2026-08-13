@@ -80,6 +80,13 @@ class UiStyleContractTests(unittest.TestCase):
             STYLES,
         )
 
+    def test_paged_width_fit_uses_the_full_viewer_stage_width(self) -> None:
+        self.assert_rule_contains(
+            '.page-spread[data-layout-mode="paged"][data-scale-mode="width"]',
+            "width: 100%",
+        )
+        self.assert_rule_contains(".page-spread", "gap: 8px")
+
     def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
         self.assert_rule_contains(
             ".viewer-end-of-volume-control", "display: inline-flex"
