@@ -26,6 +26,8 @@ codd:
 
 native entry pointは`src-tauri/src/main.rs`、Tauri composition rootは`src-tauri/src/lib.rs`、
 UI entry pointは`src/main.tsx`、root componentは`src/App.tsx`である。
+Windows release buildのnative entry pointはGUI subsystemを指定してconsole/terminalを生成せず、
+debug buildでは診断出力のためconsole subsystemを維持する。
 
 ## frontend/backend境界
 

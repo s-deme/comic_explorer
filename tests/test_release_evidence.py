@@ -15,6 +15,17 @@ SPEC.loader.exec_module(generate_sbom)
 
 
 class ReleaseEvidenceTests(unittest.TestCase):
+    def test_release_entry_uses_the_windows_gui_subsystem_only_outside_debug(self) -> None:
+        source = (ROOT / "src-tauri" / "src" / "main.rs").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            '#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]',
+            source,
+        )
+        self.assertNotIn('#![windows_subsystem = "windows"]', source)
+
     def test_product_quality_generates_sbom_before_cargo_check(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "product-quality.yml").read_text(
             encoding="utf-8"
