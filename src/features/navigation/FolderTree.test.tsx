@@ -246,4 +246,26 @@ describe("FolderTree", () => {
     fireEvent.click(screen.getByRole("treeitem", { name: /ボリューム \(E:\)/ }));
     expect(onSelectDrive).toHaveBeenCalledWith("E:\\");
   });
+
+  it("uses compact virtual rows and one expander-width indentation step", async () => {
+    render(
+      <FolderTree
+        libraryRoot={null}
+        currentPath=""
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+
+    await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ });
+    const rows = document.querySelectorAll(".tree-row");
+    expect(rows[0]).toHaveStyle({
+      transform: "translateY(0px)",
+      paddingInlineStart: "0px",
+    });
+    expect(rows[1]).toHaveStyle({
+      transform: "translateY(24px)",
+      paddingInlineStart: "16px",
+    });
+  });
 });

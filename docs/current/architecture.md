@@ -61,7 +61,8 @@ comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fi
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。treeの展開集合と取得済み子nodeはdrive identityを含むkeyで保持し、
 drive切替時にも別driveの展開を破棄しない。検索paneまたはtree表示設定で隠す場合もtree componentはmountを維持し、
-復帰時に利用者が開いたbranchを再表示する。tree headerは現在folderのExplorer形式absolute pathと、PC直下を残して
+復帰時に利用者が開いたbranchを再表示する。treeは24pxのvirtual row、16px単位の階層indent兼展開記号列、
+左paddingなしで続く14pxの種類icon列、約11pxのlabelを使って密に配置する。tree headerは現在folderのExplorer形式absolute pathと、PC直下を残して
 全drive・folderを折りたたむ明示操作を提供する。addressのWindows絶対pathは外側の引用符を除去し、
 separatorとcaseを比較用に正規化してからdriveとpath segment境界を検証し、安全なdrive相対pathへ変換する。
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと

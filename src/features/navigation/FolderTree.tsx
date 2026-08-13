@@ -22,6 +22,9 @@ interface FolderTreeProps {
   onSelectDrive: (absolutePath: string, relativePath?: string) => void | Promise<void>;
 }
 
+const TREE_ROW_HEIGHT = 24;
+const TREE_INDENT_WIDTH = 16;
+
 function leafName(path: string): string {
   return path.split("/").at(-1) ?? path;
 }
@@ -188,7 +191,7 @@ export function FolderTree({
   const virtualizer = useVirtualizer({
     count: nodes.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 32,
+    estimateSize: () => TREE_ROW_HEIGHT,
     overscan: 8,
     initialRect: { width: 240, height: 720 },
     observeElementRect: (instance, callback) => {
@@ -252,7 +255,7 @@ export function FolderTree({
                 key={node.key}
                 style={{
                   transform: `translateY(${virtualNode.start}px)`,
-                  paddingInlineStart: `${node.depth * 18}px`,
+                  paddingInlineStart: `${node.depth * TREE_INDENT_WIDTH}px`,
                 }}
               >
                 <button

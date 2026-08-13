@@ -34,6 +34,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".folder-tree-header", "grid-template-columns: minmax(0, 1fr) 30px")
         self.assert_rule_contains(".tree-scroll", "overflow: auto")
         self.assert_rule_contains(".tree-node", "color: #1f2328")
+        self.assert_rule_contains(".tree-row", "height: 24px")
+        self.assert_rule_contains(".tree-expander", "width: 16px")
+        self.assert_rule_contains(".tree-expander", "flex: 0 0 16px")
+        self.assert_rule_contains(".tree-node", "min-height: 22px")
+        self.assert_rule_contains(".tree-node", "padding: 2px 4px 2px 0")
+        self.assert_rule_contains(".tree-node", "font-size: .78rem")
+        self.assert_rule_contains(".tree-icon", "width: 14px")
+        self.assert_rule_contains(".tree-icon", "margin-right: 2px")
 
     def test_icon_toolbar_buttons_have_visible_spacing(self) -> None:
         self.assert_rule_contains(".icon-command-toolbar", "gap: 6px")
