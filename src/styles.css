@@ -470,6 +470,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: #dbeafe;
   font-weight: 600;
 }
+
+.tree-node[data-file-drop-active="true"],
+.catalog-item[data-file-drop-active="true"] {
+  outline: 2px solid #1769c2;
+  outline-offset: -2px;
+  background: #dbeafe;
+}
 .tree-error { padding: 0 6px; color: #a01717; font-weight: 700; }
 .catalog-pane {
   position: relative;

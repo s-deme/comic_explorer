@@ -66,6 +66,7 @@ pub fn run() {
             application::file_operations::create_file_folder,
             application::file_operations::copy_file_items_to_folder,
             application::file_operations::move_file_items_to_folder,
+            application::file_operations::move_file_items_to_destination,
             application::file_operations::delete_file_items,
             application::file_operations::set_file_clipboard,
             application::file_operations::file_clipboard_status,

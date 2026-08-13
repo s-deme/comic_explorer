@@ -45,6 +45,7 @@ import {
   createFileFolder,
   copyFileItemsToFolder,
   moveFileItemsToFolder,
+  moveFileItemsToDestination,
   deleteFileItems,
   setFileClipboard,
   getFileClipboardStatus,
@@ -359,6 +360,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     items: 0,
   });
   const [fileOperationBusy, setFileOperationBusy] = useState(false);
+  const [fileTreeRevision, setFileTreeRevision] = useState(0);
+  const [draggedFilePaths, setDraggedFilePaths] = useState<string[]>([]);
   const [fileNameDialog, setFileNameDialog] = useState<FileNameDialogState | null>(null);
   const [fileDeleteDialog, setFileDeleteDialog] = useState<FileDeleteDialogState | null>(null);
   const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
@@ -1227,7 +1230,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   async function runFileOperation(
     request: (generation: number) => Promise<ApiResponse<FileOperationResult>>,
     successMessage: (result: FileOperationResult) => string,
-    options: { refresh?: boolean; restore?: string[] } = {},
+    options: { refresh?: boolean; restore?: string[]; refreshTree?: boolean } = {},
   ): Promise<boolean> {
     if (fileOperationBusy) return false;
     setFileOperationBusy(true);
@@ -1254,8 +1257,38 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       }
       return false;
     } finally {
-      if (requestGeneration === fileOperationGeneration.current) setFileOperationBusy(false);
+      if (requestGeneration === fileOperationGeneration.current) {
+        if (options.refreshTree ?? options.refresh !== false) {
+          setFileTreeRevision((current) => current + 1);
+        }
+        setFileOperationBusy(false);
+      }
     }
+  }
+
+  async function moveDraggedItems(
+    destinationRelativePath: string,
+    destinationDriveRoot = libraryRoot,
+  ) {
+    const paths = draggedFilePaths;
+    setDraggedFilePaths([]);
+    if (paths.length === 0 || libraryRoot === null) return;
+    if (
+      destinationDriveRoot === null
+      || normalizeWindowsDisplayPath(destinationDriveRoot).toLocaleLowerCase("en-US")
+        !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+    ) {
+      setSelectionNotice("同じドライブ内のフォルダへ移動してください。");
+      return;
+    }
+    await runFileOperation(
+      (requestGeneration) => moveFileItemsToDestination(
+        paths,
+        destinationRelativePath,
+        requestGeneration,
+      ),
+      (result) => `${result.affected}件を「${destinationRelativePath || "ドライブのルート"}」へ移動しました。`,
+    );
   }
 
   async function handleTreeFileAction(
@@ -1291,7 +1324,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     const succeeded = await runFileOperation(
       (requestGeneration) => pasteFileItems(target.relativePath, requestGeneration),
       (result) => `${result.affected}件を「${target.name}」へ貼り付けました。`,
-      { refresh: false },
+      { refresh: false, refreshTree: true },
     );
     if (succeeded) {
       if (!sameDrive || navigation.current === target.relativePath) {
@@ -1369,13 +1402,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         if (succeeded) setFileClipboardStatus({ available: true, cut, items: paths.length });
         return;
       }
-      case "paste":
+      case "paste": {
+        const destination = entry !== null
+          && (entry.kind === "folder" || entry.kind === "comicFolder")
+          ? entry.relativePath
+          : navigation.current;
         await runFileOperation(
-          (requestGeneration) => pasteFileItems(navigation.current, requestGeneration),
-          (result) => `${result.affected}件を貼り付けました。`,
+          (requestGeneration) => pasteFileItems(destination, requestGeneration),
+          (result) => `${result.affected}件を「${destination || "現在のフォルダ"}」へ貼り付けました。`,
         );
         void refreshFileClipboardStatus();
         return;
+      }
       case "copyToFolder":
         await runFileOperation(
           (requestGeneration) => copyFileItemsToFolder(paths, requestGeneration),
@@ -3811,6 +3849,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           fileOperationBusy={fileOperationBusy}
           onFileAction={(action, target) => void handleTreeFileAction(action, target)}
           onRefreshFileClipboard={() => void refreshFileClipboardStatus()}
+          refreshToken={fileTreeRevision}
+          canDropFiles={draggedFilePaths.length > 0}
+          onMoveItems={(target) => void moveDraggedItems(target.relativePath, target.driveRoot)}
         />
         {sidePaneVisible && (
           <>
@@ -4320,6 +4361,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
               onContextMenu={openCatalogContextMenu}
+              onFileDragStart={setDraggedFilePaths}
+              onFileDragEnd={() => setDraggedFilePaths([])}
+              canDropFiles={draggedFilePaths.length > 0}
+              onMoveItems={(destination) => void moveDraggedItems(destination)}
               thumbnailFor={(entry) => {
                 const managed = entry.kind === "archive"
                   ? managedThumbnailFor(managedThumbnails, entry.relativePath)

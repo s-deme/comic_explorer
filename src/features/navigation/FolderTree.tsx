@@ -30,6 +30,9 @@ interface FolderTreeProps {
   fileOperationBusy?: boolean;
   onFileAction?: (action: TreeFileAction, target: TreeFileTarget) => void;
   onRefreshFileClipboard?: () => void;
+  refreshToken?: number;
+  canDropFiles?: boolean;
+  onMoveItems?: (target: TreeFileTarget) => void;
 }
 
 interface TreeMenuState {
@@ -77,6 +80,9 @@ export function FolderTree({
   fileOperationBusy = false,
   onFileAction = () => undefined,
   onRefreshFileClipboard = () => undefined,
+  refreshToken = 0,
+  canDropFiles = false,
+  onMoveItems = () => undefined,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
@@ -209,6 +215,27 @@ export function FolderTree({
     return flattened;
   }, [activeDrive, children, drives, expanded]);
 
+  useEffect(() => {
+    if (refreshToken === 0 || activeDrive === "") return;
+    const visibleParents = new Set([""]);
+    for (const node of nodes) {
+      if (
+        node.kind === "folder"
+        && node.driveIdentity === activeDrive
+        && expanded.has(node.key)
+      ) {
+        visibleParents.add(node.path);
+      }
+    }
+    setChildren((previous) => new Map(
+      [...previous].filter(([key]) => !key.startsWith(`${activeDrive}\u0000`)),
+    ));
+    setErrors((previous) => new Map(
+      [...previous].filter(([key]) => !key.startsWith(`${activeDrive}\u0000`)),
+    ));
+    for (const path of visibleParents) void loadChildren(path, activeDrive);
+  }, [refreshToken]);
+
   const virtualizer = useVirtualizer({
     count: nodes.length,
     getScrollElement: () => scrollRef.current,
@@ -339,6 +366,30 @@ export function FolderTree({
                     : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
                   className="tree-node"
                   title={node.name}
+                  onDragEnter={(event) => {
+                    const canDrop = fileTarget(node) !== null
+                      && canDropFiles
+                      && nodeDrive === activeDrive;
+                    if (canDrop) event.currentTarget.dataset.fileDropActive = "true";
+                  }}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      delete event.currentTarget.dataset.fileDropActive;
+                    }
+                  }}
+                  onDragOver={(event) => {
+                    if (fileTarget(node) === null || !canDropFiles || nodeDrive !== activeDrive) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    delete event.currentTarget.dataset.fileDropActive;
+                    const target = fileTarget(node);
+                    if (target === null || !canDropFiles || nodeDrive !== activeDrive) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onMoveItems(target);
+                  }}
                   onContextMenu={(event) => {
                     const target = fileTarget(node);
                     if (target === null) return;

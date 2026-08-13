@@ -34,6 +34,10 @@ interface CatalogGridProps {
     entry: CatalogEntry | null,
     position: { x: number; y: number },
   ) => void;
+  onFileDragStart?: (paths: string[]) => void;
+  onFileDragEnd?: () => void;
+  canDropFiles?: boolean;
+  onMoveItems?: (destinationRelativePath: string) => void;
 }
 
 export type ThumbnailViewState =
@@ -176,6 +180,10 @@ export function CatalogGrid({
   isFavorite = () => false,
   onToggleFavorite = () => undefined,
   onContextMenu = () => undefined,
+  onFileDragStart = () => undefined,
+  onFileDragEnd = () => undefined,
+  canDropFiles = false,
+  onMoveItems = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -395,6 +403,7 @@ export function CatalogGrid({
                         data-view-mode={viewMode}
                         aria-label={`${name}、${kind}、サイズ ${size}、更新日時 ${modified}`}
                         title={`${name} — ${kind}`}
+                        draggable
                         tabIndex={
                           selectedPath === entry.relativePath ||
                           (selectedPath === null && itemIndex === 0)
@@ -411,6 +420,38 @@ export function CatalogGrid({
                             ? onNavigate(entry)
                             : canRead && onRead(entry)
                         }
+                        onDragStart={(event) => {
+                          const paths = selectedPaths?.includes(entry.relativePath)
+                            ? selectedPaths
+                            : [entry.relativePath];
+                          if (!selectedPaths?.includes(entry.relativePath)) onSelect(entry);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", paths.join("\n"));
+                          onFileDragStart(paths);
+                        }}
+                        onDragEnd={() => onFileDragEnd()}
+                        onDragEnter={(event) => {
+                          if (canNavigate && canDropFiles) {
+                            event.currentTarget.dataset.fileDropActive = "true";
+                          }
+                        }}
+                        onDragLeave={(event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                            delete event.currentTarget.dataset.fileDropActive;
+                          }
+                        }}
+                        onDragOver={(event) => {
+                          if (!canNavigate || !canDropFiles) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          delete event.currentTarget.dataset.fileDropActive;
+                          if (!canNavigate || !canDropFiles) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onMoveItems(entry.relativePath);
+                        }}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           event.stopPropagation();

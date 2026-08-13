@@ -326,6 +326,43 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("starts a move drag with the current selection and accepts folder drops", () => {
+    const folder: CatalogEntry = {
+      relativePath: "Target" as never,
+      kind: "folder",
+    };
+    const onFileDragStart = vi.fn();
+    const onMoveItems = vi.fn();
+    render(
+      <CatalogGrid
+        entries={[...entries(2), folder]}
+        selectedPath={"book-0" as never}
+        selectedPaths={["book-0", "book-1"]}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onFileDragStart={onFileDragStart}
+        canDropFiles
+        onMoveItems={onMoveItems}
+      />,
+    );
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(screen.getByRole("button", { name: /book-0/ }), { dataTransfer });
+    expect(onFileDragStart).toHaveBeenCalledWith(["book-0", "book-1"]);
+    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "book-0\nbook-1");
+
+    const target = screen.getByRole("button", { name: /^Target、フォルダ/ });
+    fireEvent.dragEnter(target, { dataTransfer });
+    expect(target).toHaveAttribute("data-file-drop-active", "true");
+    fireEvent.drop(target, { dataTransfer });
+    expect(onMoveItems).toHaveBeenCalledWith("Target");
+  });
+
   it("moves into folders and opens only files from the card without duplicate read buttons", () => {
     const folder: CatalogEntry = {
       relativePath: "library" as never,

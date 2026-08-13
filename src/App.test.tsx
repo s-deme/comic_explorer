@@ -45,6 +45,7 @@ import {
   createFileFolder,
   copyFileItemsToFolder,
   moveFileItemsToFolder,
+  moveFileItemsToDestination,
   deleteFileItems,
   setFileClipboard,
   getFileClipboardStatus,
@@ -103,6 +104,7 @@ vi.mock("./features/library/client", () => ({
   createFileFolder: vi.fn(),
   copyFileItemsToFolder: vi.fn(),
   moveFileItemsToFolder: vi.fn(),
+  moveFileItemsToDestination: vi.fn(),
   deleteFileItems: vi.fn(),
   setFileClipboard: vi.fn(),
   getFileClipboardStatus: vi.fn(),
@@ -150,6 +152,7 @@ const renameFileItemMock = vi.mocked(renameFileItem);
 const createFileFolderMock = vi.mocked(createFileFolder);
 const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
 const moveFileItemsToFolderMock = vi.mocked(moveFileItemsToFolder);
+const moveFileItemsToDestinationMock = vi.mocked(moveFileItemsToDestination);
 const deleteFileItemsMock = vi.mocked(deleteFileItems);
 const setFileClipboardMock = vi.mocked(setFileClipboard);
 const getFileClipboardStatusMock = vi.mocked(getFileClipboardStatus);
@@ -391,6 +394,7 @@ describe("application shell", () => {
     createFileFolderMock.mockReset();
     copyFileItemsToFolderMock.mockReset();
     moveFileItemsToFolderMock.mockReset();
+    moveFileItemsToDestinationMock.mockReset();
     deleteFileItemsMock.mockReset();
     setFileClipboardMock.mockReset();
     getFileClipboardStatusMock.mockReset();
@@ -402,6 +406,7 @@ describe("application shell", () => {
     createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
     moveFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("move"));
+    moveFileItemsToDestinationMock.mockResolvedValue(fileOperationResponse("move"));
     deleteFileItemsMock.mockResolvedValue(fileOperationResponse("recycle"));
     setFileClipboardMock.mockResolvedValue(fileOperationResponse("clipboardCopy"));
     pasteFileItemsMock.mockResolvedValue(fileOperationResponse("pasteCopy"));
@@ -2578,6 +2583,53 @@ describe("application shell", () => {
     await waitFor(() => expect(deleteFileItemsMock).toHaveBeenCalledWith(
       ["books/new.cbz"],
       false,
+      expect.any(Number),
+    ));
+  });
+
+  it("pastes into the catalog folder that was right-clicked", async () => {
+    const target: CatalogEntry = {
+      relativePath: "Target" as never,
+      kind: "folder",
+    };
+    await registerTestLibrary([target]);
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /^Target、フォルダ/ }), {
+      clientX: 100,
+      clientY: 80,
+    });
+    const paste = within(screen.getByRole("menu", { name: "項目の操作" }))
+      .getByRole("menuitem", { name: /貼り付け/ });
+    await waitFor(() => expect(paste).toHaveAttribute("aria-disabled", "false"));
+    fireEvent.click(paste);
+
+    await waitFor(() => expect(pasteFileItemsMock).toHaveBeenCalledWith(
+      "Target",
+      expect.any(Number),
+    ));
+  });
+
+  it("moves dragged catalog items into a catalog folder", async () => {
+    const source = testEntry("book.cbz");
+    const target: CatalogEntry = {
+      relativePath: "Target" as never,
+      kind: "folder",
+    };
+    await registerTestLibrary([source, target]);
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(screen.getByRole("button", { name: /^book\.cbz/ }), { dataTransfer });
+    const targetButton = screen.getByRole("button", { name: /^Target、フォルダ/ });
+    fireEvent.dragOver(targetButton, { dataTransfer });
+    fireEvent.drop(targetButton, { dataTransfer });
+
+    await waitFor(() => expect(moveFileItemsToDestinationMock).toHaveBeenCalledWith(
+      ["book.cbz"],
+      "Target",
       expect.any(Number),
     ));
   });

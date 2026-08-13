@@ -230,6 +230,44 @@ describe("FolderTree", () => {
     expect(screen.getByRole("treeitem", { name: "Available" })).toBeInTheDocument();
   });
 
+  it("re-enumerates visible branches after a file operation", async () => {
+    let rootFolders = [
+      { relativePath: "Selected" as never, kind: "folder" as const },
+      { relativePath: "Removed" as never, kind: "folder" as const },
+    ];
+    listMock.mockImplementation(async (path) => ({
+      status: "ok",
+      requestId: `tree-${path}` as never,
+      generation: 1 as never,
+      data: path === "" ? rootFolders : [],
+    }));
+    const { rerender } = render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        refreshToken={0}
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    expect(await screen.findByRole("treeitem", { name: "Removed" })).toBeInTheDocument();
+
+    rootFolders = [{ relativePath: "Selected" as never, kind: "folder" as const }];
+    rerender(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        refreshToken={1}
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByRole("treeitem", { name: "Removed" }))
+      .not.toBeInTheDocument());
+    expect(listMock.mock.calls.filter(([path]) => path === "").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("shows PC drives and switches drives from the sidebar", async () => {
     const onSelectDrive = vi.fn();
     render(
@@ -309,6 +347,34 @@ describe("FolderTree", () => {
     fireEvent.keyDown(folder, { key: "v", ctrlKey: true });
     expect(onFileAction.mock.calls.slice(-3).map(([action]) => action))
       .toEqual(["cut", "copy", "paste"]);
+  });
+
+  it("accepts dragged catalog items on same-drive folders", async () => {
+    const onMoveItems = vi.fn();
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+        canDropFiles
+        onMoveItems={onMoveItems}
+      />,
+    );
+    const folder = await screen.findByRole("treeitem", { name: "Other" });
+    const dataTransfer = { dropEffect: "none" };
+
+    fireEvent.dragEnter(folder, { dataTransfer });
+    expect(folder).toHaveAttribute("data-file-drop-active", "true");
+    fireEvent.dragOver(folder, { dataTransfer });
+    fireEvent.drop(folder, { dataTransfer });
+
+    expect(onMoveItems).toHaveBeenCalledWith({
+      driveRoot: "C:\\",
+      relativePath: "Other",
+      kind: "folder",
+      name: "Other",
+    });
   });
 
   it("allows paste but not cut or copy on drive nodes", async () => {

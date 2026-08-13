@@ -350,6 +350,18 @@ export async function moveFileItemsToFolder(
   });
 }
 
+export async function moveFileItemsToDestination(
+  itemRelativePaths: string[],
+  destinationRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("move_file_items_to_destination", {
+    context: context(generation),
+    itemRelativePaths,
+    destinationRelativePath,
+  });
+}
+
 export async function deleteFileItems(
   itemRelativePaths: string[],
   permanent: boolean,

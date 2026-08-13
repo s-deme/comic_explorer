@@ -601,6 +601,42 @@ pub async fn move_file_items_to_folder(
 }
 
 #[tauri::command]
+pub async fn move_file_items_to_destination(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_paths: Vec<String>,
+    destination_relative_path: String,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let sources: Vec<PathBuf> = match contained_sources(&root, item_relative_paths) {
+        Ok(sources) => sources.into_iter().map(|(_, path)| path).collect(),
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let destination = match parse_relative(destination_relative_path)
+        .and_then(|relative| contained_directory(&root, &relative))
+    {
+        Ok(destination) => destination,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let lock = state.file_operations.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        transfer_items(sources, destination, TransferKind::Move)
+    })
+    .await
+    .map_err(|error| format!("file drag-and-drop worker failed: {error}"))?;
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
 pub async fn delete_file_items(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
@@ -867,7 +903,14 @@ fn shell_delete(sources: &[PathBuf], allow_undo: bool) -> Result<(), AppError> {
         };
         use windows::core::PCWSTR;
 
-        let from = wide_multi_string(sources.iter().map(PathBuf::as_path))?;
+        // Windows canonicalization commonly adds an extended-length prefix.
+        // The legacy Shell delete API does not consistently accept that form,
+        // even though ordinary filesystem APIs do.
+        let shell_sources: Vec<PathBuf> = sources
+            .iter()
+            .map(|path| PathBuf::from(super::library_root::display_path(path)))
+            .collect();
+        let from = wide_multi_string(shell_sources.iter().map(PathBuf::as_path))?;
         let mut flags = FOF_NOCONFIRMATION.0 | FOF_NOERRORUI.0 | FOF_NORECURSEREPARSE.0;
         if allow_undo {
             flags |= FOF_ALLOWUNDO.0;
@@ -1266,6 +1309,20 @@ mod tests {
             ErrorCode::Conflict
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn shell_delete_paths_remove_only_extended_length_prefixes() {
+        assert_eq!(
+            super::super::library_root::display_path(Path::new(r"\\?\C:\Comics\book.cbz")),
+            r"C:\Comics\book.cbz"
+        );
+        assert_eq!(
+            super::super::library_root::display_path(Path::new(
+                r"\\?\UNC\server\share\Comics\book.cbz"
+            )),
+            r"\\server\share\Comics\book.cbz"
+        );
     }
 
     #[cfg(target_os = "windows")]
