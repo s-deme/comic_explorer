@@ -69,8 +69,9 @@ Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem
 address表示ではExplorerと同じ通常pathへ変換する。
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder一覧は各項目のmetadataだけを読み、
-子孫画像の有無や直下archiveを表紙候補として走査しない。folderは内容にかかわらず専用iconで即時表示し、
-利用者が移動したfolderの内容だけを次の一覧要求で列挙する。名前検索はfrontendで検索条件を構成し、
+子孫画像の有無や直下archiveを表紙候補として走査しない。表示対象になったfolderだけをthumbnail workerが
+直下1階層に限定して列挙し、対応画像を自然順で並べた先頭を表紙にする。直下画像がない場合は専用iconへ
+局所的にfallbackし、利用者が移動したfolderの内容は次の一覧要求で改めて列挙する。名前検索はfrontendで検索条件を構成し、
 backendのread-only workerが正規化したbasename、検索開始folder、再帰、folder/file種別、size、mtimeを
 同時に評価する。固定した検索場所はroot相対pathとして再検証・canonicalizeし、root外symlinkや親directory
 への脱出を許可しない。検索結果の保持はfrontend表示状態だけに適用し、検索実行時のfilesystem再走査を
@@ -127,7 +128,7 @@ shutdownは新規受付拒否、task cancel/join、読書位置flush、media gra
 
 ## thumbnailとcache
 
-thumbnailは対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。folderには内容を走査するthumbnailを生成せず、専用iconを表示する。
+thumbnailは対応archive・PDFでは自然順の先頭表示可能pageから、catalogに直接表示する画像では画像ファイル自身から生成し、長辺384px、拡大なし、JPEG quality 82を基本とする。folderは直下1階層の対応画像だけを自然順で評価し、先頭画像から生成する。サブfolder内の画像と直下archiveは候補にせず、直下画像がない場合は専用iconを表示する。
 BMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICOはWindows標準WIC codec、静止WebPはWIC codecに依存しない
 pure-Rust decoderを使う。SVGは安全な静止PNGにrasterize後、同じWIC JPEG encoderへ渡す。
 animated GIFはviewerで原animationを渡しthumbnailは先頭frameを使う。animated WebP、破損画像、

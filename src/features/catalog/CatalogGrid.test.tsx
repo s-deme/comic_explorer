@@ -612,18 +612,15 @@ describe("CatalogGrid", () => {
     expect(slot).toHaveAttribute("data-cache-hit", "true");
   });
 
-  it("keeps folder icons without requesting thumbnails from their contents", async () => {
+  it("requests folder thumbnails and keeps the folder icon when no direct image exists", async () => {
     const onNeeded = vi.fn();
-    render(
+    const folders: CatalogEntry[] = [
+      { relativePath: "plain-folder" as never, kind: "folder" },
+      { relativePath: "series-folder" as never, kind: "comicFolder" },
+    ];
+    const { rerender } = render(
       <CatalogGrid
-        entries={[
-          { relativePath: "plain-folder" as never, kind: "folder" },
-          {
-            relativePath: "series-folder" as never,
-            kind: "folder",
-            hasFolderArchiveCover: true,
-          },
-        ]}
+        entries={folders}
         selectedPath={null}
         onSelect={() => undefined}
         onNavigate={() => undefined}
@@ -633,10 +630,36 @@ describe("CatalogGrid", () => {
     );
 
     expect(document.querySelectorAll(".thumbnail")[0])
-      .toHaveAttribute("data-thumbnail-state", "placeholder");
+      .toHaveAttribute("data-thumbnail-state", "loading");
     expect(document.querySelectorAll(".thumbnail")[1])
-      .toHaveAttribute("data-thumbnail-state", "placeholder");
-    await waitFor(() => expect(onNeeded).not.toHaveBeenCalled());
+      .toHaveAttribute("data-thumbnail-state", "loading");
+    await waitFor(() => {
+      expect(onNeeded).toHaveBeenCalledWith(folders[0]);
+      expect(onNeeded).toHaveBeenCalledWith(folders[1]);
+    });
+
+    rerender(
+      <CatalogGrid
+        entries={folders}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        thumbnailFor={(entry) => entry.relativePath === "series-folder"
+          ? {
+              status: "ready",
+              mediaUri: "comic://localhost/folder-cover",
+              cacheHit: false,
+            }
+          : { status: "error" }}
+      />,
+    );
+
+    expect(document.querySelectorAll(".thumbnail")[0])
+      .toHaveAttribute("data-thumbnail-state", "error");
+    expect(document.querySelectorAll('[data-thumbnail-icon="folder"]')).toHaveLength(1);
+    expect(document.querySelector(".thumbnail img"))
+      .toHaveAttribute("src", "comic://localhost/folder-cover");
   });
 
   it("requests a thumbnail for an image displayed directly in the catalog", async () => {

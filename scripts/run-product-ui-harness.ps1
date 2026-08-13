@@ -805,32 +805,35 @@ $favoriteMissingComicActive = $false
 $expectedRootEntryCount = if ($WebpOnly) { 130 } else { 127 }
 try {
     $cold = Start-Product
-    Wait-Evaluate "document.querySelector('#library-root') !== null" "setup UI"
+    Wait-Evaluate (
+        "document.querySelector('#address') !== null && " +
+        "document.querySelector('[role=tree]') !== null"
+    ) "Explorer shell setup UI"
     $libraryJson = $library | ConvertTo-Json -Compress
     $missingLibraryJson = $missingLibrary | ConvertTo-Json -Compress
     Invoke-Evaluate @"
 (() => {
-  const input = document.querySelector('#library-root');
+  const input = document.querySelector('#address');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, $missingLibraryJson);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  document.querySelector('button[type=submit]').click();
+  document.querySelector('.address-bar button[type=submit]').click();
   return true;
 })()
 "@ | Out-Null
     Wait-Evaluate (
         "document.querySelector('[role=alert]') !== null && " +
-        "document.querySelector('#library-root').value.endsWith('\\library-missing') && " +
-        "document.querySelector('button[type=submit]') !== null && " +
-        "document.querySelector('.picker-button') !== null"
+        "document.querySelector('#address').value.endsWith('\\library-missing') && " +
+        "document.querySelector('.address-bar button[type=submit]') !== null && " +
+        "document.querySelector('.error-panel button') !== null"
     ) "invalid root rejection and reselection actions"
     Invoke-Evaluate @"
 (() => {
-  const input = document.querySelector('#library-root');
+  const input = document.querySelector('#address');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(input, $libraryJson);
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  document.querySelector('button[type=submit]').click();
+  document.querySelector('.address-bar button[type=submit]').click();
   return true;
 })()
 "@ | Out-Null
@@ -838,14 +841,16 @@ try {
         "[...document.querySelectorAll('.status-bar span')].some((node) => " +
         "node.textContent.startsWith('$expectedRootEntryCount')) && " +
         "document.querySelector('#address').value.endsWith('\\library') && " +
-        "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
-        "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
+        "document.querySelector('[role=treeitem][title=library][aria-selected=true]') !== null"
     ) "all catalog entries"
     if (!$RatingOnly -and !$SearchOnly -and !$QuickAccessOnly -and !$FavoritePersistenceOnly -and !$WebpOnly) {
         Wait-Evaluate (
-            "document.querySelectorAll('.thumbnail[data-cache-hit=false] img').length === 3 && " +
-            "document.querySelectorAll('.thumbnail[data-thumbnail-state=error]').length === 1"
-        ) "cold thumbnail success and error"
+            "(() => { const item = (path) => [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath?.endsWith('/' + path))?.closest('.catalog-cell'); " +
+            "const direct = item('comic-folder')?.querySelector('.thumbnail img'); " +
+            "const nestedOnly = item('folder-a')?.querySelector('.thumbnail[data-thumbnail-state=error]'); " +
+            "return direct?.complete && direct.naturalWidth > 0 && nestedOnly !== null; })()"
+        ) "direct folder thumbnail and nested-only folder fallback"
         Wait-Evaluate (
             "[...document.querySelectorAll('.thumbnail[data-cache-hit=false] img')]" +
             ".every((image) => image.complete && image.naturalWidth > 0)"
@@ -1972,8 +1977,8 @@ try {
             "document.querySelector('[data-shortcut-save-status=saved]') !== null"
         ) "shortcut remap backend save completion"
         Invoke-Evaluate (
-            "(() => { const item = document.querySelector(" +
-            "'.catalog-item[data-relative-path=`"1-valid.cbz`"]'); " +
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath?.endsWith('/1-valid.cbz')); " +
             "item.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); return true; })()"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') !== null" "custom shortcut viewer setup"
@@ -1995,8 +2000,23 @@ try {
         $port = Get-FreeTcpPort
         $cold = Start-Product
         Wait-Evaluate (
+            "document.querySelector('#address') !== null && " +
+            "document.querySelector('[role=tree]') !== null"
+        ) "shortcut restart Explorer shell"
+        Invoke-Evaluate @"
+(() => {
+  const input = document.querySelector('#address');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  setter.call(input, $libraryJson);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('.address-bar button[type=submit]').click();
+  return true;
+})()
+"@ | Out-Null
+        Wait-Evaluate (
             "[...document.querySelectorAll('.status-bar span')].some((node) => " +
-            "node.textContent.startsWith('127'))"
+            "node.textContent.startsWith('127')) && " +
+            "document.querySelector('#address').value.endsWith('\\library')"
         ) "shortcut restart catalog"
         Invoke-Evaluate (
             "document.querySelector('[aria-controls=options-menu]').click(); true"
@@ -2023,8 +2043,8 @@ try {
             "document.querySelector('[data-shortcut-save-status=saved]') !== null"
         ) "shortcut reset backend save completion"
         Invoke-Evaluate (
-            "(() => { const item = document.querySelector(" +
-            "'.catalog-item[data-relative-path=`"1-valid.cbz`"]'); " +
+            "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
+            ".find((node) => node.dataset.relativePath?.endsWith('/1-valid.cbz')); " +
             "item.dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); return true; })()"
         ) | Out-Null
         Wait-Evaluate "document.querySelector('.viewer') !== null" "reset shortcut viewer setup"
