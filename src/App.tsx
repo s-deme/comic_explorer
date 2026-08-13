@@ -337,6 +337,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [addressInput, setAddressInput] = useState("");
   const addressInputDirty = useRef(false);
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
+  const catalogSnapshots = useRef<Map<string, CatalogEntry[]>>(new Map());
   const [loadedCatalogPath, setLoadedCatalogPath] = useState<string | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(
@@ -388,6 +389,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [endOfVolumeNotice, setEndOfVolumeNotice] = useState<string | null>(null);
   const [pendingEndOfVolume, setPendingEndOfVolume] =
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
+  const volumeNavigationBusy = useRef(false);
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [layoutMode, setLayoutMode] = useState<ViewerLayoutMode>("paged");
   const [readingDirection, setReadingDirection] =
@@ -515,11 +517,23 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setManagedThumbnails(next);
   }
 
+  function rememberCatalogSnapshot(path: string, snapshot: CatalogEntry[]) {
+    const snapshots = catalogSnapshots.current;
+    snapshots.delete(path);
+    snapshots.set(path, snapshot);
+    while (snapshots.size > 16) {
+      const oldest = snapshots.keys().next().value;
+      if (oldest === undefined) break;
+      snapshots.delete(oldest);
+    }
+  }
+
   function activateLibraryRoot(root: string) {
     viewerGeneration.current += 1;
     setViewerSession(null);
     setLibraryRoot(root);
     setLoadedCatalogPath(null);
+    catalogSnapshots.current.clear();
     managedThumbnailRoot.current = root;
     const storage = browserStorage();
     replaceManagedThumbnails(loadManagedThumbnailsForLibrary(storage, root));
@@ -849,6 +863,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
+        rememberCatalogSnapshot(relativePath, response.data);
         setEntries(response.data);
         setLoadedCatalogPath(relativePath);
         const available = new Set<string>(response.data.map((entry) => entry.relativePath));
@@ -1241,6 +1256,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       const response = await request(requestGeneration);
       if (requestGeneration !== fileOperationGeneration.current) return false;
       if (response.status === "ok") {
+        catalogSnapshots.current.clear();
         setSelectionNotice(successMessage(response.data));
         if (options.refresh !== false) {
           await load(navigation.current, options.restore ?? []);
@@ -2657,37 +2673,116 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     }
   }
 
-  function handleEndOfVolume() {
-    if (pendingEndOfVolume !== null || viewerSession === null) return;
-    const decision = resolveEndOfVolume(
-      sortedEntries,
-      viewerSession.itemKey,
-      endOfVolumePolicyRef.current,
+  async function viewerVolumeCatalog(
+    itemKey: string,
+    requestViewerGeneration: number,
+  ): Promise<CatalogEntry[] | null> {
+    if (sortedEntries.some((entry) => entry.relativePath === itemKey)) {
+      return sortedEntries;
+    }
+    if (itemKey === "") {
+      return [
+        { relativePath: "" as CatalogEntry["relativePath"], kind: "folder" },
+        ...sortedEntries,
+      ];
+    }
+    const parent = parentPath(itemKey);
+    if (parent === null) return null;
+    let siblings = catalogSnapshots.current.get(parent);
+    if (siblings === undefined) {
+      const response = await listFolder(parent, ++generation.current);
+      if (
+        requestViewerGeneration !== viewerGeneration.current
+        || viewerSession?.itemKey !== itemKey
+      ) return null;
+      if (response.status !== "ok") return null;
+      siblings = response.data;
+      rememberCatalogSnapshot(parent, siblings);
+    }
+    return sortCatalogEntries(
+      siblings,
+      sortField,
+      sortDescending ? "descending" : "ascending",
     );
-    if (decision.kind === "open") {
-      openComicEntry(decision.entry, "normal", "first");
-    } else if (decision.kind === "confirm") {
-      setEndOfVolumeNotice(null);
-      setPendingEndOfVolume(decision);
-    } else if (decision.kind === "return_library") {
-      closeViewer();
-    } else {
-      setEndOfVolumeNotice(
-        decision.reason === "policy"
-          ? "巻末動作が停止に設定されています。"
-          : "巻末です。次の漫画はありません。",
+  }
+
+  async function handleEndOfVolume() {
+    if (
+      volumeNavigationBusy.current
+      || pendingEndOfVolume !== null
+      || viewerSession === null
+    ) return;
+    volumeNavigationBusy.current = true;
+    const sessionAtStart = viewerSession;
+    const requestViewerGeneration = viewerGeneration.current;
+    try {
+      const volumeCatalog = await viewerVolumeCatalog(
+        sessionAtStart.itemKey,
+        requestViewerGeneration,
       );
+      if (
+        volumeCatalog === null
+        || requestViewerGeneration !== viewerGeneration.current
+        || viewerSession?.itemKey !== sessionAtStart.itemKey
+      ) {
+        if (requestViewerGeneration === viewerGeneration.current) {
+          setEndOfVolumeNotice("次の漫画を確認できませんでした。");
+        }
+        return;
+      }
+      const decision = resolveEndOfVolume(
+        volumeCatalog,
+        sessionAtStart.itemKey,
+        endOfVolumePolicyRef.current,
+      );
+      if (decision.kind === "open") {
+        await openComicEntry(decision.entry, "normal", "first");
+      } else if (decision.kind === "confirm") {
+        setEndOfVolumeNotice(null);
+        setPendingEndOfVolume(decision);
+      } else if (decision.kind === "return_library") {
+        closeViewer();
+      } else {
+        setEndOfVolumeNotice(
+          decision.reason === "policy"
+            ? "巻末動作が停止に設定されています。"
+            : "巻末です。次の漫画はありません。",
+        );
+      }
+    } finally {
+      volumeNavigationBusy.current = false;
     }
   }
 
-  function handleStartOfVolume() {
-    if (viewerSession === null) return;
-    const previous = previousComicEntry(sortedEntries, viewerSession.itemKey);
-    if (previous === undefined) {
-      setEndOfVolumeNotice("巻頭です。前の漫画はありません。");
-      return;
+  async function handleStartOfVolume() {
+    if (volumeNavigationBusy.current || viewerSession === null) return;
+    volumeNavigationBusy.current = true;
+    const sessionAtStart = viewerSession;
+    const requestViewerGeneration = viewerGeneration.current;
+    try {
+      const volumeCatalog = await viewerVolumeCatalog(
+        sessionAtStart.itemKey,
+        requestViewerGeneration,
+      );
+      if (
+        volumeCatalog === null
+        || requestViewerGeneration !== viewerGeneration.current
+        || viewerSession?.itemKey !== sessionAtStart.itemKey
+      ) {
+        if (requestViewerGeneration === viewerGeneration.current) {
+          setEndOfVolumeNotice("前の漫画を確認できませんでした。");
+        }
+        return;
+      }
+      const previous = previousComicEntry(volumeCatalog, sessionAtStart.itemKey);
+      if (previous === undefined) {
+        setEndOfVolumeNotice("巻頭です。前の漫画はありません。");
+        return;
+      }
+      await openComicEntry(previous, "normal", "last");
+    } finally {
+      volumeNavigationBusy.current = false;
     }
-    void openComicEntry(previous, "normal", "last");
   }
 
   if (viewerSession !== null) {

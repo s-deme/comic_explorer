@@ -1,5 +1,5 @@
 import type { CatalogEntry } from "../../types/domain";
-import { nextComicEntry } from "./sort";
+import { isReadableVolumeEntry, nextComicEntry } from "./sort";
 
 export const END_OF_VOLUME_POLICIES = [
   "auto_next",
@@ -35,10 +35,6 @@ export type EndOfVolumeDecision =
   | { kind: "return_library" }
   | { kind: "stop"; reason: "policy" | "no_next" | "current_not_found" };
 
-function isReadableComic(entry: CatalogEntry): boolean {
-  return entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf";
-}
-
 /** Resolve one end-of-volume action from the already sorted catalog snapshot. */
 export function resolveEndOfVolume(
   sortedEntries: readonly CatalogEntry[],
@@ -59,7 +55,7 @@ export function resolveEndOfVolume(
   }
 
   if (policy === "loop") {
-    const first = sortedEntries.find(isReadableComic);
+    const first = sortedEntries.find(isReadableVolumeEntry);
     if (first) return { kind: "open", entry: first, reason: "loop" };
   }
 

@@ -82,7 +82,7 @@ describe("catalog sorting", () => {
       entry("next-comic", { kind: "comicFolder", archiveKind: undefined }),
       entry("later.zip"),
     ];
-    expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("next.pdf");
+    expect(nextComicEntry(values, "current.cbz")?.relativePath).toBe("plain-folder");
     expect(nextComicEntry(values, "later.zip")).toBeUndefined();
     expect(nextComicEntry(values, "missing.cbz")).toBeUndefined();
   });
@@ -94,7 +94,7 @@ describe("catalog sorting", () => {
       entry("current.cbz", { archiveKind: "cbz" }),
       entry("later.zip"),
     ];
-    expect(previousComicEntry(values, "current.cbz")?.relativePath).toBe("first.pdf");
+    expect(previousComicEntry(values, "current.cbz")?.relativePath).toBe("plain-folder");
     expect(previousComicEntry(values, "first.pdf")).toBeUndefined();
     expect(previousComicEntry(values, "missing.cbz")).toBeUndefined();
   });

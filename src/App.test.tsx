@@ -1152,6 +1152,59 @@ describe("application shell", () => {
     }
   });
 
+  it("opens the next image folder after reaching the end of loose folder images", async () => {
+    const firstFolder: CatalogEntry = {
+      relativePath: "01-images" as never,
+      kind: "folder",
+    };
+    const nextFolder: CatalogEntry = {
+      relativePath: "02-images" as never,
+      kind: "folder",
+    };
+    const loosePage: CatalogEntry = {
+      relativePath: "01-images/001.jpg" as never,
+      kind: "page",
+    };
+    openMock
+      .mockResolvedValueOnce(viewerResponse(firstFolder.relativePath))
+      .mockResolvedValueOnce(viewerResponse(nextFolder.relativePath));
+    await registerTestLibrary([firstFolder, nextFolder]);
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "list-first-folder" as never,
+      generation: 3 as never,
+      data: [loosePage],
+    });
+
+    const rootGrid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+    const firstFolderButton = within(rootGrid).getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === firstFolder.relativePath);
+    expect(firstFolderButton).toBeDefined();
+    fireEvent.keyDown(firstFolderButton!, { key: "Enter" });
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith(
+      firstFolder.relativePath,
+      expect.any(Number),
+    ));
+
+    const folderGrid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const pageButton = within(folderGrid).getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === loosePage.relativePath);
+    expect(pageButton).toBeDefined();
+    fireEvent.keyDown(pageButton!, { key: "Enter" });
+    expect(await screen.findByLabelText(`${firstFolder.relativePath} ビューワ`))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+
+    expect(await screen.findByLabelText(`${nextFolder.relativePath} ビューワ`))
+      .toBeInTheDocument();
+    expect(openMock).toHaveBeenNthCalledWith(
+      2,
+      nextFolder.relativePath,
+      expect.any(Number),
+    );
+  });
+
   it("opens the next comic at its first page and the previous comic at its last page", async () => {
     const first = testEntry("01-first.cbz");
     const second = testEntry("02-second.cbz");

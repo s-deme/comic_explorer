@@ -110,6 +110,11 @@ export function sortCatalogEntries(
   );
 }
 
+export function isReadableVolumeEntry(entry: CatalogEntry): boolean {
+  return entry.kind === "folder" || entry.kind === "comicFolder"
+    || entry.kind === "archive" || entry.kind === "pdf";
+}
+
 export function nextComicEntry(
   entries: readonly CatalogEntry[],
   currentRelativePath: string,
@@ -120,9 +125,7 @@ export function nextComicEntry(
   if (current < 0) return undefined;
   return entries
     .slice(current + 1)
-    .find(
-      (entry) => entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf",
-    );
+    .find(isReadableVolumeEntry);
 }
 
 export function previousComicEntry(
@@ -136,7 +139,5 @@ export function previousComicEntry(
   return [...entries]
     .slice(0, current)
     .reverse()
-    .find(
-      (entry) => entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf",
-    );
+    .find(isReadableVolumeEntry);
 }

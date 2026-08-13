@@ -49,14 +49,22 @@ describe("FR-B02 end-of-volume policy resolver", () => {
       kind: "stop",
       reason: "policy",
     });
-    expect(resolveEndOfVolume(books, "02-second", "stop")).toEqual({
+    expect(resolveEndOfVolume(books, "plain-folder", "stop")).toEqual({
       kind: "stop",
       reason: "no_next",
     });
   });
 
+  it("treats an image folder as the next readable volume", () => {
+    expect(resolveEndOfVolume(books, "02-second", "auto_next")).toEqual({
+      kind: "open",
+      entry: books[2],
+      reason: "next",
+    });
+  });
+
   it("FT-B02-005 loops from the final comic to the sorted readable first", () => {
-    expect(resolveEndOfVolume(books, "02-second", "loop")).toEqual({
+    expect(resolveEndOfVolume(books, "plain-folder", "loop")).toEqual({
       kind: "open",
       entry: books[0],
       reason: "loop",
