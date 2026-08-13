@@ -2634,6 +2634,65 @@ describe("application shell", () => {
     ));
   });
 
+  it("moves a dragged tree folder into another tree folder", async () => {
+    treeMock.mockImplementation(async (path) => ({
+      status: "ok",
+      requestId: `tree-${path || "root"}` as never,
+      generation: 1 as never,
+      data: path === ""
+        ? [
+            { relativePath: "Source" as never, kind: "folder" as const },
+            { relativePath: "Target" as never, kind: "folder" as const },
+          ]
+        : [],
+    }));
+    await registerTestLibrary([]);
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(await screen.findByRole("treeitem", { name: "Source" }), { dataTransfer });
+    const target = screen.getByRole("treeitem", { name: "Target" });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    await waitFor(() => expect(moveFileItemsToDestinationMock).toHaveBeenCalledWith(
+      ["Source"],
+      "Target",
+      expect.any(Number),
+    ));
+  });
+
+  it("deletes a tree folder through confirmation and returns from a deleted current folder", async () => {
+    treeMock.mockImplementation(async (path) => ({
+      status: "ok",
+      requestId: `tree-${path || "root"}` as never,
+      generation: 1 as never,
+      data: path === ""
+        ? [{ relativePath: "Target" as never, kind: "folder" as const }]
+        : [],
+    }));
+    await registerTestLibrary([]);
+    const target = await screen.findByRole("treeitem", { name: "Target" });
+    fireEvent.click(target);
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith("Target", expect.any(Number)));
+
+    fireEvent.contextMenu(target, { clientX: 80, clientY: 60 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "フォルダツリーの操作" }))
+      .getByRole("menuitem", { name: /削除.*Del/ }));
+    const dialog = screen.getByRole("alertdialog", { name: "ごみ箱へ移動" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "ごみ箱へ移動" }));
+
+    await waitFor(() => expect(deleteFileItemsMock).toHaveBeenCalledWith(
+      ["Target"],
+      false,
+      expect.any(Number),
+    ));
+    await waitFor(() => expect(listMock).toHaveBeenLastCalledWith("", expect.any(Number)));
+  });
+
   it("connects folder-tree copy and paste to the Windows file clipboard", async () => {
     treeMock.mockImplementation(async (path) => ({
       status: "ok",

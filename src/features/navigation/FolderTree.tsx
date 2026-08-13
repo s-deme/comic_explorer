@@ -33,6 +33,8 @@ interface FolderTreeProps {
   refreshToken?: number;
   canDropFiles?: boolean;
   onMoveItems?: (target: TreeFileTarget) => void;
+  onFileDragStart?: (paths: string[]) => void;
+  onFileDragEnd?: () => void;
 }
 
 interface TreeMenuState {
@@ -83,6 +85,8 @@ export function FolderTree({
   refreshToken = 0,
   canDropFiles = false,
   onMoveItems = () => undefined,
+  onFileDragStart = () => undefined,
+  onFileDragEnd = () => undefined,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
@@ -362,10 +366,21 @@ export function FolderTree({
                   aria-level={node.depth + 1}
                   aria-selected={isSelected}
                   aria-keyshortcuts={node.kind === "folder"
-                    ? "Shift+F10 Control+X Control+C Control+V"
+                    ? "Shift+F10 Control+X Control+C Control+V Delete"
                     : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
                   className="tree-node"
                   title={node.name}
+                  draggable={node.kind === "folder" && nodeDrive === activeDrive}
+                  onDragStart={(event) => {
+                    if (node.kind !== "folder" || nodeDrive !== activeDrive) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", node.path);
+                    onFileDragStart([node.path]);
+                  }}
+                  onDragEnd={() => onFileDragEnd()}
                   onDragEnter={(event) => {
                     const canDrop = fileTarget(node) !== null
                       && canDropFiles
@@ -404,6 +419,11 @@ export function FolderTree({
                       event.preventDefault();
                       const bounds = event.currentTarget.getBoundingClientRect();
                       openContextMenu(target, bounds.left + 24, bounds.top + 24);
+                      return;
+                    }
+                    if (event.key === "Delete" && target.kind === "folder") {
+                      event.preventDefault();
+                      onFileAction("recycle", target);
                       return;
                     }
                     if (!(event.ctrlKey || event.metaKey) || event.altKey) return;

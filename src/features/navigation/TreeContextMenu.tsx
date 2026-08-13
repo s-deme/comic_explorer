@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { FileClipboardStatus } from "../library/client";
 
-export type TreeFileAction = "cut" | "copy" | "paste";
+export type TreeFileAction = "cut" | "copy" | "paste" | "recycle";
 
 export interface TreeFileTarget {
   driveRoot: string;
@@ -107,6 +107,8 @@ export function TreeContextMenu({
       {item("cut", "切り取り", "Ctrl+X", !canTransfer)}
       {item("copy", "コピー", "Ctrl+C", !canTransfer)}
       {item("paste", `貼り付け${clipboard.items > 0 ? `（${clipboard.items}件）` : ""}`, "Ctrl+V", !clipboard.available)}
+      <div className="menu-separator" role="separator" />
+      {item("recycle", "削除", "Del", !canTransfer)}
     </div>
   );
 }

@@ -226,6 +226,7 @@ interface FileDeleteDialogState {
   paths: string[];
   permanent: boolean;
   label: string;
+  returnPath?: string;
 }
 
 const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
@@ -1305,6 +1306,23 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       : parentPath(target.relativePath) ?? "";
     if (!sameDrive && !await selectDrive(target.driveRoot, browsePath)) return;
 
+    if (action === "recycle") {
+      if (target.kind !== "folder") return;
+      const currentIsTargetOrDescendant = sameDrive && (
+        navigation.current === target.relativePath
+        || navigation.current.startsWith(`${target.relativePath}/`)
+      );
+      setFileDeleteDialog({
+        paths: [target.relativePath],
+        permanent: false,
+        label: target.relativePath,
+        returnPath: currentIsTargetOrDescendant
+          ? parentPath(target.relativePath) ?? ""
+          : undefined,
+      });
+      return;
+    }
+
     if (action === "cut" || action === "copy") {
       if (target.kind !== "folder") return;
       const cut = action === "cut";
@@ -1508,8 +1526,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       (result) => dialog.permanent
         ? `${result.affected}件を完全に削除しました。`
         : `${result.affected}件をごみ箱へ移動しました。`,
+      dialog.returnPath === undefined
+        ? undefined
+        : { refresh: false, refreshTree: true },
     );
-    if (succeeded) setFileDeleteDialog(null);
+    if (succeeded) {
+      setFileDeleteDialog(null);
+      if (dialog.returnPath !== undefined) navigate(dialog.returnPath);
+    }
   }
 
   async function chooseRootWithPicker() {
@@ -3852,6 +3876,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           refreshToken={fileTreeRevision}
           canDropFiles={draggedFilePaths.length > 0}
           onMoveItems={(target) => void moveDraggedItems(target.relativePath, target.driveRoot)}
+          onFileDragStart={setDraggedFilePaths}
+          onFileDragEnd={() => setDraggedFilePaths([])}
         />
         {sidePaneVisible && (
           <>

@@ -329,6 +329,7 @@ describe("FolderTree", () => {
     expect(screen.getByRole("menuitem", { name: /切り取り.*Ctrl\+X/ })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: /コピー.*Ctrl\+C/ })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: /貼り付け（2件）.*Ctrl\+V/ })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: /削除.*Del/ })).toBeEnabled();
     fireEvent.click(screen.getByRole("menuitem", { name: /コピー.*Ctrl\+C/ }));
     expect(onFileAction).toHaveBeenCalledWith("copy", {
       driveRoot: "C:\\",
@@ -345,12 +346,14 @@ describe("FolderTree", () => {
     fireEvent.keyDown(folder, { key: "x", ctrlKey: true });
     fireEvent.keyDown(folder, { key: "c", ctrlKey: true });
     fireEvent.keyDown(folder, { key: "v", ctrlKey: true });
-    expect(onFileAction.mock.calls.slice(-3).map(([action]) => action))
-      .toEqual(["cut", "copy", "paste"]);
+    fireEvent.keyDown(folder, { key: "Delete" });
+    expect(onFileAction.mock.calls.slice(-4).map(([action]) => action))
+      .toEqual(["cut", "copy", "paste", "recycle"]);
   });
 
   it("accepts dragged catalog items on same-drive folders", async () => {
     const onMoveItems = vi.fn();
+    const onFileDragStart = vi.fn();
     render(
       <FolderTree
         libraryRoot="C:\\"
@@ -359,11 +362,21 @@ describe("FolderTree", () => {
         onSelectDrive={() => undefined}
         canDropFiles
         onMoveItems={onMoveItems}
+        onFileDragStart={onFileDragStart}
       />,
     );
+    const source = await screen.findByRole("treeitem", { name: "Selected" });
     const folder = await screen.findByRole("treeitem", { name: "Other" });
-    const dataTransfer = { dropEffect: "none" };
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
 
+    expect(source).toHaveAttribute("draggable", "true");
+    fireEvent.dragStart(source, { dataTransfer });
+    expect(onFileDragStart).toHaveBeenCalledWith(["Selected"]);
+    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "Selected");
     fireEvent.dragEnter(folder, { dataTransfer });
     expect(folder).toHaveAttribute("data-file-drop-active", "true");
     fireEvent.dragOver(folder, { dataTransfer });
@@ -395,6 +408,8 @@ describe("FolderTree", () => {
     expect(screen.getByRole("menuitem", { name: /切り取り/ }))
       .toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("menuitem", { name: /コピー/ }))
+      .toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: /削除/ }))
       .toHaveAttribute("aria-disabled", "true");
     fireEvent.click(screen.getByRole("menuitem", { name: /貼り付け（1件）/ }));
     expect(onFileAction).toHaveBeenCalledWith("paste", {
