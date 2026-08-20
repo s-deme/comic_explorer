@@ -105,6 +105,15 @@ import {
   isSlideshowOrder,
   type SlideshowOrder,
 } from "./slideshow";
+import {
+  applyViewerImageTransform,
+  IDENTITY_IMAGE_TRANSFORM,
+  imageTransformCss,
+  isIdentityImageTransform,
+  transformedImageSize,
+  type ImageTransformAction,
+  type ViewerImageTransform,
+} from "./image-transform";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
 
@@ -323,6 +332,7 @@ export function Viewer({
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
   const [clipboardCopying, setClipboardCopying] = useState(false);
+  const [imageTransformNotice, setImageTransformNotice] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [slideshowRunning, setSlideshowRunning] = useState(
     (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
@@ -361,6 +371,8 @@ export function Viewer({
   const lifecycleMountedRef = useRef(true);
   const randomSlideshowQueueRef = useRef<number[]>([]);
   const clipboardRequestRef = useRef(0);
+  const pageTransformsRef = useRef(new Map<number, ViewerImageTransform>());
+  const [imageTransformRevision, setImageTransformRevision] = useState(0);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -436,15 +448,30 @@ export function Viewer({
     scheduleCursorHide();
     return clearCursorHideTimer;
   }, [cursorAutoHideMs, panning, scale.loupeEnabled]);
+  const transformForPage = (index: number): ViewerImageTransform =>
+    pageTransformsRef.current.get(index) ?? IDENTITY_IMAGE_TRANSFORM;
+  const effectiveLandscape = useMemo(() => {
+    const next = new Set(landscape);
+    pageSizes.forEach((size, index) => {
+      const transformed = transformedImageSize(size, transformForPage(index));
+      if (isPagePairable(
+        transformed.width,
+        transformed.height,
+        spreadRules.portraitMaxAspectPercent,
+      )) next.delete(index);
+      else next.add(index);
+    });
+    return next;
+  }, [imageTransformRevision, landscape, pageSizes, spreadRules.portraitMaxAspectPercent]);
   const visible = useMemo(
     () => visibleIndices(
       state,
       session.pages.length,
-      landscape,
+      effectiveLandscape,
       layoutMode === "paged" && autoSpread,
       spreadRules,
     ),
-    [autoSpread, landscape, layoutMode, session.pages.length, spreadRules, state],
+    [autoSpread, effectiveLandscape, layoutMode, session.pages.length, spreadRules, state],
   );
   const nextStartIndex = state.index + Math.max(1, visible.length);
   const nextVisible = useMemo(() => {
@@ -452,11 +479,11 @@ export function Viewer({
     return visibleIndices(
       { ...state, index: nextStartIndex },
       session.pages.length,
-      landscape,
+      effectiveLandscape,
       layoutMode === "paged" && autoSpread,
       spreadRules,
     );
-  }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
+  }, [autoSpread, effectiveLandscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
   const prefetchIndices = useMemo(
     () => prefetchWindowIndices(
       layoutMode === "paged" ? visible : [state.index],
@@ -478,7 +505,10 @@ export function Viewer({
   retainedIndicesRef.current = new Set(retainedIndices);
   const calculatedFitScale = useMemo(() => {
     if (scale.mode !== "fit" || layoutMode !== "paged") return null;
-    const sizes = visible.map((index) => pageSizes.get(index));
+    const sizes = visible.map((index) => {
+      const size = pageSizes.get(index);
+      return size === undefined ? undefined : transformedImageSize(size, transformForPage(index));
+    });
     if (sizes.some((size) => size === undefined)) return null;
     return fitScaleForPages(
       sizes as { width: number; height: number }[],
@@ -488,7 +518,7 @@ export function Viewer({
       viewerSpreadGap,
       fitRules,
     );
-  }, [fitRules, fitViewport.height, fitViewport.width, layoutMode, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
+  }, [fitRules, fitViewport.height, fitViewport.width, imageTransformRevision, layoutMode, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -608,7 +638,7 @@ export function Viewer({
     dispatch({
       type: "next",
       pageCount: session.pages.length,
-      landscape,
+      landscape: effectiveLandscape,
       autoSpread: layoutMode === "paged" && autoSpread,
       spreadRules,
     });
@@ -639,6 +669,27 @@ export function Viewer({
       type: "go",
       index: randomPageIndex(state.index, session.pages.length),
     });
+  }
+
+  function applyImageTransform(action: ImageTransformAction) {
+    const pageIndex = state.index;
+    const current = transformForPage(pageIndex);
+    const next = applyViewerImageTransform(current, action);
+    if (isIdentityImageTransform(next)) {
+      pageTransformsRef.current.delete(pageIndex);
+    } else {
+      pageTransformsRef.current.set(pageIndex, next);
+    }
+    setImageTransformRevision((revision) => revision + 1);
+    setLoupe(null);
+    const actionLabel = action === "rotateClockwise"
+      ? "時計回りに90度回転"
+      : action === "flipHorizontal"
+        ? "左右反転"
+        : action === "flipVertical"
+          ? "上下反転"
+          : "回転・反転をリセット";
+    setImageTransformNotice(`ページ ${pageIndex + 1} を${actionLabel}しました。`);
   }
 
   function advanceSlideshow() {
@@ -716,11 +767,11 @@ export function Viewer({
     dispatch({
       type: "next",
       pageCount: session.pages.length,
-      landscape,
+      landscape: effectiveLandscape,
       autoSpread: layoutMode === "paged" && autoSpread,
       spreadRules,
     });
-  }, [autoSpread, imageErrors, landscape, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
+  }, [autoSpread, effectiveLandscape, imageErrors, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
@@ -886,7 +937,7 @@ export function Viewer({
       window.removeEventListener("resize", updateDisplayedScale);
       observer.disconnect();
     };
-  }, [fullscreen, landscape, layoutMode, readyPages, scale.mode, scale.scale, state.index, state.mode]);
+  }, [fullscreen, imageTransformRevision, layoutMode, readyPages, scale.mode, scale.scale, state.index, state.mode]);
 
   function updateLoupe(event: ReactPointerEvent<HTMLDivElement>) {
     if (!scale.loupeEnabled) return;
@@ -1108,6 +1159,28 @@ export function Viewer({
         handleCloseCommand();
         return;
       }
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const editingText = target !== null && (
+        target.matches("input, textarea, select, [contenteditable=true]")
+        || target.closest("[contenteditable=true]") !== null
+        || target.closest('[role="dialog"]') !== null
+      );
+      if (!editingText && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const transformAction: ImageTransformAction | undefined = event.key === "]"
+          ? "rotateClockwise"
+          : event.key.toLowerCase() === "h"
+            ? "flipHorizontal"
+            : event.key.toLowerCase() === "v"
+              ? "flipVertical"
+              : event.key === "0"
+                ? "reset"
+                : undefined;
+        if (transformAction !== undefined) {
+          event.preventDefault();
+          applyImageTransform(transformAction);
+          return;
+        }
+      }
       const customCommand = customShortcutCommand(event, activeShortcuts);
       const command = isViewerShortcutCommand(customCommand)
         ? customCommand
@@ -1200,6 +1273,7 @@ export function Viewer({
   };
   const renderPage = (index: number, withAnchor = false) => {
     const page = session.pages[index];
+    const imageTransform = transformForPage(index);
     const content = imageErrors.has(index) ? (
       <div className="page-error" role="alert">
         <h2>画像を読み込めません</h2>
@@ -1213,6 +1287,11 @@ export function Viewer({
         src={mediaUris[index]}
         alt={`${session.displayName} ${index + 1}ページ`}
         data-page-index={index}
+        data-image-transformed={!isIdentityImageTransform(imageTransform)}
+        data-quarter-turns={imageTransform.quarterTurns}
+        data-flip-horizontal={imageTransform.flipHorizontal}
+        data-flip-vertical={imageTransform.flipVertical}
+        style={{ transform: imageTransformCss(imageTransform) }}
         onLoad={(event) => {
           setReadyPages((current) => new Set(current).add(index));
           const width = event.currentTarget.naturalWidth;
@@ -1575,6 +1654,43 @@ export function Viewer({
           <span aria-hidden="true">▣</span>
         </button>
         <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="時計回りに90度回転"
+          title="現在ページを時計回りに90度回転 (])"
+          onClick={() => applyImageTransform("rotateClockwise")}
+        >
+          <span aria-hidden="true">↻</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="左右反転"
+          title="現在ページを左右反転 (H)"
+          onClick={() => applyImageTransform("flipHorizontal")}
+        >
+          <span aria-hidden="true">↔</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="上下反転"
+          title="現在ページを上下反転 (V)"
+          onClick={() => applyImageTransform("flipVertical")}
+        >
+          <span aria-hidden="true">↕</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="回転・反転をリセット"
+          title="現在ページの回転・反転をリセット (0)"
+          disabled={isIdentityImageTransform(transformForPage(state.index))}
+          onClick={() => applyImageTransform("reset")}
+        >
+          <span aria-hidden="true">0°</span>
+        </button>
+        <button
           ref={fullscreenButtonRef}
           className="viewer-icon-button"
           aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
@@ -1602,6 +1718,11 @@ export function Viewer({
         {clipboardNotice !== null && (
           <span className="fullscreen-error" role="status">
             {clipboardNotice}
+          </span>
+        )}
+        {imageTransformNotice !== null && (
+          <span className="fullscreen-error" role="status">
+            {imageTransformNotice}
           </span>
         )}
       </header>
@@ -1860,13 +1981,24 @@ export function Viewer({
               {
                 left: loupe.stageX,
                 top: loupe.stageY,
-                backgroundImage: `url("${mediaUris[loupe.index]}")`,
                 "--viewer-loupe-size": `${loupeSize}px`,
-                backgroundSize: `${loupe.imageWidth * loupeZoom}px ${loupe.imageHeight * loupeZoom}px`,
-                backgroundPosition: `${loupeSize / 2 - loupe.imageX * loupeZoom}px ${loupeSize / 2 - loupe.imageY * loupeZoom}px`,
               } as CSSProperties
             }
-          />
+          >
+            <span
+              className="viewer-loupe-surface"
+              aria-hidden="true"
+              data-quarter-turns={transformForPage(loupe.index).quarterTurns}
+              data-flip-horizontal={transformForPage(loupe.index).flipHorizontal}
+              data-flip-vertical={transformForPage(loupe.index).flipVertical}
+              style={{
+                backgroundImage: `url("${mediaUris[loupe.index]}")`,
+                backgroundSize: `${loupe.imageWidth * loupeZoom}px ${loupe.imageHeight * loupeZoom}px`,
+                backgroundPosition: `${loupeSize / 2 - loupe.imageX * loupeZoom}px ${loupeSize / 2 - loupe.imageY * loupeZoom}px`,
+                transform: imageTransformCss(transformForPage(loupe.index)),
+              }}
+            />
+          </div>
         )}
         {!scrollLayout && preloadIndices.map((index) => mediaUris[index] && (
           <img

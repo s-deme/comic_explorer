@@ -274,6 +274,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | PASS / 限定 | visible pathのSetはcatalog変更時だけ構築し、page移動ごとは現在pageとitem keyの最大2 indexed lookupであることをspy testで確認。追加I/O、polling、page数比例stateはない。release 10,000項目での復帰scroll時間・frame timeは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2で画像folderの連続page移動後に一覧へ戻る操作、10,000項目virtual catalogのscroll復帰、検索・mask中の不可視候補、次巻・前巻の選択表示は未測定。 |
 
+## Leeyes P2-P 回転・反転
+
+対象はLEY-VIEWER-030の1件。現在anchor pageだけに時計回り90度、screen軸の左右・上下反転、resetを適用する。状態はViewer session内のpage別疎Mapに限定し、回転後寸法をauto spreadとfitへ渡す。main imageとloupe surfaceへ同じCSS transformを適用する一方、原画像、Rust decode、media URI、cache、clipboard、読書位置、gridは変更しない。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | transform helper 3件とViewer 54件、計57件、FAIL 0。4回転・reset、screen軸flip、原URI不変、anchor限定、page別保持、入力control抑止、回転後spread判定、loupe transformを含む。 |
+| TypeScript typecheck | PASS | `tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | Python 59件、frontend 31 files / 414件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 523.53kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 180件とshutdown process 1件、FAIL 0。Rust sourceは変更せず、既存decode・media・cache・clipboard境界の全体回帰を確認した。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは260.839秒で全12 stageがexit 0。Rust 43.934秒、release executable/freshness、GUI権限付きshortcut product回帰11.073秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能 | PASS / 限定 | 非identity pageだけをMapへ保持し、現在pageの参照・更新はO(1)。操作ごとのcanvas decode、native I/O、timer、原画像copyはない。大量pageを実際に変換したrelease process memory・GPU frame timeは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2の実画像、見開き、縦横scroll、fit各mode、loupe、DPI別表示、GPU描画、keyboard layout差は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

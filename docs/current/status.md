@@ -77,6 +77,8 @@ P2-NではLEY-VIEWER-011をPublishedとした。viewer toolbarから現在のanc
 
 P2-OではLEY-VIEWER-012をPublishedとした。既定有効の選択同期をprofile v17・SQLite・設定dialogへ追加し、画像folderの現在page、archive・PDF・comic folderと次巻・前巻のitem keyを、現行viewer generationとvisible catalogが一致するときだけ単一selectionへ反映する。catalog変更時に作るSetを共有し、page移動は最大2 lookupとした。初回canonicalではfrontendからRustへの新field欠落をproduct-shortcut gateが検出したため、payloadを修正して専用contract testを追加し、再実行した全12 stageはPASSした。release製品の大量catalog復帰scrollは未測定として残す。
 
+P2-PではLEY-VIEWER-030をPublishedとした。現在anchor pageへ時計回り90度、screen軸の左右・上下反転、resetをtoolbarと固定keyから適用し、page別の疎なsession state、回転後寸法によるauto spread・fit再計算、main imageとloupeの同一transformを実装した。原画像、Rust decode、media URI、cache、clipboard、読書位置は変更しない。frontend 414件、Python 59件、Rust 180+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2の実画像・見開き・DPI・GPU描画は未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

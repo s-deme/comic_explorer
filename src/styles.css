@@ -1702,7 +1702,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   max-height: 100%;
   object-fit: contain;
   box-shadow: 0 4px 22px #0008;
+  transform-origin: center;
 }
+.page-spread img[data-image-transformed="true"] { will-change: transform; }
 .page-spread img:only-child { max-width: 100%; }
 .page-spread[data-layout-mode="paged"][data-scale-mode="fit"][data-fit-scale-active="true"] > img {
   flex: 0 0 auto;
@@ -1795,9 +1797,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-radius: 0;
   box-shadow: 0 4px 22px #000b;
   pointer-events: none;
+  overflow: hidden;
   transform: translate(-50%, -50%);
-  background-repeat: no-repeat;
   background-color: #14171b;
+}
+.viewer-loupe-surface {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-repeat: no-repeat;
+  transform-origin: center;
 }
 .page-error {
   z-index: 4;

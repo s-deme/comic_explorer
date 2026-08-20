@@ -225,7 +225,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(20);
+    expect(buttons).toHaveLength(24);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -423,7 +423,8 @@ describe("Viewer settings", () => {
     const loupe = screen.getByRole("img", { name: "ポインタ周辺ルーペ" });
     expect(loupe).toHaveStyle({ left: "120px", top: "100px" });
     expect(loupe.style.getPropertyValue("--viewer-loupe-size")).toBe("240px");
-    expect(loupe).toHaveStyle({
+    const loupeSurface = loupe.querySelector<HTMLElement>(".viewer-loupe-surface");
+    expect(loupeSurface).toHaveStyle({
       backgroundSize: "1050px 700px",
       backgroundPosition: "85px 85px",
     });
@@ -1699,6 +1700,105 @@ describe("Viewer settings", () => {
     });
     await act(async () => Promise.resolve());
     expect(screen.queryByText(/画像としてコピーしました/)).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P2-016 rotates and flips only the current anchor without changing its media URI", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const first = screen.getByAltText("Multi Page 1ページ") as HTMLImageElement;
+    const second = screen.getByAltText("Multi Page 2ページ") as HTMLImageElement;
+    const reset = screen.getByRole("button", { name: "回転・反転をリセット" });
+    expect(reset).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "時計回りに90度回転" }));
+    fireEvent.click(screen.getByRole("button", { name: "左右反転" }));
+    fireEvent.click(screen.getByRole("button", { name: "上下反転" }));
+
+    expect(first).toHaveAttribute("src", "comic://localhost/one");
+    expect(first).toHaveAttribute("data-quarter-turns", "1");
+    expect(first).toHaveAttribute("data-flip-horizontal", "true");
+    expect(first).toHaveAttribute("data-flip-vertical", "true");
+    expect(first).toHaveStyle({ transform: "scaleX(-1) scaleY(-1) rotate(90deg)" });
+    expect(second).toHaveAttribute("data-quarter-turns", "0");
+    expect(second).toHaveStyle({ transform: "scaleX(1) scaleY(1) rotate(0deg)" });
+    expect(reset).toBeEnabled();
+
+    fireEvent.click(reset);
+    expect(first).toHaveAttribute("data-image-transformed", "false");
+    expect(reset).toBeDisabled();
+  });
+
+  it("REQ-LEY-P2-016 keeps page transforms for the Viewer session and isolates fixed keys from editors", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="vertical_scroll"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const first = screen.getByAltText("Multi Page 1ページ") as HTMLImageElement;
+    fireEvent.keyDown(window, { key: "]" });
+    expect(first).toHaveAttribute("data-quarter-turns", "1");
+
+    const pixelInput = screen.getByRole("spinbutton", { name: "表示幅（px）" });
+    fireEvent.keyDown(pixelInput, { key: "h" });
+    expect(first).toHaveAttribute("data-flip-horizontal", "false");
+
+    const second = screen.getByAltText("Multi Page 2ページ") as HTMLImageElement;
+    fireEvent.focus(second.closest(".viewer-page")!);
+    fireEvent.keyDown(window, { key: "v" });
+    expect(second).toHaveAttribute("data-flip-vertical", "true");
+    fireEvent.focus(screen.getByRole("article", { name: "ページ 1" }));
+    expect(screen.getByRole("button", { name: "回転・反転をリセット" })).toBeEnabled();
+  });
+
+  it("REQ-LEY-P2-016 uses transformed dimensions for automatic spread pairing and the loupe", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="rightToLeft"
+        initialLoupeEnabled
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    const first = screen.getByAltText("Multi Page 1ページ") as HTMLImageElement;
+    Object.defineProperties(first, {
+      naturalWidth: { configurable: true, value: 600 },
+      naturalHeight: { configurable: true, value: 1_000 },
+    });
+    fireEvent.load(first);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-effective-view-mode", "spread");
+    fireEvent.click(screen.getByRole("button", { name: "時計回りに90度回転" }));
+    await waitFor(() => expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-effective-view-mode", "single"));
+
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, right: 300, bottom: 300, width: 300, height: 300,
+    } as DOMRect);
+    vi.spyOn(first, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, right: 200, bottom: 300, width: 200, height: 300,
+    } as DOMRect);
+    fireEvent.pointerMove(stage, { clientX: 100, clientY: 150 });
+    const surface = screen.getByRole("img", { name: "ポインタ周辺ルーペ" })
+      .querySelector<HTMLElement>(".viewer-loupe-surface");
+    expect(surface).toHaveAttribute("data-quarter-turns", "1");
+    expect(surface).toHaveStyle({ transform: "scaleX(1) scaleY(1) rotate(90deg)" });
   });
 
   it("FT-B15-001 resolves stale bookmark ordinals by pageKey and opens them from the list", async () => {
