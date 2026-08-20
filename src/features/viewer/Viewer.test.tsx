@@ -521,6 +521,79 @@ describe("Viewer settings", () => {
       .toEqual([8, 9, 10, 11]);
   });
 
+  it("REQ-LEY-P2-010 applies configurable forward/backward windows and memory limits", async () => {
+    const unloadedSession = {
+      ...multiPageSession,
+      pages: Array.from({ length: 10 }, (_, index) => ({
+        id: `page-${index + 1}` as never,
+        relativePath: `${index + 1}.png` as never,
+        mediaUri: "",
+      })),
+    };
+    vi.mocked(loadPage).mockImplementation(async (_viewer, index, generation) => ({
+      status: "ok",
+      requestId: `prefetch-${index}` as never,
+      generation: generation as never,
+      data: {
+        pageId: `page-${index + 1}` as never,
+        mediaUri: `comic://localhost/prefetch-${index}`,
+      },
+    }));
+    render(
+      <Viewer
+        session={unloadedSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="vertical_scroll"
+        initialDirection="leftToRight"
+        prefetchAhead={2}
+        prefetchBehind={2}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(loadPage).mock.calls.map((call) => call[1])).toEqual([0, 1, 2]);
+
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "5" },
+    });
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(8));
+    expect(vi.mocked(loadPage).mock.calls.slice(3).map((call) => call[1]))
+      .toEqual([5, 6, 7, 4, 3]);
+    await waitFor(() => {
+      expect(document.querySelector('img[data-page-index="0"]')).toBeNull();
+      expect(document.querySelector('img[data-page-index="5"]')).not.toBeNull();
+    });
+  });
+
+  it("REQ-LEY-P2-010 loads a zero-prefetch destination on demand as visible", async () => {
+    const unloadedSession = {
+      ...multiPageSession,
+      pages: multiPageSession.pages.map((page) => ({ ...page, mediaUri: "" })),
+    };
+    render(
+      <Viewer
+        session={unloadedSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="leftToRight"
+        prefetchAhead={0}
+        prefetchBehind={0}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(loadPage).mock.calls[0]?.[1]).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(loadPage).mock.calls[1]?.[1]).toBe(1);
+    expect(vi.mocked(loadPage).mock.calls[1]?.[3]).toBe("visible");
+  });
+
   it("lets the viewer toolbar change the end-of-volume policy", () => {
     const onEndOfVolumePolicyChange = vi.fn();
     render(

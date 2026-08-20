@@ -29,6 +29,9 @@ import {
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
+  isPrefetchPageCount,
+  isPrefetchMemoryMiB,
+  prefetchWindowIndices,
   wheelDeltaPixels,
   pageScanTarget,
   randomPageIndex,
@@ -314,6 +317,18 @@ describe("FR-B01 scale model", () => {
     expect(clampLoupeCenter(10, 300, 240)).toBe(120);
     expect(clampLoupeCenter(290, 300, 240)).toBe(180);
     expect(clampLoupeCenter(10, 200, 240)).toBe(100);
+  });
+
+  it("REQ-LEY-P2-010 creates a bounded forward and backward prefetch window", () => {
+    expect(isPrefetchPageCount(0)).toBe(true);
+    expect(isPrefetchPageCount(4)).toBe(true);
+    expect(isPrefetchPageCount(5)).toBe(false);
+    expect(isPrefetchMemoryMiB(16)).toBe(true);
+    expect(isPrefetchMemoryMiB(512)).toBe(true);
+    expect(isPrefetchMemoryMiB(15)).toBe(false);
+    expect(prefetchWindowIndices([4, 5], 10, 3, 2)).toEqual([6, 7, 8, 3, 2]);
+    expect(prefetchWindowIndices([0], 3, 0, 4)).toEqual([]);
+    expect(prefetchWindowIndices([9], 10, 4, 2)).toEqual([8, 7]);
   });
 });
 

@@ -125,6 +125,9 @@ export interface CatalogSettings {
   loupeEnabled: boolean;
   loupeSize: number;
   loupeZoom: number;
+  prefetchAhead: number;
+  prefetchBehind: number;
+  prefetchMemoryMiB: number;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -237,6 +240,9 @@ export async function saveSettingsProfile(
       loupeEnabled: profile.loupeEnabled,
       loupeSize: profile.loupeSize,
       loupeZoom: profile.loupeZoom,
+      prefetchAhead: profile.prefetchAhead,
+      prefetchBehind: profile.prefetchBehind,
+      prefetchMemoryMiB: profile.prefetchMemoryMiB,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

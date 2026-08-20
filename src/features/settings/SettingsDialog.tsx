@@ -33,6 +33,8 @@ import {
   MAX_WHEEL_SCROLL_FACTOR,
   MAX_LOUPE_SIZE,
   MAX_LOUPE_ZOOM,
+  MAX_PREFETCH_PAGE_COUNT,
+  MAX_PREFETCH_MEMORY_MIB,
   MIN_PAN_FACTOR,
   MIN_VIEWER_GRID_SIZE,
   MIN_WHEEL_DEAD_ZONE,
@@ -40,6 +42,8 @@ import {
   MIN_WHEEL_SCROLL_FACTOR,
   MIN_LOUPE_SIZE,
   MIN_LOUPE_ZOOM,
+  MIN_PREFETCH_PAGE_COUNT,
+  MIN_PREFETCH_MEMORY_MIB,
   MIN_VIEWER_SPACING,
   MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
   MIN_PORTRAIT_ASPECT_PERCENT,
@@ -349,6 +353,11 @@ export function SettingsDialog({
       id: "loupe",
       category: "viewer",
       text: `ルーペ 拡大鏡 ${draft.loupeEnabled ? "有効" : "無効"} サイズ ${draft.loupeSize}px 倍率 ${Math.round(draft.loupeZoom * 100)}% ポインター位置を正方形の拡大鏡で確認します`,
+    },
+    {
+      id: "viewer-prefetch",
+      category: "viewer",
+      text: `先読み 進行方向 ${draft.prefetchAhead}ページ 戻り方向 ${draft.prefetchBehind}ページ メモリ ${draft.prefetchMemoryMiB}MiB ページ移動前に近傍画像を読み込みます`,
     },
     {
       id: "viewer-background",
@@ -769,6 +778,25 @@ export function SettingsDialog({
                     倍率
                     <input type="number" aria-label="profileルーペ倍率（%）" min={MIN_LOUPE_ZOOM * 100} max={MAX_LOUPE_ZOOM * 100} step="25" value={Math.round(draft.loupeZoom * 100)} onChange={(event) => update({ loupeZoom: Math.min(MAX_LOUPE_ZOOM, Math.max(MIN_LOUPE_ZOOM, Number(event.target.value) / 100)) })} />
                     <span>%</span>
+                  </label>
+                </div>
+              </SettingRow>
+              <SettingRow id="viewer-prefetch" title="先読み" description="現在位置の前後に保持するページ数と圧縮済みmediaの上限を指定します。" hidden={rowHidden("viewer-prefetch")}>
+                <div className="settings-inline-actions">
+                  <label className="settings-number-control">
+                    進行方向
+                    <input type="number" aria-label="profile進行方向先読みページ数" min={MIN_PREFETCH_PAGE_COUNT} max={MAX_PREFETCH_PAGE_COUNT} step="1" value={draft.prefetchAhead} onChange={(event) => update({ prefetchAhead: Math.min(MAX_PREFETCH_PAGE_COUNT, Math.max(MIN_PREFETCH_PAGE_COUNT, Math.round(Number(event.target.value)))) })} />
+                    <span>ページ</span>
+                  </label>
+                  <label className="settings-number-control">
+                    戻り方向
+                    <input type="number" aria-label="profile戻り方向先読みページ数" min={MIN_PREFETCH_PAGE_COUNT} max={MAX_PREFETCH_PAGE_COUNT} step="1" value={draft.prefetchBehind} onChange={(event) => update({ prefetchBehind: Math.min(MAX_PREFETCH_PAGE_COUNT, Math.max(MIN_PREFETCH_PAGE_COUNT, Math.round(Number(event.target.value)))) })} />
+                    <span>ページ</span>
+                  </label>
+                  <label className="settings-number-control">
+                    上限
+                    <input type="number" aria-label="profile先読みメモリ上限（MiB）" min={MIN_PREFETCH_MEMORY_MIB} max={MAX_PREFETCH_MEMORY_MIB} step="16" value={draft.prefetchMemoryMiB} onChange={(event) => update({ prefetchMemoryMiB: Math.min(MAX_PREFETCH_MEMORY_MIB, Math.max(MIN_PREFETCH_MEMORY_MIB, Math.round(Number(event.target.value)))) })} />
+                    <span>MiB</span>
                   </label>
                 </div>
               </SettingRow>

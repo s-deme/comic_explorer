@@ -204,6 +204,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   loupeEnabled: false,
   loupeSize: 180,
   loupeZoom: 2,
+  prefetchAhead: 4,
+  prefetchBehind: 0,
+  prefetchMemoryMiB: 256,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -2702,6 +2705,15 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profileルーペ倍率（%）"), {
       target: { value: "350" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profile進行方向先読みページ数"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile戻り方向先読みページ数"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile先読みメモリ上限（MiB）"), {
+      target: { value: "192" },
+    });
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2744,6 +2756,9 @@ describe("application shell", () => {
         fitIncludePageMargin: false,
         loupeSize: 240,
         loupeZoom: 3.5,
+        prefetchAhead: 3,
+        prefetchBehind: 2,
+        prefetchMemoryMiB: 192,
         scale: 1.75,
         scrollStepPercent: 75,
         wheelScrollFactor: 1.4,
@@ -2880,7 +2895,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 12,
+        profileVersion: 13,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

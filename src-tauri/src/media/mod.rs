@@ -67,11 +67,34 @@ impl MediaTokenRegistry {
         token
     }
 
+    pub fn issue_bounded(&mut self, grant: MediaGrant, memory_limit_bytes: u64) -> String {
+        self.remove_expired();
+        let token = self.issue(grant);
+        while self.memory_bytes() > memory_limit_bytes {
+            let Some(oldest) = self
+                .grants
+                .iter()
+                .filter(|(candidate, (_, grant))| {
+                    candidate.as_str() != token && matches!(&grant.source, PageSource::Memory(_))
+                })
+                .min_by_key(|(_, (expiry, _))| *expiry)
+                .map(|(candidate, _)| candidate.clone())
+            else {
+                break;
+            };
+            self.grants.remove(&oldest);
+        }
+        token
+    }
+
     pub fn resolve(&mut self, token: &str) -> Result<MediaGrant, AppError> {
         self.remove_expired();
         self.grants
-            .get(token)
-            .map(|(_, grant)| grant.clone())
+            .get_mut(token)
+            .map(|(expiry, grant)| {
+                *expiry = Instant::now() + self.lifetime;
+                grant.clone()
+            })
             .ok_or_else(|| AppError {
                 code: ErrorCode::AccessDenied,
                 message: "Media token is invalid or expired.".into(),
@@ -93,6 +116,16 @@ impl MediaTokenRegistry {
     fn remove_expired(&mut self) {
         let now = Instant::now();
         self.grants.retain(|_, (expiry, _)| *expiry > now);
+    }
+
+    fn memory_bytes(&self) -> u64 {
+        self.grants
+            .values()
+            .filter_map(|(_, grant)| match &grant.source {
+                PageSource::Memory(bytes) => Some(bytes.len() as u64),
+                _ => None,
+            })
+            .sum()
     }
 }
 
@@ -533,6 +566,33 @@ mod tests {
         first.revoke_all();
         assert!(first.resolve(&first_token).is_err());
         assert!(first.resolve(&second_token).is_err());
+    }
+
+    #[test]
+    fn req_ley_p2_010_bounded_grants_evict_lru_and_allow_only_one_oversize_page() {
+        let grant = |page: &str, size: usize| MediaGrant {
+            page_id: PageId::parse(page).unwrap(),
+            mime_type: "image/png",
+            max_bytes: 1024,
+            source: PageSource::Memory(vec![0; size]),
+        };
+        let mut registry = MediaTokenRegistry::new(Duration::from_secs(60));
+        let first = registry.issue_bounded(grant("page-a", 6), 10);
+        let second = registry.issue_bounded(grant("page-b", 6), 10);
+        assert!(registry.resolve(&first).is_err());
+        assert!(registry.resolve(&second).is_ok());
+        assert_eq!(registry.memory_bytes(), 6);
+
+        let oversize = registry.issue_bounded(grant("page-large", 24), 10);
+        assert!(registry.resolve(&second).is_err());
+        assert!(registry.resolve(&oversize).is_ok());
+        assert_eq!(registry.memory_bytes(), 24);
+
+        for index in 0..2_048 {
+            registry.issue_bounded(grant(&format!("bulk-{index}"), 64), 1_024);
+        }
+        assert!(registry.memory_bytes() <= 1_024);
+        assert!(registry.grants.len() <= 16);
     }
 
     #[test]

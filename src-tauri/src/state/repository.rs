@@ -81,6 +81,9 @@ pub struct Settings {
     pub loupe_enabled: bool,
     pub loupe_size: String,
     pub loupe_zoom: String,
+    pub prefetch_ahead: String,
+    pub prefetch_behind: String,
+    pub prefetch_memory_mib: String,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -157,6 +160,9 @@ impl Default for Settings {
             loupe_enabled: false,
             loupe_size: "180".into(),
             loupe_zoom: "2".into(),
+            prefetch_ahead: "4".into(),
+            prefetch_behind: "0".into(),
+            prefetch_memory_mib: "256".into(),
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -273,6 +279,9 @@ impl StateStore {
                 "loupeEnabled" => settings.loupe_enabled = value == "true",
                 "loupeSize" => settings.loupe_size = value,
                 "loupeZoom" => settings.loupe_zoom = value,
+                "prefetchAhead" => settings.prefetch_ahead = value,
+                "prefetchBehind" => settings.prefetch_behind = value,
+                "prefetchMemoryMiB" => settings.prefetch_memory_mib = value,
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -376,6 +385,9 @@ impl StateStore {
             ("loupeEnabled", settings.loupe_enabled.to_string()),
             ("loupeSize", settings.loupe_size.clone()),
             ("loupeZoom", settings.loupe_zoom.clone()),
+            ("prefetchAhead", settings.prefetch_ahead.clone()),
+            ("prefetchBehind", settings.prefetch_behind.clone()),
+            ("prefetchMemoryMiB", settings.prefetch_memory_mib.clone()),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
@@ -1432,6 +1444,9 @@ mod tests {
                 loupe_enabled: true,
                 loupe_size: "240".into(),
                 loupe_zoom: "3.5".into(),
+                prefetch_ahead: "3".into(),
+                prefetch_behind: "2".into(),
+                prefetch_memory_mib: "192".into(),
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1526,6 +1541,9 @@ mod tests {
         assert!(restored.loupe_enabled);
         assert_eq!(restored.loupe_size, "240");
         assert_eq!(restored.loupe_zoom, "3.5");
+        assert_eq!(restored.prefetch_ahead, "3");
+        assert_eq!(restored.prefetch_behind, "2");
+        assert_eq!(restored.prefetch_memory_mib, "192");
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 12,
+    profileVersion: 13,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -33,6 +33,9 @@ function validProfile(): SettingsProfile {
     loupeEnabled: false,
     loupeSize: 180,
     loupeZoom: 2,
+    prefetchAhead: 4,
+    prefetchBehind: 0,
+    prefetchMemoryMiB: 256,
     viewerBackground: "checker",
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
@@ -106,7 +109,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 13, 99, "12", undefined])(
+  it.each([0, 14, 99, "13", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -280,6 +283,32 @@ describe("settings profile", () => {
     for (const [field, value] of [
       ["loupeSize", 79], ["loupeSize", 401], ["loupeSize", 180.5],
       ["loupeZoom", 1.24], ["loupeZoom", 8.01], ["loupeZoom", Number.NaN],
+    ] as const) {
+      expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+    }
+  });
+
+  it("REQ-LEY-P2-010 migrates v12 and validates bounded prefetch settings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 12;
+    delete legacy.prefetchAhead;
+    delete legacy.prefetchBehind;
+    delete legacy.prefetchMemoryMiB;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      prefetchAhead: 3,
+      prefetchBehind: 2,
+      prefetchMemoryMiB: 192,
+    })).toEqual(expect.objectContaining({
+      prefetchAhead: 3,
+      prefetchBehind: 2,
+      prefetchMemoryMiB: 192,
+    }));
+    for (const [field, value] of [
+      ["prefetchAhead", -1], ["prefetchAhead", 5], ["prefetchBehind", 1.5],
+      ["prefetchMemoryMiB", 15], ["prefetchMemoryMiB", 513],
+      ["prefetchMemoryMiB", Number.NaN],
     ] as const) {
       expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
     }

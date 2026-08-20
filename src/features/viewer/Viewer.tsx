@@ -27,6 +27,8 @@ import {
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_LOUPE_SIZE,
   DEFAULT_LOUPE_ZOOM,
+  DEFAULT_PREFETCH_AHEAD,
+  DEFAULT_PREFETCH_BEHIND,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
   normalizeViewerSpacing,
@@ -41,6 +43,8 @@ import {
   isPagePairable,
   isLoupeSize,
   isLoupeZoom,
+  isPrefetchPageCount,
+  prefetchWindowIndices,
   fitScaleForPages,
   wheelDeltaPixels,
   pageScanTarget,
@@ -92,7 +96,6 @@ import {
 } from "../catalog/end-of-volume";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
-const VIEWER_PREFETCH_AHEAD = 4;
 const DEFAULT_SLIDESHOW_INTERVAL_MS = 3_000;
 
 interface ViewerProps {
@@ -115,6 +118,8 @@ interface ViewerProps {
   initialLoupeEnabled?: boolean;
   loupeSize?: number;
   loupeZoom?: number;
+  prefetchAhead?: number;
+  prefetchBehind?: number;
   initialBackground?: ViewerBackground;
   initialPageMargin?: number;
   initialSpreadGap?: number;
@@ -183,6 +188,8 @@ export function Viewer({
   initialLoupeEnabled = false,
   loupeSize: initialLoupeSize = DEFAULT_LOUPE_SIZE,
   loupeZoom: initialLoupeZoom = DEFAULT_LOUPE_ZOOM,
+  prefetchAhead: initialPrefetchAhead = DEFAULT_PREFETCH_AHEAD,
+  prefetchBehind: initialPrefetchBehind = DEFAULT_PREFETCH_BEHIND,
   initialBackground = DEFAULT_VIEWER_BACKGROUND,
   initialPageMargin = DEFAULT_VIEWER_PAGE_MARGIN,
   initialSpreadGap = DEFAULT_VIEWER_SPREAD_GAP,
@@ -214,6 +221,12 @@ export function Viewer({
   const viewerBackground = normalizeViewerBackground(initialBackground);
   const loupeSize = isLoupeSize(initialLoupeSize) ? initialLoupeSize : DEFAULT_LOUPE_SIZE;
   const loupeZoom = isLoupeZoom(initialLoupeZoom) ? initialLoupeZoom : DEFAULT_LOUPE_ZOOM;
+  const prefetchAhead = isPrefetchPageCount(initialPrefetchAhead)
+    ? initialPrefetchAhead
+    : DEFAULT_PREFETCH_AHEAD;
+  const prefetchBehind = isPrefetchPageCount(initialPrefetchBehind)
+    ? initialPrefetchBehind
+    : DEFAULT_PREFETCH_BEHIND;
   const viewerPageMargin = normalizeViewerSpacing(
     initialPageMargin,
     DEFAULT_VIEWER_PAGE_MARGIN,
@@ -305,6 +318,7 @@ export function Viewer({
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const pageRequests = useRef(new Set<number>());
+  const retainedIndicesRef = useRef(new Set<number>());
   const scrollAnchorFrameRef = useRef<number | null>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
   const pageScanInitializedRef = useRef(false);
@@ -410,6 +424,25 @@ export function Viewer({
       spreadRules,
     );
   }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
+  const prefetchIndices = useMemo(
+    () => prefetchWindowIndices(
+      layoutMode === "paged" ? visible : [state.index],
+      session.pages.length,
+      prefetchAhead,
+      prefetchBehind,
+    ),
+    [layoutMode, prefetchAhead, prefetchBehind, session.pages.length, state.index, visible],
+  );
+  const retainedIndices = useMemo(() => Array.from(new Set([
+    ...visible,
+    ...prefetchIndices,
+    ...(pendingNextIndex === null ? [] : nextVisible),
+  ])), [nextVisible, pendingNextIndex, prefetchIndices, visible]);
+  const preloadIndices = useMemo(
+    () => retainedIndices.filter((index) => !visible.includes(index)),
+    [retainedIndices, visible],
+  );
+  retainedIndicesRef.current = new Set(retainedIndices);
   const calculatedFitScale = useMemo(() => {
     if (scale.mode !== "fit" || layoutMode !== "paged") return null;
     const sizes = visible.map((index) => pageSizes.get(index));
@@ -429,37 +462,57 @@ export function Viewer({
   );
 
   useEffect(() => {
-    const wanted =
-      layoutMode === "paged"
-        ? [...visible]
-        : Array.from(
-          {
-            length: Math.min(
-              session.pages.length,
-              state.index + VIEWER_PREFETCH_AHEAD + 1,
-            ) - state.index,
-          },
-          (_, offset) => state.index + offset,
-        );
-    if (layoutMode === "paged") {
-      wanted.push(...nextVisible);
-    }
-    wanted.forEach((index) => {
+    retainedIndices.forEach((index) => {
       if (mediaUris[index] || imageErrors.has(index) || pageRequests.current.has(index)) return;
       pageRequests.current.add(index);
-      void loadPage(session, index, generation, visible.includes(index) ? "visible" : "near")
+      const demanded = visible.includes(index)
+        || (pendingNextIndex !== null && nextVisible.includes(index));
+      void loadPage(
+        session,
+        index,
+        generation,
+        demanded ? "visible" : "near",
+      )
         .then((response) => {
-          if (response.status === "ok" && response.generation === generation) {
+          pageRequests.current.delete(index);
+          if (
+            response.status === "ok"
+            && response.generation === generation
+            && retainedIndicesRef.current.has(index)
+          ) {
             setMediaUris((current) => ({ ...current, [index]: response.data.mediaUri }));
-          } else if (response.status === "error") {
+          } else if (response.status === "error" && retainedIndicesRef.current.has(index)) {
             setImageErrors((current) => new Set(current).add(index));
-          } else {
-            pageRequests.current.delete(index);
           }
         })
-        .catch(() => setImageErrors((current) => new Set(current).add(index)));
+        .catch(() => {
+          pageRequests.current.delete(index);
+          if (retainedIndicesRef.current.has(index)) {
+            setImageErrors((current) => new Set(current).add(index));
+          }
+        });
     });
-  }, [generation, imageErrors, layoutMode, mediaUris, nextVisible, session, state.index, visible]);
+  }, [generation, imageErrors, mediaUris, nextVisible, pendingNextIndex, retainedIndices, session, visible]);
+
+  useEffect(() => {
+    const retained = new Set(retainedIndices);
+    const pruneSet = (current: Set<number>) => {
+      if ([...current].every((index) => retained.has(index))) return current;
+      return new Set([...current].filter((index) => retained.has(index)));
+    };
+    setReadyPages(pruneSet);
+    setImageErrors(pruneSet);
+    setLandscape(pruneSet);
+    setPageSizes((current) => {
+      if ([...current.keys()].every((index) => retained.has(index))) return current;
+      return new Map([...current].filter(([index]) => retained.has(index)));
+    });
+    setMediaUris((current) => {
+      const entries = Object.entries(current);
+      if (entries.every(([index]) => retained.has(Number(index)))) return current;
+      return Object.fromEntries(entries.filter(([index]) => retained.has(Number(index))));
+    });
+  }, [retainedIndices]);
 
   function cancelScheduledPositionSave() {
     if (positionTimerRef.current === null) return;
@@ -1621,7 +1674,7 @@ export function Viewer({
             }
           />
         )}
-        {!scrollLayout && nextVisible.map((index) => mediaUris[index] && (
+        {!scrollLayout && preloadIndices.map((index) => mediaUris[index] && (
           <img
             key={session.pages[index].id}
             className="prefetch-page"

@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 9 | 7 |
+| P2 閲覧中核 | 16 | 10 | 6 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **30** | **73** |
+| **合計** | **103** | **31** | **72** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -64,6 +64,8 @@ P2-GではLEY-VIEWER-026をPublishedとした。page内scroll量10〜100%、連�
 P2-HではLEY-VIEWER-027をPublishedとした。標準縦送り、N字のcolumn優先、Z字のrow優先を左右の読書方向とprevious逆走へ接続し、profile v11・SQLite・設定dialog・viewerで共有する。行/列切替はleft/topを1回で移すatomic scrollとし、continuous layoutには適用しない。release WebView2の巨大画像・見開き経路、smooth中の連続入力、pointer pan後の再開位置は未測定として残す。
 
 P2-IではLEY-VIEWER-029をPublishedとした。既存pointerルーペへ80〜400pxの正方形サイズと125〜800%倍率をprofile v12・SQLite・設定dialog・viewerで接続した。pointerの画像座標とstage内のルーペ中心をclampし、stageより大きい選択では中央へ固定する。既存media URIを再利用して追加decodeやtimerを導入しない。release WebView2の巨大画像、800%・400px時のGPU/描画時間、DPI別表示は未測定として残す。
+
+P2-JではLEY-VIEWER-032をPublishedとした。先読みを進行方向0〜4page・戻り方向0〜4page、media grant 16〜512MiBとしてprofile v13・SQLite・設定dialogへ接続した。page/continuous共通window、0page時のvisible優先on-demand、window外frontend解放、native期限切れ/LRU解放を実装し、単一過大pageだけは表示可能性を保つ。synthetic 2,048 grantではtest上限を維持したが、releaseの巨大画像、低速disk/archive、process working set、100ms基準は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

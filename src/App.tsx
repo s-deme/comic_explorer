@@ -113,6 +113,9 @@ import {
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_LOUPE_SIZE,
   DEFAULT_LOUPE_ZOOM,
+  DEFAULT_PREFETCH_AHEAD,
+  DEFAULT_PREFETCH_BEHIND,
+  DEFAULT_PREFETCH_MEMORY_MIB,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -133,6 +136,8 @@ import {
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
+  isPrefetchPageCount,
+  isPrefetchMemoryMiB,
   isAutoViewportAspectPercent,
   isPortraitAspectPercent,
   SPREAD_PAIRINGS,
@@ -485,6 +490,9 @@ export function App({
   const [loupeEnabled, setLoupeEnabled] = useState(false);
   const [loupeSize, setLoupeSize] = useState(DEFAULT_LOUPE_SIZE);
   const [loupeZoom, setLoupeZoom] = useState(DEFAULT_LOUPE_ZOOM);
+  const [prefetchAhead, setPrefetchAhead] = useState(DEFAULT_PREFETCH_AHEAD);
+  const [prefetchBehind, setPrefetchBehind] = useState(DEFAULT_PREFETCH_BEHIND);
+  const [prefetchMemoryMiB, setPrefetchMemoryMiB] = useState(DEFAULT_PREFETCH_MEMORY_MIB);
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -904,6 +912,15 @@ export function App({
           setLoupeZoom(isLoupeZoom(response.data.loupeZoom)
             ? response.data.loupeZoom
             : DEFAULT_LOUPE_ZOOM);
+          setPrefetchAhead(isPrefetchPageCount(response.data.prefetchAhead)
+            ? response.data.prefetchAhead
+            : DEFAULT_PREFETCH_AHEAD);
+          setPrefetchBehind(isPrefetchPageCount(response.data.prefetchBehind)
+            ? response.data.prefetchBehind
+            : DEFAULT_PREFETCH_BEHIND);
+          setPrefetchMemoryMiB(isPrefetchMemoryMiB(response.data.prefetchMemoryMiB)
+            ? response.data.prefetchMemoryMiB
+            : DEFAULT_PREFETCH_MEMORY_MIB);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -2499,6 +2516,9 @@ export function App({
       loupeEnabled,
       loupeSize,
       loupeZoom,
+      prefetchAhead,
+      prefetchBehind,
+      prefetchMemoryMiB,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2594,6 +2614,9 @@ export function App({
       setLoupeEnabled(normalized.loupeEnabled);
       setLoupeSize(normalized.loupeSize);
       setLoupeZoom(normalized.loupeZoom);
+      setPrefetchAhead(normalized.prefetchAhead);
+      setPrefetchBehind(normalized.prefetchBehind);
+      setPrefetchMemoryMiB(normalized.prefetchMemoryMiB);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2762,6 +2785,7 @@ export function App({
     settingsOpen, viewerSession, sortField, sortDescending, endOfVolumePolicy,
     catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
     viewerScaleMode, viewerScale, loupeEnabled, loupeSize, loupeZoom,
+    prefetchAhead, prefetchBehind, prefetchMemoryMiB,
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
@@ -3319,6 +3343,8 @@ export function App({
           initialLoupeEnabled={loupeEnabled}
           loupeSize={loupeSize}
           loupeZoom={loupeZoom}
+          prefetchAhead={prefetchAhead}
+          prefetchBehind={prefetchBehind}
           initialBackground={viewerBackground}
           initialPageMargin={viewerPageMargin}
           initialSpreadGap={viewerSpreadGap}

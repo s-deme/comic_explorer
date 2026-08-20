@@ -304,6 +304,10 @@ pub struct CatalogSettings {
     pub loupe_enabled: bool,
     pub loupe_size: u16,
     pub loupe_zoom: f64,
+    pub prefetch_ahead: u8,
+    pub prefetch_behind: u8,
+    #[serde(rename = "prefetchMemoryMiB")]
+    pub prefetch_memory_mib: u16,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -366,6 +370,10 @@ pub struct SettingsProfileInput {
     pub loupe_enabled: bool,
     pub loupe_size: u16,
     pub loupe_zoom: f64,
+    pub prefetch_ahead: u8,
+    pub prefetch_behind: u8,
+    #[serde(rename = "prefetchMemoryMiB")]
+    pub prefetch_memory_mib: u16,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -431,6 +439,12 @@ const MIN_LOUPE_SIZE: u16 = 80;
 const MAX_LOUPE_SIZE: u16 = 400;
 const MIN_LOUPE_ZOOM: f64 = 1.25;
 const MAX_LOUPE_ZOOM: f64 = 8.0;
+const MAX_PREFETCH_PAGE_COUNT: u8 = 4;
+const MIN_PREFETCH_MEMORY_MIB: u16 = 16;
+const MAX_PREFETCH_MEMORY_MIB: u16 = 512;
+const DEFAULT_PREFETCH_AHEAD: u8 = 4;
+const DEFAULT_PREFETCH_BEHIND: u8 = 0;
+const DEFAULT_PREFETCH_MEMORY_MIB: u16 = 256;
 const MIN_SCROLL_STEP_PERCENT: u16 = 10;
 const MAX_SCROLL_STEP_PERCENT: u16 = 100;
 const MIN_WHEEL_SCROLL_FACTOR: f64 = 0.5;
@@ -941,6 +955,23 @@ fn loupe_zoom(settings: &crate::state::Settings) -> f64 {
         .unwrap_or(2.0)
 }
 
+fn prefetch_page_count(value: &str, default: u8) -> u8 {
+    value
+        .parse::<u8>()
+        .ok()
+        .filter(|count| *count <= MAX_PREFETCH_PAGE_COUNT)
+        .unwrap_or(default)
+}
+
+fn prefetch_memory_mib(settings: &crate::state::Settings) -> u16 {
+    settings
+        .prefetch_memory_mib
+        .parse::<u16>()
+        .ok()
+        .filter(|limit| (MIN_PREFETCH_MEMORY_MIB..=MAX_PREFETCH_MEMORY_MIB).contains(limit))
+        .unwrap_or(DEFAULT_PREFETCH_MEMORY_MIB)
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -978,6 +1009,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let page_scan_mode = page_scan_mode(&settings);
     let loupe_size = loupe_size(&settings);
     let loupe_zoom = loupe_zoom(&settings);
+    let prefetch_ahead = prefetch_page_count(&settings.prefetch_ahead, DEFAULT_PREFETCH_AHEAD);
+    let prefetch_behind = prefetch_page_count(&settings.prefetch_behind, DEFAULT_PREFETCH_BEHIND);
+    let prefetch_memory_mib = prefetch_memory_mib(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
@@ -1002,6 +1036,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         loupe_enabled: settings.loupe_enabled,
         loupe_size,
         loupe_zoom,
+        prefetch_ahead,
+        prefetch_behind,
+        prefetch_memory_mib,
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -2412,6 +2449,10 @@ fn validate_settings_profile(
         || !(MIN_LOUPE_SIZE..=MAX_LOUPE_SIZE).contains(&profile.loupe_size)
         || !profile.loupe_zoom.is_finite()
         || !(MIN_LOUPE_ZOOM..=MAX_LOUPE_ZOOM).contains(&profile.loupe_zoom)
+        || profile.prefetch_ahead > MAX_PREFETCH_PAGE_COUNT
+        || profile.prefetch_behind > MAX_PREFETCH_PAGE_COUNT
+        || !(MIN_PREFETCH_MEMORY_MIB..=MAX_PREFETCH_MEMORY_MIB)
+            .contains(&profile.prefetch_memory_mib)
         || !matches!(
             profile.viewer_background.as_str(),
             "checker" | "dark" | "black" | "light"
@@ -2521,6 +2562,9 @@ pub fn set_settings_profile(
         settings.loupe_enabled = profile.loupe_enabled;
         settings.loupe_size = profile.loupe_size.to_string();
         settings.loupe_zoom = profile.loupe_zoom.to_string();
+        settings.prefetch_ahead = profile.prefetch_ahead.to_string();
+        settings.prefetch_behind = profile.prefetch_behind.to_string();
+        settings.prefetch_memory_mib = profile.prefetch_memory_mib.to_string();
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -3924,6 +3968,14 @@ pub async fn load_page(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
+    let prefetch_memory_mib = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .map(|settings| prefetch_memory_mib(&settings))
+        .unwrap_or(DEFAULT_PREFETCH_MEMORY_MIB);
     let item = RelativePath::parse(item_relative_path).map_err(str::to_string)?;
     let page = RelativePath::parse(page_relative_path).map_err(str::to_string)?;
     let root = state
@@ -4030,11 +4082,14 @@ pub async fn load_page(
         .media
         .lock()
         .map_err(|_| "state poisoned")?
-        .issue(MediaGrant {
-            mime_type: delivered_mime_type,
-            source: PageSource::Memory(bytes),
-            ..grant
-        });
+        .issue_bounded(
+            MediaGrant {
+                mime_type: delivered_mime_type,
+                source: PageSource::Memory(bytes),
+                ..grant
+            },
+            u64::from(prefetch_memory_mib) * 1024 * 1024,
+        );
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
@@ -4310,6 +4365,44 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p2_010_prefetch_preferences_default_and_bound_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_ahead, DEFAULT_PREFETCH_AHEAD),
+            4
+        );
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_behind, DEFAULT_PREFETCH_BEHIND),
+            0
+        );
+        assert_eq!(prefetch_memory_mib(&settings), 256);
+        settings.prefetch_ahead = "3".into();
+        settings.prefetch_behind = "2".into();
+        settings.prefetch_memory_mib = "192".into();
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_ahead, DEFAULT_PREFETCH_AHEAD),
+            3
+        );
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_behind, DEFAULT_PREFETCH_BEHIND),
+            2
+        );
+        assert_eq!(prefetch_memory_mib(&settings), 192);
+        settings.prefetch_ahead = "5".into();
+        settings.prefetch_behind = "invalid".into();
+        settings.prefetch_memory_mib = "8".into();
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_ahead, DEFAULT_PREFETCH_AHEAD),
+            4
+        );
+        assert_eq!(
+            prefetch_page_count(&settings.prefetch_behind, DEFAULT_PREFETCH_BEHIND),
+            0
+        );
+        assert_eq!(prefetch_memory_mib(&settings), 256);
+    }
+
+    #[test]
     fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(
@@ -4369,6 +4462,9 @@ mod shutdown_tests {
             loupe_enabled: false,
             loupe_size: 180,
             loupe_zoom: 2.0,
+            prefetch_ahead: 4,
+            prefetch_behind: 0,
+            prefetch_memory_mib: 256,
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
@@ -4401,6 +4497,15 @@ mod shutdown_tests {
         let (shortcuts, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(shortcuts, profile.shortcuts);
         assert_eq!(gestures, profile.mouse_gestures);
+        let json = serde_json::to_value(&profile).unwrap();
+        assert_eq!(json["prefetchMemoryMiB"], 256);
+        assert!(json.get("prefetchMemoryMib").is_none());
+        assert_eq!(
+            serde_json::from_value::<SettingsProfileInput>(json)
+                .unwrap()
+                .prefetch_memory_mib,
+            256
+        );
 
         profile.catalog_thumbnail_sizes.small_thumbnail = 63;
         assert_eq!(
@@ -4464,6 +4569,18 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.loupe_zoom = 3.5;
+        profile.prefetch_ahead = 5;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.prefetch_ahead = 3;
+        profile.prefetch_memory_mib = 8;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.prefetch_memory_mib = 192;
         profile.scroll_step_percent = 9;
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,

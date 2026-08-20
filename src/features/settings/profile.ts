@@ -26,6 +26,9 @@ import {
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_LOUPE_SIZE,
   DEFAULT_LOUPE_ZOOM,
+  DEFAULT_PREFETCH_AHEAD,
+  DEFAULT_PREFETCH_BEHIND,
+  DEFAULT_PREFETCH_MEMORY_MIB,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
@@ -43,6 +46,8 @@ import {
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
+  isPrefetchPageCount,
+  isPrefetchMemoryMiB,
   MAX_SCALE,
   MIN_SCALE,
   VIEWER_BACKGROUNDS,
@@ -71,7 +76,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 12;
+export const SETTINGS_PROFILE_VERSION = 13;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -143,6 +148,9 @@ export interface SettingsProfile {
   loupeEnabled: boolean;
   loupeSize: number;
   loupeZoom: number;
+  prefetchAhead: number;
+  prefetchBehind: number;
+  prefetchMemoryMiB: number;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -196,6 +204,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     loupeEnabled: false,
     loupeSize: DEFAULT_LOUPE_SIZE,
     loupeZoom: DEFAULT_LOUPE_ZOOM,
+    prefetchAhead: DEFAULT_PREFETCH_AHEAD,
+    prefetchBehind: DEFAULT_PREFETCH_BEHIND,
+    prefetchMemoryMiB: DEFAULT_PREFETCH_MEMORY_MIB,
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -365,6 +376,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const legacyLoupePreferences = legacyPageScan || candidate.profileVersion === 11;
   const loupeSize = legacyLoupePreferences ? DEFAULT_LOUPE_SIZE : candidate.loupeSize;
   const loupeZoom = legacyLoupePreferences ? DEFAULT_LOUPE_ZOOM : candidate.loupeZoom;
+  const legacyPrefetchPreferences = legacyLoupePreferences || candidate.profileVersion === 12;
+  const prefetchAhead = legacyPrefetchPreferences
+    ? DEFAULT_PREFETCH_AHEAD
+    : candidate.prefetchAhead;
+  const prefetchBehind = legacyPrefetchPreferences
+    ? DEFAULT_PREFETCH_BEHIND
+    : candidate.prefetchBehind;
+  const prefetchMemoryMiB = legacyPrefetchPreferences
+    ? DEFAULT_PREFETCH_MEMORY_MIB
+    : candidate.prefetchMemoryMiB;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -377,6 +398,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 9
       && candidate.profileVersion !== 10
       && candidate.profileVersion !== 11
+      && candidate.profileVersion !== 12
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -401,6 +423,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof candidate.loupeEnabled !== "boolean" ||
     !isLoupeSize(loupeSize) ||
     !isLoupeZoom(loupeZoom) ||
+    !isPrefetchPageCount(prefetchAhead) ||
+    !isPrefetchPageCount(prefetchBehind) ||
+    !isPrefetchMemoryMiB(prefetchMemoryMiB) ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -454,6 +479,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     loupeEnabled: candidate.loupeEnabled,
     loupeSize,
     loupeZoom,
+    prefetchAhead,
+    prefetchBehind,
+    prefetchMemoryMiB,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

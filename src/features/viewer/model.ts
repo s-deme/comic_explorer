@@ -124,6 +124,13 @@ export const MIN_WHEEL_SCROLL_FACTOR = 0.5;
 export const MAX_WHEEL_SCROLL_FACTOR = 2;
 export const DEFAULT_WHEEL_SCROLL_FACTOR = 1;
 export const DEFAULT_SMOOTH_SCROLL = true;
+export const MIN_PREFETCH_PAGE_COUNT = 0;
+export const MAX_PREFETCH_PAGE_COUNT = 4;
+export const DEFAULT_PREFETCH_AHEAD = 4;
+export const DEFAULT_PREFETCH_BEHIND = 0;
+export const MIN_PREFETCH_MEMORY_MIB = 16;
+export const MAX_PREFETCH_MEMORY_MIB = 512;
+export const DEFAULT_PREFETCH_MEMORY_MIB = 256;
 
 export function isPortraitAspectPercent(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value)
@@ -157,6 +164,39 @@ export function isLoupeSize(value: unknown): value is number {
 export function isLoupeZoom(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
     && value >= MIN_LOUPE_ZOOM && value <= MAX_LOUPE_ZOOM;
+}
+
+export function isPrefetchPageCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_PREFETCH_PAGE_COUNT && value <= MAX_PREFETCH_PAGE_COUNT;
+}
+
+export function isPrefetchMemoryMiB(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_PREFETCH_MEMORY_MIB && value <= MAX_PREFETCH_MEMORY_MIB;
+}
+
+export function prefetchWindowIndices(
+  visible: readonly number[],
+  pageCount: number,
+  ahead: number,
+  behind: number,
+): number[] {
+  if (visible.length === 0 || !Number.isInteger(pageCount) || pageCount <= 0) return [];
+  const safeAhead = isPrefetchPageCount(ahead) ? ahead : DEFAULT_PREFETCH_AHEAD;
+  const safeBehind = isPrefetchPageCount(behind) ? behind : DEFAULT_PREFETCH_BEHIND;
+  const first = Math.min(...visible);
+  const last = Math.max(...visible);
+  const result: number[] = [];
+  for (let index = last + 1; index < pageCount && result.length < safeAhead; index += 1) {
+    result.push(index);
+  }
+  for (let offset = 1; offset <= safeBehind; offset += 1) {
+    const index = first - offset;
+    if (index < 0) break;
+    result.push(index);
+  }
+  return result;
 }
 
 export function wheelDeltaPixels(

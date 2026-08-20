@@ -128,6 +128,9 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       loupeEnabled: false,
       loupeSize: 180,
       loupeZoom: 2,
+      prefetchAhead: 4,
+      prefetchBehind: 0,
+      prefetchMemoryMiB: 256,
       viewerBackground: "checker" as const,
       viewerPageMargin: 0,
       viewerSpreadGap: 8,
@@ -227,6 +230,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     thumbnailMock.mockReset();
     saveSettingsMock.mockReset();
     saveReadingMock.mockReset();
+    vi.mocked(loadPage).mockReset();
     recoveryNoticeMock.mockReset();
 
     settingsMock.mockResolvedValue(settingsResponse());
@@ -274,6 +278,15 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       generation: 1 as never,
       data: undefined,
     });
+    vi.mocked(loadPage).mockImplementation(async (session, index, generation) => ({
+      status: "ok",
+      requestId: `page-${index}` as never,
+      generation: generation as never,
+      data: {
+        pageId: session.pages[index].id,
+        mediaUri: `data:image/png;base64,reloaded-${index}`,
+      },
+    }));
     saveSettingsMock.mockImplementation(async (profile) => ({
       status: "ok",
       requestId: "settings-save" as never,
@@ -375,9 +388,13 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     const catalogItem = screen.getByRole("button", { name: /^book\.cbz/ });
     catalogItem.focus();
     fireEvent.keyDown(catalogItem, { key: "k", ctrlKey: true });
-    expect(screen.getByRole("complementary", { name: "検索ペイン" })).toBeInTheDocument();
+    await waitFor(() => expect(
+      screen.getByRole("complementary", { name: "検索ペイン" }),
+    ).toBeInTheDocument());
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    expect(screen.queryByRole("complementary", { name: "検索ペイン" })).not.toBeInTheDocument();
+    await waitFor(() => expect(
+      screen.queryByRole("complementary", { name: "検索ペイン" }),
+    ).not.toBeInTheDocument());
   });
 
   it("FT-B11-004 keeps keyboard fallback, suppresses focused input, and stops at the Viewer/navigation boundary", async () => {
