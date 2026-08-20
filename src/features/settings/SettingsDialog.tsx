@@ -37,6 +37,7 @@ import {
   VIEWER_GRID_COLORS,
   VIEWER_LAYOUT_MODE_LABELS,
   VIEWER_LAYOUT_MODES,
+  VIEW_MODE_LABELS,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -90,11 +91,6 @@ const SORT_FIELD_LABELS: Record<SortField, string> = {
   modified: "更新日時",
   size: "サイズ",
   kind: "種類",
-};
-
-const VIEW_MODE_LABELS: Record<SettingsProfile["viewMode"], string> = {
-  single: "単ページ",
-  spread: "見開き",
 };
 
 const READING_DIRECTION_LABELS: Record<SettingsProfile["readingDirection"], string> = {
@@ -294,7 +290,7 @@ export function SettingsDialog({
     {
       id: "viewer-view-mode",
       category: "viewer",
-      text: `閲覧モード 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 1ページずつまたは見開きで表示します`,
+      text: `閲覧モード 自動 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 表示領域と画像寸法から自動判定、または表示枚数を固定します`,
     },
     {
       id: "viewer-layout-mode",
@@ -616,7 +612,7 @@ export function SettingsDialog({
 
             <section className="settings-panel" aria-label="ビューワ設定" hidden={panelHidden("viewer")}>
               <h3>ビューワ</h3>
-              <SettingRow id="viewer-view-mode" title="閲覧モード" description="1ページずつ、または見開きで表示します。" hidden={rowHidden("viewer-view-mode")}>
+              <SettingRow id="viewer-view-mode" title="閲覧モード" description="自動判定、単ページ固定、見開き固定から選びます。" hidden={rowHidden("viewer-view-mode")}>
                 <select aria-label="profile閲覧モード" value={draft.viewMode} onChange={(event) => update({ viewMode: event.target.value as SettingsProfile["viewMode"] })}>
                   {Object.entries(VIEW_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>

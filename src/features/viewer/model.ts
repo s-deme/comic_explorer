@@ -1,4 +1,11 @@
-export type ViewMode = "single" | "spread";
+export const VIEW_MODES = ["auto", "single", "spread"] as const;
+export type ViewMode = (typeof VIEW_MODES)[number];
+export const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  auto: "自動",
+  single: "単ページ",
+  spread: "見開き",
+};
+export const AUTO_SPREAD_MIN_VIEWPORT_ASPECT = 1.25;
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
@@ -59,6 +66,12 @@ export const DEFAULT_PAN_FACTOR = 1;
 export const MIN_WHEEL_DEAD_ZONE = 0;
 export const MAX_WHEEL_DEAD_ZONE = 200;
 export const DEFAULT_WHEEL_DEAD_ZONE = 0;
+
+export function autoSpreadForViewport(width: number, height: number): boolean {
+  return Number.isFinite(width) && Number.isFinite(height)
+    && width > 0 && height > 0
+    && width / height >= AUTO_SPREAD_MIN_VIEWPORT_ASPECT;
+}
 
 export function randomPageIndex(
   currentIndex: number,
@@ -216,7 +229,12 @@ export interface ViewerState {
 }
 
 export type ViewerAction =
-  | { type: "next"; pageCount: number; landscape: ReadonlySet<number> }
+  | {
+      type: "next";
+      pageCount: number;
+      landscape: ReadonlySet<number>;
+      autoSpread?: boolean;
+    }
   | { type: "previous" }
   | { type: "shift"; delta: -1 | 1; pageCount: number }
   | { type: "mode"; mode: ViewMode }
@@ -227,11 +245,14 @@ export function visibleIndices(
   state: ViewerState,
   pageCount: number,
   landscape: ReadonlySet<number>,
+  autoSpread = true,
 ): number[] {
   if (state.index >= pageCount) return [];
   if (
     state.mode === "single" ||
+    (state.mode === "auto" && !autoSpread) ||
     landscape.has(state.index) ||
+    landscape.has(state.index + 1) ||
     state.index + 1 >= pageCount
   ) {
     return [state.index];
@@ -249,6 +270,7 @@ export function viewerReducer(
         state,
         action.pageCount,
         action.landscape,
+        action.autoSpread,
       );
       const next = state.index + Math.max(1, visible.length);
       if (next >= action.pageCount) return state;

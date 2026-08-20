@@ -34,6 +34,7 @@ import {
   VIEWER_BACKGROUNDS,
   VIEWER_GRID_COLORS,
   VIEWER_LAYOUT_MODES,
+  VIEW_MODES,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -226,7 +227,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     : candidate.profileVersion === 2
       ? migrateV2CatalogThumbnailSizes(candidate.catalogThumbnailSizes)
       : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
-  const viewMode = enumValue(candidate.viewMode, ["single", "spread"] as const);
+  const viewMode = enumValue(candidate.viewMode, VIEW_MODES);
   const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
   const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);

@@ -17,6 +17,7 @@ import type {
   ViewerBackground,
   ViewerGridColor,
   ViewerLayoutMode,
+  ViewMode,
   ZoomRetention,
 } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
@@ -106,7 +107,7 @@ export interface CatalogSettings {
   endOfVolumePolicy: EndOfVolumePolicy;
   catalogViewMode: CatalogViewMode;
   catalogThumbnailSizes: CatalogThumbnailSizes;
-  viewMode: "single" | "spread";
+  viewMode: ViewMode;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;

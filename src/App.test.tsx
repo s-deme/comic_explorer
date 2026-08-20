@@ -2665,6 +2665,9 @@ describe("application shell", () => {
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
+    fireEvent.change(within(dialog).getByLabelText("profile閲覧モード"), {
+      target: { value: "auto" },
+    });
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2687,6 +2690,7 @@ describe("application shell", () => {
           referenceTile: 176,
         },
         treeVisible: false,
+        viewMode: "auto",
         scale: 1.75,
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",

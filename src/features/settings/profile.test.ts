@@ -88,6 +88,11 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
+  it("REQ-LEY-P2-004 accepts and preserves automatic viewer mode", () => {
+    const profile = normalizeSettingsProfile({ ...validProfile(), viewMode: "auto" });
+    expect(profile?.viewMode).toBe("auto");
+  });
+
   it.each([0, 8, 99, "7", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {

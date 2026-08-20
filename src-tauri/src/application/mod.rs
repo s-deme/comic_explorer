@@ -719,6 +719,14 @@ fn catalog_view_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn viewer_view_mode(settings: &crate::state::Settings) -> String {
+    if matches!(settings.view_mode.as_str(), "auto" | "single" | "spread") {
+        settings.view_mode.clone()
+    } else {
+        "single".into()
+    }
+}
+
 fn catalog_thumbnail_sizes(settings: &crate::state::Settings) -> CatalogThumbnailSizes {
     fn valid_size(value: &str, fallback: u16) -> u16 {
         value
@@ -832,6 +840,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale_mode = viewer_scale_mode(&settings);
     let end_of_volume_policy = end_of_volume_policy(&settings);
     let catalog_view_mode = catalog_view_mode(&settings);
+    let view_mode = viewer_view_mode(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
     let viewer_background = viewer_background(&settings);
@@ -853,7 +862,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         end_of_volume_policy,
         catalog_view_mode,
         catalog_thumbnail_sizes,
-        view_mode: settings.view_mode,
+        view_mode,
         layout_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
@@ -2127,7 +2136,7 @@ pub fn set_viewer_settings(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    if !matches!(view_mode.as_str(), "single" | "spread")
+    if !matches!(view_mode.as_str(), "auto" | "single" | "spread")
         || !matches!(
             layout_mode.as_str(),
             "paged" | "vertical_scroll" | "horizontal_scroll"
@@ -2208,7 +2217,7 @@ fn validate_settings_profile(
     ) || !matches!(
         profile.catalog_view_mode.as_str(),
         "small_thumbnail" | "detail_list" | "cover_list" | "card_grid" | "reference_tile"
-    ) || !matches!(profile.view_mode.as_str(), "single" | "spread")
+    ) || !matches!(profile.view_mode.as_str(), "auto" | "single" | "spread")
         || ![
             profile.catalog_thumbnail_sizes.small_thumbnail,
             profile.catalog_thumbnail_sizes.cover_list,
@@ -3991,6 +4000,18 @@ mod shutdown_tests {
 
         settings.catalog_view_mode = "not-a-mode".into();
         assert_eq!(catalog_view_mode(&settings), "cover_list");
+    }
+
+    #[test]
+    fn req_ley_p2_004_viewer_mode_accepts_auto_and_defaults_invalid_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(viewer_view_mode(&settings), "single");
+        settings.view_mode = "auto".into();
+        assert_eq!(viewer_view_mode(&settings), "auto");
+        settings.view_mode = "spread".into();
+        assert_eq!(viewer_view_mode(&settings), "spread");
+        settings.view_mode = "unexpected".into();
+        assert_eq!(viewer_view_mode(&settings), "single");
     }
 
     #[test]

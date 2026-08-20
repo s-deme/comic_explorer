@@ -7,6 +7,7 @@ import {
 } from "../library/client";
 import {
   clampLoupePointer,
+  autoSpreadForViewport,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -32,6 +33,8 @@ import {
   scaleReducer,
   viewerReducer,
   visibleIndices,
+  VIEW_MODE_LABELS,
+  VIEW_MODES,
   type ReadingDirection,
   type ScaleMode,
   type ViewerScaleAction,
@@ -213,6 +216,8 @@ export function Viewer({
   const [displayedScale, setDisplayedScale] = useState(initialScale);
   const [layoutMode, setLayoutMode] =
     useState<ViewerLayoutMode>(initialLayoutMode);
+  const [autoSpread, setAutoSpread] = useState(() =>
+    autoSpreadForViewport(window.innerWidth, window.innerHeight));
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
@@ -248,6 +253,30 @@ export function Viewer({
   const cursorInsideStageRef = useRef(false);
   const cursorHideTimerRef = useRef<number | null>(null);
   const initialFullscreenRequested = useRef(false);
+
+  useLayoutEffect(() => {
+    const update = () => {
+      const bounds = spreadRef.current?.getBoundingClientRect();
+      const width = bounds !== undefined && bounds.width > 0
+        ? bounds.width
+        : window.innerWidth;
+      const height = bounds !== undefined && bounds.height > 0
+        ? bounds.height
+        : window.innerHeight;
+      setAutoSpread(autoSpreadForViewport(width, height));
+    };
+    update();
+    window.addEventListener("resize", update);
+    if (typeof ResizeObserver === "undefined" || spreadRef.current === null) {
+      return () => window.removeEventListener("resize", update);
+    }
+    const observer = new ResizeObserver(update);
+    observer.observe(spreadRef.current);
+    return () => {
+      window.removeEventListener("resize", update);
+      observer.disconnect();
+    };
+  }, [fullscreen, layoutMode]);
 
   useEffect(() => {
     const releaseRightButton = (event: PointerEvent) => {
@@ -293,21 +322,24 @@ export function Viewer({
     return clearCursorHideTimer;
   }, [cursorAutoHideMs, panning, scale.loupeEnabled]);
   const visible = useMemo(
-    () => visibleIndices(state, session.pages.length, landscape),
-    [landscape, session.pages.length, state],
+    () => visibleIndices(
+      state,
+      session.pages.length,
+      landscape,
+      layoutMode === "paged" && autoSpread,
+    ),
+    [autoSpread, landscape, layoutMode, session.pages.length, state],
   );
   const nextStartIndex = state.index + Math.max(1, visible.length);
   const nextVisible = useMemo(() => {
     if (nextStartIndex >= session.pages.length) return [];
-    if (
-      state.mode === "single"
-      || landscape.has(nextStartIndex)
-      || nextStartIndex + 1 >= session.pages.length
-    ) {
-      return [nextStartIndex];
-    }
-    return [nextStartIndex, nextStartIndex + 1];
-  }, [landscape, nextStartIndex, session.pages.length, state.mode]);
+    return visibleIndices(
+      { ...state, index: nextStartIndex },
+      session.pages.length,
+      landscape,
+      layoutMode === "paged" && autoSpread,
+    );
+  }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, state]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -399,6 +431,7 @@ export function Viewer({
       type: "next",
       pageCount: session.pages.length,
       landscape,
+      autoSpread: layoutMode === "paged" && autoSpread,
     });
   }
 
@@ -432,8 +465,9 @@ export function Viewer({
       type: "next",
       pageCount: session.pages.length,
       landscape,
+      autoSpread: layoutMode === "paged" && autoSpread,
     });
-  }, [imageErrors, landscape, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length]);
+  }, [autoSpread, imageErrors, landscape, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
@@ -918,8 +952,20 @@ export function Viewer({
         }}
       >
         <strong>{session.displayName}</strong>
-        <span>{state.mode === "single" ? "単ページ" : "見開き"}</span>
+        <span>{VIEW_MODE_LABELS[state.mode]}</span>
         <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>
+        <label className="viewer-layout-control">
+          表示枚数
+          <select
+            aria-label="表示枚数"
+            value={state.mode}
+            onChange={(event) => changeMode(event.target.value as ViewMode)}
+          >
+            {VIEW_MODES.map((mode) => (
+              <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
+            ))}
+          </select>
+        </label>
         <label className="viewer-layout-control">
           レイアウト
           <select
@@ -1400,6 +1446,7 @@ export function Viewer({
           data-scale-mode={scale.mode}
           data-scale={scale.scale}
           data-page-count={scrollLayout ? session.pages.length : ordered.length}
+          data-effective-view-mode={visible.length === 2 ? "spread" : "single"}
           data-page-anchor={state.index}
           data-loupe-enabled={scale.loupeEnabled}
           style={{ "--viewer-custom-scale": scale.scale } as CSSProperties}

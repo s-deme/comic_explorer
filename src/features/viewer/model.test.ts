@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import {
+  autoSpreadForViewport,
   clampLoupePointer,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
@@ -59,6 +60,32 @@ describe("viewer page model", () => {
     expect(
       visibleIndices({ ...initial, index: 4 }, 5, new Set()),
     ).toEqual([4]);
+  });
+
+  it("REQ-LEY-P2-004 distinguishes automatic, single, and spread display units", () => {
+    const automatic = { ...initial, mode: "auto" as const };
+    expect(visibleIndices(automatic, 4, new Set(), true)).toEqual([0, 1]);
+    expect(visibleIndices(automatic, 4, new Set(), false)).toEqual([0]);
+    expect(visibleIndices(automatic, 4, new Set([0]), true)).toEqual([0]);
+    expect(visibleIndices(automatic, 4, new Set([1]), true)).toEqual([0]);
+    expect(visibleIndices({ ...initial, mode: "single" }, 4, new Set(), true)).toEqual([0]);
+    expect(visibleIndices(initial, 4, new Set(), false)).toEqual([0, 1]);
+
+    const narrowNext = viewerReducer(automatic, {
+      type: "next", pageCount: 4, landscape: new Set(), autoSpread: false,
+    });
+    const wideNext = viewerReducer(automatic, {
+      type: "next", pageCount: 4, landscape: new Set(), autoSpread: true,
+    });
+    expect(narrowNext.index).toBe(1);
+    expect(wideNext.index).toBe(2);
+  });
+
+  it("REQ-LEY-P2-004 uses the fixed safe viewport threshold", () => {
+    expect(autoSpreadForViewport(1000, 800)).toBe(true);
+    expect(autoSpreadForViewport(999, 800)).toBe(false);
+    expect(autoSpreadForViewport(0, 800)).toBe(false);
+    expect(autoSpreadForViewport(Number.NaN, 800)).toBe(false);
   });
 
   it("uses display-unit history so previous is reversible", () => {

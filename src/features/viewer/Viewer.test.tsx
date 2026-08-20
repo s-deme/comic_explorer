@@ -72,13 +72,51 @@ describe("Viewer settings", () => {
         onClose={() => undefined}
       />,
     );
-    expect(screen.getByText("見開き")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "表示枚数" })).toHaveValue("spread");
     expect(screen.getByText("左開き")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "単ページへ" }));
     expect(onSettingsChange).toHaveBeenCalledWith("single", "leftToRight");
     fireEvent.click(screen.getByRole("button", { name: "読み方向" }));
     expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
+  });
+
+  it("REQ-LEY-P2-004 selects automatic mode and responds to viewport width", async () => {
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+      const onSettingsChange = vi.fn();
+      render(
+        <Viewer
+          session={multiPageSession}
+          generation={1}
+          initialMode="auto"
+          initialDirection="rightToLeft"
+          onSettingsChange={onSettingsChange}
+          onClose={() => undefined}
+        />,
+      );
+      expect(screen.getByRole("combobox", { name: "表示枚数" })).toHaveValue("auto");
+      expect(document.querySelector(".page-spread"))
+        .toHaveAttribute("data-effective-view-mode", "spread");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+      fireEvent(window, new Event("resize"));
+      await waitFor(() => expect(document.querySelector(".page-spread"))
+        .toHaveAttribute("data-effective-view-mode", "single"));
+
+      fireEvent.change(screen.getByRole("combobox", { name: "表示枚数" }), {
+        target: { value: "spread" },
+      });
+      expect(onSettingsChange).toHaveBeenCalledWith("spread", "rightToLeft");
+      expect(document.querySelector(".page-spread"))
+        .toHaveAttribute("data-effective-view-mode", "spread");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
+    }
   });
 
   it("renders viewer actions as explained icon buttons", () => {
