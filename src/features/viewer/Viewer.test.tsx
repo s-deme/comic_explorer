@@ -40,7 +40,13 @@ const multiPageSession = {
 
 function markPrefetchedPagesReady(): void {
   document.querySelectorAll<HTMLImageElement>(".prefetch-page")
-    .forEach((image) => fireEvent.load(image));
+    .forEach((image) => {
+      Object.defineProperties(image, {
+        naturalWidth: { configurable: true, value: 800 },
+        naturalHeight: { configurable: true, value: 1000 },
+      });
+      fireEvent.load(image);
+    });
 }
 
 describe("Viewer settings", () => {
@@ -117,6 +123,42 @@ describe("Viewer settings", () => {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
       Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
     }
+  });
+
+  it("REQ-LEY-P2-005 applies persisted cover and even-page pairing rules", () => {
+    const fourPageSession = {
+      ...multiPageSession,
+      pages: [0, 1, 2, 3].map((index) => ({
+        id: `spread-${index}` as never,
+        relativePath: `${index + 1}.png` as never,
+        mediaUri: `comic://localhost/${index + 1}`,
+      })),
+    };
+    render(
+      <Viewer
+        session={fourPageSession}
+        generation={1}
+        initialMode="spread"
+        spreadRules={{
+          portraitMaxAspectPercent: 80,
+          autoViewportMinAspectPercent: 160,
+          firstPageSingle: true,
+          pairing: "even",
+        }}
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-effective-view-mode", "single");
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "1" },
+    });
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-effective-view-mode", "spread");
+    expect(screen.getByAltText("Multi Page 2ページ")).toBeInTheDocument();
+    expect(screen.getByAltText("Multi Page 3ページ")).toBeInTheDocument();
   });
 
   it("renders viewer actions as explained icon buttons", () => {
@@ -731,6 +773,10 @@ describe("Viewer settings", () => {
     expect(screen.getByText("1-2 / 4")).toBeInTheDocument();
     const prefetched = document.querySelectorAll<HTMLImageElement>(".prefetch-page");
     expect(prefetched).toHaveLength(2);
+    prefetched.forEach((image) => Object.defineProperties(image, {
+      naturalWidth: { configurable: true, value: 800 },
+      naturalHeight: { configurable: true, value: 1000 },
+    }));
     fireEvent.load(prefetched[0]);
     expect(screen.getByText("1-2 / 4")).toBeInTheDocument();
     fireEvent.load(prefetched[1]);

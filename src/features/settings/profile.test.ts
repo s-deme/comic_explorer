@@ -12,13 +12,17 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 7,
+    profileVersion: 8,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
     catalogViewMode: "cover_list",
     catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
     viewMode: "single",
+    spreadPortraitMaxAspectPercent: 100,
+    autoSpreadMinViewportAspectPercent: 125,
+    spreadFirstPageSingle: false,
+    spreadPairing: "continuous",
     layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
@@ -93,7 +97,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 8, 99, "7", undefined])(
+  it.each([0, 9, 99, "8", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -162,6 +166,44 @@ describe("settings profile", () => {
     delete legacy.catalogPalette;
     delete legacy.restoreLastViewer;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P2-005 migrates a v7 profile with the fixed P2-D spread rules", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 7;
+    delete legacy.spreadPortraitMaxAspectPercent;
+    delete legacy.autoSpreadMinViewportAspectPercent;
+    delete legacy.spreadFirstPageSingle;
+    delete legacy.spreadPairing;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P2-005 accepts strict configurable spread rules", () => {
+    const profile = normalizeSettingsProfile({
+      ...validProfile(),
+      spreadPortraitMaxAspectPercent: 80,
+      autoSpreadMinViewportAspectPercent: 160,
+      spreadFirstPageSingle: true,
+      spreadPairing: "even",
+    });
+    expect(profile).toEqual(expect.objectContaining({
+      spreadPortraitMaxAspectPercent: 80,
+      autoSpreadMinViewportAspectPercent: 160,
+      spreadFirstPageSingle: true,
+      spreadPairing: "even",
+    }));
+  });
+
+  it.each([
+    ["spreadPortraitMaxAspectPercent", 49],
+    ["spreadPortraitMaxAspectPercent", 101],
+    ["spreadPortraitMaxAspectPercent", 80.5],
+    ["autoSpreadMinViewportAspectPercent", 99],
+    ["autoSpreadMinViewportAspectPercent", 301],
+    ["spreadFirstPageSingle", "true"],
+    ["spreadPairing", "alternating"],
+  ])("REQ-LEY-P2-005 rejects invalid %s", (field, value) => {
+    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
   });
 
   it.each([

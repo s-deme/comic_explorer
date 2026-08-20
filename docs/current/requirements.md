@@ -167,6 +167,7 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P2-002 | LEY-VIEWER-009 | 巻末動作は「次巻を自動」「次巻を確認」「libraryへ戻る」「停止」「最終巻から先頭巻へloop」の5 policyを設定dialogとviewerで選択・永続化する。archive、PDF、画像folderを同じ読み取り可能volumeとして現在のcatalog sort順で扱い、次巻は先頭page、前巻は末尾pageから開く。「libraryへ戻る」は次巻の有無にかかわらず巻末でviewerを閉じる。次巻なし、現在volume不明、一覧再取得失敗では安全に停止し、確認前・失敗時に別volumeを開かない。 |
 | REQ-LEY-P2-003 | LEY-VIEWER-010 | 作品ごとに複数の任意pageをしおりとしてapp-local SQLiteへ保存し、同じpageの再保存は重複を作らず最新ordinal hintへ更新する。viewerを開くと保存済みしおりを読込み、現在のpageKey列へ再解決して次の有効なしおりへ循環移動できる。欠落pageは一覧に残して無効と明示し、個別削除できる。既存root-scoped localStorageしおりは対象作品を初めて開いたときSQLiteへ重複なく移行し、全件成功後だけ旧行を除去する。root外path、空key、不正ordinal・時刻、過大な移行payloadは拒否し、失敗時はviewerと旧データを保持して局所errorを表示する。 |
 | REQ-LEY-P2-004 | LEY-VIEWER-013 | viewerの表示枚数を「自動」「単ページ」「見開き」から明示選択し、toolbarと設定profile/SQLiteで同じmodeを保持する。単ページは常に1page、見開きは横長pageと最終余りpageを単独表示し、それ以外を2page単位で表示する。自動はpage layoutかつ表示領域の幅/高さ比が1.25以上のときだけ2枚の縦長pageを見開きにし、狭い領域、横長page、最終余りpageでは単独表示する。resizeで自動判定を更新しても現在anchorを保持し、次移動は現在の表示枚数、前移動は実際に通ったanchor履歴へ戻る。詳細なしきい値、先頭単独、偶奇条件はLEY-VIEWER-014へ分離する。 |
+| REQ-LEY-P2-005 | LEY-VIEWER-014 | 見開き条件として、縦長pageとみなす最大幅/高さ比を50〜100%、自動見開きを許可するviewer領域の最小幅/高さ比を100〜300%、先頭pageの単独表示を有効/無効、組合せ開始を「制限なし」「奇数page」「偶数page」から選択できる。見開き候補は現在pageと次pageの両方が縦長条件を満たし、選択した開始page条件を満たす場合だけ2pageとする。単独page、横長page、条件外pageの後は選択した偶奇条件へ再同期し、最終余りpageは単独とする。設定dialog、profile v8、app-local SQLite、通常viewerを同じ値へ接続し、旧profile v1〜v7と欠落DB keyはP2-D相当の既定値（100%、125%、先頭単独なし、制限なし）へ安全に移行する。不正値はprofile import/native境界で拒否し、原本へ書き込まない。 |
 
 ## 非採用と将来候補の境界
 

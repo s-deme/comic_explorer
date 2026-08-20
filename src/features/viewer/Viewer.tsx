@@ -13,6 +13,7 @@ import {
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_SPREAD_RULES,
   DEFAULT_PAN_FACTOR,
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
@@ -29,6 +30,7 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  isPagePairable,
   scaleForPixelDimension,
   scaleReducer,
   viewerReducer,
@@ -42,6 +44,7 @@ import {
   type ViewerBackground,
   type ViewerGridColor,
   type ViewMode,
+  type SpreadRules,
   type ViewerLayoutMode,
   type ZoomRetention,
 } from "./model";
@@ -85,6 +88,7 @@ interface ViewerProps {
   endOfVolumePolicy?: EndOfVolumePolicy;
   onEndOfVolumePolicyChange?: (policy: EndOfVolumePolicy) => void;
   initialMode: ViewMode;
+  spreadRules?: SpreadRules;
   initialLayoutMode?: ViewerLayoutMode;
   initialDirection: ReadingDirection;
   onSettingsChange: (mode: ViewMode, direction: ReadingDirection) => void;
@@ -145,6 +149,7 @@ export function Viewer({
   endOfVolumePolicy = "auto_next",
   onEndOfVolumePolicyChange,
   initialMode,
+  spreadRules = DEFAULT_SPREAD_RULES,
   initialLayoutMode = "paged",
   initialDirection,
   onSettingsChange,
@@ -217,7 +222,11 @@ export function Viewer({
   const [layoutMode, setLayoutMode] =
     useState<ViewerLayoutMode>(initialLayoutMode);
   const [autoSpread, setAutoSpread] = useState(() =>
-    autoSpreadForViewport(window.innerWidth, window.innerHeight));
+    autoSpreadForViewport(
+      window.innerWidth,
+      window.innerHeight,
+      spreadRules.autoViewportMinAspectPercent,
+    ));
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
@@ -263,7 +272,11 @@ export function Viewer({
       const height = bounds !== undefined && bounds.height > 0
         ? bounds.height
         : window.innerHeight;
-      setAutoSpread(autoSpreadForViewport(width, height));
+      setAutoSpread(autoSpreadForViewport(
+        width,
+        height,
+        spreadRules.autoViewportMinAspectPercent,
+      ));
     };
     update();
     window.addEventListener("resize", update);
@@ -276,7 +289,7 @@ export function Viewer({
       window.removeEventListener("resize", update);
       observer.disconnect();
     };
-  }, [fullscreen, layoutMode]);
+  }, [fullscreen, layoutMode, spreadRules.autoViewportMinAspectPercent]);
 
   useEffect(() => {
     const releaseRightButton = (event: PointerEvent) => {
@@ -327,8 +340,9 @@ export function Viewer({
       session.pages.length,
       landscape,
       layoutMode === "paged" && autoSpread,
+      spreadRules,
     ),
-    [autoSpread, landscape, layoutMode, session.pages.length, state],
+    [autoSpread, landscape, layoutMode, session.pages.length, spreadRules, state],
   );
   const nextStartIndex = state.index + Math.max(1, visible.length);
   const nextVisible = useMemo(() => {
@@ -338,8 +352,9 @@ export function Viewer({
       session.pages.length,
       landscape,
       layoutMode === "paged" && autoSpread,
+      spreadRules,
     );
-  }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, state]);
+  }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -432,6 +447,7 @@ export function Viewer({
       pageCount: session.pages.length,
       landscape,
       autoSpread: layoutMode === "paged" && autoSpread,
+      spreadRules,
     });
   }
 
@@ -466,8 +482,9 @@ export function Viewer({
       pageCount: session.pages.length,
       landscape,
       autoSpread: layoutMode === "paged" && autoSpread,
+      spreadRules,
     });
-  }, [autoSpread, imageErrors, landscape, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length]);
+  }, [autoSpread, imageErrors, landscape, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
@@ -888,7 +905,11 @@ export function Viewer({
         data-page-index={index}
         onLoad={(event) => {
           setReadyPages((current) => new Set(current).add(index));
-          if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
+          if (!isPagePairable(
+            event.currentTarget.naturalWidth,
+            event.currentTarget.naturalHeight,
+            spreadRules.portraitMaxAspectPercent,
+          )) {
             setLandscape((current) => new Set(current).add(index));
           }
         }}
@@ -1497,7 +1518,11 @@ export function Viewer({
             aria-hidden="true"
             onLoad={(event) => {
               setReadyPages((current) => new Set(current).add(index));
-              if (event.currentTarget.naturalWidth > event.currentTarget.naturalHeight) {
+              if (!isPagePairable(
+                event.currentTarget.naturalWidth,
+                event.currentTarget.naturalHeight,
+                spreadRules.portraitMaxAspectPercent,
+              )) {
                 setLandscape((current) => new Set(current).add(index));
               }
             }}

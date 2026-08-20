@@ -6,6 +6,29 @@ export const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   spread: "見開き",
 };
 export const AUTO_SPREAD_MIN_VIEWPORT_ASPECT = 1.25;
+export const SPREAD_PAIRINGS = ["continuous", "odd", "even"] as const;
+export type SpreadPairing = (typeof SPREAD_PAIRINGS)[number];
+export const SPREAD_PAIRING_LABELS: Record<SpreadPairing, string> = {
+  continuous: "制限なし",
+  odd: "奇数ページから",
+  even: "偶数ページから",
+};
+export interface SpreadRules {
+  portraitMaxAspectPercent: number;
+  autoViewportMinAspectPercent: number;
+  firstPageSingle: boolean;
+  pairing: SpreadPairing;
+}
+export const MIN_PORTRAIT_ASPECT_PERCENT = 50;
+export const MAX_PORTRAIT_ASPECT_PERCENT = 100;
+export const MIN_AUTO_VIEWPORT_ASPECT_PERCENT = 100;
+export const MAX_AUTO_VIEWPORT_ASPECT_PERCENT = 300;
+export const DEFAULT_SPREAD_RULES: SpreadRules = {
+  portraitMaxAspectPercent: 100,
+  autoViewportMinAspectPercent: 125,
+  firstPageSingle: false,
+  pairing: "continuous",
+};
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
@@ -67,10 +90,36 @@ export const MIN_WHEEL_DEAD_ZONE = 0;
 export const MAX_WHEEL_DEAD_ZONE = 200;
 export const DEFAULT_WHEEL_DEAD_ZONE = 0;
 
-export function autoSpreadForViewport(width: number, height: number): boolean {
+export function isPortraitAspectPercent(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_PORTRAIT_ASPECT_PERCENT
+    && value <= MAX_PORTRAIT_ASPECT_PERCENT;
+}
+
+export function isAutoViewportAspectPercent(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_AUTO_VIEWPORT_ASPECT_PERCENT
+    && value <= MAX_AUTO_VIEWPORT_ASPECT_PERCENT;
+}
+
+export function isPagePairable(
+  width: number,
+  height: number,
+  portraitMaxAspectPercent = DEFAULT_SPREAD_RULES.portraitMaxAspectPercent,
+): boolean {
   return Number.isFinite(width) && Number.isFinite(height)
     && width > 0 && height > 0
-    && width / height >= AUTO_SPREAD_MIN_VIEWPORT_ASPECT;
+    && width / height <= portraitMaxAspectPercent / 100;
+}
+
+export function autoSpreadForViewport(
+  width: number,
+  height: number,
+  minAspectPercent = DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent,
+): boolean {
+  return Number.isFinite(width) && Number.isFinite(height)
+    && width > 0 && height > 0
+    && width / height >= minAspectPercent / 100;
 }
 
 export function randomPageIndex(
@@ -234,6 +283,7 @@ export type ViewerAction =
       pageCount: number;
       landscape: ReadonlySet<number>;
       autoSpread?: boolean;
+      spreadRules?: SpreadRules;
     }
   | { type: "previous" }
   | { type: "shift"; delta: -1 | 1; pageCount: number }
@@ -246,11 +296,18 @@ export function visibleIndices(
   pageCount: number,
   landscape: ReadonlySet<number>,
   autoSpread = true,
+  spreadRules: SpreadRules = DEFAULT_SPREAD_RULES,
 ): number[] {
   if (state.index >= pageCount) return [];
+  const pageNumber = state.index + 1;
+  const pairingAllowed = spreadRules.pairing === "continuous"
+    || (spreadRules.pairing === "odd" && pageNumber % 2 === 1)
+    || (spreadRules.pairing === "even" && pageNumber % 2 === 0);
   if (
     state.mode === "single" ||
     (state.mode === "auto" && !autoSpread) ||
+    (spreadRules.firstPageSingle && state.index === 0) ||
+    !pairingAllowed ||
     landscape.has(state.index) ||
     landscape.has(state.index + 1) ||
     state.index + 1 >= pageCount
@@ -271,6 +328,7 @@ export function viewerReducer(
         action.pageCount,
         action.landscape,
         action.autoSpread,
+        action.spreadRules,
       );
       const next = state.index + Math.max(1, visible.length);
       if (next >= action.pageCount) return state;

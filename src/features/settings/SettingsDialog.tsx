@@ -24,6 +24,8 @@ import {
 } from "../input/shortcuts";
 import {
   MAX_VIEWER_SPACING,
+  MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
+  MAX_PORTRAIT_ASPECT_PERCENT,
   MAX_PAN_FACTOR,
   MAX_VIEWER_GRID_SIZE,
   MAX_WHEEL_DEAD_ZONE,
@@ -31,6 +33,8 @@ import {
   MIN_VIEWER_GRID_SIZE,
   MIN_WHEEL_DEAD_ZONE,
   MIN_VIEWER_SPACING,
+  MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
+  MIN_PORTRAIT_ASPECT_PERCENT,
   normalizeViewerLayoutMode,
   VIEWER_BACKGROUNDS,
   VIEWER_CURSOR_AUTO_HIDE_DELAYS,
@@ -38,6 +42,8 @@ import {
   VIEWER_LAYOUT_MODE_LABELS,
   VIEWER_LAYOUT_MODES,
   VIEW_MODE_LABELS,
+  SPREAD_PAIRING_LABELS,
+  SPREAD_PAIRINGS,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -291,6 +297,26 @@ export function SettingsDialog({
       id: "viewer-view-mode",
       category: "viewer",
       text: `閲覧モード 自動 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 表示領域と画像寸法から自動判定、または表示枚数を固定します`,
+    },
+    {
+      id: "spread-portrait-ratio",
+      category: "viewer",
+      text: `見開き 縦長 判定 幅 高さ 比率 ${draft.spreadPortraitMaxAspectPercent}%`,
+    },
+    {
+      id: "auto-spread-viewport-ratio",
+      category: "viewer",
+      text: `自動 見開き viewer 領域 幅 高さ 比率 ${draft.autoSpreadMinViewportAspectPercent}%`,
+    },
+    {
+      id: "spread-first-page-single",
+      category: "viewer",
+      text: `見開き 先頭 表紙 単独 ${draft.spreadFirstPageSingle ? "有効" : "無効"}`,
+    },
+    {
+      id: "spread-pairing",
+      category: "viewer",
+      text: `見開き 組合せ 偶奇 奇数 偶数 ${SPREAD_PAIRING_LABELS[draft.spreadPairing]}`,
     },
     {
       id: "viewer-layout-mode",
@@ -615,6 +641,55 @@ export function SettingsDialog({
               <SettingRow id="viewer-view-mode" title="閲覧モード" description="自動判定、単ページ固定、見開き固定から選びます。" hidden={rowHidden("viewer-view-mode")}>
                 <select aria-label="profile閲覧モード" value={draft.viewMode} onChange={(event) => update({ viewMode: event.target.value as SettingsProfile["viewMode"] })}>
                   {Object.entries(VIEW_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="spread-portrait-ratio" title="縦長ページ判定" description="幅÷高さがこの値以下のページだけを見開き候補にします。" hidden={rowHidden("spread-portrait-ratio")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profile見開き縦長判定（%）"
+                    min={MIN_PORTRAIT_ASPECT_PERCENT}
+                    max={MAX_PORTRAIT_ASPECT_PERCENT}
+                    step="1"
+                    value={draft.spreadPortraitMaxAspectPercent}
+                    onChange={(event) => update({
+                      spreadPortraitMaxAspectPercent: Math.min(
+                        MAX_PORTRAIT_ASPECT_PERCENT,
+                        Math.max(MIN_PORTRAIT_ASPECT_PERCENT, Math.round(Number(event.target.value))),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="auto-spread-viewport-ratio" title="自動見開きの画面幅" description="viewer領域の幅÷高さがこの値以上の場合だけ自動見開きを許可します。" hidden={rowHidden("auto-spread-viewport-ratio")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profile自動見開き画面幅判定（%）"
+                    min={MIN_AUTO_VIEWPORT_ASPECT_PERCENT}
+                    max={MAX_AUTO_VIEWPORT_ASPECT_PERCENT}
+                    step="5"
+                    value={draft.autoSpreadMinViewportAspectPercent}
+                    onChange={(event) => update({
+                      autoSpreadMinViewportAspectPercent: Math.min(
+                        MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
+                        Math.max(MIN_AUTO_VIEWPORT_ASPECT_PERCENT, Math.round(Number(event.target.value))),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="spread-first-page-single" title="先頭ページを単独表示" description="表紙を次ページと組み合わせず単独で表示します。" hidden={rowHidden("spread-first-page-single")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile先頭ページを単独表示" checked={draft.spreadFirstPageSingle} onChange={(event) => update({ spreadFirstPageSingle: event.target.checked })} />
+                  <span>{draft.spreadFirstPageSingle ? "有効" : "無効"}</span>
+                </label>
+              </SettingRow>
+              <SettingRow id="spread-pairing" title="見開きの組合せ開始" description="組合せを開始できるページ番号の偶奇を固定します。" hidden={rowHidden("spread-pairing")}>
+                <select aria-label="profile見開き組合せ開始" value={draft.spreadPairing} onChange={(event) => update({ spreadPairing: event.target.value as SettingsProfile["spreadPairing"] })}>
+                  {SPREAD_PAIRINGS.map((pairing) => <option key={pairing} value={pairing}>{SPREAD_PAIRING_LABELS[pairing]}</option>)}
                 </select>
               </SettingRow>
               <SettingRow id="viewer-layout-mode" title="閲覧レイアウト" description="ページ送り、縦スクロール、横スクロールから選びます。" hidden={rowHidden("viewer-layout-mode")}>

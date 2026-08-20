@@ -97,6 +97,7 @@ import type {
   ViewerScaleState,
   ViewerLayoutMode,
   ViewerGridColor,
+  SpreadRules,
   ZoomRetention,
 } from "./features/viewer/model";
 import {
@@ -109,6 +110,7 @@ import {
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_SPREAD_RULES,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
   normalizeViewerLayoutMode,
@@ -118,6 +120,9 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  isAutoViewportAspectPercent,
+  isPortraitAspectPercent,
+  SPREAD_PAIRINGS,
 } from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
@@ -453,6 +458,9 @@ export function App({
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
   const volumeNavigationBusy = useRef(false);
   const [viewMode, setViewMode] = useState<ViewMode>("single");
+  const [spreadRules, setSpreadRules] = useState<SpreadRules>(() => ({
+    ...DEFAULT_SPREAD_RULES,
+  }));
   const [layoutMode, setLayoutMode] = useState<ViewerLayoutMode>("paged");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
@@ -844,6 +852,18 @@ export function App({
             setEndOfVolumePolicy(restoredEndOfVolumePolicy);
           }
           setViewMode(response.data.viewMode);
+          setSpreadRules({
+            portraitMaxAspectPercent: isPortraitAspectPercent(
+              response.data.spreadPortraitMaxAspectPercent,
+            ) ? response.data.spreadPortraitMaxAspectPercent : DEFAULT_SPREAD_RULES.portraitMaxAspectPercent,
+            autoViewportMinAspectPercent: isAutoViewportAspectPercent(
+              response.data.autoSpreadMinViewportAspectPercent,
+            ) ? response.data.autoSpreadMinViewportAspectPercent : DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent,
+            firstPageSingle: response.data.spreadFirstPageSingle === true,
+            pairing: SPREAD_PAIRINGS.includes(response.data.spreadPairing)
+              ? response.data.spreadPairing
+              : DEFAULT_SPREAD_RULES.pairing,
+          });
           setLayoutMode(normalizeViewerLayoutMode(response.data.layoutMode));
           setReadingDirection(response.data.readingDirection);
           setViewerScaleMode(response.data.scaleMode);
@@ -2420,6 +2440,10 @@ export function App({
       catalogViewMode,
       catalogThumbnailSizes: { ...catalogThumbnailSizes },
       viewMode,
+      spreadPortraitMaxAspectPercent: spreadRules.portraitMaxAspectPercent,
+      autoSpreadMinViewportAspectPercent: spreadRules.autoViewportMinAspectPercent,
+      spreadFirstPageSingle: spreadRules.firstPageSingle,
+      spreadPairing: spreadRules.pairing,
       layoutMode,
       readingDirection,
       scaleMode: viewerScaleMode,
@@ -2498,6 +2522,12 @@ export function App({
       persistedCatalogViewMode.current = normalized.catalogViewMode;
       setCatalogThumbnailSizes(normalized.catalogThumbnailSizes);
       setViewMode(normalized.viewMode);
+      setSpreadRules({
+        portraitMaxAspectPercent: normalized.spreadPortraitMaxAspectPercent,
+        autoViewportMinAspectPercent: normalized.autoSpreadMinViewportAspectPercent,
+        firstPageSingle: normalized.spreadFirstPageSingle,
+        pairing: normalized.spreadPairing,
+      });
       setLayoutMode(normalized.layoutMode);
       setReadingDirection(normalized.readingDirection);
       setViewerScaleMode(normalized.scaleMode);
@@ -2982,6 +3012,8 @@ export function App({
       Pick<
         CatalogSettings,
         "viewMode" | "readingDirection" | "scaleMode" | "scale" | "loupeEnabled"
+        | "spreadPortraitMaxAspectPercent" | "autoSpreadMinViewportAspectPercent"
+        | "spreadFirstPageSingle" | "spreadPairing"
         | "layoutMode" | "viewerBackground" | "viewerPageMargin"
         | "viewerSpreadGap" | "cursorAutoHideMs"
       >
@@ -2991,6 +3023,10 @@ export function App({
     void saveViewerSettings(
       {
         viewMode,
+        spreadPortraitMaxAspectPercent: spreadRules.portraitMaxAspectPercent,
+        autoSpreadMinViewportAspectPercent: spreadRules.autoViewportMinAspectPercent,
+        spreadFirstPageSingle: spreadRules.firstPageSingle,
+        spreadPairing: spreadRules.pairing,
         layoutMode,
         readingDirection,
         scaleMode: viewerScaleMode,
@@ -3204,6 +3240,7 @@ export function App({
           session={viewerSession}
           generation={viewerGeneration.current}
           initialMode={viewMode}
+          spreadRules={spreadRules}
           initialDirection={readingDirection}
           initialScaleMode={viewerScaleMode}
           initialScale={viewerScale}

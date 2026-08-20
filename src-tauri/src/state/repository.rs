@@ -67,6 +67,10 @@ pub struct Settings {
     pub card_grid_thumbnail_size: String,
     pub reference_tile_thumbnail_size: String,
     pub view_mode: String,
+    pub spread_portrait_max_aspect_percent: String,
+    pub auto_spread_min_viewport_aspect_percent: String,
+    pub spread_first_page_single: bool,
+    pub spread_pairing: String,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -130,6 +134,10 @@ impl Default for Settings {
             card_grid_thumbnail_size: "216".into(),
             reference_tile_thumbnail_size: "128".into(),
             view_mode: "single".into(),
+            spread_portrait_max_aspect_percent: "100".into(),
+            auto_spread_min_viewport_aspect_percent: "125".into(),
+            spread_first_page_single: false,
+            spread_pairing: "continuous".into(),
             layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
@@ -229,6 +237,14 @@ impl StateStore {
                 "cardGridThumbnailSize" => settings.card_grid_thumbnail_size = value,
                 "referenceTileThumbnailSize" => settings.reference_tile_thumbnail_size = value,
                 "viewMode" => settings.view_mode = value,
+                "spreadPortraitMaxAspectPercent" => {
+                    settings.spread_portrait_max_aspect_percent = value
+                }
+                "autoSpreadMinViewportAspectPercent" => {
+                    settings.auto_spread_min_viewport_aspect_percent = value
+                }
+                "spreadFirstPageSingle" => settings.spread_first_page_single = value == "true",
+                "spreadPairing" => settings.spread_pairing = value,
                 "layoutMode" => settings.layout_mode = value,
                 "readingDirection" => settings.reading_direction = value,
                 "scaleMode" => settings.scale_mode = value,
@@ -307,6 +323,19 @@ impl StateStore {
                 settings.reference_tile_thumbnail_size.clone(),
             ),
             ("viewMode", settings.view_mode.clone()),
+            (
+                "spreadPortraitMaxAspectPercent",
+                settings.spread_portrait_max_aspect_percent.clone(),
+            ),
+            (
+                "autoSpreadMinViewportAspectPercent",
+                settings.auto_spread_min_viewport_aspect_percent.clone(),
+            ),
+            (
+                "spreadFirstPageSingle",
+                settings.spread_first_page_single.to_string(),
+            ),
+            ("spreadPairing", settings.spread_pairing.clone()),
             ("layoutMode", settings.layout_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
             ("scaleMode", settings.scale_mode.clone()),
@@ -1350,6 +1379,10 @@ mod tests {
                 card_grid_thumbnail_size: "224".into(),
                 reference_tile_thumbnail_size: "152".into(),
                 view_mode: "spread".into(),
+                spread_portrait_max_aspect_percent: "82".into(),
+                auto_spread_min_viewport_aspect_percent: "160".into(),
+                spread_first_page_single: true,
+                spread_pairing: "even".into(),
                 layout_mode: "vertical_scroll".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
@@ -1435,6 +1468,10 @@ mod tests {
         assert_eq!(restored.card_grid_thumbnail_size, "224");
         assert_eq!(restored.reference_tile_thumbnail_size, "152");
         assert_eq!(restored.layout_mode, "vertical_scroll");
+        assert_eq!(restored.spread_portrait_max_aspect_percent, "82");
+        assert_eq!(restored.auto_spread_min_viewport_aspect_percent, "160");
+        assert!(restored.spread_first_page_single);
+        assert_eq!(restored.spread_pairing, "even");
         assert!(restored.loupe_enabled);
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");

@@ -290,6 +290,10 @@ pub struct CatalogSettings {
     pub catalog_view_mode: String,
     pub catalog_thumbnail_sizes: CatalogThumbnailSizes,
     pub view_mode: String,
+    pub spread_portrait_max_aspect_percent: u16,
+    pub auto_spread_min_viewport_aspect_percent: u16,
+    pub spread_first_page_single: bool,
+    pub spread_pairing: String,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -339,6 +343,10 @@ pub struct SettingsProfileInput {
     pub catalog_view_mode: String,
     pub catalog_thumbnail_sizes: CatalogThumbnailSizes,
     pub view_mode: String,
+    pub spread_portrait_max_aspect_percent: u16,
+    pub auto_spread_min_viewport_aspect_percent: u16,
+    pub spread_first_page_single: bool,
+    pub spread_pairing: String,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -392,6 +400,10 @@ pub struct FavoriteEntry {
 const MIN_VIEWER_SCALE: f64 = 0.01;
 const MAX_VIEWER_SCALE: f64 = 8.0;
 const MAX_VIEWER_SPACING: u16 = 64;
+const MIN_PORTRAIT_ASPECT_PERCENT: u16 = 50;
+const MAX_PORTRAIT_ASPECT_PERCENT: u16 = 100;
+const MIN_AUTO_VIEWPORT_ASPECT_PERCENT: u16 = 100;
+const MAX_AUTO_VIEWPORT_ASPECT_PERCENT: u16 = 300;
 const MIN_VIEWER_GRID_SIZE: u16 = 8;
 const MAX_VIEWER_GRID_SIZE: u16 = 256;
 const MIN_PAN_FACTOR: f64 = 0.5;
@@ -785,6 +797,21 @@ fn viewer_spacing(value: &str, fallback: u16) -> u16 {
         .unwrap_or(fallback)
 }
 
+fn spread_percent(value: &str, minimum: u16, maximum: u16, fallback: u16) -> u16 {
+    value
+        .parse::<u16>()
+        .ok()
+        .filter(|percent| (minimum..=maximum).contains(percent))
+        .unwrap_or(fallback)
+}
+
+fn spread_pairing(settings: &crate::state::Settings) -> String {
+    match settings.spread_pairing.as_str() {
+        "continuous" | "odd" | "even" => settings.spread_pairing.clone(),
+        _ => "continuous".into(),
+    }
+}
+
 fn viewer_cursor_auto_hide_ms(settings: &crate::state::Settings) -> u32 {
     settings
         .cursor_auto_hide_ms
@@ -841,6 +868,19 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let end_of_volume_policy = end_of_volume_policy(&settings);
     let catalog_view_mode = catalog_view_mode(&settings);
     let view_mode = viewer_view_mode(&settings);
+    let spread_portrait_max_aspect_percent = spread_percent(
+        &settings.spread_portrait_max_aspect_percent,
+        MIN_PORTRAIT_ASPECT_PERCENT,
+        MAX_PORTRAIT_ASPECT_PERCENT,
+        100,
+    );
+    let auto_spread_min_viewport_aspect_percent = spread_percent(
+        &settings.auto_spread_min_viewport_aspect_percent,
+        MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
+        MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
+        125,
+    );
+    let spread_pairing = spread_pairing(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
     let viewer_background = viewer_background(&settings);
@@ -863,6 +903,10 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         catalog_view_mode,
         catalog_thumbnail_sizes,
         view_mode,
+        spread_portrait_max_aspect_percent,
+        auto_spread_min_viewport_aspect_percent,
+        spread_first_page_single: settings.spread_first_page_single,
+        spread_pairing,
         layout_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
@@ -2123,6 +2167,10 @@ pub fn set_viewer_settings(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
     view_mode: String,
+    spread_portrait_max_aspect_percent: u16,
+    auto_spread_min_viewport_aspect_percent: u16,
+    spread_first_page_single: bool,
+    spread_pairing: String,
     layout_mode: String,
     reading_direction: String,
     scale_mode: String,
@@ -2137,6 +2185,11 @@ pub fn set_viewer_settings(
         return Ok(error_response(&context, error));
     }
     if !matches!(view_mode.as_str(), "auto" | "single" | "spread")
+        || !(MIN_PORTRAIT_ASPECT_PERCENT..=MAX_PORTRAIT_ASPECT_PERCENT)
+            .contains(&spread_portrait_max_aspect_percent)
+        || !(MIN_AUTO_VIEWPORT_ASPECT_PERCENT..=MAX_AUTO_VIEWPORT_ASPECT_PERCENT)
+            .contains(&auto_spread_min_viewport_aspect_percent)
+        || !matches!(spread_pairing.as_str(), "continuous" | "odd" | "even")
         || !matches!(
             layout_mode.as_str(),
             "paged" | "vertical_scroll" | "horizontal_scroll"
@@ -2170,6 +2223,12 @@ pub fn set_viewer_settings(
             .map_err(|error| error.message)?
             .unwrap_or_default();
         settings.view_mode = view_mode;
+        settings.spread_portrait_max_aspect_percent =
+            spread_portrait_max_aspect_percent.to_string();
+        settings.auto_spread_min_viewport_aspect_percent =
+            auto_spread_min_viewport_aspect_percent.to_string();
+        settings.spread_first_page_single = spread_first_page_single;
+        settings.spread_pairing = spread_pairing;
         settings.layout_mode = layout_mode;
         settings.reading_direction = reading_direction;
         settings.scale_mode = scale_mode;
@@ -2218,6 +2277,14 @@ fn validate_settings_profile(
         profile.catalog_view_mode.as_str(),
         "small_thumbnail" | "detail_list" | "cover_list" | "card_grid" | "reference_tile"
     ) || !matches!(profile.view_mode.as_str(), "auto" | "single" | "spread")
+        || !(MIN_PORTRAIT_ASPECT_PERCENT..=MAX_PORTRAIT_ASPECT_PERCENT)
+            .contains(&profile.spread_portrait_max_aspect_percent)
+        || !(MIN_AUTO_VIEWPORT_ASPECT_PERCENT..=MAX_AUTO_VIEWPORT_ASPECT_PERCENT)
+            .contains(&profile.auto_spread_min_viewport_aspect_percent)
+        || !matches!(
+            profile.spread_pairing.as_str(),
+            "continuous" | "odd" | "even"
+        )
         || ![
             profile.catalog_thumbnail_sizes.small_thumbnail,
             profile.catalog_thumbnail_sizes.cover_list,
@@ -2327,6 +2394,12 @@ pub fn set_settings_profile(
         settings.reference_tile_thumbnail_size =
             profile.catalog_thumbnail_sizes.reference_tile.to_string();
         settings.view_mode = profile.view_mode;
+        settings.spread_portrait_max_aspect_percent =
+            profile.spread_portrait_max_aspect_percent.to_string();
+        settings.auto_spread_min_viewport_aspect_percent =
+            profile.auto_spread_min_viewport_aspect_percent.to_string();
+        settings.spread_first_page_single = profile.spread_first_page_single;
+        settings.spread_pairing = profile.spread_pairing;
         settings.layout_mode = profile.layout_mode;
         settings.reading_direction = profile.reading_direction;
         settings.scale_mode = profile.scale_mode;
@@ -4015,6 +4088,56 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p2_005_spread_rules_normalize_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(
+            spread_percent(
+                &settings.spread_portrait_max_aspect_percent,
+                MIN_PORTRAIT_ASPECT_PERCENT,
+                MAX_PORTRAIT_ASPECT_PERCENT,
+                100,
+            ),
+            100
+        );
+        assert_eq!(spread_pairing(&settings), "continuous");
+        settings.spread_portrait_max_aspect_percent = "82".into();
+        settings.auto_spread_min_viewport_aspect_percent = "160".into();
+        settings.spread_pairing = "even".into();
+        assert_eq!(
+            spread_percent(
+                &settings.spread_portrait_max_aspect_percent,
+                MIN_PORTRAIT_ASPECT_PERCENT,
+                MAX_PORTRAIT_ASPECT_PERCENT,
+                100,
+            ),
+            82
+        );
+        assert_eq!(spread_pairing(&settings), "even");
+        settings.spread_portrait_max_aspect_percent = "101".into();
+        settings.auto_spread_min_viewport_aspect_percent = "invalid".into();
+        settings.spread_pairing = "alternating".into();
+        assert_eq!(
+            spread_percent(
+                &settings.spread_portrait_max_aspect_percent,
+                MIN_PORTRAIT_ASPECT_PERCENT,
+                MAX_PORTRAIT_ASPECT_PERCENT,
+                100,
+            ),
+            100
+        );
+        assert_eq!(
+            spread_percent(
+                &settings.auto_spread_min_viewport_aspect_percent,
+                MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
+                MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
+                125,
+            ),
+            125
+        );
+        assert_eq!(spread_pairing(&settings), "continuous");
+    }
+
+    #[test]
     fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(
@@ -4060,6 +4183,10 @@ mod shutdown_tests {
                 reference_tile: 128,
             },
             view_mode: "single".into(),
+            spread_portrait_max_aspect_percent: 100,
+            auto_spread_min_viewport_aspect_percent: 125,
+            spread_first_page_single: false,
+            spread_pairing: "continuous".into(),
             layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
@@ -4119,6 +4246,25 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.cursor_auto_hide_ms = 2_000;
+
+        profile.spread_portrait_max_aspect_percent = 49;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.spread_portrait_max_aspect_percent = 100;
+        profile.auto_spread_min_viewport_aspect_percent = 301;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.auto_spread_min_viewport_aspect_percent = 125;
+        profile.spread_pairing = "alternating".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.spread_pairing = "even".into();
 
         profile.navigation_selection_policy = "middle".into();
         assert_eq!(

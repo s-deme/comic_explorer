@@ -190,6 +190,10 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   catalogViewMode: "cover_list",
   catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
   viewMode: "single",
+  spreadPortraitMaxAspectPercent: 100,
+  autoSpreadMinViewportAspectPercent: 125,
+  spreadFirstPageSingle: false,
+  spreadPairing: "continuous",
   layoutMode: "paged",
   readingDirection: "rightToLeft",
   scaleMode: "fit",
@@ -2668,6 +2672,16 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile閲覧モード"), {
       target: { value: "auto" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profile見開き縦長判定（%）"), {
+      target: { value: "80" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile自動見開き画面幅判定（%）"), {
+      target: { value: "160" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profile先頭ページを単独表示"));
+    fireEvent.change(within(dialog).getByLabelText("profile見開き組合せ開始"), {
+      target: { value: "even" },
+    });
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2691,6 +2705,10 @@ describe("application shell", () => {
         },
         treeVisible: false,
         viewMode: "auto",
+        spreadPortraitMaxAspectPercent: 80,
+        autoSpreadMinViewportAspectPercent: 160,
+        spreadFirstPageSingle: true,
+        spreadPairing: "even",
         scale: 1.75,
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
@@ -2823,7 +2841,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 7,
+        profileVersion: 8,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

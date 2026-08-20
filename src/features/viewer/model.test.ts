@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   autoSpreadForViewport,
+  isPagePairable,
   clampLoupePointer,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
@@ -86,6 +87,44 @@ describe("viewer page model", () => {
     expect(autoSpreadForViewport(999, 800)).toBe(false);
     expect(autoSpreadForViewport(0, 800)).toBe(false);
     expect(autoSpreadForViewport(Number.NaN, 800)).toBe(false);
+  });
+
+  it("REQ-LEY-P2-005 applies cover, parity, portrait, and width conditions", () => {
+    const automatic = { ...initial, mode: "auto" as const };
+    const coverEvenRules = {
+      portraitMaxAspectPercent: 80,
+      autoViewportMinAspectPercent: 160,
+      firstPageSingle: true,
+      pairing: "even" as const,
+    };
+    expect(visibleIndices(automatic, 6, new Set(), true, coverEvenRules)).toEqual([0]);
+    expect(visibleIndices({ ...automatic, index: 1 }, 6, new Set(), true, coverEvenRules))
+      .toEqual([1, 2]);
+    expect(visibleIndices({ ...automatic, index: 2 }, 6, new Set(), true, coverEvenRules))
+      .toEqual([2]);
+    expect(visibleIndices({ ...automatic, index: 3 }, 6, new Set([4]), true, coverEvenRules))
+      .toEqual([3]);
+    expect(autoSpreadForViewport(1599, 1000, 160)).toBe(false);
+    expect(autoSpreadForViewport(1600, 1000, 160)).toBe(true);
+    expect(isPagePairable(800, 1000, 80)).toBe(true);
+    expect(isPagePairable(801, 1000, 80)).toBe(false);
+
+    const afterCover = viewerReducer(automatic, {
+      type: "next",
+      pageCount: 6,
+      landscape: new Set(),
+      autoSpread: true,
+      spreadRules: coverEvenRules,
+    });
+    expect(afterCover.index).toBe(1);
+    const afterPair = viewerReducer(afterCover, {
+      type: "next",
+      pageCount: 6,
+      landscape: new Set(),
+      autoSpread: true,
+      spreadRules: coverEvenRules,
+    });
+    expect(afterPair.index).toBe(3);
   });
 
   it("uses display-unit history so previous is reversible", () => {

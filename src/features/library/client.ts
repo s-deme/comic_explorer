@@ -18,6 +18,7 @@ import type {
   ViewerGridColor,
   ViewerLayoutMode,
   ViewMode,
+  SpreadPairing,
   ZoomRetention,
 } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
@@ -108,6 +109,10 @@ export interface CatalogSettings {
   catalogViewMode: CatalogViewMode;
   catalogThumbnailSizes: CatalogThumbnailSizes;
   viewMode: ViewMode;
+  spreadPortraitMaxAspectPercent: number;
+  autoSpreadMinViewportAspectPercent: number;
+  spreadFirstPageSingle: boolean;
+  spreadPairing: SpreadPairing;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -153,6 +158,10 @@ export async function saveViewerSettings(
   settings: Pick<
     CatalogSettings,
     | "viewMode"
+    | "spreadPortraitMaxAspectPercent"
+    | "autoSpreadMinViewportAspectPercent"
+    | "spreadFirstPageSingle"
+    | "spreadPairing"
     | "layoutMode"
     | "readingDirection"
     | "scaleMode"
@@ -168,6 +177,10 @@ export async function saveViewerSettings(
   return invoke("set_viewer_settings", {
     context: context(generation),
     viewMode: settings.viewMode,
+    spreadPortraitMaxAspectPercent: settings.spreadPortraitMaxAspectPercent,
+    autoSpreadMinViewportAspectPercent: settings.autoSpreadMinViewportAspectPercent,
+    spreadFirstPageSingle: settings.spreadFirstPageSingle,
+    spreadPairing: settings.spreadPairing,
     layoutMode: settings.layoutMode,
     readingDirection: settings.readingDirection,
     scaleMode: settings.scaleMode,
@@ -193,6 +206,10 @@ export async function saveSettingsProfile(
       catalogViewMode: profile.catalogViewMode,
       catalogThumbnailSizes: profile.catalogThumbnailSizes,
       viewMode: profile.viewMode,
+      spreadPortraitMaxAspectPercent: profile.spreadPortraitMaxAspectPercent,
+      autoSpreadMinViewportAspectPercent: profile.autoSpreadMinViewportAspectPercent,
+      spreadFirstPageSingle: profile.spreadFirstPageSingle,
+      spreadPairing: profile.spreadPairing,
       layoutMode: profile.layoutMode,
       readingDirection: profile.readingDirection,
       scaleMode: profile.scaleMode,

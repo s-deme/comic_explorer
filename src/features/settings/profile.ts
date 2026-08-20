@@ -23,11 +23,14 @@ import {
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_SPREAD_RULES,
   DEFAULT_SCALE,
   isViewerCursorAutoHideMs,
   isPanFactor,
   isViewerGridSize,
   isViewerSpacing,
+  isAutoViewportAspectPercent,
+  isPortraitAspectPercent,
   isWheelDeadZone,
   MAX_SCALE,
   MIN_SCALE,
@@ -35,11 +38,13 @@ import {
   VIEWER_GRID_COLORS,
   VIEWER_LAYOUT_MODES,
   VIEW_MODES,
+  SPREAD_PAIRINGS,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
   type ViewerLayoutMode,
   type ViewMode,
+  type SpreadPairing,
   type ZoomRetention,
   ZOOM_RETENTIONS,
 } from "../viewer/model";
@@ -51,7 +56,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 7;
+export const SETTINGS_PROFILE_VERSION = 8;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -109,6 +114,10 @@ export interface SettingsProfile {
   catalogViewMode: CatalogViewMode;
   catalogThumbnailSizes: CatalogThumbnailSizes;
   viewMode: ViewMode;
+  spreadPortraitMaxAspectPercent: number;
+  autoSpreadMinViewportAspectPercent: number;
+  spreadFirstPageSingle: boolean;
+  spreadPairing: SpreadPairing;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -149,6 +158,10 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     catalogViewMode: DEFAULT_CATALOG_VIEW_MODE,
     catalogThumbnailSizes: { ...DEFAULT_CATALOG_THUMBNAIL_SIZES },
     viewMode: "single",
+    spreadPortraitMaxAspectPercent: DEFAULT_SPREAD_RULES.portraitMaxAspectPercent,
+    autoSpreadMinViewportAspectPercent: DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent,
+    spreadFirstPageSingle: DEFAULT_SPREAD_RULES.firstPageSingle,
+    spreadPairing: DEFAULT_SPREAD_RULES.pairing,
     layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
@@ -279,6 +292,19 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     ? DEFAULT_CATALOG_PALETTE
     : enumValue(candidate.catalogPalette, CATALOG_PALETTES);
   const restoreLastViewer = legacyP1CPreferences ? false : candidate.restoreLastViewer;
+  const legacySpreadRules = legacyP1CPreferences || candidate.profileVersion === 7;
+  const spreadPortraitMaxAspectPercent = legacySpreadRules
+    ? DEFAULT_SPREAD_RULES.portraitMaxAspectPercent
+    : candidate.spreadPortraitMaxAspectPercent;
+  const autoSpreadMinViewportAspectPercent = legacySpreadRules
+    ? DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent
+    : candidate.autoSpreadMinViewportAspectPercent;
+  const spreadFirstPageSingle = legacySpreadRules
+    ? DEFAULT_SPREAD_RULES.firstPageSingle
+    : candidate.spreadFirstPageSingle;
+  const spreadPairing = legacySpreadRules
+    ? DEFAULT_SPREAD_RULES.pairing
+    : enumValue(candidate.spreadPairing, SPREAD_PAIRINGS);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -286,6 +312,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 4
       && candidate.profileVersion !== 5
       && candidate.profileVersion !== 6
+      && candidate.profileVersion !== 7
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -293,6 +320,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     catalogViewMode === null ||
     catalogThumbnailSizes === null ||
     viewMode === null ||
+    !isPortraitAspectPercent(spreadPortraitMaxAspectPercent) ||
+    !isAutoViewportAspectPercent(autoSpreadMinViewportAspectPercent) ||
+    typeof spreadFirstPageSingle !== "boolean" ||
+    spreadPairing === null ||
     layoutMode === null ||
     readingDirection === null ||
     scaleMode === null ||
@@ -336,6 +367,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     catalogViewMode,
     catalogThumbnailSizes,
     viewMode,
+    spreadPortraitMaxAspectPercent,
+    autoSpreadMinViewportAspectPercent,
+    spreadFirstPageSingle,
+    spreadPairing,
     layoutMode,
     readingDirection,
     scaleMode,

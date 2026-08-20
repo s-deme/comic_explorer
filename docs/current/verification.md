@@ -130,6 +130,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Rust / release / CoDD | PASS | formal canonicalは348.5秒で全12 stageがexit 0。Rust lib 165件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。 |
 | 性能・製品直接観測 | NOT RUN | 判定は定数時間でResizeObserverを1件だけ保持する。release WebView2での連続resize、DPI/分離viewer、実画像の多様な縦横比は未測定。 |
 
+## Leeyes P2-E 見開き条件
+
+対象はLEY-VIEWER-014の1件。縦長page比率、auto viewport比率、先頭単独、開始偶奇をstrict profile v8・SQLite・設定dialog・viewer modelへ接続し、v1〜v7はP2-D互換既定値へ移行する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | model・Viewer・profile・Appの4 files / 219件、FAIL 0。cover/even再同期、50〜100% page比、100〜300% viewport比、設定apply、v7 migration、不正値拒否を含む。 |
+| TypeScript typecheck | PASS | exit 0。 |
+| Rust focused | PASS | persisted spread ruleの既定値・正常値・不正値fallback 1件、FAIL 0。sandbox内target書込み拒否後、承認済みWindows境界で再実行した。 |
+| Windows tests / build | PASS | Python 59件、frontend 27 files / 363件、FAIL 0。typecheck exit 0、frontend 68 modules build。 |
+| Rust / release / CoDD | PASS | formal canonicalは350.2秒で全12 stageがexit 0。Rust lib 166件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・製品直接観測 | NOT RUN | 判定はpageごとに定数時間、設定値は固定サイズ。release WebView2のDPI別resize、実画像の縦横比境界、極端な画像寸法は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。
