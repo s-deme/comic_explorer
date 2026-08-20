@@ -283,6 +283,10 @@ pub struct CatalogSettings {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub viewer_background: String,
+    pub viewer_page_margin: u16,
+    pub viewer_spread_gap: u16,
+    pub cursor_auto_hide_ms: u32,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -313,6 +317,10 @@ pub struct SettingsProfileInput {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub viewer_background: String,
+    pub viewer_page_margin: u16,
+    pub viewer_spread_gap: u16,
+    pub cursor_auto_hide_ms: u32,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -341,6 +349,9 @@ pub struct FavoriteEntry {
 
 const MIN_VIEWER_SCALE: f64 = 0.25;
 const MAX_VIEWER_SCALE: f64 = 4.0;
+const MAX_VIEWER_SPACING: u16 = 64;
+const DEFAULT_VIEWER_PAGE_MARGIN: u16 = 0;
+const DEFAULT_VIEWER_SPREAD_GAP: u16 = 8;
 const MIN_CATALOG_THUMBNAIL_SIZE: u16 = 64;
 const MAX_CATALOG_THUMBNAIL_SIZE: u16 = 320;
 const DEFAULT_CATALOG_THUMBNAIL_SIZES: CatalogThumbnailSizes = CatalogThumbnailSizes {
@@ -700,6 +711,34 @@ fn viewer_layout_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn viewer_background(settings: &crate::state::Settings) -> String {
+    if matches!(
+        settings.viewer_background.as_str(),
+        "checker" | "dark" | "black" | "light"
+    ) {
+        settings.viewer_background.clone()
+    } else {
+        "checker".into()
+    }
+}
+
+fn viewer_spacing(value: &str, fallback: u16) -> u16 {
+    value
+        .parse::<u16>()
+        .ok()
+        .filter(|spacing| *spacing <= MAX_VIEWER_SPACING)
+        .unwrap_or(fallback)
+}
+
+fn viewer_cursor_auto_hide_ms(settings: &crate::state::Settings) -> u32 {
+    settings
+        .cursor_auto_hide_ms
+        .parse::<u32>()
+        .ok()
+        .filter(|delay| matches!(*delay, 0 | 1_000 | 2_000 | 3_000 | 5_000))
+        .unwrap_or(0)
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -707,6 +746,11 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let catalog_view_mode = catalog_view_mode(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
+    let viewer_background = viewer_background(&settings);
+    let viewer_page_margin =
+        viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN);
+    let viewer_spread_gap = viewer_spacing(&settings.viewer_spread_gap, DEFAULT_VIEWER_SPREAD_GAP);
+    let cursor_auto_hide_ms = viewer_cursor_auto_hide_ms(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
@@ -722,6 +766,10 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         scale_mode,
         scale,
         loupe_enabled: settings.loupe_enabled,
+        viewer_background,
+        viewer_page_margin,
+        viewer_spread_gap,
+        cursor_auto_hide_ms,
         tree_visible: settings.tree_visible,
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
@@ -1701,6 +1749,10 @@ pub fn set_viewer_settings(
     scale_mode: String,
     scale: f64,
     loupe_enabled: bool,
+    viewer_background: String,
+    viewer_page_margin: u16,
+    viewer_spread_gap: u16,
+    cursor_auto_hide_ms: u32,
 ) -> Result<Response<CatalogSettings>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
@@ -1717,6 +1769,13 @@ pub fn set_viewer_settings(
         )
         || !scale.is_finite()
         || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&scale)
+        || !matches!(
+            viewer_background.as_str(),
+            "checker" | "dark" | "black" | "light"
+        )
+        || viewer_page_margin > MAX_VIEWER_SPACING
+        || viewer_spread_gap > MAX_VIEWER_SPACING
+        || !matches!(cursor_auto_hide_ms, 0 | 1_000 | 2_000 | 3_000 | 5_000)
     {
         return Ok(error_response(
             &context,
@@ -1737,6 +1796,10 @@ pub fn set_viewer_settings(
         settings.scale_mode = scale_mode;
         settings.scale = scale.to_string();
         settings.loupe_enabled = loupe_enabled;
+        settings.viewer_background = viewer_background;
+        settings.viewer_page_margin = viewer_page_margin.to_string();
+        settings.viewer_spread_gap = viewer_spread_gap.to_string();
+        settings.cursor_auto_hide_ms = cursor_auto_hide_ms.to_string();
         if let Some(store) = stores.as_mut() {
             store
                 .save_settings(&settings)
@@ -1798,6 +1861,16 @@ fn validate_settings_profile(
         )
         || !profile.scale.is_finite()
         || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&profile.scale)
+        || !matches!(
+            profile.viewer_background.as_str(),
+            "checker" | "dark" | "black" | "light"
+        )
+        || profile.viewer_page_margin > MAX_VIEWER_SPACING
+        || profile.viewer_spread_gap > MAX_VIEWER_SPACING
+        || !matches!(
+            profile.cursor_auto_hide_ms,
+            0 | 1_000 | 2_000 | 3_000 | 5_000
+        )
     {
         return Err(request_error(
             ErrorCode::InvalidRequest,
@@ -1861,6 +1934,10 @@ pub fn set_settings_profile(
         settings.scale_mode = profile.scale_mode;
         settings.scale = profile.scale.to_string();
         settings.loupe_enabled = profile.loupe_enabled;
+        settings.viewer_background = profile.viewer_background;
+        settings.viewer_page_margin = profile.viewer_page_margin.to_string();
+        settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
+        settings.cursor_auto_hide_ms = profile.cursor_auto_hide_ms.to_string();
         settings.tree_visible = profile.tree_visible;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
@@ -3488,6 +3565,10 @@ mod shutdown_tests {
             scale_mode: "fit".into(),
             scale: 1.0,
             loupe_enabled: false,
+            viewer_background: "checker".into(),
+            viewer_page_margin: 0,
+            viewer_spread_gap: 8,
+            cursor_auto_hide_ms: 0,
             tree_visible: false,
             menu_bar_visible: true,
             toolbar_visible: false,
@@ -3504,6 +3585,25 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.catalog_thumbnail_sizes.small_thumbnail = 104;
+
+        profile.viewer_page_margin = 65;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.viewer_page_margin = 0;
+        profile.viewer_background = "transparent".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.viewer_background = "checker".into();
+        profile.cursor_auto_hide_ms = 4_000;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.cursor_auto_hide_ms = 2_000;
 
         profile
             .mouse_gestures
@@ -3608,6 +3708,51 @@ mod shutdown_tests {
 
         settings.layout_mode = "fullscreen".into();
         assert_eq!(viewer_layout_mode(&settings), "paged");
+    }
+
+    #[test]
+    fn ft_b23_004_viewer_appearance_uses_valid_values_and_safe_defaults() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(viewer_background(&settings), "checker");
+        assert_eq!(
+            viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN),
+            0
+        );
+        assert_eq!(
+            viewer_spacing(&settings.viewer_spread_gap, DEFAULT_VIEWER_SPREAD_GAP),
+            8
+        );
+        assert_eq!(viewer_cursor_auto_hide_ms(&settings), 0);
+
+        settings.viewer_background = "light".into();
+        settings.viewer_page_margin = "24".into();
+        settings.viewer_spread_gap = "18".into();
+        settings.cursor_auto_hide_ms = "3000".into();
+        assert_eq!(viewer_background(&settings), "light");
+        assert_eq!(
+            viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN),
+            24
+        );
+        assert_eq!(
+            viewer_spacing(&settings.viewer_spread_gap, DEFAULT_VIEWER_SPREAD_GAP),
+            18
+        );
+        assert_eq!(viewer_cursor_auto_hide_ms(&settings), 3_000);
+
+        settings.viewer_background = "transparent".into();
+        settings.viewer_page_margin = "65".into();
+        settings.viewer_spread_gap = "invalid".into();
+        settings.cursor_auto_hide_ms = "4000".into();
+        assert_eq!(viewer_background(&settings), "checker");
+        assert_eq!(
+            viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN),
+            0
+        );
+        assert_eq!(
+            viewer_spacing(&settings.viewer_spread_gap, DEFAULT_VIEWER_SPREAD_GAP),
+            8
+        );
+        assert_eq!(viewer_cursor_auto_hide_ms(&settings), 0);
     }
 
     #[test]

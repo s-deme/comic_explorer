@@ -17,15 +17,31 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-13 JST
+- 最終更新日: 2026-08-20 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
-- 対象: 上記commitの実装と、本ドキュメント統合差分
+- 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
-## 最新の受理済み結果
+## FR-B23 Leeyes viewer操作・外観
+
+対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。
+
+| Gate | 結果 | 2026-08-20の実測 |
+|---|---|---|
+| Windows tests | PASS | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-tests-windows.ps1`: Python 56件、frontend 25 files / 296件、FAIL 0。見開き1page移動、背景・余白・間隔、cursor inactivityとpointer drag・ルーペ中の抑止、profile v4移行・不正値拒否、Appからbackend payloadとViewer CSS propertyへの接続、192行トラッカー整合性を含む。 |
+| TypeScript typecheck | PASS | `.\scripts\run-typecheck-windows.ps1`: exit 0。 |
+| Rust focused | PASS | `.\scripts\invoke-windows-toolchain.ps1 -Task RustFocused -RustFilter ft_b23_004`: 1件PASS、157件filtered out、FAIL 0。 |
+| Rust canonical | PASS | `.\scripts\invoke-windows-toolchain.ps1 -Task RustCanonical`: `cargo fmt --check`、`cargo check --locked`、lib 158件とshutdown process 1件を含む`cargo test --locked`がexit 0。既存dead-code warning 2件はFAILへ読み替えない。 |
+| Windows frontend build | PASS | `.\scripts\run-build-windows.ps1`: 66 modules、exit 0。`dist/`は生成物としてcommitしない。 |
+| CoDD | PASS（red 0） | scan 5 documents / 59 nodes / 132 edges。checkはred failure 0、advisory 10。verifyはexit 0、DAG red 3 PASS / 0 FAIL、amber WARN 1、SKIP 3、VACUOUS 1、typecheck実行、source integrity 13 files。SKIP・VACUOUS・verification tests 0件を機能PASSへ加算しない。 |
+| release WebView2直接観測 | NOT RUN | 背景色、余白、見開き間隔、cursor消去・復帰の実製品目視は今回の必須自動gateに含まれず未測定。自動テストのPASSから直接観測済みとは推定しない。 |
+
+Windows SDK x64 libraryが当初存在しなかったため、Microsoft公式component `Microsoft.VisualStudio.Component.Windows11SDK.26100`をVisual Studio Community 2026へ追加した。SDKは`E:\Windows Kits\10\Lib\10.0.26100.0`として解決され、追加後にRust focused/canonicalを実行した。
+
+## 既存laneの受理済み結果
 
 | 領域 | 状態 | 実測内容または境界 |
 |---|---|---|
@@ -59,7 +75,7 @@ codd:
 
 ## Feature受入要約
 
-- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、B21、FR-B11のkeyboard・mouse範囲。
+- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、B21、B23、FR-B11のkeyboard・mouse範囲。
 - BLOCKED/PARTIAL: B08のanimated GIF製品観測とAVIF decode、B11の任意軌跡gesture/touch/gamepad、B17、B18、B20、B22の製品表示・native shell観測。
 - Windows release WebView2を直接観測したlaneと、Vitest/jsdom・Rust contractだけのlaneを区別する。
 - focused testのexcluded-by-pattern、構造的SKIP、vacuous check、advisoryをPASS件数へ加えない。

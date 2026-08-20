@@ -69,12 +69,22 @@ class UiStyleContractTests(unittest.TestCase):
         )
 
     def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:
-        self.assert_rule_contains(".viewer-stage", "background-size: 24px 24px")
         self.assert_rule_contains(
-            ".viewer-stage",
+            '.viewer-stage[data-background="checker"]',
+            "background-size: 24px 24px",
+        )
+        self.assert_rule_contains(
+            '.viewer-stage[data-background="checker"]',
             "background-position: 0 0, 0 12px, 12px -12px, -12px 0",
         )
         self.assert_rule_contains(".viewer-stage", "background-color: #20211f")
+        self.assert_rule_contains(
+            '.viewer-stage[data-background="black"]', "background-color: #000"
+        )
+        self.assert_rule_contains(
+            '.viewer-stage[data-background="light"]',
+            "background-color: #e6e8eb",
+        )
         self.assertIn(
             "linear-gradient(45deg, #252625 25%, transparent 25%)",
             STYLES,
@@ -93,7 +103,22 @@ class UiStyleContractTests(unittest.TestCase):
             '.page-spread[data-layout-mode="paged"][data-scale-mode="width"] > img',
             "margin-block: auto",
         )
-        self.assert_rule_contains(".page-spread", "gap: 8px")
+        self.assert_rule_contains(
+            ".page-spread", "padding: var(--viewer-page-margin, 0)"
+        )
+        self.assert_rule_contains(
+            ".page-spread", "gap: var(--viewer-spread-gap, 8px)"
+        )
+        self.assert_rule_contains(
+            '.page-spread[data-scale-mode="width"] img',
+            "width: calc(50% - var(--viewer-spread-half-gap, 4px))",
+        )
+
+    def test_viewer_cursor_hides_only_for_an_idle_non_panning_stage(self) -> None:
+        self.assert_rule_contains(
+            '.viewer-stage[data-cursor-hidden="true"][data-panning="false"]',
+            "cursor: none",
+        )
 
     def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
         self.assert_rule_contains(

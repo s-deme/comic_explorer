@@ -3,8 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   clampLoupePointer,
   createViewerScaleState,
+  DEFAULT_VIEWER_BACKGROUND,
+  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
   MAX_SCALE,
   MIN_SCALE,
+  normalizeViewerBackground,
+  normalizeViewerCursorAutoHideMs,
+  normalizeViewerSpacing,
   normalizeScale,
   normalizeViewerLayoutMode,
   scaleReducer,
@@ -53,6 +60,19 @@ describe("viewer page model", () => {
     expect(state.index).toBe(2);
     state = viewerReducer(state, { type: "previous" });
     expect(state.index).toBe(0);
+  });
+
+  it("FT-B23-001 shifts a spread anchor by exactly one page without crossing bounds", () => {
+    let state = viewerReducer(initial, { type: "shift", delta: 1, pageCount: 5 });
+    expect(state.index).toBe(1);
+    expect(visibleIndices(state, 5, new Set())).toEqual([1, 2]);
+
+    state = viewerReducer(state, { type: "shift", delta: -1, pageCount: 5 });
+    expect(state.index).toBe(0);
+    expect(viewerReducer(state, { type: "shift", delta: -1, pageCount: 5 })).toBe(state);
+
+    const final = { ...initial, index: 4 };
+    expect(viewerReducer(final, { type: "shift", delta: 1, pageCount: 5 })).toBe(final);
   });
 });
 
@@ -129,5 +149,23 @@ describe("FR-B04 viewer layout model", () => {
     expect(normalizeViewerLayoutMode("vertical_scroll")).toBe("vertical_scroll");
     expect(normalizeViewerLayoutMode("horizontal_scroll")).toBe("horizontal_scroll");
     expect(normalizeViewerLayoutMode("fullscreen")).toBe("paged");
+  });
+});
+
+describe("FR-B23 viewer appearance settings", () => {
+  it("FT-B23-002 normalizes backgrounds, spacing and cursor delay to safe defaults", () => {
+    expect(normalizeViewerBackground("black")).toBe("black");
+    expect(normalizeViewerBackground("transparent")).toBe(DEFAULT_VIEWER_BACKGROUND);
+    expect(normalizeViewerSpacing(24, DEFAULT_VIEWER_PAGE_MARGIN)).toBe(24);
+    expect(normalizeViewerSpacing(65, DEFAULT_VIEWER_PAGE_MARGIN)).toBe(
+      DEFAULT_VIEWER_PAGE_MARGIN,
+    );
+    expect(normalizeViewerSpacing(-1, DEFAULT_VIEWER_SPREAD_GAP)).toBe(
+      DEFAULT_VIEWER_SPREAD_GAP,
+    );
+    expect(normalizeViewerCursorAutoHideMs(3_000)).toBe(3_000);
+    expect(normalizeViewerCursorAutoHideMs(4_000)).toBe(
+      DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+    );
   });
 });

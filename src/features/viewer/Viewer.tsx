@@ -8,8 +8,15 @@ import {
 import {
   clampLoupePointer,
   createViewerScaleState,
+  DEFAULT_VIEWER_BACKGROUND,
+  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
   LOUPE_SIZE,
   LOUPE_ZOOM,
+  normalizeViewerBackground,
+  normalizeViewerCursorAutoHideMs,
+  normalizeViewerSpacing,
   scaleReducer,
   viewerReducer,
   visibleIndices,
@@ -17,6 +24,7 @@ import {
   type ScaleMode,
   type ViewerScaleAction,
   type ViewerScaleState,
+  type ViewerBackground,
   type ViewMode,
   type ViewerLayoutMode,
 } from "./model";
@@ -66,6 +74,10 @@ interface ViewerProps {
   initialScaleMode?: ScaleMode;
   initialScale?: number;
   initialLoupeEnabled?: boolean;
+  initialBackground?: ViewerBackground;
+  initialPageMargin?: number;
+  initialSpreadGap?: number;
+  initialCursorAutoHideMs?: number;
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
@@ -115,6 +127,10 @@ export function Viewer({
   initialScaleMode = "fit",
   initialScale = 1,
   initialLoupeEnabled = false,
+  initialBackground = DEFAULT_VIEWER_BACKGROUND,
+  initialPageMargin = DEFAULT_VIEWER_PAGE_MARGIN,
+  initialSpreadGap = DEFAULT_VIEWER_SPREAD_GAP,
+  initialCursorAutoHideMs = DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
@@ -128,6 +144,18 @@ export function Viewer({
   onSaveBookmark,
   onNextBookmark,
 }: ViewerProps) {
+  const viewerBackground = normalizeViewerBackground(initialBackground);
+  const viewerPageMargin = normalizeViewerSpacing(
+    initialPageMargin,
+    DEFAULT_VIEWER_PAGE_MARGIN,
+  );
+  const viewerSpreadGap = normalizeViewerSpacing(
+    initialSpreadGap,
+    DEFAULT_VIEWER_SPREAD_GAP,
+  );
+  const cursorAutoHideMs = normalizeViewerCursorAutoHideMs(
+    initialCursorAutoHideMs,
+  );
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
     mode: initialMode,
@@ -169,6 +197,9 @@ export function Viewer({
   const pointerDragRef = useRef<PointerDragState | null>(null);
   const rightButtonHeldRef = useRef(false);
   const [panning, setPanning] = useState(false);
+  const [cursorHidden, setCursorHidden] = useState(false);
+  const cursorInsideStageRef = useRef(false);
+  const cursorHideTimerRef = useRef<number | null>(null);
   const initialFullscreenRequested = useRef(false);
 
   useEffect(() => {
@@ -186,6 +217,34 @@ export function Viewer({
     };
   }, []);
   const positionTimerRef = useRef<number | null>(null);
+
+  function clearCursorHideTimer() {
+    if (cursorHideTimerRef.current === null) return;
+    window.clearTimeout(cursorHideTimerRef.current);
+    cursorHideTimerRef.current = null;
+  }
+
+  function scheduleCursorHide() {
+    clearCursorHideTimer();
+    setCursorHidden(false);
+    if (
+      !cursorInsideStageRef.current
+      || cursorAutoHideMs === 0
+      || pointerDragRef.current !== null
+      || rightButtonHeldRef.current
+      || panning
+      || scale.loupeEnabled
+    ) return;
+    cursorHideTimerRef.current = window.setTimeout(() => {
+      cursorHideTimerRef.current = null;
+      setCursorHidden(true);
+    }, cursorAutoHideMs);
+  }
+
+  useEffect(() => {
+    scheduleCursorHide();
+    return clearCursorHideTimer;
+  }, [cursorAutoHideMs, panning, scale.loupeEnabled]);
   const visible = useMemo(
     () => visibleIndices(state, session.pages.length, landscape),
     [landscape, session.pages.length, state],
@@ -347,6 +406,11 @@ export function Viewer({
   function changeMode(mode: ViewMode) {
     dispatch({ type: "mode", mode });
     onSettingsChange(mode, state.direction);
+  }
+
+  function shiftOnePage(delta: -1 | 1) {
+    if (layoutMode !== "paged" || state.mode !== "spread") return;
+    dispatch({ type: "shift", delta, pageCount: session.pages.length });
   }
 
   function changeLayout(next: ViewerLayoutMode) {
@@ -831,6 +895,32 @@ export function Viewer({
         </button>
         <button
           className="viewer-icon-button"
+          aria-label="見開きを1ページ戻す"
+          title="見開きの開始位置を1ページ戻す"
+          disabled={
+            layoutMode !== "paged"
+            || state.mode !== "spread"
+            || state.index === 0
+          }
+          onClick={() => shiftOnePage(-1)}
+        >
+          <span aria-hidden="true">1◀</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          aria-label="見開きを1ページ進める"
+          title="見開きの開始位置を1ページ進める"
+          disabled={
+            layoutMode !== "paged"
+            || state.mode !== "spread"
+            || state.index + 1 >= session.pages.length
+          }
+          onClick={() => shiftOnePage(1)}
+        >
+          <span aria-hidden="true">▶1</span>
+        </button>
+        <button
+          className="viewer-icon-button"
           aria-label="倍率を下げる"
           title="倍率を下げる"
           onClick={() => applyScale({ type: "zoomOut" })}
@@ -983,7 +1073,19 @@ export function Viewer({
         ref={stageRef}
         className="viewer-stage"
         data-panning={panning}
+        data-background={viewerBackground}
+        data-cursor-hidden={cursorHidden}
+        style={{
+          "--viewer-page-margin": viewerPageMargin + "px",
+          "--viewer-spread-gap": viewerSpreadGap + "px",
+          "--viewer-spread-half-gap": viewerSpreadGap / 2 + "px",
+        } as CSSProperties}
+        onPointerEnter={() => {
+          cursorInsideStageRef.current = true;
+          scheduleCursorHide();
+        }}
         onPointerMove={(event) => {
+          scheduleCursorHide();
           updateLoupe(event);
           const drag = pointerDragRef.current;
           if (!drag || drag.pointerId !== event.pointerId || !drag.pannable) return;
@@ -1000,8 +1102,15 @@ export function Viewer({
           drag.lastY = event.clientY;
           event.preventDefault();
         }}
-        onPointerLeave={() => setLoupe(null)}
+        onPointerLeave={() => {
+          cursorInsideStageRef.current = false;
+          clearCursorHideTimer();
+          setCursorHidden(false);
+          setLoupe(null);
+        }}
         onPointerDown={(event) => {
+          clearCursorHideTimer();
+          setCursorHidden(false);
           if (event.button === 2) {
             rightButtonHeldRef.current = true;
             event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -1039,13 +1148,18 @@ export function Viewer({
         onPointerUp={(event) => {
           if (event.button === 2) {
             rightButtonHeldRef.current = false;
+            scheduleCursorHide();
             event.preventDefault();
             return;
           }
-          if (event.button !== 0) return;
+          if (event.button !== 0) {
+            scheduleCursorHide();
+            return;
+          }
           const drag = pointerDragRef.current;
           pointerDragRef.current = null;
           setPanning(false);
+          scheduleCursorHide();
           if (!drag || drag.pointerId !== event.pointerId || drag.pannable) return;
           if (Math.abs(event.clientX - drag.startX) < 48) return;
           const action = event.clientX < drag.startX
@@ -1057,6 +1171,7 @@ export function Viewer({
           rightButtonHeldRef.current = false;
           pointerDragRef.current = null;
           setPanning(false);
+          scheduleCursorHide();
         }}
         onContextMenu={(event) => event.preventDefault()}
         onDoubleClick={() => void requestFullscreen(!fullscreen)}

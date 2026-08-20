@@ -14,11 +14,19 @@ import {
   type CatalogViewMode,
 } from "../catalog/view-mode";
 import {
+  DEFAULT_VIEWER_BACKGROUND,
+  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
   DEFAULT_SCALE,
+  isViewerCursorAutoHideMs,
+  isViewerSpacing,
   MAX_SCALE,
   MIN_SCALE,
+  VIEWER_BACKGROUNDS,
   VIEWER_LAYOUT_MODES,
   type ScaleMode,
+  type ViewerBackground,
   type ViewerLayoutMode,
   type ViewMode,
 } from "../viewer/model";
@@ -30,7 +38,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 3;
+export const SETTINGS_PROFILE_VERSION = 4;
 export const APP_VERSION = packageMetadata.version;
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
@@ -80,6 +88,10 @@ export interface SettingsProfile {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  viewerBackground: ViewerBackground;
+  viewerPageMargin: number;
+  viewerSpreadGap: number;
+  cursorAutoHideMs: number;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -101,6 +113,10 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     scaleMode: "fit",
     scale: DEFAULT_SCALE,
     loupeEnabled: false,
+    viewerBackground: DEFAULT_VIEWER_BACKGROUND,
+    viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
+    viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
+    cursorAutoHideMs: DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -161,9 +177,26 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);
   const shortcuts = strictShortcutBindings(candidate.shortcuts);
   const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
+  const legacyViewerAppearance =
+    candidate.profileVersion === 1
+    || candidate.profileVersion === 2
+    || candidate.profileVersion === 3;
+  const viewerBackground = legacyViewerAppearance
+    ? DEFAULT_VIEWER_BACKGROUND
+    : enumValue(candidate.viewerBackground, VIEWER_BACKGROUNDS);
+  const viewerPageMargin = legacyViewerAppearance
+    ? DEFAULT_VIEWER_PAGE_MARGIN
+    : candidate.viewerPageMargin;
+  const viewerSpreadGap = legacyViewerAppearance
+    ? DEFAULT_VIEWER_SPREAD_GAP
+    : candidate.viewerSpreadGap;
+  const cursorAutoHideMs = legacyViewerAppearance
+    ? DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS
+    : candidate.cursorAutoHideMs;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
+      && candidate.profileVersion !== 3
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -179,6 +212,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     candidate.scale < MIN_SCALE ||
     candidate.scale > MAX_SCALE ||
     typeof candidate.loupeEnabled !== "boolean" ||
+    viewerBackground === null ||
+    !isViewerSpacing(viewerPageMargin) ||
+    !isViewerSpacing(viewerSpreadGap) ||
+    !isViewerCursorAutoHideMs(cursorAutoHideMs) ||
     typeof candidate.treeVisible !== "boolean" ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
@@ -200,6 +237,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     scaleMode,
     scale: candidate.scale,
     loupeEnabled: candidate.loupeEnabled,
+    viewerBackground,
+    viewerPageMargin,
+    viewerSpreadGap,
+    cursorAutoHideMs,
     treeVisible: candidate.treeVisible,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,

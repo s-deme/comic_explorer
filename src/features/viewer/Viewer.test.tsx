@@ -96,7 +96,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(13);
+    expect(buttons).toHaveLength(15);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -109,6 +109,177 @@ describe("Viewer settings", () => {
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
     expect(close).toHaveTextContent("↩");
     expect(close).not.toHaveTextContent("一覧へ戻る");
+  });
+
+  it("FT-B23-001 shifts a paged spread by one page without invoking volume navigation", () => {
+    const spreadSession = {
+      ...multiPageSession,
+      pages: [
+        ...multiPageSession.pages,
+        {
+          id: "page-3" as never,
+          relativePath: "3.png" as never,
+          mediaUri: "comic://localhost/three",
+        },
+        {
+          id: "page-4" as never,
+          relativePath: "4.png" as never,
+          mediaUri: "comic://localhost/four",
+        },
+      ],
+    };
+    const onNextItem = vi.fn();
+    const onPreviousItem = vi.fn();
+    render(
+      <Viewer
+        session={spreadSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        onNextItem={onNextItem}
+        onPreviousItem={onPreviousItem}
+      />,
+    );
+
+    const previousOne = screen.getByRole("button", { name: "見開きを1ページ戻す" });
+    const nextOne = screen.getByRole("button", { name: "見開きを1ページ進める" });
+    expect(previousOne).toBeDisabled();
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "0");
+
+    fireEvent.click(nextOne);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
+    expect(previousOne).toBeEnabled();
+    expect(onNextItem).not.toHaveBeenCalled();
+
+    fireEvent.click(previousOne);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "0");
+    expect(onPreviousItem).not.toHaveBeenCalled();
+  });
+
+  it("FT-B23-002 applies validated background, page margin and spread gap settings", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="rightToLeft"
+        initialBackground="black"
+        initialPageMargin={24}
+        initialSpreadGap={18}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    expect(stage).toHaveAttribute("data-background", "black");
+    expect(stage?.style.getPropertyValue("--viewer-page-margin")).toBe("24px");
+    expect(stage?.style.getPropertyValue("--viewer-spread-gap")).toBe("18px");
+    expect(stage?.style.getPropertyValue("--viewer-spread-half-gap")).toBe("9px");
+  });
+
+  it("FT-B23-003 hides only the stage cursor after inactivity and reveals it on movement", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={session}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialCursorAutoHideMs={2_000}
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+
+      const stage = document.querySelector<HTMLElement>(".viewer-stage");
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+      fireEvent.pointerEnter(stage!);
+      act(() => vi.advanceTimersByTime(1_999));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+      act(() => vi.advanceTimersByTime(1));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "true");
+
+      fireEvent.pointerMove(stage!, { clientX: 10, clientY: 10 });
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+      fireEvent.pointerLeave(stage!);
+      act(() => vi.advanceTimersByTime(2_000));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("FT-B23-003 keeps the cursor visible while the loupe is active", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={session}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialLoupeEnabled
+          initialCursorAutoHideMs={1_000}
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+
+      const stage = document.querySelector<HTMLElement>(".viewer-stage");
+      fireEvent.pointerEnter(stage!);
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("FT-B23-003 suspends cursor hiding for the full pointer drag", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={multiPageSession}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialScaleMode="custom"
+          initialScale={2}
+          initialCursorAutoHideMs={1_000}
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+
+      const stage = document.querySelector<HTMLElement>(".viewer-stage");
+      const spread = document.querySelector<HTMLElement>(".page-spread");
+      Object.defineProperties(spread!, {
+        clientWidth: { configurable: true, value: 500 },
+        clientHeight: { configurable: true, value: 400 },
+        scrollWidth: { configurable: true, value: 1_000 },
+        scrollHeight: { configurable: true, value: 800 },
+      });
+
+      fireEvent.pointerEnter(stage!);
+      fireEvent.pointerDown(stage!, { pointerId: 1, clientX: 200, clientY: 180 });
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+      fireEvent.pointerMove(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
+      expect(stage).toHaveAttribute("data-panning", "true");
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "false");
+
+      fireEvent.pointerUp(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
+      expect(stage).toHaveAttribute("data-panning", "false");
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(stage).toHaveAttribute("data-cursor-hidden", "true");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("moves to any page from the bottom page navigator instead of the toolbar", () => {

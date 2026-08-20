@@ -12,7 +12,7 @@ import type {
   RelativePath,
   RequestId,
 } from "../../types/domain";
-import type { ScaleMode, ViewerLayoutMode } from "../viewer/model";
+import type { ScaleMode, ViewerBackground, ViewerLayoutMode } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import type { SearchRequestOptions } from "../catalog/search-options";
@@ -81,6 +81,10 @@ export interface CatalogSettings {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  viewerBackground: ViewerBackground;
+  viewerPageMargin: number;
+  viewerSpreadGap: number;
+  cursorAutoHideMs: number;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -107,6 +111,10 @@ export async function saveViewerSettings(
     | "scaleMode"
     | "scale"
     | "loupeEnabled"
+    | "viewerBackground"
+    | "viewerPageMargin"
+    | "viewerSpreadGap"
+    | "cursorAutoHideMs"
   >,
   generation: number,
 ): Promise<ApiResponse<CatalogSettings>> {
@@ -118,6 +126,10 @@ export async function saveViewerSettings(
     scaleMode: settings.scaleMode,
     scale: settings.scale,
     loupeEnabled: settings.loupeEnabled,
+    viewerBackground: settings.viewerBackground,
+    viewerPageMargin: settings.viewerPageMargin,
+    viewerSpreadGap: settings.viewerSpreadGap,
+    cursorAutoHideMs: settings.cursorAutoHideMs,
   });
 }
 
@@ -139,6 +151,10 @@ export async function saveSettingsProfile(
       scaleMode: profile.scaleMode,
       scale: profile.scale,
       loupeEnabled: profile.loupeEnabled,
+      viewerBackground: profile.viewerBackground,
+      viewerPageMargin: profile.viewerPageMargin,
+      viewerSpreadGap: profile.viewerSpreadGap,
+      cursorAutoHideMs: profile.cursorAutoHideMs,
       treeVisible: profile.treeVisible,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,

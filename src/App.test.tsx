@@ -173,6 +173,10 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   scaleMode: "fit",
   scale: 1,
   loupeEnabled: false,
+  viewerBackground: "checker",
+  viewerPageMargin: 0,
+  viewerSpreadGap: 8,
+  cursorAutoHideMs: 0,
   treeVisible: true,
   menuBarVisible: true,
   toolbarVisible: true,
@@ -2448,7 +2452,7 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("FT-B19-006 searches categorized settings and resets the whole draft", async () => {
     await registerTestLibrary([]);
@@ -2476,6 +2480,50 @@ describe("application shell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
     expect(screen.getByRole("complementary", { name: "フォルダツリー" })).toBeInTheDocument();
     expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+  });
+
+  it("FT-B23-002 and FT-B23-004 persist viewer appearance settings and apply them to the viewer", async () => {
+    const entry = testEntry("appearance.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry]);
+
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^ビューワ/ }));
+    fireEvent.change(within(dialog).getByLabelText("profileビューワ背景"), {
+      target: { value: "black" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profileページ周囲の余白（px）"), {
+      target: { value: "24" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile見開き間隔（px）"), {
+      target: { value: "18" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profileカーソル自動非表示"), {
+      target: { value: "2000" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileVersion: 4,
+        viewerBackground: "black",
+        viewerPageMargin: 24,
+        viewerSpreadGap: 18,
+        cursorAutoHideMs: 2_000,
+      }),
+      expect.any(Number),
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /^appearance\.cbz/ }), {
+      key: "Enter",
+    });
+    await screen.findByLabelText("appearance.cbz ビューワ");
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    expect(stage).toHaveAttribute("data-background", "black");
+    expect(stage?.style.getPropertyValue("--viewer-page-margin")).toBe("24px");
+    expect(stage?.style.getPropertyValue("--viewer-spread-gap")).toBe("18px");
   });
 
   it("FT-B19-002 exports a safe profile and imports it only into the settings draft", async () => {

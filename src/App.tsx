@@ -85,11 +85,21 @@ import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import type {
   ReadingDirection,
   ScaleMode,
+  ViewerBackground,
   ViewMode,
   ViewerScaleState,
   ViewerLayoutMode,
 } from "./features/viewer/model";
-import { normalizeViewerLayoutMode } from "./features/viewer/model";
+import {
+  DEFAULT_VIEWER_BACKGROUND,
+  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
+  normalizeViewerBackground,
+  normalizeViewerCursorAutoHideMs,
+  normalizeViewerLayoutMode,
+  normalizeViewerSpacing,
+} from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
   SHORTCUT_COMMANDS,
@@ -397,6 +407,14 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
   const [viewerScale, setViewerScale] = useState(1);
   const [loupeEnabled, setLoupeEnabled] = useState(false);
+  const [viewerBackground, setViewerBackground] =
+    useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
+  const [viewerPageMargin, setViewerPageMargin] =
+    useState(DEFAULT_VIEWER_PAGE_MARGIN);
+  const [viewerSpreadGap, setViewerSpreadGap] =
+    useState(DEFAULT_VIEWER_SPREAD_GAP);
+  const [cursorAutoHideMs, setCursorAutoHideMs] =
+    useState(DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS);
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
@@ -752,6 +770,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
           setLoupeEnabled(response.data.loupeEnabled);
+          setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
+          setViewerPageMargin(normalizeViewerSpacing(
+            response.data.viewerPageMargin,
+            DEFAULT_VIEWER_PAGE_MARGIN,
+          ));
+          setViewerSpreadGap(normalizeViewerSpacing(
+            response.data.viewerSpreadGap,
+            DEFAULT_VIEWER_SPREAD_GAP,
+          ));
+          setCursorAutoHideMs(normalizeViewerCursorAutoHideMs(
+            response.data.cursorAutoHideMs,
+          ));
           setTreeVisible(response.data.treeVisible);
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
@@ -2101,6 +2131,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       scaleMode: viewerScaleMode,
       scale: viewerScale,
       loupeEnabled,
+      viewerBackground,
+      viewerPageMargin,
+      viewerSpreadGap,
+      cursorAutoHideMs,
       treeVisible,
       menuBarVisible,
       toolbarVisible,
@@ -2151,6 +2185,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setViewerScaleMode(normalized.scaleMode);
       setViewerScale(normalized.scale);
       setLoupeEnabled(normalized.loupeEnabled);
+      setViewerBackground(normalized.viewerBackground);
+      setViewerPageMargin(normalized.viewerPageMargin);
+      setViewerSpreadGap(normalized.viewerSpreadGap);
+      setCursorAutoHideMs(normalized.cursorAutoHideMs);
       setTreeVisible(normalized.treeVisible);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
@@ -2581,7 +2619,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       Pick<
         CatalogSettings,
         "viewMode" | "readingDirection" | "scaleMode" | "scale" | "loupeEnabled"
-        | "layoutMode"
+        | "layoutMode" | "viewerBackground" | "viewerPageMargin"
+        | "viewerSpreadGap" | "cursorAutoHideMs"
       >
     >,
   ) {
@@ -2594,6 +2633,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         scaleMode: viewerScaleMode,
         scale: viewerScale,
         loupeEnabled,
+        viewerBackground,
+        viewerPageMargin,
+        viewerSpreadGap,
+        cursorAutoHideMs,
         ...next,
       },
       settingsGeneration.current,
@@ -2800,6 +2843,10 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           initialScaleMode={viewerScaleMode}
           initialScale={viewerScale}
           initialLoupeEnabled={loupeEnabled}
+          initialBackground={viewerBackground}
+          initialPageMargin={viewerPageMargin}
+          initialSpreadGap={viewerSpreadGap}
+          initialCursorAutoHideMs={cursorAutoHideMs}
           shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
             setViewMode(mode);

@@ -71,6 +71,10 @@ pub struct Settings {
     pub scale_mode: String,
     pub scale: String,
     pub loupe_enabled: bool,
+    pub viewer_background: String,
+    pub viewer_page_margin: String,
+    pub viewer_spread_gap: String,
+    pub cursor_auto_hide_ms: String,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -106,6 +110,10 @@ impl Default for Settings {
             scale_mode: "fit".into(),
             scale: "1".into(),
             loupe_enabled: false,
+            viewer_background: "checker".into(),
+            viewer_page_margin: "0".into(),
+            viewer_spread_gap: "8".into(),
+            cursor_auto_hide_ms: "0".into(),
             tree_visible: true,
             menu_bar_visible: true,
             toolbar_visible: true,
@@ -186,6 +194,10 @@ impl StateStore {
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
                 "loupeEnabled" => settings.loupe_enabled = value == "true",
+                "viewerBackground" => settings.viewer_background = value,
+                "viewerPageMargin" => settings.viewer_page_margin = value,
+                "viewerSpreadGap" => settings.viewer_spread_gap = value,
+                "cursorAutoHideMs" => settings.cursor_auto_hide_ms = value,
                 "treeVisible" => settings.tree_visible = value == "true",
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
@@ -245,6 +257,10 @@ impl StateStore {
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
             ("loupeEnabled", settings.loupe_enabled.to_string()),
+            ("viewerBackground", settings.viewer_background.clone()),
+            ("viewerPageMargin", settings.viewer_page_margin.clone()),
+            ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
+            ("cursorAutoHideMs", settings.cursor_auto_hide_ms.clone()),
             ("treeVisible", settings.tree_visible.to_string()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
@@ -1112,6 +1128,10 @@ mod tests {
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
                 loupe_enabled: true,
+                viewer_background: "black".into(),
+                viewer_page_margin: "24".into(),
+                viewer_spread_gap: "18".into(),
+                cursor_auto_hide_ms: "2000".into(),
                 tree_visible: false,
                 menu_bar_visible: false,
                 toolbar_visible: true,
@@ -1174,6 +1194,10 @@ mod tests {
         assert_eq!(restored.reference_tile_thumbnail_size, "152");
         assert_eq!(restored.layout_mode, "vertical_scroll");
         assert!(restored.loupe_enabled);
+        assert_eq!(restored.viewer_background, "black");
+        assert_eq!(restored.viewer_page_margin, "24");
+        assert_eq!(restored.viewer_spread_gap, "18");
+        assert_eq!(restored.cursor_auto_hide_ms, "2000");
         assert!(!restored.tree_visible);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);

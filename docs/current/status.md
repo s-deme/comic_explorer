@@ -24,16 +24,16 @@ codd:
 
 ## 機能集計
 
-現行台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来71件の計98件である。
+現行要件台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来75件の計102件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理し、2026-08-20時点で利用者が選択した3件だけを実装・検証済みとする。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
-| Implemented | PASS | 67 |
+| Implemented | PASS | 71 |
 | Implemented | BLOCKED | 15 |
 | Partial | BLOCKED | 9 |
 | Candidate | NOT TESTED | 3 |
 | Rejected | NOT TESTED | 4 |
-| **合計** |  | **98** |
+| **合計** |  | **102** |
 
 ## MVP状態
 
@@ -54,7 +54,7 @@ codd:
 |---|---|---|---|
 | FR-B01 | 表示倍率 | Implemented / PASS | page layoutの横幅フィットはviewer stage全幅・全高を使い、見開きではpage間gapだけを残す。stageより低い画像の上下中央配置と、高い画像を上端から下端まで末尾の固定余白なしでscrollできるstyle contractをWindows testで検証済み。 |
 | FR-B02 | 巻末policy | Implemented / PASS | folder内画像を1冊として閲覧した巻末では親catalogのsort順から次巻を選び、次項目が通常folderでもbackendのfolder画像列挙へ渡して先頭pageを開くことをWindows frontend testで検証済み。 |
-| FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッド、情報カードの順序・名称、4形式別の固定thumbnail幅、表紙中心の縦型grid、外枠と内側余白を省いて4px間隔で並べる大判表紙だけのカードグリッド、属性付き横長情報カードの区別、ファイル名非重複、profile v1/v2からv3への移行とSQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
+| FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッド、情報カードの順序・名称、4形式別の固定thumbnail幅、表紙中心の縦型grid、外枠と内側余白を省いて4px間隔で並べる大判表紙だけのカードグリッド、属性付き横長情報カードの区別、ファイル名非重複、profile v1/v2からv3への移行とprofile v4での保持、SQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
 | FR-B05 | 名前検索 | Implemented / PASS | 10,000項目/1秒はNFR gate。 |
 | FR-B06 | quick access・favorite保存 | Implemented / PASS | — |
 | FR-B07 | memo・history・rating | Implemented / PASS | — |
@@ -74,6 +74,7 @@ codd:
 | FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
 | FR-B21 | standalone PDF | Implemented / PASS | Windows.Data.Pdfの実render、canonical path正規化、上限・分類・root containmentに加え、release WebView2のviewer・thumbnail実decodeを日本語名PDFで直接観測済み。 |
 | FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、Shell delete path正規化、catalog/tree context menu・keyboard操作・右click宛先paste・catalog/tree双方を起点とするdrag move・tree folder削除後の安全な親folder遷移・操作後tree再列挙・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorerとの実paste、アプリ選択の製品直接観測は未測定。 |
+| FR-B23 | Leeyes viewer操作・外観 | Implemented / PASS | LEY-VIEWER-004、025、028を選択範囲として、見開きanchorの1page移動、4背景preset、0〜64pxの周囲余白・見開き間隔、無効/1/2/3/5秒のstage cursor自動非表示、profile v4・SQLite保存、v1〜v3移行、不正値拒否をWindows frontend 296件、Python 56件、Rust canonical、typecheck、buildで検証済み。release WebView2上の目視・操作は未測定であり、自動検証PASSへ合算しない。 |
 
 ## CandidateとRejected
 

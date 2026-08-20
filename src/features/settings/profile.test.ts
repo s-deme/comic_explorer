@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 3,
+    profileVersion: 4,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -24,6 +24,10 @@ function validProfile(): SettingsProfile {
     scaleMode: "fit",
     scale: 1,
     loupeEnabled: false,
+    viewerBackground: "checker",
+    viewerPageMargin: 0,
+    viewerSpreadGap: 8,
+    cursorAutoHideMs: 0,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -69,7 +73,7 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 4, 99, "3", undefined])(
+  it.each([0, 5, 99, "4", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -80,6 +84,10 @@ describe("settings profile", () => {
     const legacy = validProfile() as unknown as Record<string, unknown>;
     legacy.profileVersion = 1;
     delete legacy.catalogThumbnailSizes;
+    delete legacy.viewerBackground;
+    delete legacy.viewerPageMargin;
+    delete legacy.viewerSpreadGap;
+    delete legacy.cursorAutoHideMs;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
@@ -91,6 +99,20 @@ describe("settings profile", () => {
       coverList: 144,
       referenceTile: 128,
     };
+    delete legacy.viewerBackground;
+    delete legacy.viewerPageMargin;
+    delete legacy.viewerSpreadGap;
+    delete legacy.cursorAutoHideMs;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("migrates a v3 profile with the default viewer appearance settings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 3;
+    delete legacy.viewerBackground;
+    delete legacy.viewerPageMargin;
+    delete legacy.viewerSpreadGap;
+    delete legacy.cursorAutoHideMs;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
@@ -101,7 +123,7 @@ describe("settings profile", () => {
     { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 100.5 },
     { smallThumbnail: "104", coverList: 144, cardGrid: 216, referenceTile: 128 },
     undefined,
-  ])("rejects invalid v3 catalog thumbnail sizes (%s)", (catalogThumbnailSizes) => {
+  ])("rejects invalid v4 catalog thumbnail sizes (%s)", (catalogThumbnailSizes) => {
     expect(normalizeSettingsProfile(withField("catalogThumbnailSizes", catalogThumbnailSizes)))
       .toBeNull();
   });
@@ -114,6 +136,7 @@ describe("settings profile", () => {
     ["layoutMode", "grid"],
     ["readingDirection", "topToBottom"],
     ["scaleMode", "automatic"],
+    ["viewerBackground", "transparent"],
   ])("rejects an invalid %s enum", (field, value) => {
     expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
   });
@@ -135,6 +158,18 @@ describe("settings profile", () => {
       expect(normalizeSettingsProfile(withField("scale", scale))).toBeNull();
     },
   );
+
+  it.each([
+    ["viewerPageMargin", -1],
+    ["viewerPageMargin", 65],
+    ["viewerPageMargin", 1.5],
+    ["viewerSpreadGap", -1],
+    ["viewerSpreadGap", 65],
+    ["cursorAutoHideMs", 4_000],
+    ["cursorAutoHideMs", "2000"],
+  ])("rejects an invalid viewer appearance field %s=%s", (field, value) => {
+    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+  });
 
   it("requires every profile field instead of silently defaulting it", () => {
     const candidate = validProfile() as unknown as Record<string, unknown>;

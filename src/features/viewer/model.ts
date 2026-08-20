@@ -1,6 +1,7 @@
 export type ViewMode = "single" | "spread";
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
+export type ViewerBackground = "checker" | "dark" | "black" | "light";
 export type ViewerLayoutMode =
   | "paged"
   | "vertical_scroll"
@@ -30,6 +31,50 @@ export const SCALE_STEP = 0.1;
 export const DEFAULT_SCALE = 1;
 export const LOUPE_ZOOM = 2;
 export const LOUPE_SIZE = 180;
+export const VIEWER_BACKGROUNDS: ViewerBackground[] = [
+  "checker",
+  "dark",
+  "black",
+  "light",
+];
+export const DEFAULT_VIEWER_BACKGROUND: ViewerBackground = "checker";
+export const MIN_VIEWER_SPACING = 0;
+export const MAX_VIEWER_SPACING = 64;
+export const DEFAULT_VIEWER_PAGE_MARGIN = 0;
+export const DEFAULT_VIEWER_SPREAD_GAP = 8;
+export const VIEWER_CURSOR_AUTO_HIDE_DELAYS = [0, 1_000, 2_000, 3_000, 5_000] as const;
+export const DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS = 0;
+
+export function normalizeViewerBackground(value: unknown): ViewerBackground {
+  return typeof value === "string"
+    && VIEWER_BACKGROUNDS.includes(value as ViewerBackground)
+    ? value as ViewerBackground
+    : DEFAULT_VIEWER_BACKGROUND;
+}
+
+export function isViewerSpacing(value: unknown): value is number {
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= MIN_VIEWER_SPACING
+    && value <= MAX_VIEWER_SPACING;
+}
+
+export function normalizeViewerSpacing(value: unknown, fallback: number): number {
+  return isViewerSpacing(value) ? value : fallback;
+}
+
+export function isViewerCursorAutoHideMs(value: unknown): value is number {
+  return typeof value === "number"
+    && VIEWER_CURSOR_AUTO_HIDE_DELAYS.includes(
+      value as typeof VIEWER_CURSOR_AUTO_HIDE_DELAYS[number],
+    );
+}
+
+export function normalizeViewerCursorAutoHideMs(value: unknown): number {
+  return isViewerCursorAutoHideMs(value)
+    ? value
+    : DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS;
+}
 
 export interface ViewerScaleState {
   mode: ScaleMode;
@@ -105,6 +150,7 @@ export interface ViewerState {
 export type ViewerAction =
   | { type: "next"; pageCount: number; landscape: ReadonlySet<number> }
   | { type: "previous" }
+  | { type: "shift"; delta: -1 | 1; pageCount: number }
   | { type: "mode"; mode: ViewMode }
   | { type: "toggleDirection" }
   | { type: "go"; index: number };
@@ -144,6 +190,20 @@ export function viewerReducer(
       const previous = state.history.at(-1);
       if (previous === undefined) return state;
       return { ...state, index: previous, history: state.history.slice(0, -1) };
+    }
+    case "shift": {
+      const index = Math.min(
+        Math.max(0, state.index + action.delta),
+        Math.max(0, action.pageCount - 1),
+      );
+      if (index === state.index) return state;
+      const history =
+        action.delta < 0 && state.history.at(-1) === index
+          ? state.history.slice(0, -1)
+          : action.delta > 0
+            ? [...state.history, state.index]
+            : state.history;
+      return { ...state, index, history };
     }
     case "mode":
       return { ...state, mode: action.mode };

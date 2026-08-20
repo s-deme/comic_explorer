@@ -52,7 +52,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 | REQ-MVP-008 | 画像folderおよび対応archive内のBMP、JPEG/JPG、GIF、TIFF/TIF、PNG、ICO、SVG、静止WebPを1冊として相対pathの自然順で読み、catalogの画像を直接開いた場合は同じfolderのpage群を選択画像から開始する。raster画像はWICまたは専用decoderで実ピクセルを検証し、SVGはscriptと外部resourceを実行・取得せずに表示とthumbnail生成を行う。 |
 | REQ-MVP-009 | ZIP/CBZ/EPUB、単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を隣接展開せず、対応圧縮entryを検証し、格納画像を自然順で読む。対応書庫内の対応書庫は形式を混在でき、内側3階層・内側書庫64個・内側書庫の展開データ累計512 MiBを上限として再帰的に読む。分割RAR、暗号化書庫、未対応圧縮方式、EPUBのHTML本文組版は対象外とする。書庫ごとのentry数・展開後entry size・展開後合計size上限、危険path拒否、原本非破壊を共通に保証する。 |
 | REQ-MVP-010 | catalogのfolder（漫画画像を含むfolderを含む）はダブルクリックまたはkeyboardでviewerを開かず、そのfolderへ移動する。親folderから子folderへ移動したcatalogは先頭から表示し、子folderから親folderへ戻ったcatalogは親folderを離れる直前のscroll位置を復元する。archive、PDF、画像は同じ操作でviewerへ開き、card内に重複する読むbuttonを置かず、終了後にcatalogの文脈を復元する。 |
-| REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。page layoutの横幅フィットでは画像表示領域の横幅を左右の固定余白なしで使い、見開き時はpage間の間隔だけを残す。横幅フィットしたpageが表示領域より低い場合は残る縦余白を上下へ均等に配分し、高い場合は上端から画像下端まで末尾の固定余白なしでscrollできるようにする。page layoutで縦が表示領域へ収まらない場合は上端から表示し、次page操作では未表示部分を下へ送って全体を閲覧した後に次pageへ進む。 |
+| REQ-MVP-011 | 単pageを縦横比維持で表示し、範囲内移動とfitを提供する。page layoutの横幅フィットでは、利用者が設定したpage周囲余白を除く画像表示領域の横幅を使い、見開き時は設定したpage間隔だけを残す。page周囲余白の既定値は0pxとし、横幅フィットしたpageが表示領域より低い場合は残る縦余白を上下へ均等に配分し、高い場合は上端から画像下端まで設定値以外の末尾余白なしでscrollできるようにする。page layoutで縦が表示領域へ収まらない場合は上端から表示し、次page操作では未表示部分を下へ送って全体を閲覧した後に次pageへ進む。 |
 | REQ-MVP-012 | 見開きは最大2pageとし、横長pageと末尾1pageを単独表示する。 |
 | REQ-MVP-013 | 右開き・左開きを配置と移動へ一貫適用し、設定を保存する。 |
 | REQ-MVP-014 | keyboard、wheel、swipe、Escで閲覧でき、画像stageの単clickではpage移動せず、double clickで全画面表示と解除を切り替える。viewer toolbarの操作を説明付きicon buttonで提供する。現在pageはtoolbarに表示せず、画像表示領域の下部に現在位置と総page数を示すslider式のpage移動barを置き、任意のpageへ移動できる。対応archiveを通常openした場合は全画面で開始し、全画面中はviewer toolbarとpage移動barを隠して、toolbarは画面上端、page移動barは画面下端へpointerを移動したときだけ表示する。viewerはopen時に全pageを画像として読み込まず、現在表示に必要なpageと最大4page先までを先読みする。見開き遷移は次の表示対象を先読みし、途中で1pageだけを表示せず見開き単位で滑らかに切り替える。viewer generationの古い結果を捨てる。 |
@@ -70,7 +70,7 @@ Windows標準codecが扱うraster画像のdecode基盤として利用する。AV
 |---|---|---|
 | NFR-MVP-001 | 1TB、10,000 files、1,000作品、1冊300pageを想定し、遅延処理、virtualize、10GiB thumbnail LRUを使う。folder移動では一覧の列挙と表示をthumbnail生成・cache保守の完了待ちから分離し、placeholderを先に表示してthumbnailを非同期に更新する。新しいfolderへ移動した場合は古いthumbnail要求をcancelし、cancel不能な生成中処理やpin解除が完了するまでfolder一覧を開く操作を待たせない。 | 10,000項目のWindows製品UI性能はBLOCKED。 |
 | NFR-MVP-002 | cold起動3秒、cached一覧1秒、prefetch済みpage 100ms、10,000項目検索1秒、idle 250MiBを基準PCで測る。 | 現行release候補の基準PC測定はBLOCKED。 |
-| NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、catalog cardは文字と操作欄を重ねず、tree labelは選択状態によらず背景と判別できる文字色で表示する。viewerの画像表示領域は濃いグレーの市松模様で画像領域を判別可能にする。catalogの全5一覧形式は利用可能なペイン幅に応じて列数または表示する詳細列を縮退し、横方向にはみ出し・重なりを起こさない。小サムネイルと表紙グリッドでは画像の縦横比にかかわらずファイル名用の領域を画像とは別に確保し、文字を画像へ重ねず、種別ラベルを表示しない。カードグリッドは表紙グリッドより大きい既定thumbnailだけを縦横比2:3で表示し、ファイル名・種類icon・metadata用の視覚領域を設けない。情報カードでは横長cardの左に表紙、右にファイル名、種別、サイズ、更新日時を独立した情報領域として配置し、欠落metadataは安全な代替表示にする。小サムネイルでは画像をサムネイル枠の下端でclipし、ファイル名領域へ描画しない。サムネイル系4形式のthumbnail寸法は保存された形式別設定だけから決定し、ウィンドウやcatalogペインの幅変更では拡縮しない。ファイル名は本文より小さいcompactサイズで表示し、左端の種類iconを文字の省略や折返しから独立させる。お気に入りtoggleは小サムネイル、表紙グリッド、カードグリッドではサムネイルの左上、情報カードでは情報領域の右上、詳細リストでは左端の専用列に表示する小型buttonとする。設定画面を含む全dialogは共通のheader、余白、control、action、scroll表現を使い、狭い画面でもlabelと操作を重ねない。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
+| NFR-MVP-003 | 14px基準のcompactな文字でtree、catalog、viewerをkeyboard操作でき、focusを視認できる。icon buttonは間隔、accessible name、hover説明を持ち、catalog cardは文字と操作欄を重ねず、tree labelは選択状態によらず背景と判別できる文字色で表示する。viewerの画像表示領域は既定で濃いグレーの市松模様を使い、設定から市松模様、濃灰、黒、明色の背景を選択して画像領域を判別可能にする。catalogの全5一覧形式は利用可能なペイン幅に応じて列数または表示する詳細列を縮退し、横方向にはみ出し・重なりを起こさない。小サムネイルと表紙グリッドでは画像の縦横比にかかわらずファイル名用の領域を画像とは別に確保し、文字を画像へ重ねず、種別ラベルを表示しない。カードグリッドは表紙グリッドより大きい既定thumbnailだけを縦横比2:3で表示し、ファイル名・種類icon・metadata用の視覚領域を設けない。情報カードでは横長cardの左に表紙、右にファイル名、種別、サイズ、更新日時を独立した情報領域として配置し、欠落metadataは安全な代替表示にする。小サムネイルでは画像をサムネイル枠の下端でclipし、ファイル名領域へ描画しない。サムネイル系4形式のthumbnail寸法は保存された形式別設定だけから決定し、ウィンドウやcatalogペインの幅変更では拡縮しない。ファイル名は本文より小さいcompactサイズで表示し、左端の種類iconを文字の省略や折返しから独立させる。お気に入りtoggleは小サムネイル、表紙グリッド、カードグリッドではサムネイルの左上、情報カードでは情報領域の右上、詳細リストでは左端の専用列に表示する小型buttonとする。設定画面を含む全dialogは共通のheader、余白、control、action、scroll表現を使い、狭い画面でもlabelと操作を重ねない。 | UIA、screen reader、high contrast、DPIはBLOCKED。 |
 | NFR-MVP-004 | lockfile全依存を再配布可能licenseに限定し、SBOMとTHIRD-PARTY-NOTICESを同期する。 | 既知の禁止・unknown licenseは0。 |
 | NFR-MVP-005 | Windows 10 22H2 x64と対応中Windows 11 x64向けinstallerを生成する。 | clean VM install/uninstallはBLOCKED。 |
 | NFR-MVP-006 | 採用構成を再現可能なfixture、性能値、原本snapshot、配布検証で評価し、実測・推定・未測定を分ける。 | 外部環境の未測定を保持する。 |
@@ -85,7 +85,7 @@ Git履歴から参照する。
 |---|---|---|---|
 | FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037 | 共通scale model、25%〜400%、fit幅/高さ/全体、原寸、状態維持、正方形のpointerルーペ、再起動復元。任意倍率の入力欄は25〜400%の整数で表示・入力し、内部値と保存形式には換算した倍率を使う。`+`/`-` は現在表示中の先頭pageの実表示倍率を基準に10%ずつ増減し、連続する逆方向操作で直前の表示倍率へ戻す。画像が表示領域を超えてもscrollbarを表示せず、pointer dragで任意の表示位置へpanできる。 |
 | FR-B02 巻末動作 | REQ-FR-B02-001, REQ-FR-B02-002, REQ-FR-B02-003 | FUT-C-020, FUT-C-038, FUT-C-039, FUT-C-040, FUT-C-041 | viewer toolbarから`auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を安全に適用し、sortと設定を維持する。folder内画像の閲覧では親catalogを巻順として使い、対応archive、PDF、画像folderを次巻・前巻候補とする。次巻・loop先は先頭page、巻頭からの前巻移動は末尾pageを開く。 |
-| FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `detail_list`、`small_thumbnail`、`cover_list`（表示名: 表紙グリッド）、`card_grid`（表示名: カードグリッド）、`reference_tile`（表示名: 情報カード）の順序、操作、focus、永続化を共通modelで扱う。表紙グリッドは縦長の表紙と直下のファイル名を中心にした画像優先layout、カードグリッドは表紙グリッドより大きい既定thumbnailだけを表示してファイル名・種類icon・metadataを視覚表示しない表紙専用layout、情報カードは横長cardの左側に縦長の表紙、右側に左揃えのファイル名、種別、サイズ、更新日時を置く情報優先layoutとし、外枠や色だけに依存せずシルエットと情報量で判別可能にする。カードグリッドでも項目名と種別はaccessible name、title、selection、context menuへ保持する。小サムネイルと表紙グリッドは種別ラベルを省き、画像とファイル名を別のlayout領域に置く。小サムネイルの画像はサムネイル枠の下端でclipしてファイル名領域への描画を防ぐ。カードグリッドは外側の枠線と内側余白を設けずthumbnailをcard全面へ配置し、行間・列間を他のthumbnail形式より狭い4pxにする。選択状態は外枠ではなくthumbnail上の色overlayで示す。カードグリッドのお気に入りtoggleは表紙の左上、情報カードでは情報領域の右上へ置き、card全体の既存open・selection・context menu操作と重ねない。仮想化した各rowは形式別thumbnail幅設定から導出した固定寸法、高さ、縦間隔を適用し、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。`small_thumbnail`、`cover_list`、`card_grid`、`reference_tile`の形式別thumbnail幅は安全な範囲へ検証し、profile、app-local設定、再起動復元へ含める。profile v3は4つの幅を必須fieldとして扱い、旧profile v1/v2には新しいカードグリッドの既定幅を補って移行する。詳細リストと情報カードでは種別を表示する。 |
+| FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `detail_list`、`small_thumbnail`、`cover_list`（表示名: 表紙グリッド）、`card_grid`（表示名: カードグリッド）、`reference_tile`（表示名: 情報カード）の順序、操作、focus、永続化を共通modelで扱う。表紙グリッドは縦長の表紙と直下のファイル名を中心にした画像優先layout、カードグリッドは表紙グリッドより大きい既定thumbnailだけを表示してファイル名・種類icon・metadataを視覚表示しない表紙専用layout、情報カードは横長cardの左側に縦長の表紙、右側に左揃えのファイル名、種別、サイズ、更新日時を置く情報優先layoutとし、外枠や色だけに依存せずシルエットと情報量で判別可能にする。カードグリッドでも項目名と種別はaccessible name、title、selection、context menuへ保持する。小サムネイルと表紙グリッドは種別ラベルを省き、画像とファイル名を別のlayout領域に置く。小サムネイルの画像はサムネイル枠の下端でclipしてファイル名領域への描画を防ぐ。カードグリッドは外側の枠線と内側余白を設けずthumbnailをcard全面へ配置し、行間・列間を他のthumbnail形式より狭い4pxにする。選択状態は外枠ではなくthumbnail上の色overlayで示す。カードグリッドのお気に入りtoggleは表紙の左上、情報カードでは情報領域の右上へ置き、card全体の既存open・selection・context menu操作と重ねない。仮想化した各rowは形式別thumbnail幅設定から導出した固定寸法、高さ、縦間隔を適用し、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。`small_thumbnail`、`cover_list`、`card_grid`、`reference_tile`の形式別thumbnail幅は安全な範囲へ検証し、profile、app-local設定、再起動復元へ含める。profile v3で導入した4つの必須幅をprofile v4でも保持し、旧profile v1/v2には新しいカードグリッドの既定幅を補って移行する。詳細リストと情報カードでは種別を表示する。 |
 | FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。検索条件として、サブフォルダ、folder/file種別、固定した現在folderの検索範囲、sizeの以上/以下、更新日時の以降/以前/期間を指定でき、結果を移動時にも保持するか選べる。 |
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
@@ -94,6 +94,7 @@ Git履歴から参照する。
 | FR-B10 tag | REQ-FR-B10-001, REQ-FR-B10-002, REQ-FR-B10-003, REQ-FR-B10-004 | FUT-C-022 | normalized tagのassign/remove/query/rename/merge、invalid拒否、migration、再起動保存を保証する。 |
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | catalogのopen・戻る・進む・上へ・更新・検索と、viewerのpage移動・表示・方向・倍率・ルーペ・全画面をkeyboard commandとしてremapし、command間および予約済みapp操作とのconflict拒否、個別/全体reset、focus fallback、再起動保存を保証する。viewerでは左右swipe、page layoutのwheel上下、右button+wheel上下、middle button、戻る/進むside buttonをcommandへ割り当て、double clickの全画面toggleは固定する。同じcommandへの複数mouse入力を許可し、旧keyboard/swipe設定を新しい既定値と統合して復元する。旧keyと新command既定値の衝突時は旧割り当てを優先し、新commandだけを未使用keyへ退避する。編集入口は統合設定だけに置き、group、command、keyboard、mouse、説明を同じcommand表で確認できるようにし、helpは現在のkeyboard割り当て表示だけを行う。原本変更・file削除・保存・印刷はglobal入力割り当てへ含めず、任意軌跡gesture、touch、gamepad、command parameterは候補のままとする。 |
 | FR-B22 file manager | REQ-MVP-021, REQ-FR-B22-001, REQ-FR-B22-002, REQ-FR-B22-003, REQ-FR-B22-004 | FUT-C-024〜029, FUT-C-053 | 右click/keyboard context menu、Windows shell連携、選択項目のrename/move/copy/delete、現在folderへのcreate/paste、安全境界、成功後refreshを一貫して扱う。通常deleteはごみ箱、完全deleteは対象名を示す確認後だけ実行する。 |
+| FR-B23 Leeyes viewer操作・外観 | REQ-FR-B23-001, REQ-FR-B23-002, REQ-FR-B23-003, REQ-FR-B23-004 | LEY-VIEWER-004, LEY-VIEWER-025, LEY-VIEWER-028 | page layoutの見開きを表示単位とは独立して1pageずつ前後へずらす。viewer背景、page周囲余白、見開き間隔、cursor自動非表示時間を統合設定、app-local設定、strict profileで検証・保存し、旧profileを安全な既定値へ移行する。 |
 
 ## 採用済みP1〜P10
 
@@ -117,6 +118,7 @@ Git履歴から参照する。
 - E2E-MVP-003: catalogの自然順・sort順に従い、巻末から次の漫画の先頭または保存pageへ進む。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
 - E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、folder treeのfolderまたはdrive nodeからcut/copy/pasteを行う。選択した対象だけが変更され、アプリとWindows Explorerの双方向pasteおよび成功後のcatalog反映を確認する。
+- E2E-MVP-006: 見開きを1pageずつ前後へずらし、背景・page周囲余白・見開き間隔・cursor自動非表示時間を変更して再起動およびprofile export/import後にも復元する。設定変更と閲覧の前後でlibrary原本を変更しない。
 
 ## 非採用と将来候補の境界
 
@@ -128,6 +130,15 @@ Git履歴から参照する。
 | Partial | FUT-C-006, FUT-C-007, FUT-C-008 | AVIFはunsupported/parser境界だけ実装済み。完全decodeを推定しない。 |
 
 FR-B04は現行の採用laneとして定義されていない。欠番を新機能の根拠として扱わない。
+
+## Leeyes viewer操作・外観の受入条件
+
+| 要件ID | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-FR-B23-001 | LEY-VIEWER-004 | page layoutかつ見開き表示のtoolbarに「1ページ戻す」「1ページ進める」を説明付きicon buttonとして置く。操作は現在の見開きanchorを自然順で正確に1pageだけ移動し、読み方向に従う左右配置、横長pageの単独表示、読書位置保存を維持する。先頭・末尾では範囲外へ進まず、巻頭・巻末の作品移動を発火しない。単pageとscroll layoutでは無効にする。 |
+| REQ-FR-B23-002 | LEY-VIEWER-025 | viewer設定で背景を市松模様・濃灰・黒・明色から選び、page周囲余白と見開き間隔をそれぞれ0〜64pxの整数で指定する。既定値は市松模様・0px・8pxとする。設定値はpage layoutの単page・見開きおよびscroll layoutへ適用し、見開き画像の利用可能幅計算にも同じ間隔を用いる。 |
+| REQ-FR-B23-003 | LEY-VIEWER-028 | viewer設定でcursor自動非表示を無効・1秒・2秒・3秒・5秒から選ぶ。有効時はpointerが画像stage内で指定時間操作されなければstage上のcursorだけを隠し、pointer移動・再入場・button操作で直ちに再表示する。pointer drag中およびルーペ有効時はcursorを隠さず、toolbar・page移動bar上のcursorへ影響させない。既定値は無効とする。 |
+| REQ-FR-B23-004 | LEY-VIEWER-025, LEY-VIEWER-028 | 背景、余白、間隔、自動非表示時間はapp-local SQLiteと設定profile v4へ保存し、再起動とexport/importで復元する。profile v1〜v3と既存SQLiteに値がない場合はREQ-FR-B23-002・003の既定値へ移行する。frontendとbackendの両方でenum・整数範囲を検証し、不正値を適用・保存しない。 |
 
 ## PDF対応の受入条件
 

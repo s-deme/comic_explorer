@@ -23,10 +23,15 @@ import {
   type ShortcutCommand,
 } from "../input/shortcuts";
 import {
+  MAX_VIEWER_SPACING,
+  MIN_VIEWER_SPACING,
   normalizeViewerLayoutMode,
+  VIEWER_BACKGROUNDS,
+  VIEWER_CURSOR_AUTO_HIDE_DELAYS,
   VIEWER_LAYOUT_MODE_LABELS,
   VIEWER_LAYOUT_MODES,
   type ScaleMode,
+  type ViewerBackground,
 } from "../viewer/model";
 import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
@@ -76,6 +81,21 @@ const SCALE_MODE_LABELS: Record<ScaleMode, string> = {
   height: "高さフィット",
   original: "原寸",
   custom: "任意倍率",
+};
+
+const VIEWER_BACKGROUND_LABELS: Record<ViewerBackground, string> = {
+  checker: "市松模様",
+  dark: "濃灰",
+  black: "黒",
+  light: "明色",
+};
+
+const CURSOR_AUTO_HIDE_LABELS: Record<number, string> = {
+  0: "無効",
+  1000: "1秒",
+  2000: "2秒",
+  3000: "3秒",
+  5000: "5秒",
 };
 
 const GESTURE_LABELS: Record<MouseGestureName, string> = {
@@ -237,6 +257,32 @@ export function SettingsDialog({
       id: "loupe",
       category: "viewer",
       text: `ルーペ 拡大鏡 ${draft.loupeEnabled ? "有効" : "無効"} ポインター位置を正方形の拡大鏡で確認します`,
+    },
+    {
+      id: "viewer-background",
+      category: "viewer",
+      text: "背景 市松模様 濃灰 黒 明色 "
+        + VIEWER_BACKGROUND_LABELS[draft.viewerBackground]
+        + " 画像表示領域の背景を選びます",
+    },
+    {
+      id: "viewer-page-margin",
+      category: "viewer",
+      text: "ページ 周囲 余白 " + draft.viewerPageMargin
+        + "px 0から64pxの範囲で指定します",
+    },
+    {
+      id: "viewer-spread-gap",
+      category: "viewer",
+      text: "見開き 間隔 " + draft.viewerSpreadGap
+        + "px 0から64pxの範囲で指定します",
+    },
+    {
+      id: "cursor-auto-hide",
+      category: "viewer",
+      text: "カーソル 自動 非表示 "
+        + CURSOR_AUTO_HIDE_LABELS[draft.cursorAutoHideMs]
+        + " 画像領域内で操作がないときだけ隠します",
     },
     {
       id: "scale-mode",
@@ -483,6 +529,74 @@ export function SettingsDialog({
                   <input type="checkbox" aria-label="profileルーペ" checked={draft.loupeEnabled} onChange={(event) => update({ loupeEnabled: event.target.checked })} />
                   <span>{draft.loupeEnabled ? "有効" : "無効"}</span>
                 </label>
+              </SettingRow>
+              <SettingRow id="viewer-background" title="背景" description="画像表示領域の背景を選びます。" hidden={rowHidden("viewer-background")}>
+                <select
+                  aria-label="profileビューワ背景"
+                  value={draft.viewerBackground}
+                  onChange={(event) => update({
+                    viewerBackground: event.target.value as ViewerBackground,
+                  })}
+                >
+                  {VIEWER_BACKGROUNDS.map((background) => (
+                    <option key={background} value={background}>
+                      {VIEWER_BACKGROUND_LABELS[background]}
+                    </option>
+                  ))}
+                </select>
+              </SettingRow>
+              <SettingRow id="viewer-page-margin" title="ページ周囲の余白" description="画像表示領域の端からページまでの余白を0〜64pxで指定します。" hidden={rowHidden("viewer-page-margin")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profileページ周囲の余白（px）"
+                    min={MIN_VIEWER_SPACING}
+                    max={MAX_VIEWER_SPACING}
+                    step="1"
+                    value={draft.viewerPageMargin}
+                    onChange={(event) => update({
+                      viewerPageMargin: Math.min(
+                        MAX_VIEWER_SPACING,
+                        Math.max(MIN_VIEWER_SPACING, Math.round(Number(event.target.value))),
+                      ),
+                    })}
+                  />
+                  <span>px</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="viewer-spread-gap" title="見開き間隔" description="見開きで隣り合うページの間隔を0〜64pxで指定します。" hidden={rowHidden("viewer-spread-gap")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profile見開き間隔（px）"
+                    min={MIN_VIEWER_SPACING}
+                    max={MAX_VIEWER_SPACING}
+                    step="1"
+                    value={draft.viewerSpreadGap}
+                    onChange={(event) => update({
+                      viewerSpreadGap: Math.min(
+                        MAX_VIEWER_SPACING,
+                        Math.max(MIN_VIEWER_SPACING, Math.round(Number(event.target.value))),
+                      ),
+                    })}
+                  />
+                  <span>px</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="cursor-auto-hide" title="カーソル自動非表示" description="画像領域内で操作がないときにカーソルを隠すまでの時間です。" hidden={rowHidden("cursor-auto-hide")}>
+                <select
+                  aria-label="profileカーソル自動非表示"
+                  value={draft.cursorAutoHideMs}
+                  onChange={(event) => update({
+                    cursorAutoHideMs: Number(event.target.value),
+                  })}
+                >
+                  {VIEWER_CURSOR_AUTO_HIDE_DELAYS.map((delay) => (
+                    <option key={delay} value={delay}>
+                      {CURSOR_AUTO_HIDE_LABELS[delay]}
+                    </option>
+                  ))}
+                </select>
               </SettingRow>
               <SettingRow id="scale-mode" title="倍率モード" description="画像を画面へ収める方法、または原寸・任意倍率を選びます。" hidden={rowHidden("scale-mode")}>
                 <select aria-label="profile倍率モード" value={draft.scaleMode} onChange={(event) => update({ scaleMode: event.target.value as ScaleMode })}>
