@@ -31,11 +31,15 @@ import {
   MAX_WHEEL_DEAD_ZONE,
   MAX_SCROLL_STEP_PERCENT,
   MAX_WHEEL_SCROLL_FACTOR,
+  MAX_LOUPE_SIZE,
+  MAX_LOUPE_ZOOM,
   MIN_PAN_FACTOR,
   MIN_VIEWER_GRID_SIZE,
   MIN_WHEEL_DEAD_ZONE,
   MIN_SCROLL_STEP_PERCENT,
   MIN_WHEEL_SCROLL_FACTOR,
+  MIN_LOUPE_SIZE,
+  MIN_LOUPE_ZOOM,
   MIN_VIEWER_SPACING,
   MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
   MIN_PORTRAIT_ASPECT_PERCENT,
@@ -344,7 +348,7 @@ export function SettingsDialog({
     {
       id: "loupe",
       category: "viewer",
-      text: `ルーペ 拡大鏡 ${draft.loupeEnabled ? "有効" : "無効"} ポインター位置を正方形の拡大鏡で確認します`,
+      text: `ルーペ 拡大鏡 ${draft.loupeEnabled ? "有効" : "無効"} サイズ ${draft.loupeSize}px 倍率 ${Math.round(draft.loupeZoom * 100)}% ポインター位置を正方形の拡大鏡で確認します`,
     },
     {
       id: "viewer-background",
@@ -751,10 +755,22 @@ export function SettingsDialog({
                 </select>
               </SettingRow>
               <SettingRow id="loupe" title="ルーペ" description="ポインター位置を正方形の拡大鏡で確認します。" hidden={rowHidden("loupe")}>
-                <label className="settings-switch">
-                  <input type="checkbox" aria-label="profileルーペ" checked={draft.loupeEnabled} onChange={(event) => update({ loupeEnabled: event.target.checked })} />
-                  <span>{draft.loupeEnabled ? "有効" : "無効"}</span>
-                </label>
+                <div className="settings-inline-actions">
+                  <label className="settings-switch">
+                    <input type="checkbox" aria-label="profileルーペ" checked={draft.loupeEnabled} onChange={(event) => update({ loupeEnabled: event.target.checked })} />
+                    <span>{draft.loupeEnabled ? "有効" : "無効"}</span>
+                  </label>
+                  <label className="settings-number-control">
+                    サイズ
+                    <input type="number" aria-label="profileルーペサイズ（px）" min={MIN_LOUPE_SIZE} max={MAX_LOUPE_SIZE} step="10" value={draft.loupeSize} onChange={(event) => update({ loupeSize: Math.min(MAX_LOUPE_SIZE, Math.max(MIN_LOUPE_SIZE, Math.round(Number(event.target.value)))) })} />
+                    <span>px</span>
+                  </label>
+                  <label className="settings-number-control">
+                    倍率
+                    <input type="number" aria-label="profileルーペ倍率（%）" min={MIN_LOUPE_ZOOM * 100} max={MAX_LOUPE_ZOOM * 100} step="25" value={Math.round(draft.loupeZoom * 100)} onChange={(event) => update({ loupeZoom: Math.min(MAX_LOUPE_ZOOM, Math.max(MIN_LOUPE_ZOOM, Number(event.target.value) / 100)) })} />
+                    <span>%</span>
+                  </label>
+                </div>
               </SettingRow>
               <SettingRow id="viewer-background" title="背景" description="画像表示領域の背景を選びます。" hidden={rowHidden("viewer-background")}>
                 <select

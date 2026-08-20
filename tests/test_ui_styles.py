@@ -129,8 +129,12 @@ class UiStyleContractTests(unittest.TestCase):
         )
 
     def test_viewer_loupe_uses_a_square_frame(self) -> None:
-        self.assert_rule_contains(".viewer-loupe", "width: 180px")
-        self.assert_rule_contains(".viewer-loupe", "height: 180px")
+        self.assert_rule_contains(
+            ".viewer-loupe", "width: var(--viewer-loupe-size, 180px)"
+        )
+        self.assert_rule_contains(
+            ".viewer-loupe", "height: var(--viewer-loupe-size, 180px)"
+        )
         self.assert_rule_contains(".viewer-loupe", "border-radius: 0")
 
     def test_catalog_favorite_controls_use_mode_specific_placement(self) -> None:

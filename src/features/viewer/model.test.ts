@@ -5,6 +5,7 @@ import {
   isPagePairable,
   fitScaleForPages,
   clampLoupePointer,
+  clampLoupeCenter,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -26,6 +27,8 @@ import {
   isWheelDeadZone,
   isScrollStepPercent,
   isWheelScrollFactor,
+  isLoupeSize,
+  isLoupeZoom,
   wheelDeltaPixels,
   pageScanTarget,
   randomPageIndex,
@@ -301,6 +304,16 @@ describe("FR-B01 scale model", () => {
       .toEqual({ left: 200, top: 90 });
     expect(pageScanTarget({ ...viewport, left: 200, top: 200 }, "n", "leftToRight", 90, 1))
       .toBeNull();
+  });
+
+  it("REQ-LEY-P2-009 bounds loupe preferences and keeps its center inside the stage", () => {
+    expect(isLoupeSize(80)).toBe(true);
+    expect(isLoupeSize(401)).toBe(false);
+    expect(isLoupeZoom(1.25)).toBe(true);
+    expect(isLoupeZoom(8.01)).toBe(false);
+    expect(clampLoupeCenter(10, 300, 240)).toBe(120);
+    expect(clampLoupeCenter(290, 300, 240)).toBe(180);
+    expect(clampLoupeCenter(10, 200, 240)).toBe(100);
   });
 });
 

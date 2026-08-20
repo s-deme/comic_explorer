@@ -302,6 +302,8 @@ pub struct CatalogSettings {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub loupe_size: u16,
+    pub loupe_zoom: f64,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -362,6 +364,8 @@ pub struct SettingsProfileInput {
     pub scale_mode: String,
     pub scale: f64,
     pub loupe_enabled: bool,
+    pub loupe_size: u16,
+    pub loupe_zoom: f64,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -423,6 +427,10 @@ const MAX_VIEWER_GRID_SIZE: u16 = 256;
 const MIN_PAN_FACTOR: f64 = 0.5;
 const MAX_PAN_FACTOR: f64 = 2.0;
 const MAX_WHEEL_DEAD_ZONE: u16 = 200;
+const MIN_LOUPE_SIZE: u16 = 80;
+const MAX_LOUPE_SIZE: u16 = 400;
+const MIN_LOUPE_ZOOM: f64 = 1.25;
+const MAX_LOUPE_ZOOM: f64 = 8.0;
 const MIN_SCROLL_STEP_PERCENT: u16 = 10;
 const MAX_SCROLL_STEP_PERCENT: u16 = 100;
 const MIN_WHEEL_SCROLL_FACTOR: f64 = 0.5;
@@ -915,6 +923,24 @@ fn page_scan_mode(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn loupe_size(settings: &crate::state::Settings) -> u16 {
+    settings
+        .loupe_size
+        .parse::<u16>()
+        .ok()
+        .filter(|size| (MIN_LOUPE_SIZE..=MAX_LOUPE_SIZE).contains(size))
+        .unwrap_or(180)
+}
+
+fn loupe_zoom(settings: &crate::state::Settings) -> f64 {
+    settings
+        .loupe_zoom
+        .parse::<f64>()
+        .ok()
+        .filter(|zoom| zoom.is_finite() && (MIN_LOUPE_ZOOM..=MAX_LOUPE_ZOOM).contains(zoom))
+        .unwrap_or(2.0)
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -950,6 +976,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scroll_step_percent = scroll_step_percent(&settings);
     let wheel_scroll_factor = wheel_scroll_factor(&settings);
     let page_scan_mode = page_scan_mode(&settings);
+    let loupe_size = loupe_size(&settings);
+    let loupe_zoom = loupe_zoom(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
@@ -972,6 +1000,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         scale_mode,
         scale,
         loupe_enabled: settings.loupe_enabled,
+        loupe_size,
+        loupe_zoom,
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -2379,6 +2409,9 @@ fn validate_settings_profile(
         )
         || !profile.scale.is_finite()
         || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&profile.scale)
+        || !(MIN_LOUPE_SIZE..=MAX_LOUPE_SIZE).contains(&profile.loupe_size)
+        || !profile.loupe_zoom.is_finite()
+        || !(MIN_LOUPE_ZOOM..=MAX_LOUPE_ZOOM).contains(&profile.loupe_zoom)
         || !matches!(
             profile.viewer_background.as_str(),
             "checker" | "dark" | "black" | "light"
@@ -2486,6 +2519,8 @@ pub fn set_settings_profile(
         settings.scale_mode = profile.scale_mode;
         settings.scale = profile.scale.to_string();
         settings.loupe_enabled = profile.loupe_enabled;
+        settings.loupe_size = profile.loupe_size.to_string();
+        settings.loupe_zoom = profile.loupe_zoom.to_string();
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -4260,6 +4295,21 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p2_009_loupe_preferences_default_and_bound_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(loupe_size(&settings), 180);
+        assert_eq!(loupe_zoom(&settings), 2.0);
+        settings.loupe_size = "240".into();
+        settings.loupe_zoom = "3.5".into();
+        assert_eq!(loupe_size(&settings), 240);
+        assert_eq!(loupe_zoom(&settings), 3.5);
+        settings.loupe_size = "401".into();
+        settings.loupe_zoom = "NaN".into();
+        assert_eq!(loupe_size(&settings), 180);
+        assert_eq!(loupe_zoom(&settings), 2.0);
+    }
+
+    #[test]
     fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(
@@ -4317,6 +4367,8 @@ mod shutdown_tests {
             scale_mode: "fit".into(),
             scale: 1.0,
             loupe_enabled: false,
+            loupe_size: 180,
+            loupe_zoom: 2.0,
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
@@ -4400,6 +4452,18 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.fit_basis = "page".into();
+        profile.loupe_size = 79;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.loupe_size = 240;
+        profile.loupe_zoom = 8.01;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.loupe_zoom = 3.5;
         profile.scroll_step_percent = 9;
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,

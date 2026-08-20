@@ -123,6 +123,8 @@ export interface CatalogSettings {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  loupeSize: number;
+  loupeZoom: number;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -233,6 +235,8 @@ export async function saveSettingsProfile(
       scaleMode: profile.scaleMode,
       scale: profile.scale,
       loupeEnabled: profile.loupeEnabled,
+      loupeSize: profile.loupeSize,
+      loupeZoom: profile.loupeZoom,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

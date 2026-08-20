@@ -24,6 +24,8 @@ import {
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
+  DEFAULT_LOUPE_SIZE,
+  DEFAULT_LOUPE_ZOOM,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
@@ -39,6 +41,8 @@ import {
   isWheelDeadZone,
   isScrollStepPercent,
   isWheelScrollFactor,
+  isLoupeSize,
+  isLoupeZoom,
   MAX_SCALE,
   MIN_SCALE,
   VIEWER_BACKGROUNDS,
@@ -67,7 +71,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 11;
+export const SETTINGS_PROFILE_VERSION = 12;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -137,6 +141,8 @@ export interface SettingsProfile {
   scaleMode: ScaleMode;
   scale: number;
   loupeEnabled: boolean;
+  loupeSize: number;
+  loupeZoom: number;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -188,6 +194,8 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     scaleMode: "fit",
     scale: DEFAULT_SCALE,
     loupeEnabled: false,
+    loupeSize: DEFAULT_LOUPE_SIZE,
+    loupeZoom: DEFAULT_LOUPE_ZOOM,
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -354,6 +362,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const pageScanMode = legacyPageScan
     ? DEFAULT_PAGE_SCAN_MODE
     : enumValue(candidate.pageScanMode, PAGE_SCAN_MODES);
+  const legacyLoupePreferences = legacyPageScan || candidate.profileVersion === 11;
+  const loupeSize = legacyLoupePreferences ? DEFAULT_LOUPE_SIZE : candidate.loupeSize;
+  const loupeZoom = legacyLoupePreferences ? DEFAULT_LOUPE_ZOOM : candidate.loupeZoom;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -365,6 +376,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 8
       && candidate.profileVersion !== 9
       && candidate.profileVersion !== 10
+      && candidate.profileVersion !== 11
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -387,6 +399,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     candidate.scale < MIN_SCALE ||
     candidate.scale > MAX_SCALE ||
     typeof candidate.loupeEnabled !== "boolean" ||
+    !isLoupeSize(loupeSize) ||
+    !isLoupeZoom(loupeZoom) ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -438,6 +452,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     scaleMode,
     scale: candidate.scale,
     loupeEnabled: candidate.loupeEnabled,
+    loupeSize,
+    loupeZoom,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

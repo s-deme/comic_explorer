@@ -202,6 +202,8 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   scaleMode: "fit",
   scale: 1,
   loupeEnabled: false,
+  loupeSize: 180,
+  loupeZoom: 2,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -2694,6 +2696,12 @@ describe("application shell", () => {
       target: { value: "page" },
     });
     fireEvent.click(within(dialog).getByLabelText("profile余白をフィット計算に含める"));
+    fireEvent.change(within(dialog).getByLabelText("profileルーペサイズ（px）"), {
+      target: { value: "240" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profileルーペ倍率（%）"), {
+      target: { value: "350" },
+    });
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2734,6 +2742,8 @@ describe("application shell", () => {
         fitAllowUpscale: true,
         fitBasis: "page",
         fitIncludePageMargin: false,
+        loupeSize: 240,
+        loupeZoom: 3.5,
         scale: 1.75,
         scrollStepPercent: 75,
         wheelScrollFactor: 1.4,
@@ -2870,7 +2880,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 11,
+        profileVersion: 12,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

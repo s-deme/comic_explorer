@@ -1789,8 +1789,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .viewer-loupe {
   position: absolute;
   z-index: 4;
-  width: 180px;
-  height: 180px;
+  width: var(--viewer-loupe-size, 180px);
+  height: var(--viewer-loupe-size, 180px);
   border: 3px solid #f5f7fa;
   border-radius: 0;
   box-shadow: 0 4px 22px #000b;

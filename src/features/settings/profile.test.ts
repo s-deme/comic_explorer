@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 11,
+    profileVersion: 12,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -31,6 +31,8 @@ function validProfile(): SettingsProfile {
     scaleMode: "fit",
     scale: 1,
     loupeEnabled: false,
+    loupeSize: 180,
+    loupeZoom: 2,
     viewerBackground: "checker",
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
@@ -104,7 +106,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 12, 99, "11", undefined])(
+  it.each([0, 13, 99, "12", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -265,6 +267,22 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile({ ...validProfile(), pageScanMode: "z" }))
       .toEqual(expect.objectContaining({ pageScanMode: "z" }));
     expect(normalizeSettingsProfile(withField("pageScanMode", "spiral"))).toBeNull();
+  });
+
+  it("REQ-LEY-P2-009 migrates v11 and validates loupe size and zoom", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 11;
+    delete legacy.loupeSize;
+    delete legacy.loupeZoom;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({ ...validProfile(), loupeSize: 240, loupeZoom: 3.5 }))
+      .toEqual(expect.objectContaining({ loupeSize: 240, loupeZoom: 3.5 }));
+    for (const [field, value] of [
+      ["loupeSize", 79], ["loupeSize", 401], ["loupeSize", 180.5],
+      ["loupeZoom", 1.24], ["loupeZoom", 8.01], ["loupeZoom", Number.NaN],
+    ] as const) {
+      expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+    }
   });
 
   it.each([

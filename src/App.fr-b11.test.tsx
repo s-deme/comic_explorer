@@ -126,6 +126,8 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       scaleMode: "fit" as const,
       scale: 1,
       loupeEnabled: false,
+      loupeSize: 180,
+      loupeZoom: 2,
       viewerBackground: "checker" as const,
       viewerPageMargin: 0,
       viewerSpreadGap: 8,

@@ -79,6 +79,8 @@ pub struct Settings {
     pub scale_mode: String,
     pub scale: String,
     pub loupe_enabled: bool,
+    pub loupe_size: String,
+    pub loupe_zoom: String,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -153,6 +155,8 @@ impl Default for Settings {
             scale_mode: "fit".into(),
             scale: "1".into(),
             loupe_enabled: false,
+            loupe_size: "180".into(),
+            loupe_zoom: "2".into(),
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -267,6 +271,8 @@ impl StateStore {
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
                 "loupeEnabled" => settings.loupe_enabled = value == "true",
+                "loupeSize" => settings.loupe_size = value,
+                "loupeZoom" => settings.loupe_zoom = value,
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -368,6 +374,8 @@ impl StateStore {
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
             ("loupeEnabled", settings.loupe_enabled.to_string()),
+            ("loupeSize", settings.loupe_size.clone()),
+            ("loupeZoom", settings.loupe_zoom.clone()),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
@@ -1422,6 +1430,8 @@ mod tests {
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
                 loupe_enabled: true,
+                loupe_size: "240".into(),
+                loupe_zoom: "3.5".into(),
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1514,6 +1524,8 @@ mod tests {
         assert_eq!(restored.fit_basis, "page");
         assert!(!restored.fit_include_page_margin);
         assert!(restored.loupe_enabled);
+        assert_eq!(restored.loupe_size, "240");
+        assert_eq!(restored.loupe_zoom, "3.5");
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

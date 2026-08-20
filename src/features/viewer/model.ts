@@ -85,8 +85,12 @@ export const MIN_SCALE = 0.01;
 export const MAX_SCALE = 8;
 export const SCALE_STEP = 0.1;
 export const DEFAULT_SCALE = 1;
-export const LOUPE_ZOOM = 2;
-export const LOUPE_SIZE = 180;
+export const MIN_LOUPE_SIZE = 80;
+export const MAX_LOUPE_SIZE = 400;
+export const DEFAULT_LOUPE_SIZE = 180;
+export const MIN_LOUPE_ZOOM = 1.25;
+export const MAX_LOUPE_ZOOM = 8;
+export const DEFAULT_LOUPE_ZOOM = 2;
 export const VIEWER_BACKGROUNDS: ViewerBackground[] = [
   "checker",
   "dark",
@@ -143,6 +147,16 @@ export function isWheelScrollFactor(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
     && value >= MIN_WHEEL_SCROLL_FACTOR
     && value <= MAX_WHEEL_SCROLL_FACTOR;
+}
+
+export function isLoupeSize(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_LOUPE_SIZE && value <= MAX_LOUPE_SIZE;
+}
+
+export function isLoupeZoom(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value)
+    && value >= MIN_LOUPE_ZOOM && value <= MAX_LOUPE_ZOOM;
 }
 
 export function wheelDeltaPixels(
@@ -425,6 +439,13 @@ export function clampLoupePointer(
     x: Math.min(Math.max(x, 0), Math.max(0, width)),
     y: Math.min(Math.max(y, 0), Math.max(0, height)),
   };
+}
+
+export function clampLoupeCenter(position: number, extent: number, size: number): number {
+  if (!Number.isFinite(position) || !Number.isFinite(extent) || extent <= 0) return 0;
+  if (!Number.isFinite(size) || size <= 0 || size >= extent) return extent / 2;
+  const radius = size / 2;
+  return Math.min(Math.max(position, radius), extent - radius);
 }
 
 export interface ViewerState {

@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 8 | 8 |
+| P2 閲覧中核 | 16 | 9 | 7 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **29** | **74** |
+| **合計** | **103** | **30** | **73** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -62,6 +62,8 @@ P2-FではLEY-VIEWER-019をPublishedとした。全体フィットへ小画像�
 P2-GではLEY-VIEWER-026をPublishedとした。page内scroll量10〜100%、連続layoutのwheel速度50〜200%、smooth有無をprofile v10・SQLite・設定dialog・viewerへ接続した。previousもpage上端まで設定量ずつ戻し、wheelのpixel/line/page単位を正規化する。慣性timerは導入せずOSの視覚効果軽減を優先する。release WebView2のmouse/trackpad deltaMode、smooth/reduced-motion、巨大画像panの体感は未測定として残す。
 
 P2-HではLEY-VIEWER-027をPublishedとした。標準縦送り、N字のcolumn優先、Z字のrow優先を左右の読書方向とprevious逆走へ接続し、profile v11・SQLite・設定dialog・viewerで共有する。行/列切替はleft/topを1回で移すatomic scrollとし、continuous layoutには適用しない。release WebView2の巨大画像・見開き経路、smooth中の連続入力、pointer pan後の再開位置は未測定として残す。
+
+P2-IではLEY-VIEWER-029をPublishedとした。既存pointerルーペへ80〜400pxの正方形サイズと125〜800%倍率をprofile v12・SQLite・設定dialog・viewerで接続した。pointerの画像座標とstage内のルーペ中心をclampし、stageより大きい選択では中央へ固定する。既存media URIを再利用して追加decodeやtimerを導入しない。release WebView2の巨大画像、800%・400px時のGPU/描画時間、DPI別表示は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

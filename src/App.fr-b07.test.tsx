@@ -180,6 +180,8 @@ const defaultSettings: CatalogSettings = {
   scaleMode: "fit",
   scale: 1,
   loupeEnabled: false,
+  loupeSize: 180,
+  loupeZoom: 2,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,

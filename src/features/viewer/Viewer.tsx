@@ -7,6 +7,7 @@ import {
 } from "../library/client";
 import {
   clampLoupePointer,
+  clampLoupeCenter,
   autoSpreadForViewport,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
@@ -24,8 +25,8 @@ import {
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_ZOOM_RETENTION,
-  LOUPE_SIZE,
-  LOUPE_ZOOM,
+  DEFAULT_LOUPE_SIZE,
+  DEFAULT_LOUPE_ZOOM,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
   normalizeViewerSpacing,
@@ -38,6 +39,8 @@ import {
   isScrollStepPercent,
   isWheelScrollFactor,
   isPagePairable,
+  isLoupeSize,
+  isLoupeZoom,
   fitScaleForPages,
   wheelDeltaPixels,
   pageScanTarget,
@@ -110,6 +113,8 @@ interface ViewerProps {
   initialScaleMode?: ScaleMode;
   initialScale?: number;
   initialLoupeEnabled?: boolean;
+  loupeSize?: number;
+  loupeZoom?: number;
   initialBackground?: ViewerBackground;
   initialPageMargin?: number;
   initialSpreadGap?: number;
@@ -176,6 +181,8 @@ export function Viewer({
   initialScaleMode = "fit",
   initialScale = 1,
   initialLoupeEnabled = false,
+  loupeSize: initialLoupeSize = DEFAULT_LOUPE_SIZE,
+  loupeZoom: initialLoupeZoom = DEFAULT_LOUPE_ZOOM,
   initialBackground = DEFAULT_VIEWER_BACKGROUND,
   initialPageMargin = DEFAULT_VIEWER_PAGE_MARGIN,
   initialSpreadGap = DEFAULT_VIEWER_SPREAD_GAP,
@@ -205,6 +212,8 @@ export function Viewer({
   onDeleteBookmark,
 }: ViewerProps) {
   const viewerBackground = normalizeViewerBackground(initialBackground);
+  const loupeSize = isLoupeSize(initialLoupeSize) ? initialLoupeSize : DEFAULT_LOUPE_SIZE;
+  const loupeZoom = isLoupeZoom(initialLoupeZoom) ? initialLoupeZoom : DEFAULT_LOUPE_ZOOM;
   const viewerPageMargin = normalizeViewerSpacing(
     initialPageMargin,
     DEFAULT_VIEWER_PAGE_MARGIN,
@@ -715,8 +724,8 @@ export function Viewer({
     }
     setLoupe({
       index,
-      stageX: event.clientX - stageRect.left,
-      stageY: event.clientY - stageRect.top,
+      stageX: clampLoupeCenter(event.clientX - stageRect.left, stageRect.width, loupeSize),
+      stageY: clampLoupeCenter(event.clientY - stageRect.top, stageRect.height, loupeSize),
       imageX: pointer.x,
       imageY: pointer.y,
       imageWidth: imageRect.width,
@@ -1605,8 +1614,9 @@ export function Viewer({
                 left: loupe.stageX,
                 top: loupe.stageY,
                 backgroundImage: `url("${mediaUris[loupe.index]}")`,
-                backgroundSize: `${loupe.imageWidth * LOUPE_ZOOM}px ${loupe.imageHeight * LOUPE_ZOOM}px`,
-                backgroundPosition: `${LOUPE_SIZE / 2 - loupe.imageX * LOUPE_ZOOM}px ${LOUPE_SIZE / 2 - loupe.imageY * LOUPE_ZOOM}px`,
+                "--viewer-loupe-size": `${loupeSize}px`,
+                backgroundSize: `${loupe.imageWidth * loupeZoom}px ${loupe.imageHeight * loupeZoom}px`,
+                backgroundPosition: `${loupeSize / 2 - loupe.imageX * loupeZoom}px ${loupeSize / 2 - loupe.imageY * loupeZoom}px`,
               } as CSSProperties
             }
           />

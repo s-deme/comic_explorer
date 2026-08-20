@@ -380,6 +380,41 @@ describe("Viewer settings", () => {
     }
   });
 
+  it("REQ-LEY-P2-009 applies bounded loupe size and zoom without leaving the stage", () => {
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialLoupeEnabled
+        loupeSize={240}
+        loupeZoom={3.5}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    const image = screen.getByAltText("Book 1ページ") as HTMLImageElement;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, right: 300, bottom: 200, width: 300, height: 200,
+    } as DOMRect);
+    vi.spyOn(image, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, right: 300, bottom: 200, width: 300, height: 200,
+    } as DOMRect);
+
+    fireEvent.pointerMove(stage, { clientX: 10, clientY: 10 });
+    const loupe = screen.getByRole("img", { name: "ポインタ周辺ルーペ" });
+    expect(loupe).toHaveStyle({ left: "120px", top: "100px" });
+    expect(loupe.style.getPropertyValue("--viewer-loupe-size")).toBe("240px");
+    expect(loupe).toHaveStyle({
+      backgroundSize: "1050px 700px",
+      backgroundPosition: "85px 85px",
+    });
+    fireEvent.pointerLeave(stage);
+    expect(screen.queryByRole("img", { name: "ポインタ周辺ルーペ" })).not.toBeInTheDocument();
+  });
+
   it("FT-B23-003 suspends cursor hiding for the full pointer drag", () => {
     vi.useFakeTimers();
     try {

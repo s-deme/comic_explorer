@@ -111,6 +111,8 @@ import {
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
+  DEFAULT_LOUPE_SIZE,
+  DEFAULT_LOUPE_ZOOM,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -129,6 +131,8 @@ import {
   isWheelDeadZone,
   isScrollStepPercent,
   isWheelScrollFactor,
+  isLoupeSize,
+  isLoupeZoom,
   isAutoViewportAspectPercent,
   isPortraitAspectPercent,
   SPREAD_PAIRINGS,
@@ -479,6 +483,8 @@ export function App({
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
   const [viewerScale, setViewerScale] = useState(1);
   const [loupeEnabled, setLoupeEnabled] = useState(false);
+  const [loupeSize, setLoupeSize] = useState(DEFAULT_LOUPE_SIZE);
+  const [loupeZoom, setLoupeZoom] = useState(DEFAULT_LOUPE_ZOOM);
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -892,6 +898,12 @@ export function App({
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
           setLoupeEnabled(response.data.loupeEnabled);
+          setLoupeSize(isLoupeSize(response.data.loupeSize)
+            ? response.data.loupeSize
+            : DEFAULT_LOUPE_SIZE);
+          setLoupeZoom(isLoupeZoom(response.data.loupeZoom)
+            ? response.data.loupeZoom
+            : DEFAULT_LOUPE_ZOOM);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -2485,6 +2497,8 @@ export function App({
       scaleMode: viewerScaleMode,
       scale: viewerScale,
       loupeEnabled,
+      loupeSize,
+      loupeZoom,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2578,6 +2592,8 @@ export function App({
       setViewerScaleMode(normalized.scaleMode);
       setViewerScale(normalized.scale);
       setLoupeEnabled(normalized.loupeEnabled);
+      setLoupeSize(normalized.loupeSize);
+      setLoupeZoom(normalized.loupeZoom);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2745,7 +2761,8 @@ export function App({
   }, [
     settingsOpen, viewerSession, sortField, sortDescending, endOfVolumePolicy,
     catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
-    viewerScaleMode, viewerScale, loupeEnabled, viewerBackground, viewerPageMargin,
+    viewerScaleMode, viewerScale, loupeEnabled, loupeSize, loupeZoom,
+    viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
     wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
@@ -3300,6 +3317,8 @@ export function App({
           initialScaleMode={viewerScaleMode}
           initialScale={viewerScale}
           initialLoupeEnabled={loupeEnabled}
+          loupeSize={loupeSize}
+          loupeZoom={loupeZoom}
           initialBackground={viewerBackground}
           initialPageMargin={viewerPageMargin}
           initialSpreadGap={viewerSpreadGap}
