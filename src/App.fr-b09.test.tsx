@@ -53,6 +53,7 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   loadPage: vi.fn(),
+  copyViewerPageToClipboard: vi.fn(),
   openComic: vi.fn(),
   pickLibraryRoot: vi.fn(),
   registerLibraryRoot: vi.fn(),

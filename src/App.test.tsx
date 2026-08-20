@@ -96,6 +96,7 @@ vi.mock("./features/library/client", () => ({
   getItemMetadata: vi.fn(),
   getThumbnail: vi.fn(),
   loadPage: vi.fn(),
+  copyViewerPageToClipboard: vi.fn(),
   saveCatalogSort: vi.fn(),
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),

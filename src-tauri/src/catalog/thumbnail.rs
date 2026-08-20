@@ -293,7 +293,7 @@ fn is_webp(bytes: &[u8]) -> bool {
 /// WIC expects an opaque 24bpp BGR bitmap for the JPEG encoder. WebP's decoded
 /// pixels are unpremultiplied sRGB, so alpha is composited over white before the
 /// channel order is converted.
-fn decode_static_webp_bgr(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
+fn decode_static_webp_pixels(bytes: &[u8]) -> Result<(u32, u32, usize, Vec<u8>), AppError> {
     // Keep the strict RIFF/container, animation, and dimension validation shared
     // with media loading ahead of any decoder allocation.
     let metadata = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?;
@@ -335,22 +335,10 @@ fn decode_static_webp_bgr(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError>
             "WebP cover decode buffer exceeds the resource limit.",
         )
     })?;
-    let bgr_len = pixel_count.checked_mul(3).ok_or_else(|| {
-        thumbnail_error(
-            ErrorCode::ResourceLimit,
-            "WebP thumbnail buffer exceeds the resource limit.",
-        )
-    })?;
-    let working_len = decoded_len.checked_add(bgr_len).ok_or_else(|| {
-        thumbnail_error(
-            ErrorCode::ResourceLimit,
-            "WebP thumbnail working buffers exceed the resource limit.",
-        )
-    })?;
-    if u64::try_from(working_len).unwrap_or(u64::MAX) > MAX_IMAGE_BYTES {
+    if u64::try_from(decoded_len).unwrap_or(u64::MAX) > MAX_IMAGE_BYTES {
         return Err(thumbnail_error(
             ErrorCode::ResourceLimit,
-            "WebP thumbnail working buffers exceed the resource limit.",
+            "WebP decode buffer exceeds the resource limit.",
         ));
     }
     let reported_len = decoder.output_buffer_size().ok_or_else(|| {
@@ -373,6 +361,29 @@ fn decode_static_webp_bgr(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError>
             &format!("Cannot decode WebP cover: {error}"),
         )
     })?;
+    Ok((width, height, channels, decoded))
+}
+
+fn decode_static_webp_bgr(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
+    let (width, height, channels, decoded) = decode_static_webp_pixels(bytes)?;
+    let pixel_count = usize::try_from(u64::from(width) * u64::from(height)).map_err(|_| {
+        thumbnail_error(
+            ErrorCode::ResourceLimit,
+            "WebP thumbnail dimensions cannot fit in memory.",
+        )
+    })?;
+    let bgr_len = pixel_count.checked_mul(3).ok_or_else(|| {
+        thumbnail_error(
+            ErrorCode::ResourceLimit,
+            "WebP thumbnail buffer exceeds the resource limit.",
+        )
+    })?;
+    if u64::try_from(decoded.len().saturating_add(bgr_len)).unwrap_or(u64::MAX) > MAX_IMAGE_BYTES {
+        return Err(thumbnail_error(
+            ErrorCode::ResourceLimit,
+            "WebP thumbnail working buffers exceed the resource limit.",
+        ));
+    }
 
     let mut bgr = Vec::with_capacity(bgr_len);
     for pixel in decoded.chunks_exact(channels) {
@@ -392,6 +403,149 @@ fn decode_static_webp_bgr(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError>
         bgr.extend_from_slice(&[blue, green, red]);
     }
     Ok((width, height, bgr))
+}
+
+#[cfg(target_os = "windows")]
+pub fn decode_wic_bgra(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
+    use windows::Win32::Graphics::Imaging::*;
+    use windows::Win32::System::Com::{
+        CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+        CoUninitialize,
+    };
+    use windows::core::Interface;
+
+    if bytes.len() as u64 > MAX_IMAGE_BYTES {
+        return Err(thumbnail_error(
+            ErrorCode::ResourceLimit,
+            "Clipboard image source byte limit exceeded.",
+        ));
+    }
+    if is_webp(bytes) {
+        let (width, height, channels, decoded) = decode_static_webp_pixels(bytes)?;
+        let pixel_count = usize::try_from(u64::from(width) * u64::from(height)).map_err(|_| {
+            thumbnail_error(
+                ErrorCode::ResourceLimit,
+                "Clipboard dimensions cannot fit in memory.",
+            )
+        })?;
+        let output_len = pixel_count.checked_mul(4).ok_or_else(|| {
+            thumbnail_error(
+                ErrorCode::ResourceLimit,
+                "Clipboard pixel buffer is too large.",
+            )
+        })?;
+        if u64::try_from(output_len).unwrap_or(u64::MAX) > MAX_IMAGE_BYTES {
+            return Err(thumbnail_error(
+                ErrorCode::ResourceLimit,
+                "Clipboard pixel buffer exceeds the resource limit.",
+            ));
+        }
+        let mut bgra = Vec::new();
+        bgra.try_reserve_exact(output_len).map_err(|_| {
+            thumbnail_error(
+                ErrorCode::ResourceLimit,
+                "Cannot allocate the WebP clipboard pixel buffer.",
+            )
+        })?;
+        for pixel in decoded.chunks_exact(channels) {
+            bgra.extend_from_slice(&[
+                pixel[2],
+                pixel[1],
+                pixel[0],
+                if channels == 4 { pixel[3] } else { 255 },
+            ]);
+        }
+        return Ok((width, height, bgra));
+    }
+    if svg_text_candidate(bytes) {
+        let (_, _, png) = super::render_svg_png(bytes, None)?;
+        return decode_wic_bgra(&png);
+    }
+    let orientation = exif_orientation(bytes);
+    unsafe {
+        CoInitializeEx(None, COINIT_MULTITHREADED)
+            .ok()
+            .map_err(wic_error)?;
+        let result = (|| {
+            let factory: IWICImagingFactory =
+                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)
+                    .map_err(wic_error)?;
+            let input = factory.CreateStream().map_err(wic_error)?;
+            input.InitializeFromMemory(bytes).map_err(wic_error)?;
+            let decoder = factory
+                .CreateDecoderFromStream(&input, std::ptr::null(), WICDecodeMetadataCacheOnLoad)
+                .map_err(wic_error)?;
+            let frame = decoder.GetFrame(0).map_err(wic_error)?;
+            let source: IWICBitmapSource = if orientation == 1 {
+                frame.cast().map_err(wic_error)?
+            } else {
+                let rotator = factory.CreateBitmapFlipRotator().map_err(wic_error)?;
+                rotator
+                    .Initialize(&frame, orientation_transform(orientation))
+                    .map_err(wic_error)?;
+                rotator.cast().map_err(wic_error)?
+            };
+            let mut width = 0;
+            let mut height = 0;
+            source.GetSize(&mut width, &mut height).map_err(wic_error)?;
+            let pixels = u64::from(width) * u64::from(height);
+            let output_len = pixels.checked_mul(4).ok_or_else(|| {
+                thumbnail_error(
+                    ErrorCode::ResourceLimit,
+                    "Clipboard pixel buffer is too large.",
+                )
+            })?;
+            if width == 0
+                || height == 0
+                || width > 16_384
+                || height > 16_384
+                || pixels > MAX_IMAGE_PIXELS
+                || output_len > MAX_IMAGE_BYTES
+            {
+                return Err(thumbnail_error(
+                    ErrorCode::ResourceLimit,
+                    "Clipboard image dimensions exceed the resource limit.",
+                ));
+            }
+            let converter = factory.CreateFormatConverter().map_err(wic_error)?;
+            converter
+                .Initialize(
+                    &source,
+                    &GUID_WICPixelFormat32bppBGRA,
+                    WICBitmapDitherTypeNone,
+                    None,
+                    0.0,
+                    WICBitmapPaletteTypeCustom,
+                )
+                .map_err(wic_error)?;
+            let stride = width.checked_mul(4).ok_or_else(|| {
+                thumbnail_error(
+                    ErrorCode::ResourceLimit,
+                    "Clipboard row stride is too large.",
+                )
+            })?;
+            let output_len = usize::try_from(output_len).map_err(|_| {
+                thumbnail_error(
+                    ErrorCode::ResourceLimit,
+                    "Clipboard buffer cannot fit in memory.",
+                )
+            })?;
+            let mut bgra = Vec::new();
+            bgra.try_reserve_exact(output_len).map_err(|_| {
+                thumbnail_error(
+                    ErrorCode::ResourceLimit,
+                    "Cannot allocate the clipboard pixel buffer.",
+                )
+            })?;
+            bgra.resize(output_len, 0);
+            converter
+                .CopyPixels(std::ptr::null(), stride, &mut bgra)
+                .map_err(wic_error)?;
+            Ok((width, height, bgra))
+        })();
+        CoUninitialize();
+        result
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -938,6 +1092,21 @@ mod tests {
                 .unwrap();
         assert_eq!((metadata.width, metadata.height), dimensions);
         std::fs::remove_file(output).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p2_014_wic_decodes_transparent_png_to_bgra() {
+        use image::{DynamicImage, ImageBuffer, ImageFormat as DecoderFormat};
+
+        let image = DynamicImage::ImageRgba8(
+            ImageBuffer::from_raw(2, 1, vec![10, 20, 30, 40, 50, 60, 70, 80]).unwrap(),
+        );
+        let mut encoded = Cursor::new(Vec::new());
+        image.write_to(&mut encoded, DecoderFormat::Png).unwrap();
+        let (width, height, pixels) = decode_wic_bgra(&encoded.into_inner()).unwrap();
+        assert_eq!((width, height), (2, 1));
+        assert_eq!(pixels, [30, 20, 10, 40, 70, 60, 50, 80]);
     }
 
     #[cfg(target_os = "windows")]

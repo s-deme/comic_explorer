@@ -903,6 +903,25 @@ export async function loadPage(
   });
 }
 
+export interface ClipboardImageResult {
+  pageRelativePath: string;
+  width: number;
+  height: number;
+  payloadBytes: number;
+}
+
+export async function copyViewerPageToClipboard(
+  session: ViewerSession,
+  index: number,
+  generation: number,
+): Promise<ApiResponse<ClipboardImageResult>> {
+  return invoke("copy_viewer_page_to_clipboard", {
+    context: context(generation),
+    itemRelativePath: session.itemKey,
+    pageRelativePath: session.pages[index].relativePath,
+  });
+}
+
 export async function saveReadingPosition(
   session: ViewerSession,
   index: number,

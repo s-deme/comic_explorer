@@ -248,6 +248,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | PASS / 限定 | `vite-node`で100,000 pageから現在pageを除くqueueを生成し、99,999件・全件一意・22.315ms。queueはpage数以下、同時timeoutは1件。単回synthetic測定でありrelease WebView2の長時間timer精度やprocess memoryを示さない。 |
 | 製品直接観測 | NOT RUN | release WebView2での長時間timer精度、background/focus復帰、実archiveのdecode/prefetch待機、順序・反復全組合せ、長時間memoryは未測定。 |
 
+## Leeyes P2-N 画像clipboard
+
+対象はLEY-VIEWER-011の1件。viewerの現在anchor pageをRust commandへ渡し、folder・archive・PDF・対応画像を既存の読み取り境界でdecodeして、透明度を保持したtop-down 32bpp BGRAの`CF_DIBV5`としてWindows clipboardへ書く。TypeScriptは現在pageの識別、重複操作防止、status表示だけを担う。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend / Rust | PASS | Viewer 51件、Rust `REQ-LEY-P2-014` 3件、FAIL 0。現在anchor、見開き非合成、busy無効化、page変更後の古いstatus抑止、透明PNG→BGRA、top-down DIBV5 header・alpha mask・overflow拒否、実Windows clipboardのCF_DIBV5 availabilityを含む。 |
+| Windows tests / typecheck / build | PASS | Python 59件、frontend 28 files / 399件、FAIL 0。typecheck exit 0、frontend 69 modules build、bundle 518.78kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 180件とshutdown process 1件、FAIL 0。既存folder・archive・PDF page読取、resource上限、原本非破壊回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは374.755秒で全12 stageがexit 0。Rust canonical 150.135秒、release executable/freshness、GUI権限付きshortcut product回帰25.245秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | source 256MiB、長辺16,384px、120,000,000 pixels、DIBV5 header込み256MiBの拒否境界とchecked overflowをtestした。decodeとclipboard書込みはblocking workerへ分離する。最大付近の実画像による処理時間・peak working setは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2 toolbarからの実操作、Explorer・Paint等の他appへの透明画像貼り付け、animated形式、archive・PDF全形式、clipboard競合中の再試行は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

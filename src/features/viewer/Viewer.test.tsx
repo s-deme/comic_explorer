@@ -1,11 +1,15 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadPage, saveReadingPosition } from "../library/client";
+import { copyViewerPageToClipboard, loadPage, saveReadingPosition } from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
 import { Viewer } from "./Viewer";
 
-vi.mock("../library/client", () => ({ loadPage: vi.fn(), saveReadingPosition: vi.fn() }));
+vi.mock("../library/client", () => ({
+  copyViewerPageToClipboard: vi.fn(),
+  loadPage: vi.fn(),
+  saveReadingPosition: vi.fn(),
+}));
 
 const session = {
   itemKey: "book.cbz",
@@ -54,6 +58,7 @@ describe("Viewer settings", () => {
     cleanup();
     vi.mocked(loadPage).mockReset();
     vi.mocked(saveReadingPosition).mockReset();
+    vi.mocked(copyViewerPageToClipboard).mockReset();
   });
 
   beforeEach(() => {
@@ -63,6 +68,17 @@ describe("Viewer settings", () => {
       requestId: "position" as never,
       generation: 1 as never,
       data: undefined,
+    });
+    vi.mocked(copyViewerPageToClipboard).mockResolvedValue({
+      status: "ok",
+      requestId: "clipboard-image" as never,
+      generation: 1 as never,
+      data: {
+        pageRelativePath: "1.png",
+        width: 800,
+        height: 1_000,
+        payloadBytes: 3_200_124,
+      },
     });
   });
 
@@ -209,7 +225,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(19);
+    expect(buttons).toHaveLength(20);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -1623,6 +1639,66 @@ describe("Viewer settings", () => {
       random.mockRestore();
       vi.useRealTimers();
     }
+  });
+
+  it("REQ-LEY-P2-014 copies only the current anchor page through the native image clipboard", async () => {
+    let resolveCopy: ((value: Awaited<ReturnType<typeof copyViewerPageToClipboard>>) => void) | undefined;
+    vi.mocked(copyViewerPageToClipboard).mockReturnValueOnce(new Promise((resolve) => {
+      resolveCopy = resolve;
+    }));
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="spread"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "現在ページの画像をコピー" });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(screen.getByText("ページ 1 をクリップボードへコピーしています。")).toBeInTheDocument();
+    expect(copyViewerPageToClipboard).toHaveBeenCalledWith(multiPageSession, 0, 1);
+    resolveCopy?.({
+      status: "ok",
+      requestId: "clipboard-image" as never,
+      generation: 1 as never,
+      data: { pageRelativePath: "1.png", width: 800, height: 1_000, payloadBytes: 3_200_124 },
+    });
+    await waitFor(() => expect(screen.getByText("ページ 1 を 800×1000px の画像としてコピーしました。"))
+      .toBeInTheDocument());
+    expect(button).not.toBeDisabled();
+  });
+
+  it("REQ-LEY-P2-014 suppresses a completed copy result after the page changes", async () => {
+    let resolveCopy: ((value: Awaited<ReturnType<typeof copyViewerPageToClipboard>>) => void) | undefined;
+    vi.mocked(copyViewerPageToClipboard).mockReturnValueOnce(new Promise((resolve) => {
+      resolveCopy = resolve;
+    }));
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    markPrefetchedPagesReady();
+    fireEvent.click(screen.getByRole("button", { name: "現在ページの画像をコピー" }));
+    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    resolveCopy?.({
+      status: "ok",
+      requestId: "clipboard-stale" as never,
+      generation: 1 as never,
+      data: { pageRelativePath: "1.png", width: 800, height: 1_000, payloadBytes: 3_200_124 },
+    });
+    await act(async () => Promise.resolve());
+    expect(screen.queryByText(/画像としてコピーしました/)).not.toBeInTheDocument();
   });
 
   it("FT-B15-001 resolves stale bookmark ordinals by pageKey and opens them from the list", async () => {

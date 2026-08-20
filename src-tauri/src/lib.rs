@@ -89,6 +89,7 @@ pub fn run() {
             application::cancel_library_diagnostics,
             application::open_comic,
             application::load_page,
+            application::copy_viewer_page_to_clipboard,
             application::save_reading_position,
             tray::get_tray_status,
             tray::store_main_window_in_tray,

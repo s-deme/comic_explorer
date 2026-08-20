@@ -4085,6 +4085,52 @@ pub async fn open_comic(
     })
 }
 
+fn viewer_page_grant(
+    root: &std::path::Path,
+    item: &RelativePath,
+    page: &RelativePath,
+) -> Result<MediaGrant, AppError> {
+    let is_archive = classify_file_name(item.as_str()) == FileKind::Archive;
+    let is_pdf = classify_file_name(item.as_str()) == FileKind::Pdf;
+    let source = if is_archive {
+        let archive = contained_library_path(root, item)?;
+        if !archive.is_file() {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                "Archive path is not a file.",
+            ));
+        }
+        PageSource::ArchiveEntry {
+            archive,
+            entry: page.as_str().into(),
+        }
+    } else {
+        let source_path = if is_pdf { item } else { page };
+        let file = contained_library_path(root, source_path)?;
+        if !file.is_file() {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                if is_pdf {
+                    "PDF path is not a file."
+                } else {
+                    "Page path is not a file."
+                },
+            ));
+        }
+        PageSource::File(file)
+    };
+    Ok(MediaGrant {
+        page_id: page_id_for(item.as_str(), page.as_str()),
+        mime_type: if is_pdf {
+            "application/pdf"
+        } else {
+            page_mime_type(page)
+        },
+        max_bytes: MAX_IMAGE_BYTES,
+        source,
+    })
+}
+
 #[tauri::command]
 pub async fn load_page(
     state: tauri::State<'_, AppState>,
@@ -4112,62 +4158,17 @@ pub async fn load_page(
         .map_err(|_| "state poisoned")?
         .clone()
         .ok_or_else(|| "library root is not configured".to_string())?;
-    let is_archive = classify_file_name(item.as_str()) == FileKind::Archive;
-    let is_pdf = classify_file_name(item.as_str()) == FileKind::Pdf;
-    let source = if is_archive {
-        let archive = match contained_library_path(&root, &item) {
-            Ok(path) if path.is_file() => path,
-            Ok(_) => {
-                return Ok(error_response(
-                    &context,
-                    request_error(ErrorCode::InvalidPath, "Archive path is not a file."),
-                ));
-            }
-            Err(error) => return Ok(error_response(&context, error)),
-        };
-        PageSource::ArchiveEntry {
-            archive,
-            entry: page.as_str().into(),
-        }
-    } else {
-        let source_path = if is_pdf { &item } else { &page };
-        let file = match contained_library_path(&root, source_path) {
-            Ok(path) if path.is_file() => path,
-            Ok(_) => {
-                return Ok(error_response(
-                    &context,
-                    request_error(
-                        ErrorCode::InvalidPath,
-                        if is_pdf {
-                            "PDF path is not a file."
-                        } else {
-                            "Page path is not a file."
-                        },
-                    ),
-                ));
-            }
-            Err(error) => return Ok(error_response(&context, error)),
-        };
-        PageSource::File(file)
+    let grant = match viewer_page_grant(&root, &item, &page) {
+        Ok(grant) => grant,
+        Err(error) => return Ok(error_response(&context, error)),
     };
-    let page_id = page_id_for(item.as_str(), page.as_str());
-    let mime_type = if is_pdf {
-        "application/pdf"
-    } else {
-        page_mime_type(&page)
-    };
+    let page_id = grant.page_id.clone();
     let cancellation = state
         .viewer
         .lock()
         .map_err(|_| "state poisoned")?
         .cancellation_for(context.generation);
     let (sender, receiver) = tokio::sync::oneshot::channel();
-    let grant = MediaGrant {
-        page_id: page_id.clone(),
-        mime_type,
-        max_bytes: MAX_IMAGE_BYTES,
-        source,
-    };
     let worker_page = page.clone();
     if state
         .page_workers
@@ -4224,6 +4225,93 @@ pub async fn load_page(
         data: PageResponse {
             page_id,
             media_uri: media_uri(&token),
+        },
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardImageResult {
+    pub page_relative_path: RelativePath,
+    pub width: u32,
+    pub height: u32,
+    pub payload_bytes: usize,
+}
+
+#[cfg(target_os = "windows")]
+fn decode_clipboard_bgra(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
+    crate::catalog::decode_wic_bgra(bytes)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn decode_clipboard_bgra(_bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
+    Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "Image clipboard operations are available only on Windows.",
+    ))
+}
+
+#[tauri::command]
+pub async fn copy_viewer_page_to_clipboard(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_path: String,
+    page_relative_path: String,
+) -> Result<Response<ClipboardImageResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item = RelativePath::parse(item_relative_path).map_err(str::to_string)?;
+    let page = RelativePath::parse(page_relative_path).map_err(str::to_string)?;
+    let root = state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+        .ok_or_else(|| "library root is not configured".to_string())?;
+    let grant = match viewer_page_grant(&root, &item, &page) {
+        Ok(grant) => grant,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let worker_page = page.clone();
+    let decoded = tauri::async_runtime::spawn_blocking(move || {
+        let (_, bytes) = read_page_bytes(&grant, &worker_page)?;
+        decode_clipboard_bgra(&bytes)
+    })
+    .await
+    .map_err(|error| format!("image clipboard decode worker failed: {error}"))?;
+    let (width, height, bgra) = match decoded {
+        Ok(decoded) => decoded,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if !state
+        .viewer
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let payload_bytes = match tauri::async_runtime::spawn_blocking(move || {
+        file_operations::write_image_clipboard(width, height, &bgra)
+    })
+    .await
+    .map_err(|error| format!("image clipboard worker failed: {error}"))?
+    {
+        Ok(bytes) => bytes,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: ClipboardImageResult {
+            page_relative_path: page,
+            width,
+            height,
+            payload_bytes,
         },
     })
 }

@@ -14,12 +14,12 @@ pub use folder::{
 pub use image_metadata::{ImageMetadata, inspect_image};
 pub(crate) use image_render::{raster_delivery_png, render_svg_png};
 pub use pdf::{enumerate_pdf_pages, pdf_page_index, render_pdf_page};
-#[cfg(target_os = "windows")]
-pub use thumbnail::encode_wic_jpeg;
 pub use thumbnail::{
     CoverBytes, THUMBNAIL_JPEG_QUALITY, THUMBNAIL_LONG_EDGE, exif_orientation, output_dimensions,
     read_cover,
 };
+#[cfg(target_os = "windows")]
+pub use thumbnail::{decode_wic_bgra, encode_wic_jpeg};
 
 #[cfg(test)]
 mod fixture_tests {

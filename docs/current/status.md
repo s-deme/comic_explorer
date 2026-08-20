@@ -73,9 +73,11 @@ P2-LではLEY-SHELL-014をPublishedとした。既存の手動tray格納に、�
 
 P2-MではLEY-VIEWER-008をPublishedとした。0.5〜60秒の間隔、順方向・逆方向・random、現在作品の反復をprofile v16・SQLite・設定dialog・通常/slideshow起動viewerへ接続した。randomはpage数以下のFisher-Yates shuffle-bagで1 cycle内の重複を防ぎ、Leeyesの不明な重複規則を安全で予測可能な独自挙動として明記した。100,000 page synthetic queueは99,999件一意を22.315msで生成した。Windows canonicalとrelease buildはPASSしたが、release WebView2での長時間timer精度、background/focus復帰、実archive decode待機、長時間memoryは未測定として残す。
 
+P2-NではLEY-VIEWER-011をPublishedとした。viewer toolbarから現在のanchor pageをRust native commandへ渡し、folder・archive・PDF・対応画像を既存の安全境界で読み、EXIF向き適用済み32bpp BGRAをtop-down `CF_DIBV5`としてWindows clipboardへ書く。透明PNG、DIBV5 header・resource上限、実clipboard format、page変更後の古いstatus抑止を自動検証した。Windows canonicalとrelease buildはPASSしたが、release製品から他appへの貼り付け、最大上限付近の実画像、処理時間・peak memoryは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
-| Implemented | PASS | 71 |
+| Implemented | PASS | 72 |
 | Implemented | BLOCKED | 15 |
 | Partial | BLOCKED | 9 |
 | Candidate | NOT TESTED | 3 |

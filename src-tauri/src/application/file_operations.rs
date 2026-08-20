@@ -8,7 +8,7 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 
 use super::{AppState, error_response, request_error, validate_request};
-use crate::api::{RequestContext, Response};
+use crate::api::{MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::domain::{AppError, ErrorCode, RelativePath};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -996,6 +996,114 @@ impl Drop for ClipboardGuard {
     }
 }
 
+const DIB_V5_HEADER_BYTES: usize = 124;
+
+fn build_dib_v5(width: u32, height: u32, bgra: &[u8]) -> Result<Vec<u8>, AppError> {
+    let pixel_bytes = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .and_then(|bytes| usize::try_from(bytes).ok())
+        .ok_or_else(|| clipboard_error("Image clipboard dimensions cannot fit in memory."))?;
+    let payload_bytes = DIB_V5_HEADER_BYTES
+        .checked_add(pixel_bytes)
+        .ok_or_else(|| clipboard_error("Image clipboard payload size overflowed."))?;
+    if width == 0
+        || height == 0
+        || bgra.len() != pixel_bytes
+        || u64::try_from(payload_bytes).unwrap_or(u64::MAX) > MAX_IMAGE_BYTES
+    {
+        return Err(clipboard_error(
+            "Image clipboard payload exceeds the resource limit.",
+        ));
+    }
+    let width =
+        i32::try_from(width).map_err(|_| clipboard_error("Image clipboard width is too large."))?;
+    let height = i32::try_from(height)
+        .map_err(|_| clipboard_error("Image clipboard height is too large."))?;
+    let image_size = u32::try_from(pixel_bytes)
+        .map_err(|_| clipboard_error("Image clipboard pixel buffer is too large."))?;
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(payload_bytes)
+        .map_err(|_| clipboard_error("Cannot allocate image clipboard memory."))?;
+    payload.resize(payload_bytes, 0);
+    let write_u16 = |buffer: &mut [u8], offset: usize, value: u16| {
+        buffer[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+    };
+    let write_u32 = |buffer: &mut [u8], offset: usize, value: u32| {
+        buffer[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    };
+    let write_i32 = |buffer: &mut [u8], offset: usize, value: i32| {
+        buffer[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    };
+    write_u32(&mut payload, 0, DIB_V5_HEADER_BYTES as u32);
+    write_i32(&mut payload, 4, width);
+    write_i32(&mut payload, 8, -height);
+    write_u16(&mut payload, 12, 1);
+    write_u16(&mut payload, 14, 32);
+    write_u32(&mut payload, 16, 3); // BI_BITFIELDS
+    write_u32(&mut payload, 20, image_size);
+    write_u32(&mut payload, 40, 0x00ff_0000);
+    write_u32(&mut payload, 44, 0x0000_ff00);
+    write_u32(&mut payload, 48, 0x0000_00ff);
+    write_u32(&mut payload, 52, 0xff00_0000);
+    write_u32(&mut payload, 56, 0x7352_4742); // LCS_sRGB
+    payload[DIB_V5_HEADER_BYTES..].copy_from_slice(bgra);
+    Ok(payload)
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn write_image_clipboard(
+    width: u32,
+    height: u32,
+    bgra: &[u8],
+) -> Result<usize, AppError> {
+    use windows::Win32::Foundation::{GlobalFree, HANDLE};
+    use windows::Win32::System::DataExchange::{EmptyClipboard, SetClipboardData};
+    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+    use windows::Win32::System::Ole::CF_DIBV5;
+
+    let payload = build_dib_v5(width, height, bgra)?;
+    let memory = unsafe { GlobalAlloc(GMEM_MOVEABLE, payload.len()) }.map_err(clipboard_error)?;
+    let pointer = unsafe { GlobalLock(memory) };
+    if pointer.is_null() {
+        let _ = unsafe { GlobalFree(Some(memory)) };
+        return Err(clipboard_error("Cannot lock image clipboard memory."));
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(payload.as_ptr(), pointer.cast::<u8>(), payload.len());
+        let _ = GlobalUnlock(memory);
+    }
+    let _guard = match ClipboardGuard::open() {
+        Ok(guard) => guard,
+        Err(error) => {
+            let _ = unsafe { GlobalFree(Some(memory)) };
+            return Err(error);
+        }
+    };
+    if let Err(error) = unsafe { EmptyClipboard() } {
+        let _ = unsafe { GlobalFree(Some(memory)) };
+        return Err(clipboard_error(error));
+    }
+    if let Err(error) = unsafe { SetClipboardData(CF_DIBV5.0 as u32, Some(HANDLE(memory.0))) } {
+        let _ = unsafe { GlobalFree(Some(memory)) };
+        return Err(clipboard_error(error));
+    }
+    Ok(payload.len())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn write_image_clipboard(
+    _width: u32,
+    _height: u32,
+    _bgra: &[u8],
+) -> Result<usize, AppError> {
+    Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "Image clipboard operations are available only on Windows.",
+    ))
+}
+
 #[cfg(target_os = "windows")]
 fn write_file_clipboard(paths: &[PathBuf], cut: bool) -> Result<(), AppError> {
     use std::mem::size_of;
@@ -1221,6 +1329,9 @@ fn clipboard_error(error: impl std::fmt::Display) -> AppError {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "windows")]
+    static CLIPBOARD_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn fixture(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "comic-explorer-file-operation-{name}-{}-{}",
@@ -1325,9 +1436,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn req_ley_p2_014_builds_bounded_top_down_dib_v5() {
+        let pixels = [3, 2, 1, 4, 7, 6, 5, 8];
+        let payload = build_dib_v5(2, 1, &pixels).unwrap();
+        assert_eq!(payload.len(), DIB_V5_HEADER_BYTES + pixels.len());
+        assert_eq!(u32::from_le_bytes(payload[0..4].try_into().unwrap()), 124);
+        assert_eq!(i32::from_le_bytes(payload[4..8].try_into().unwrap()), 2);
+        assert_eq!(i32::from_le_bytes(payload[8..12].try_into().unwrap()), -1);
+        assert_eq!(u16::from_le_bytes(payload[14..16].try_into().unwrap()), 32);
+        assert_eq!(
+            u32::from_le_bytes(payload[52..56].try_into().unwrap()),
+            0xff00_0000
+        );
+        assert_eq!(&payload[DIB_V5_HEADER_BYTES..], &pixels);
+        assert!(build_dib_v5(2, 1, &[0; 4]).is_err());
+        assert!(build_dib_v5(u32::MAX, u32::MAX, &[]).is_err());
+    }
+
     #[cfg(target_os = "windows")]
     #[test]
     fn windows_file_clipboard_round_trips_copy_and_cut_effects() {
+        let _clipboard = CLIPBOARD_TEST_LOCK.lock().unwrap();
         let root = fixture("clipboard");
         fs::create_dir_all(&root).unwrap();
         let first = root.join("first.cbz");
@@ -1346,6 +1476,19 @@ mod tests {
         assert!(cut);
         clear_clipboard().unwrap();
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p2_014_windows_image_clipboard_exposes_dib_v5() {
+        use windows::Win32::System::DataExchange::IsClipboardFormatAvailable;
+        use windows::Win32::System::Ole::CF_DIBV5;
+
+        let _clipboard = CLIPBOARD_TEST_LOCK.lock().unwrap();
+        let bytes = write_image_clipboard(1, 1, &[30, 20, 10, 40]).unwrap();
+        assert_eq!(bytes, DIB_V5_HEADER_BYTES + 4);
+        assert!(unsafe { IsClipboardFormatAvailable(CF_DIBV5.0 as u32) }.is_ok());
+        clear_clipboard().unwrap();
     }
 
     #[cfg(target_os = "windows")]

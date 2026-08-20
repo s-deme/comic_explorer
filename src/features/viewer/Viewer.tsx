@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import {
+  copyViewerPageToClipboard,
   loadPage,
   saveReadingPosition,
   type ViewerSession,
 } from "../library/client";
+import { presentError, presentUnexpectedError } from "../errors/presentation";
 import {
   clampLoupePointer,
   clampLoupeCenter,
@@ -319,6 +321,8 @@ export function Viewer({
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
+  const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
+  const [clipboardCopying, setClipboardCopying] = useState(false);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [slideshowRunning, setSlideshowRunning] = useState(
     (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
@@ -356,6 +360,7 @@ export function Viewer({
   const fullscreenRef = useRef(false);
   const lifecycleMountedRef = useRef(true);
   const randomSlideshowQueueRef = useRef<number[]>([]);
+  const clipboardRequestRef = useRef(0);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -677,6 +682,33 @@ export function Viewer({
     });
   }
 
+  async function copyCurrentPageImage() {
+    if (clipboardCopying) return;
+    const request = ++clipboardRequestRef.current;
+    const pageIndex = state.index;
+    setClipboardCopying(true);
+    setClipboardNotice(`ページ ${pageIndex + 1} をクリップボードへコピーしています。`);
+    try {
+      const response = await copyViewerPageToClipboard(session, pageIndex, generation);
+      if (request !== clipboardRequestRef.current) return;
+      if (response.status === "ok") {
+        setClipboardNotice(
+          `ページ ${pageIndex + 1} を ${response.data.width}×${response.data.height}px の画像としてコピーしました。`,
+        );
+      } else if (response.status === "error") {
+        setClipboardNotice(`画像をコピーできませんでした。${presentError(response.error)}`);
+      } else {
+        setClipboardNotice("画像のコピーはキャンセルされました。もう一度お試しください。");
+      }
+    } catch {
+      if (request === clipboardRequestRef.current) {
+        setClipboardNotice(`画像をコピーできませんでした。${presentUnexpectedError()}`);
+      }
+    } finally {
+      if (request === clipboardRequestRef.current) setClipboardCopying(false);
+    }
+  }
+
   useEffect(() => {
     if (pendingNextIndex === null || pendingNextIndex !== nextStartIndex) return;
     if (nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))) return;
@@ -955,6 +987,12 @@ export function Viewer({
   useEffect(() => {
     randomSlideshowQueueRef.current = [];
   }, [session.itemKey, session.pages.length, slideshowOrder]);
+
+  useEffect(() => {
+    clipboardRequestRef.current += 1;
+    setClipboardCopying(false);
+    setClipboardNotice(null);
+  }, [session.itemKey, state.index]);
 
   useEffect(() => {
     const updateVisibility = () => {
@@ -1527,6 +1565,16 @@ export function Viewer({
           <span aria-hidden="true">{detached ? "↙" : "↗"}</span>
         </button>
         <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="現在ページの画像をコピー"
+          title="現在ページを画像データとしてクリップボードへコピー"
+          disabled={clipboardCopying}
+          onClick={() => void copyCurrentPageImage()}
+        >
+          <span aria-hidden="true">▣</span>
+        </button>
+        <button
           ref={fullscreenButtonRef}
           className="viewer-icon-button"
           aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
@@ -1549,6 +1597,11 @@ export function Viewer({
         {fullscreenError !== null && (
           <span className="fullscreen-error" role="status">
             {fullscreenError}
+          </span>
+        )}
+        {clipboardNotice !== null && (
+          <span className="fullscreen-error" role="status">
+            {clipboardNotice}
           </span>
         )}
       </header>
