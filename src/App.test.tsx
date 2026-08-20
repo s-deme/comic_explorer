@@ -678,7 +678,8 @@ describe("application shell", () => {
       expect.any(Number),
     ));
     expect(registerMock).toHaveBeenLastCalledWith("C:\\", expect.any(Number));
-    expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Users\\Test\\Desktop");
+    await waitFor(() => expect(screen.getByLabelText("アドレス"))
+      .toHaveValue("C:\\Users\\Test\\Desktop"));
   });
 
   it("REQ-LEY-P1-012 opens a supported file returned by the native picker", async () => {
@@ -1465,6 +1466,25 @@ describe("application shell", () => {
     expect(
       screen.getByRole("grid", { name: "現在のフォルダの項目" }),
     ).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("REQ-LEY-P2-002 returns to the library from the final volume", async () => {
+    const only = testEntry("01-only.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(only.relativePath));
+    await registerTestLibrary([only]);
+    await openTestComic(only.relativePath);
+    fireEvent.change(screen.getByRole("combobox", { name: "巻末動作" }), {
+      target: { value: "return_library" },
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+
+    await waitFor(() => expect(
+      screen.queryByLabelText(`${only.relativePath} ビューワ`),
+    ).not.toBeInTheDocument());
+    expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
+      .toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
   });
 

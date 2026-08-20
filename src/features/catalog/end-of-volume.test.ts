@@ -51,7 +51,13 @@ describe("FR-B02 end-of-volume policy resolver", () => {
     });
     expect(resolveEndOfVolume(books, "plain-folder", "stop")).toEqual({
       kind: "stop",
-      reason: "no_next",
+      reason: "policy",
+    });
+  });
+
+  it("REQ-LEY-P2-002 returns to the library even when the current volume is final", () => {
+    expect(resolveEndOfVolume(books, "plain-folder", "return_library")).toEqual({
+      kind: "return_library",
     });
   });
 

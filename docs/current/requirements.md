@@ -159,11 +159,12 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P1-020 | LEY-VIEWER-006 | 2page以上のviewerで現在page以外を一様に選ぶrandom移動commandを提供し、1pageでは何も変更しない。page sequence、読書位置保存、prefetch上限、原本を変更せず、選択結果を通常page移動と同じ境界へ渡す。 |
 | REQ-LEY-P1-021 | LEY-SETTING-006 | 「前回の画像を再表示」を明示的に有効化した場合だけ、前回root復元後に最新の成功した閲覧作品と保存pageを再度開く。既定は無効とし、cancel・失敗openを対象にせず、missing・access拒否・removable drive不在ではshellを維持して局所errorを表示する。設定はprofileとSQLiteへ保存する。 |
 
-## Leeyes P2-A slideshow中核の受入条件
+## Leeyes P2 閲覧中核の受入条件
 
 | Requirement | Leeyes ID | 受入条件 |
 |---|---|---|
 | REQ-LEY-P2-001 | LEY-VIEWER-007 | 2page以上のviewerはtoolbarからslideshowを開始・停止でき、slideshow起動commandでは開始状態で開く。既定間隔3秒で通常の次page commandを1回ずつ実行し、page decode/prefetch待機と巻末policyを迂回しない。documentが非表示またはwindow focusを失った間は自動送りせず、復帰後に新しい1 intervalを待つ。1pageでは開始不可とし、停止・viewer終了・unmountでtimerを破棄する。詳細な間隔・順序・反復・random設定はLEY-VIEWER-008で要件化し、このbatchでは固定しない。 |
+| REQ-LEY-P2-002 | LEY-VIEWER-009 | 巻末動作は「次巻を自動」「次巻を確認」「libraryへ戻る」「停止」「最終巻から先頭巻へloop」の5 policyを設定dialogとviewerで選択・永続化する。archive、PDF、画像folderを同じ読み取り可能volumeとして現在のcatalog sort順で扱い、次巻は先頭page、前巻は末尾pageから開く。「libraryへ戻る」は次巻の有無にかかわらず巻末でviewerを閉じる。次巻なし、現在volume不明、一覧再取得失敗では安全に停止し、確認前・失敗時に別volumeを開かない。 |
 
 ## 非採用と将来候補の境界
 

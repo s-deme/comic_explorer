@@ -46,11 +46,12 @@ export function resolveEndOfVolume(
   );
   if (!current) return { kind: "stop", reason: "current_not_found" };
 
+  if (policy === "return_library") return { kind: "return_library" };
+  if (policy === "stop") return { kind: "stop", reason: "policy" };
+
   const next = nextComicEntry(sortedEntries, currentRelativePath);
   if (next) {
     if (policy === "confirm_next") return { kind: "confirm", entry: next };
-    if (policy === "return_library") return { kind: "return_library" };
-    if (policy === "stop") return { kind: "stop", reason: "policy" };
     return { kind: "open", entry: next, reason: "next" };
   }
 

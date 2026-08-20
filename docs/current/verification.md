@@ -95,6 +95,17 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Rust / release / CoDD | PASS | formal canonicalは全12 stageがexit 0。Rust lib 163件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。製品harnessはP2-A固有slideshowの直接観測ではない。 |
 | 性能・製品直接観測 | NOT RUN | timerは常に1件でboundedだが、release WebView2での3秒精度、background、focus復帰、長時間memoryは未測定。詳細設定の性能・組合せはLEY-VIEWER-008で測定する。 |
 
+## Leeyes P2-B 境界動作
+
+対象はLEY-VIEWER-009の1件。既存5 policyの接続を回帰し、最終volumeでreturn-libraryがno-next停止になる不足を修正した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 27 files / 344件、FAIL 0。resolver 9件とApp 83件に、最終巻return、次巻ありreturn、auto/confirm/stop/loop、PDF・画像folder、次巻先頭・前巻末尾、stale設定、永続復元を含む。known-folder addressの非同期assertion flakeをwaitForへ補強後に全件再実行した。 |
+| TypeScript typecheck / build | PASS | typecheck exit 0、frontend 68 modules build。 |
+| Rust / release / CoDD | PASS | formal canonicalは251.2秒で全12 stageがexit 0。Rust lib 163件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。製品harnessはP2-B固有の全policy直接観測ではない。 |
+| 性能・製品直接観測 | NOT RUN | resolverはbounded catalog snapshot上の同期判定。release WebView2での全5 policy、低速folder再列挙、長時間連続巻移動は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。
