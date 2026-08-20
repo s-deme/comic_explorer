@@ -159,6 +159,12 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P1-020 | LEY-VIEWER-006 | 2page以上のviewerで現在page以外を一様に選ぶrandom移動commandを提供し、1pageでは何も変更しない。page sequence、読書位置保存、prefetch上限、原本を変更せず、選択結果を通常page移動と同じ境界へ渡す。 |
 | REQ-LEY-P1-021 | LEY-SETTING-006 | 「前回の画像を再表示」を明示的に有効化した場合だけ、前回root復元後に最新の成功した閲覧作品と保存pageを再度開く。既定は無効とし、cancel・失敗openを対象にせず、missing・access拒否・removable drive不在ではshellを維持して局所errorを表示する。設定はprofileとSQLiteへ保存する。 |
 
+## Leeyes P2-A slideshow中核の受入条件
+
+| Requirement | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-LEY-P2-001 | LEY-VIEWER-007 | 2page以上のviewerはtoolbarからslideshowを開始・停止でき、slideshow起動commandでは開始状態で開く。既定間隔3秒で通常の次page commandを1回ずつ実行し、page decode/prefetch待機と巻末policyを迂回しない。documentが非表示またはwindow focusを失った間は自動送りせず、復帰後に新しい1 intervalを待つ。1pageでは開始不可とし、停止・viewer終了・unmountでtimerを破棄する。詳細な間隔・順序・反復・random設定はLEY-VIEWER-008で要件化し、このbatchでは固定しない。 |
+
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |

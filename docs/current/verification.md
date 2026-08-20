@@ -83,6 +83,18 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | CoDD | PASS（red 0） | formal canonical内のscan/check/verifyはexit 0。文書・tracker最終同期後にもscan/check/verifyを再実行する。SKIP、VACUOUS、advisoryを機能PASSへ合算しない。 |
 | 性能・製品直接観測 | NOT RUN | このS機能batchに専用性能閾値はない。10,000項目virtual DOMの既存回帰はPASSだがincremental searchの基準PC時間、random分布の統計測定、known folder全種類、hidden実folder、4配色、IME、removable drive欠落をrelease WebView2では未測定。 |
 
+## Leeyes P2-A slideshow中核
+
+対象はLEY-VIEWER-007の1件。既存context slideshowをtoolbar開始・停止、focus/visibility pause、fresh interval、1page無効化、timer cleanupまで完成させた。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 27 files / 342件、FAIL 0。Viewer単体33件に開始・停止、2999/3000ms境界、blur中の非進行、focus復帰後600msのfresh interval、既存context起動を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Windows frontend build | PASS | 68 modules、exit 0。`dist/`は生成物としてcommitしない。 |
+| Rust / release / CoDD | PASS | formal canonicalは全12 stageがexit 0。Rust lib 163件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。製品harnessはP2-A固有slideshowの直接観測ではない。 |
+| 性能・製品直接観測 | NOT RUN | timerは常に1件でboundedだが、release WebView2での3秒精度、background、focus復帰、長時間memoryは未測定。詳細設定の性能・組合せはLEY-VIEWER-008で測定する。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

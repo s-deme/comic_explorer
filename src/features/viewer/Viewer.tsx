@@ -71,6 +71,7 @@ import {
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
 const VIEWER_PREFETCH_AHEAD = 4;
+const DEFAULT_SLIDESHOW_INTERVAL_MS = 3_000;
 
 interface ViewerProps {
   session: ViewerSession;
@@ -215,6 +216,12 @@ export function Viewer({
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
+  const [slideshowRunning, setSlideshowRunning] = useState(
+    slideshowIntervalMs !== undefined && session.pages.length > 1,
+  );
+  const [slideshowPlaybackAllowed, setSlideshowPlaybackAllowed] = useState(
+    () => document.visibilityState !== "hidden",
+  );
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
   const [pixelWidthInput, setPixelWidthInput] = useState("");
   const [pixelHeightInput, setPixelHeightInput] = useState("");
@@ -620,10 +627,41 @@ export function Viewer({
   }, [initialFullscreen]);
 
   useEffect(() => {
-    if (slideshowIntervalMs === undefined || slideshowIntervalMs < 500) return;
-    const timer = window.setTimeout(next, slideshowIntervalMs);
+    setSlideshowRunning(slideshowIntervalMs !== undefined && session.pages.length > 1);
+  }, [session.itemKey, session.pages.length, slideshowIntervalMs]);
+
+  useEffect(() => {
+    const updateVisibility = () => {
+      setSlideshowPlaybackAllowed(document.visibilityState !== "hidden");
+    };
+    const pauseForBlur = () => setSlideshowPlaybackAllowed(false);
+    const resumeForFocus = () => {
+      if (document.visibilityState !== "hidden") setSlideshowPlaybackAllowed(true);
+    };
+    document.addEventListener("visibilitychange", updateVisibility);
+    window.addEventListener("blur", pauseForBlur);
+    window.addEventListener("focus", resumeForFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", updateVisibility);
+      window.removeEventListener("blur", pauseForBlur);
+      window.removeEventListener("focus", resumeForFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!slideshowRunning || !slideshowPlaybackAllowed || session.pages.length <= 1) return;
+    const interval = Math.max(500, slideshowIntervalMs ?? DEFAULT_SLIDESHOW_INTERVAL_MS);
+    const timer = window.setTimeout(next, interval);
     return () => window.clearTimeout(timer);
-  }, [slideshowIntervalMs, state.index, state.mode, visible.length]);
+  }, [
+    session.pages.length,
+    slideshowIntervalMs,
+    slideshowPlaybackAllowed,
+    slideshowRunning,
+    state.index,
+    state.mode,
+    visible.length,
+  ]);
 
   useEffect(() => {
     if (layoutMode === "paged") return;
@@ -847,7 +885,7 @@ export function Viewer({
       data-fullscreen={fullscreen}
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
       data-page-navigator-visible={!fullscreen || fullscreenPageNavigatorVisible}
-      data-slideshow={slideshowIntervalMs !== undefined}
+      data-slideshow={slideshowRunning}
       onPointerMove={(event) => {
         if (
           fullscreen
@@ -1015,6 +1053,16 @@ export function Viewer({
           onClick={randomPage}
         >
           <span aria-hidden="true">⤨</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
+          title={slideshowRunning ? "スライドショーを停止" : "3秒間隔でスライドショーを開始"}
+          aria-pressed={slideshowRunning}
+          disabled={session.pages.length <= 1}
+          onClick={() => setSlideshowRunning((current) => !current)}
+        >
+          <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
         </button>
         <button
           className="viewer-icon-button"

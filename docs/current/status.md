@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 0 | 16 |
+| P2 閲覧中核 | 16 | 1 | 15 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **21** | **82** |
+| **合計** | **103** | **22** | **81** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -46,6 +46,8 @@ P1-AではLEY-SHELL-012/013、LEY-VIEWER-020/021/022/031、LEY-INPUT-004/010/012
 P1-BではLEY-FILER-016、LEY-CATALOG-010、LEY-FILE-001/009、LEY-SETTING-005、LEY-HELP-001の6件をPublishedとした。移動後初期選択、bounded thumbnail生成範囲、native file picker、永続recent 20件と消去、起動場所、検索可能な同梱helpをprofile v6・SQLite・Windows shell境界へ接続した。Windows自動gateはPASS。native pickerのrelease製品直接操作、実disk上のrecent欠落file回復、helpのDPI/visualは未測定として残す。
 
 P1-CではLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件をPublishedとした。Windows known folder移動、dot/hidden属性の表示切替、NFKC前方一致incremental search、安全なcatalog配色preset、現在pageを除くrandom移動、opt-inの前回viewer復元をprofile v7・SQLite・Windows shell境界へ接続した。Windows自動gateとformal canonicalはPASS。特殊folder全種類、各配色のrelease目視、IME実入力、random統計、removable drive欠落時の製品直接操作は未測定として残す。
+
+P2-AではLEY-VIEWER-007をPublishedとした。既存のslideshow context起動を、通常viewerからも開始・停止できる単一timer commandへ完成させ、background・focus喪失中の停止、復帰後のfresh interval、1page無効化、unmount cleanupを接続した。詳細な間隔・順序・反復・random設定は依存順どおりLEY-VIEWER-008で実装する。release WebView2でのbackground/focus直接観測は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

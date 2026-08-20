@@ -96,7 +96,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(18);
+    expect(buttons).toHaveLength(19);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -1034,6 +1034,63 @@ describe("Viewer settings", () => {
       expect(screen.getByText("1 / 2")).toBeInTheDocument();
       markPrefetchedPagesReady();
       await act(async () => vi.advanceTimersByTime(600));
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("REQ-LEY-P2-001 starts and stops a fixed-interval slideshow from the toolbar", async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={multiPageSession}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      markPrefetchedPagesReady();
+      fireEvent.click(screen.getByRole("button", { name: "スライドショーを開始" }));
+      expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow", "true");
+      await act(async () => vi.advanceTimersByTime(2_999));
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTime(1));
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "スライドショーを停止" }));
+      await act(async () => vi.advanceTimersByTime(3_000));
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("REQ-LEY-P2-001 pauses while the window is unfocused and waits a fresh interval", async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={multiPageSession}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          slideshowIntervalMs={600}
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      markPrefetchedPagesReady();
+      fireEvent(window, new Event("blur"));
+      await act(async () => vi.advanceTimersByTime(1_200));
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      fireEvent(window, new Event("focus"));
+      await act(async () => vi.advanceTimersByTime(599));
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTime(1));
       expect(screen.getByText("2 / 2")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
