@@ -1,0 +1,104 @@
+leeyes_id,priority_tier,priority_rank,priority_reason
+LEY-SHELL-012,P1,1,既存UI上のPartialを先に完成
+LEY-FILER-016,P1,2,既存navigation上のPartialを先に完成
+LEY-CATALOG-010,P1,3,既存thumbnail設定のPartialを先に完成
+LEY-FILE-001,P1,4,既存picker経路のPartialを先に完成
+LEY-FILE-009,P1,5,既存履歴基盤のPartialを先に完成
+LEY-VIEWER-020,P1,6,既存zoom操作のPartialを先に完成
+LEY-VIEWER-022,P1,7,既存zoom状態のPartialを先に完成
+LEY-INPUT-004,P1,8,既存shortcut設定のPartialを先に完成
+LEY-SETTING-005,P1,9,既存復元状態のPartialを先に完成
+LEY-HELP-001,P1,10,既存help表示のPartialを先に完成
+LEY-SHELL-013,P1,11,利用頻度が高い独立S機能
+LEY-FILER-007,P1,12,利用頻度が高い独立S機能
+LEY-FILER-011,P1,13,利用頻度が高い独立S機能
+LEY-FILER-014,P1,14,利用頻度が高い独立S機能
+LEY-FILER-018,P1,15,局所的な表示設定
+LEY-VIEWER-006,P1,16,独立したviewer操作
+LEY-VIEWER-021,P1,17,独立したzoom指定
+LEY-VIEWER-031,P1,18,独立したviewer overlay
+LEY-INPUT-010,P1,19,独立したpointer設定
+LEY-INPUT-012,P1,20,独立したwheel設定
+LEY-SETTING-006,P1,21,既存読書位置を使う復元機能
+LEY-VIEWER-007,P2,1,slideshow基盤のPartialを先に完成
+LEY-VIEWER-009,P2,2,既存巻末policyのPartialを先に完成
+LEY-VIEWER-010,P2,3,既存bookmark基盤のPartialを先に完成
+LEY-VIEWER-013,P2,4,spread判定基盤のPartialを先に完成
+LEY-VIEWER-014,P2,5,spread判定基盤に依存
+LEY-VIEWER-019,P2,6,既存fit計算のPartialを先に完成
+LEY-VIEWER-026,P2,7,scroll入力基盤のPartialを先に完成
+LEY-VIEWER-027,P2,8,scroll入力基盤に依存
+LEY-VIEWER-029,P2,9,既存loupeのPartialを先に完成
+LEY-VIEWER-032,P2,10,既存prefetch基盤のPartialを先に完成
+LEY-VIEWER-033,P2,11,既存fullscreen lifecycleのPartialを先に完成
+LEY-SHELL-014,P2,12,viewerとwindow lifecycleの共通基盤
+LEY-VIEWER-008,P2,13,slideshow基盤に依存
+LEY-VIEWER-011,P2,14,viewer media出力の追加
+LEY-VIEWER-012,P2,15,viewerとcatalog状態の同期
+LEY-VIEWER-030,P2,16,spreadとrender変換を横断
+LEY-SEARCH-003,P3,1,query parserを検索とmaskで共有
+LEY-CATALOG-006,P3,2,共通query parserに依存
+LEY-CATALOG-007,P3,3,catalog mask基盤に依存
+LEY-SEARCH-001,P3,4,複数source検索の共通抽象
+LEY-SEARCH-002,P3,5,複数source検索基盤に依存
+LEY-FILER-010,P3,6,filesystem watcher基盤
+LEY-FILER-015,P3,7,既存tree動作のPartialを完成
+LEY-FILER-017,P3,8,共通command registryへ接続
+LEY-FILER-019,P3,9,既存detail listのPartialを完成
+LEY-CATALOG-016,P3,10,既存thumbnail pipelineを再利用
+LEY-FILE-020,P3,11,既存DnDのPartialを完成
+LEY-INPUT-001,P3,12,複数bindingのcommand基盤
+LEY-INPUT-005,P3,13,P2 scroll基盤へ接続
+LEY-INPUT-006,P3,14,共通command基盤へ接続
+LEY-INPUT-008,P3,15,共通command基盤へ接続
+LEY-INPUT-009,P3,16,context menu境界を保つ入力機能
+LEY-INPUT-013,P3,17,pointer captureを使う入力機能
+LEY-FILE-005,P3,18,安全な外部app allowlist基盤
+LEY-FILE-006,P3,19,外部app allowlist基盤に依存
+LEY-FILE-007,P3,20,外部app allowlist基盤に依存
+LEY-FILE-022,P3,21,preview付きrename基盤
+LEY-SETTING-004,P3,22,既存strict profileの選択機能
+LEY-IO-001,P3,23,CSV preset共通基盤
+LEY-IO-002,P3,24,CSV preset基盤に依存
+LEY-IO-003,P3,25,CSV preset基盤に依存するPartial
+LEY-IO-004,P3,26,CSV列schemaに依存
+LEY-IO-005,P3,27,CSV出力対象と上限
+LEY-IO-006,P3,28,CSV列schemaに依存
+LEY-IO-007,P3,29,安全なCLI parser基盤
+LEY-IO-008,P3,30,CLI parser基盤に依存
+LEY-IO-009,P3,31,CLI parserとslideshow基盤に依存
+LEY-SHELF-001,P4,1,名前付き仮想本棚のDB基盤
+LEY-SHELF-005,P4,2,本棚DB基盤に依存するPartial
+LEY-SHELF-003,P4,3,本棚DB基盤に依存
+LEY-SHELF-004,P4,4,本棚DB基盤に依存
+LEY-SHELF-007,P4,5,本棚DB基盤に依存
+LEY-SHELF-008,P4,6,本棚DB基盤に依存
+LEY-SHELF-009,P4,7,本棚DB基盤に依存
+LEY-FILER-003,P4,8,archive virtual path基盤
+LEY-FILER-002,P4,9,archive virtual path基盤に依存
+LEY-FILER-004,P4,10,archive virtual pathと既存上限を再利用
+LEY-FILE-016,P4,11,安全なoperation journal基盤
+LEY-SHELL-007,P4,12,永続化を伴う大型layout変更
+LEY-MEDIA-001,P5,1,offline media catalogのDBとscanner基盤
+LEY-MEDIA-002,P5,2,media catalog transactionに依存
+LEY-MEDIA-008,P5,3,media catalog identityに依存
+LEY-MEDIA-003,P5,4,media catalog基盤に依存
+LEY-MEDIA-004,P5,5,media catalogとbounded cacheに依存
+LEY-MEDIA-005,P5,6,media identityとvolume状態に依存
+LEY-MEDIA-009,P5,7,media catalog asset管理に依存
+LEY-FILTER-002,P5,8,non-destructive filter pipeline基盤
+LEY-FILTER-001,P5,9,filter pipelineのnamed set管理
+LEY-FILTER-003,P5,10,filter pipeline上の基本色変換
+LEY-FILTER-005,P5,11,filter pipeline上の基本色変換
+LEY-FILTER-006,P5,12,filter pipeline上の基本色変換
+LEY-FILTER-007,P5,13,filter pipeline上の基本色変換
+LEY-FILTER-010,P5,14,filter pipeline上の基本色変換
+LEY-FILTER-016,P5,15,filter pipelineとviewer余白基盤を再利用
+LEY-FILTER-004,P5,16,histogram基盤を使う補正
+LEY-FILTER-008,P5,17,histogram基盤を使う補正
+LEY-FILTER-009,P5,18,filter pipeline上の階調変換
+LEY-FILTER-011,P5,19,curve editorを伴う専門補正
+LEY-FILTER-012,P5,20,kernel基盤を使う専門補正
+LEY-FILTER-013,P5,21,kernel基盤を使う専門補正
+LEY-FILTER-014,P5,22,kernel基盤を使う専門補正
+LEY-FILTER-015,P5,23,spread座標を扱う非破壊変換

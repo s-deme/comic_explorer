@@ -15,7 +15,8 @@ codd:
 役割を次の2ファイルへ分離する。
 
 - .tools/leeyes-2.6.1-feature-audit.md: Leeyesの挙動、証拠、Comic Explorerとの差分を説明する調査記録
-- docs/current/leeyes-feature-tracker.csv: 採否、実装進捗、要件、実装、テスト、検証、成果参照を更新する運用上の正本
+- docs/current/leeyes-feature-tracker.csv: 採否、優先順位、実装進捗、要件、実装、テスト、検証、成果参照を更新する運用上の正本
+- docs/current/leeyes-implementation-manifest.csv: 2026-08-21に一括承認された103件のP1〜P5順序を固定する実装マニフェスト
 
 2026-08-20に最初の実装対象としてLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028が選択されたため、トラッカーと本ガイドをdocs/currentへ昇格した。以後、選択機能の要件・実装・テストと同じ変更単位で必ず台帳も更新する。
 
@@ -40,6 +41,9 @@ baseline_status と delivery_status は別の意味を持つ。
 | decision_status | 採否 | ID選択・延期・却下時 |
 | delivery_status | 実装ライフサイクル | 各工程終了時 |
 | size | S / M / L / XL / NA | 分割後に再見積り可 |
+| priority_tier | P1 / P2 / P3 / P4 / P5。今回の対象外は空欄 | 選択時 |
+| priority_rank | tier内の1始まり連番 | 選択時 |
+| priority_reason | 依存、既存Partial、利用頻度、規模を踏まえた順序理由 | 選択時 |
 | requirement_ids | docs/current/requirements.md の正確な要件ID。複数はセミコロン区切り | 着手前 |
 | acceptance_ref | 受入条件の節または要件ID | 着手前 |
 | implementation_refs | 実装ファイル・symbol。複数はセミコロン区切り | 実装時 |
@@ -64,7 +68,10 @@ CSV内で複数値を持つ場合はカンマではなくセミコロンで区�
 | ReviewAlternative | 安全な代替方式を維持するか、厳密互換を求めるか判断待ち |
 | DeclinedSafety | 安全上の理由から互換実装を非推奨として除外 |
 
-Selected への変更は、利用者が指定したIDだけに行う。近接機能や依存機能を自動選択しない。依存機能が必要なら dependencies に記録し、実装前に提示する。
+Selected への変更は、利用者が指定したIDだけに行う。2026-08-21の一括実装指示は
+`leeyes-implementation-manifest.csv`の103件すべてを指定した承認として記録する。近接機能や依存機能を
+自動選択しない。依存機能が必要なら dependencies に記録し、対象外IDの互換方式を変更せず既存の安全な
+境界または内部共通基盤を利用する。
 
 ## delivery_status
 
@@ -96,7 +103,7 @@ Selected への変更は、利用者が指定したIDだけに行う。近接機
 
 ## ID選択後の更新手順
 
-1. 利用者が指定したIDだけ decision_status を Selected にする。
+1. 利用者が指定したIDだけ decision_status を Selected にし、priority_tier、priority_rank、priority_reasonを記録する。
 2. 大きなIDは受入可能な小単位へ分解する。ただし元のLeeyes IDは親キーとして保持する。
 3. requirements.md を先に更新し、requirement_ids と acceptance_ref を埋める。
 4. Windows-native CoDD scan と impact を実行する。
@@ -106,6 +113,9 @@ Selected への変更は、利用者が指定したIDだけに行う。近接機
 8. 成功した検証だけ verification_refs へ記録し、Verified にする。
 9. scoped diffをcommit・pushし、Published と delivery_ref を記録する。
 10. 無関係なIDのdecision_statusやdelivery_statusを一緒に変更しない。
+
+今回の103件はP1 21件、P2 16件、P3 31件、P4 12件、P5 23件である。各tierのrankは
+連番とし、マニフェスト内依存は必ず同じtierの小さいrankまたは前tierを指す。
 
 同じcommitに実装と台帳更新を含める場合、delivery_ref は SELF と記録できる。後から実ハッシュが必要な場合は git blame または当該行を追加したcommitから解決する。別の台帳同期commitを作る場合は git:<short-hash> を記録する。
 
@@ -167,6 +177,9 @@ trackedトラッカーには次の整合性検査を適用する。
 8. DeclinedSafetyなら risk_notes が必須。
 9. baseline_status=Equivalent の初期delivery_statusは Existing。
 10. baseline_status=Missing の初期delivery_statusは NotStarted。
+11. 実装マニフェストは103件かつ一意で、Missing 67件 / Partial 36件と一致する。
+12. P1〜P5の件数とrank連番、trackerとのpriority一致、依存順序を検証する。
+13. 既存Published 3件以外のMissing / Partialはすべてマニフェストに含み、対象外statusを混入させない。
 
 これをCIまたはCoDD verificationから実行し、台帳更新漏れを赤gateにする。実装コードだけが進んで台帳が古い状態になることを防ぐ。
 

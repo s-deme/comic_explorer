@@ -107,6 +107,20 @@ function Resolve-WindowsNode {
         )).Path
 }
 
+function Resolve-PowerShellHost {
+    $currentHost = (Get-Process -Id $PID -ErrorAction SilentlyContinue).Path
+    return (Resolve-ExecutablePath -ToolName "PowerShell host" `
+        -CommandNames @("pwsh.exe", "powershell.exe", "pwsh", "powershell") `
+        -CandidatePaths @(
+            $currentHost,
+            (Join-Path $PSHOME "pwsh.exe"),
+            (Join-Path $PSHOME "powershell.exe"),
+            $(if ($env:SystemRoot) {
+                Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+            })
+        )).Path
+}
+
 function Resolve-VisualStudioEnvironment {
     $programFilesX86 = [Environment]::GetFolderPath("ProgramFilesX86")
     $searched = [Collections.Generic.List[string]]::new()

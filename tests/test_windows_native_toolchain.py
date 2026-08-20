@@ -37,6 +37,18 @@ class WindowsNativeToolchainTests(unittest.TestCase):
         for extension in (".COM", ".EXE", ".BAT", ".CMD"):
             self.assertIn(extension, bootstrap)
 
+    def test_windows_runners_resolve_powershell_5_or_7_host(self) -> None:
+        bootstrap = (ROOT / "scripts/windows-toolchain.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("function Resolve-PowerShellHost", bootstrap)
+        self.assertIn('"pwsh.exe", "powershell.exe", "pwsh", "powershell"', bootstrap)
+        for name in ("run-tests-windows.ps1", "verify-feature-windows.ps1"):
+            with self.subTest(runner=name):
+                source = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+                self.assertIn("Resolve-PowerShellHost", source)
+                self.assertNotIn('Join-Path $PSHOME "powershell.exe"', source)
+
     def test_feature_runner_has_feature_aliases_and_failure_json(self) -> None:
         source = (ROOT / "scripts/verify-feature-windows.ps1").read_text(
             encoding="utf-8"

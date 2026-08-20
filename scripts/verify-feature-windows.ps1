@@ -144,7 +144,7 @@ function Invoke-ToolchainBootstrapStage {
     return $true
 }
 
-$powerShell = Join-Path $PSHOME "powershell.exe"
+$powerShell = Resolve-PowerShellHost
 $toolchainScript = Join-Path $PSScriptRoot "invoke-windows-toolchain.ps1"
 $coddScript = Join-Path $PSScriptRoot "run-codd-windows.ps1"
 $productScript = Join-Path $PSScriptRoot "run-product-ui-harness.ps1"

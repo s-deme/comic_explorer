@@ -17,13 +17,31 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-20 JST
+- 最終更新日: 2026-08-21 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
+
+## Leeyes P1〜P5実装マニフェスト
+
+2026-08-21の一括承認対象を`leeyes-implementation-manifest.csv`へ固定した。自動検査は103件の一意性、
+Missing 67件 / Partial 36件、P1 21件 / P2 16件 / P3 31件 / P4 12件 / P5 23件、tier内rank連番、
+trackerとのpriority一致、既存Published 3件との分離、対象外statusの非混入、依存が後tierを指さないことを確認する。
+
+Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.exe`を固定参照していたため、
+実行中host、`pwsh.exe`、Windows PowerShellの順で検証済み実行fileを解決する共通境界へ修正した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 25 files / 296件、FAIL 0。tracker/manifest整合5件とPowerShell 5/7 host解決回帰を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Windows frontend build / SBOM | PASS | 66 modules、SBOM 729 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | `cargo fmt --check`、`cargo check --locked`、lib 158件とshutdown process 1件を含む`cargo test --locked`がexit 0。既存dead-code warning 2件はFAILへ読み替えない。 |
+
+この段階では実装対象を選択・順序固定しただけであり、103件をImplemented、Verified、Publishedへ推定しない。
 
 ## FR-B23 Leeyes viewer操作・外観
 

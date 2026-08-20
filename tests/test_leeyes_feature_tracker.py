@@ -6,6 +6,7 @@ import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TRACKER = PROJECT_ROOT / "docs" / "current" / "leeyes-feature-tracker.csv"
+MANIFEST = PROJECT_ROOT / "docs" / "current" / "leeyes-implementation-manifest.csv"
 
 BASELINE_STATUSES = {
     "Equivalent",
@@ -38,7 +39,7 @@ DELIVERY_STATUSES = {
     "Published",
     "Blocked",
 }
-SELECTED_IDS = {
+PREVIOUSLY_PUBLISHED_IDS = {
     "LEY-VIEWER-004",
     "LEY-VIEWER-025",
     "LEY-VIEWER-028",
@@ -51,6 +52,9 @@ EXPECTED_COLUMNS = [
     "decision_status",
     "delivery_status",
     "size",
+    "priority_tier",
+    "priority_rank",
+    "priority_reason",
     "requirement_ids",
     "acceptance_ref",
     "implementation_refs",
@@ -93,6 +97,11 @@ def load_tracker() -> tuple[list[str], list[dict[str, str]]]:
         return list(reader.fieldnames or []), list(reader)
 
 
+def load_manifest() -> list[dict[str, str]]:
+    with MANIFEST.open(encoding="utf-8", newline="") as source:
+        return list(csv.DictReader(source))
+
+
 class LeeyesFeatureTrackerTests(unittest.TestCase):
     def test_tracker_has_all_unique_leeyes_features_and_known_states(self) -> None:
         columns, rows = load_tracker()
@@ -108,23 +117,80 @@ class LeeyesFeatureTrackerTests(unittest.TestCase):
             self.assertIsNotNone(match, row["leeyes_id"])
             self.assertEqual(row["category"], PREFIX_CATEGORIES[match.group(1)])
 
-    def test_tracker_records_only_the_explicitly_selected_features(self) -> None:
+    def test_manifest_selects_the_exact_approved_candidate_set(self) -> None:
         _, rows = load_tracker()
+        manifest = load_manifest()
+        manifest_ids = [row["leeyes_id"] for row in manifest]
         selected = {
             row["leeyes_id"]
             for row in rows
             if row["decision_status"] == "Selected"
         }
 
-        self.assertEqual(selected, SELECTED_IDS)
+        self.assertEqual(len(manifest_ids), 103)
+        self.assertEqual(len(set(manifest_ids)), 103)
+        self.assertEqual(
+            {row["leeyes_id"] for row in rows if row["baseline_status"] in {"Missing", "Partial"}},
+            set(manifest_ids) | PREVIOUSLY_PUBLISHED_IDS,
+        )
+        self.assertEqual(selected, set(manifest_ids) | PREVIOUSLY_PUBLISHED_IDS)
+        selected_rows = {row["leeyes_id"]: row for row in rows}
+        self.assertEqual(
+            sum(selected_rows[feature_id]["baseline_status"] == "Missing" for feature_id in manifest_ids),
+            67,
+        )
+        self.assertEqual(
+            sum(selected_rows[feature_id]["baseline_status"] == "Partial" for feature_id in manifest_ids),
+            36,
+        )
         for row in rows:
-            if row["leeyes_id"] in SELECTED_IDS:
+            if row["leeyes_id"] in PREVIOUSLY_PUBLISHED_IDS:
                 self.assertIn(
                     row["delivery_status"],
                     {"Planned", "InProgress", "Implemented", "Verified", "Published"},
                 )
                 self.assertTrue(row["requirement_ids"])
                 self.assertTrue(row["acceptance_ref"])
+
+    def test_manifest_priorities_are_contiguous_and_match_tracker(self) -> None:
+        _, rows = load_tracker()
+        manifest = load_manifest()
+        tracker_by_id = {row["leeyes_id"]: row for row in rows}
+        expected_counts = {"P1": 21, "P2": 16, "P3": 31, "P4": 12, "P5": 23}
+
+        for tier, expected_count in expected_counts.items():
+            tier_rows = [row for row in manifest if row["priority_tier"] == tier]
+            self.assertEqual(len(tier_rows), expected_count, tier)
+            self.assertEqual(
+                sorted(int(row["priority_rank"]) for row in tier_rows),
+                list(range(1, expected_count + 1)),
+                tier,
+            )
+        self.assertEqual({row["priority_tier"] for row in manifest}, set(expected_counts))
+        for manifest_row in manifest:
+            tracker_row = tracker_by_id[manifest_row["leeyes_id"]]
+            self.assertEqual(tracker_row["decision_status"], "Selected")
+            for column in ("priority_tier", "priority_rank", "priority_reason"):
+                self.assertEqual(tracker_row[column], manifest_row[column], manifest_row["leeyes_id"])
+        for row in rows:
+            if row["leeyes_id"] not in {item["leeyes_id"] for item in manifest}:
+                self.assertFalse(row["priority_tier"], row["leeyes_id"])
+                self.assertFalse(row["priority_rank"], row["leeyes_id"])
+                self.assertFalse(row["priority_reason"], row["leeyes_id"])
+
+    def test_manifest_dependencies_never_point_to_a_later_priority(self) -> None:
+        _, rows = load_tracker()
+        manifest = load_manifest()
+        order = {
+            row["leeyes_id"]: (int(row["priority_tier"][1:]), int(row["priority_rank"]))
+            for row in manifest
+        }
+        tracker_by_id = {row["leeyes_id"]: row for row in rows}
+        for feature_id, feature_order in order.items():
+            dependencies = re.findall(r"LEY-[A-Z]+-\d{3}", tracker_by_id[feature_id]["dependencies"])
+            for dependency in dependencies:
+                if dependency in order:
+                    self.assertLess(order[dependency], feature_order, f"{feature_id} -> {dependency}")
 
     def test_tracker_requires_evidence_as_delivery_advances(self) -> None:
         _, rows = load_tracker()

@@ -15,10 +15,11 @@ $toolchainScript = Join-Path $PSScriptRoot "windows-toolchain.ps1"
 $python = (Resolve-ExecutablePath -ToolName "Windows Python virtual environment" `
     -CandidatePaths @((Join-Path $venvRoot "Scripts\python.exe"))).Path
 $node = Resolve-WindowsNode
+$powerShell = Resolve-PowerShellHost
 
 Push-Location $projectRoot
 try {
-    $consistency = Invoke-TrackedNative -FilePath (Join-Path $PSHOME "powershell.exe") `
+    $consistency = Invoke-TrackedNative -FilePath $powerShell `
         -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
             (Join-Path $PSScriptRoot "run-codd-consistency-windows.ps1"), "-VenvPath", $venvRoot) `
         -WorkingDirectory $projectRoot

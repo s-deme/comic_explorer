@@ -24,7 +24,22 @@ codd:
 
 ## 機能集計
 
-現行要件台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来75件の計102件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理し、2026-08-20時点で利用者が選択した3件だけを実装・検証済みとする。
+現行要件台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来75件の計102件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
+
+## Leeyes P1〜P5進捗
+
+| tier | 対象 | Published | 未完了 |
+|---|---:|---:|---:|
+| P1 即効改善 | 21 | 0 | 21 |
+| P2 閲覧中核 | 16 | 0 | 16 |
+| P3 操作・検索 | 31 | 0 | 31 |
+| P4 大型基盤 | 12 | 0 | 12 |
+| P5 専門機能 | 23 | 0 | 23 |
+| **合計** | **103** | **0** | **103** |
+
+マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
+対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
+Leeyes互換方式へ変更しない。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
