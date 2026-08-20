@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 5 | 11 |
+| P2 閲覧中核 | 16 | 6 | 10 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **26** | **77** |
+| **合計** | **103** | **27** | **76** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -56,6 +56,8 @@ P2-CではLEY-VIEWER-010をPublishedとした。複数しおりをcanonical root
 P2-DではLEY-VIEWER-013をPublishedとした。自動・単ページ・見開きの3 modeを設定とSQLiteへ接続し、自動modeはpaged表示かつviewport比1.25以上で連続する縦長2pageだけを見開きにする。resize時は現在pageをanchorとして再判定し、次移動は表示単位、前移動は履歴単位を維持する。release WebView2での連続resize、DPI、分離viewer、実画像の多様な縦横比は未測定として残す。
 
 P2-EではLEY-VIEWER-014をPublishedとした。見開き候補page比50〜100%、auto viewport比100〜300%、先頭単独、開始pageの奇数・偶数・制限なしをprofile v8・SQLite・設定dialog・viewer modelへ接続した。旧profile v1〜v7と欠落DB keyはP2-D互換既定値へ移行し、不正値はimport/native境界で拒否する。release WebView2のDPI別resizeと実画像比率matrixは未測定として残す。
+
+P2-FではLEY-VIEWER-019をPublishedとした。全体フィットへ小画像の拡大可否、見開き全体/page単位の基準、page余白の算入可否をprofile v9・SQLite・設定dialog・viewerへ接続した。natural寸法が揃うまで従来CSSへfallbackし、縮小のみは100%、拡大許可は800%で制限する。release WebView2のDPI別zoom、巨大画像、異なる縦横比の見開き、scroll/pan感触は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

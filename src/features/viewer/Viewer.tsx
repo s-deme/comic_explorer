@@ -14,6 +14,7 @@ import {
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
   DEFAULT_SPREAD_RULES,
+  DEFAULT_FIT_RULES,
   DEFAULT_PAN_FACTOR,
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
@@ -31,6 +32,7 @@ import {
   isViewerGridSize,
   isWheelDeadZone,
   isPagePairable,
+  fitScaleForPages,
   scaleForPixelDimension,
   scaleReducer,
   viewerReducer,
@@ -45,6 +47,7 @@ import {
   type ViewerGridColor,
   type ViewMode,
   type SpreadRules,
+  type FitRules,
   type ViewerLayoutMode,
   type ZoomRetention,
 } from "./model";
@@ -89,6 +92,7 @@ interface ViewerProps {
   onEndOfVolumePolicyChange?: (policy: EndOfVolumePolicy) => void;
   initialMode: ViewMode;
   spreadRules?: SpreadRules;
+  fitRules?: FitRules;
   initialLayoutMode?: ViewerLayoutMode;
   initialDirection: ReadingDirection;
   onSettingsChange: (mode: ViewMode, direction: ReadingDirection) => void;
@@ -150,6 +154,7 @@ export function Viewer({
   onEndOfVolumePolicyChange,
   initialMode,
   spreadRules = DEFAULT_SPREAD_RULES,
+  fitRules = DEFAULT_FIT_RULES,
   initialLayoutMode = "paged",
   initialDirection,
   onSettingsChange,
@@ -209,6 +214,9 @@ export function Viewer({
     history: [],
   });
   const [landscape, setLandscape] = useState<Set<number>>(new Set());
+  const [pageSizes, setPageSizes] = useState<Map<number, { width: number; height: number }>>(
+    () => new Map(),
+  );
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [readyPages, setReadyPages] = useState<Set<number>>(new Set());
   const [pendingNextIndex, setPendingNextIndex] = useState<number | null>(null);
@@ -227,6 +235,10 @@ export function Viewer({
       window.innerHeight,
       spreadRules.autoViewportMinAspectPercent,
     ));
+  const [fitViewport, setFitViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
@@ -277,6 +289,9 @@ export function Viewer({
         height,
         spreadRules.autoViewportMinAspectPercent,
       ));
+      setFitViewport((current) => current.width === width && current.height === height
+        ? current
+        : { width, height });
     };
     update();
     window.addEventListener("resize", update);
@@ -355,6 +370,19 @@ export function Viewer({
       spreadRules,
     );
   }, [autoSpread, landscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
+  const calculatedFitScale = useMemo(() => {
+    if (scale.mode !== "fit" || layoutMode !== "paged") return null;
+    const sizes = visible.map((index) => pageSizes.get(index));
+    if (sizes.some((size) => size === undefined)) return null;
+    return fitScaleForPages(
+      sizes as { width: number; height: number }[],
+      fitViewport.width,
+      fitViewport.height,
+      viewerPageMargin,
+      viewerSpreadGap,
+      fitRules,
+    );
+  }, [fitRules, fitViewport.height, fitViewport.width, layoutMode, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -905,9 +933,18 @@ export function Viewer({
         data-page-index={index}
         onLoad={(event) => {
           setReadyPages((current) => new Set(current).add(index));
+          const width = event.currentTarget.naturalWidth;
+          const height = event.currentTarget.naturalHeight;
+          if (width > 0 && height > 0) {
+            setPageSizes((current) => {
+              const existing = current.get(index);
+              if (existing?.width === width && existing.height === height) return current;
+              return new Map(current).set(index, { width, height });
+            });
+          }
           if (!isPagePairable(
-            event.currentTarget.naturalWidth,
-            event.currentTarget.naturalHeight,
+            width,
+            height,
             spreadRules.portraitMaxAspectPercent,
           )) {
             setLandscape((current) => new Set(current).add(index));
@@ -1470,7 +1507,11 @@ export function Viewer({
           data-effective-view-mode={visible.length === 2 ? "spread" : "single"}
           data-page-anchor={state.index}
           data-loupe-enabled={scale.loupeEnabled}
-          style={{ "--viewer-custom-scale": scale.scale } as CSSProperties}
+          data-fit-scale-active={calculatedFitScale !== null}
+          style={{
+            "--viewer-custom-scale": scale.scale,
+            "--viewer-fit-scale": calculatedFitScale ?? 1,
+          } as CSSProperties}
           onScroll={scheduleScrollAnchorUpdate}
         >
           {(scrollLayout ? scrollIndices : ordered).map((index) =>
@@ -1518,9 +1559,18 @@ export function Viewer({
             aria-hidden="true"
             onLoad={(event) => {
               setReadyPages((current) => new Set(current).add(index));
+              const width = event.currentTarget.naturalWidth;
+              const height = event.currentTarget.naturalHeight;
+              if (width > 0 && height > 0) {
+                setPageSizes((current) => {
+                  const existing = current.get(index);
+                  if (existing?.width === width && existing.height === height) return current;
+                  return new Map(current).set(index, { width, height });
+                });
+              }
               if (!isPagePairable(
-                event.currentTarget.naturalWidth,
-                event.currentTarget.naturalHeight,
+                width,
+                height,
                 spreadRules.portraitMaxAspectPercent,
               )) {
                 setLandscape((current) => new Set(current).add(index));

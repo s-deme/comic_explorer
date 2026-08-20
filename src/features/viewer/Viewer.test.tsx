@@ -161,6 +161,39 @@ describe("Viewer settings", () => {
     expect(screen.getByAltText("Multi Page 3ページ")).toBeInTheDocument();
   });
 
+  it("REQ-LEY-P2-006 applies a measured fit scale and keeps unknown dimensions on CSS fallback", async () => {
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 400 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 300 });
+      render(
+        <Viewer
+          session={session}
+          generation={1}
+          initialMode="single"
+          fitRules={{ allowUpscale: true, basis: "spread", includePageMargin: true }}
+          initialDirection="rightToLeft"
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      const spread = document.querySelector<HTMLElement>(".page-spread");
+      expect(spread).toHaveAttribute("data-fit-scale-active", "false");
+      const image = screen.getByAltText("Book 1ページ") as HTMLImageElement;
+      Object.defineProperties(image, {
+        naturalWidth: { configurable: true, value: 100 },
+        naturalHeight: { configurable: true, value: 100 },
+      });
+      fireEvent.load(image);
+      await waitFor(() => expect(spread).toHaveAttribute("data-fit-scale-active", "true"));
+      expect(spread?.style.getPropertyValue("--viewer-fit-scale")).toBe("3");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
+    }
+  });
+
   it("renders viewer actions as explained icon buttons", () => {
     render(
       <Viewer

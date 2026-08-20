@@ -194,6 +194,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   autoSpreadMinViewportAspectPercent: 125,
   spreadFirstPageSingle: false,
   spreadPairing: "continuous",
+  fitAllowUpscale: false,
+  fitBasis: "spread",
+  fitIncludePageMargin: true,
   layoutMode: "paged",
   readingDirection: "rightToLeft",
   scaleMode: "fit",
@@ -2682,6 +2685,11 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile見開き組合せ開始"), {
       target: { value: "even" },
     });
+    fireEvent.click(within(dialog).getByLabelText("profile小画像のフィット拡大"));
+    fireEvent.change(within(dialog).getByLabelText("profile見開きフィット基準"), {
+      target: { value: "page" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profile余白をフィット計算に含める"));
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
@@ -2709,6 +2717,9 @@ describe("application shell", () => {
         autoSpreadMinViewportAspectPercent: 160,
         spreadFirstPageSingle: true,
         spreadPairing: "even",
+        fitAllowUpscale: true,
+        fitBasis: "page",
+        fitIncludePageMargin: false,
         scale: 1.75,
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
@@ -2841,7 +2852,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 8,
+        profileVersion: 9,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

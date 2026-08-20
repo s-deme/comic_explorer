@@ -71,6 +71,9 @@ pub struct Settings {
     pub auto_spread_min_viewport_aspect_percent: String,
     pub spread_first_page_single: bool,
     pub spread_pairing: String,
+    pub fit_allow_upscale: bool,
+    pub fit_basis: String,
+    pub fit_include_page_margin: bool,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -138,6 +141,9 @@ impl Default for Settings {
             auto_spread_min_viewport_aspect_percent: "125".into(),
             spread_first_page_single: false,
             spread_pairing: "continuous".into(),
+            fit_allow_upscale: false,
+            fit_basis: "spread".into(),
+            fit_include_page_margin: true,
             layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
@@ -245,6 +251,9 @@ impl StateStore {
                 }
                 "spreadFirstPageSingle" => settings.spread_first_page_single = value == "true",
                 "spreadPairing" => settings.spread_pairing = value,
+                "fitAllowUpscale" => settings.fit_allow_upscale = value == "true",
+                "fitBasis" => settings.fit_basis = value,
+                "fitIncludePageMargin" => settings.fit_include_page_margin = value == "true",
                 "layoutMode" => settings.layout_mode = value,
                 "readingDirection" => settings.reading_direction = value,
                 "scaleMode" => settings.scale_mode = value,
@@ -336,6 +345,12 @@ impl StateStore {
                 settings.spread_first_page_single.to_string(),
             ),
             ("spreadPairing", settings.spread_pairing.clone()),
+            ("fitAllowUpscale", settings.fit_allow_upscale.to_string()),
+            ("fitBasis", settings.fit_basis.clone()),
+            (
+                "fitIncludePageMargin",
+                settings.fit_include_page_margin.to_string(),
+            ),
             ("layoutMode", settings.layout_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
             ("scaleMode", settings.scale_mode.clone()),
@@ -1383,6 +1398,9 @@ mod tests {
                 auto_spread_min_viewport_aspect_percent: "160".into(),
                 spread_first_page_single: true,
                 spread_pairing: "even".into(),
+                fit_allow_upscale: true,
+                fit_basis: "page".into(),
+                fit_include_page_margin: false,
                 layout_mode: "vertical_scroll".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
@@ -1472,6 +1490,9 @@ mod tests {
         assert_eq!(restored.auto_spread_min_viewport_aspect_percent, "160");
         assert!(restored.spread_first_page_single);
         assert_eq!(restored.spread_pairing, "even");
+        assert!(restored.fit_allow_upscale);
+        assert_eq!(restored.fit_basis, "page");
+        assert!(!restored.fit_include_page_margin);
         assert!(restored.loupe_enabled);
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");

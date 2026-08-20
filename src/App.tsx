@@ -98,6 +98,7 @@ import type {
   ViewerLayoutMode,
   ViewerGridColor,
   SpreadRules,
+  FitRules,
   ZoomRetention,
 } from "./features/viewer/model";
 import {
@@ -111,6 +112,7 @@ import {
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
   DEFAULT_SPREAD_RULES,
+  DEFAULT_FIT_RULES,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
   normalizeViewerLayoutMode,
@@ -123,6 +125,7 @@ import {
   isAutoViewportAspectPercent,
   isPortraitAspectPercent,
   SPREAD_PAIRINGS,
+  FIT_BASES,
 } from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
@@ -461,6 +464,7 @@ export function App({
   const [spreadRules, setSpreadRules] = useState<SpreadRules>(() => ({
     ...DEFAULT_SPREAD_RULES,
   }));
+  const [fitRules, setFitRules] = useState<FitRules>(() => ({ ...DEFAULT_FIT_RULES }));
   const [layoutMode, setLayoutMode] = useState<ViewerLayoutMode>("paged");
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
@@ -863,6 +867,13 @@ export function App({
             pairing: SPREAD_PAIRINGS.includes(response.data.spreadPairing)
               ? response.data.spreadPairing
               : DEFAULT_SPREAD_RULES.pairing,
+          });
+          setFitRules({
+            allowUpscale: response.data.fitAllowUpscale === true,
+            basis: FIT_BASES.includes(response.data.fitBasis)
+              ? response.data.fitBasis
+              : DEFAULT_FIT_RULES.basis,
+            includePageMargin: response.data.fitIncludePageMargin !== false,
           });
           setLayoutMode(normalizeViewerLayoutMode(response.data.layoutMode));
           setReadingDirection(response.data.readingDirection);
@@ -2444,6 +2455,9 @@ export function App({
       autoSpreadMinViewportAspectPercent: spreadRules.autoViewportMinAspectPercent,
       spreadFirstPageSingle: spreadRules.firstPageSingle,
       spreadPairing: spreadRules.pairing,
+      fitAllowUpscale: fitRules.allowUpscale,
+      fitBasis: fitRules.basis,
+      fitIncludePageMargin: fitRules.includePageMargin,
       layoutMode,
       readingDirection,
       scaleMode: viewerScaleMode,
@@ -2527,6 +2541,11 @@ export function App({
         autoViewportMinAspectPercent: normalized.autoSpreadMinViewportAspectPercent,
         firstPageSingle: normalized.spreadFirstPageSingle,
         pairing: normalized.spreadPairing,
+      });
+      setFitRules({
+        allowUpscale: normalized.fitAllowUpscale,
+        basis: normalized.fitBasis,
+        includePageMargin: normalized.fitIncludePageMargin,
       });
       setLayoutMode(normalized.layoutMode);
       setReadingDirection(normalized.readingDirection);
@@ -3014,6 +3033,7 @@ export function App({
         "viewMode" | "readingDirection" | "scaleMode" | "scale" | "loupeEnabled"
         | "spreadPortraitMaxAspectPercent" | "autoSpreadMinViewportAspectPercent"
         | "spreadFirstPageSingle" | "spreadPairing"
+        | "fitAllowUpscale" | "fitBasis" | "fitIncludePageMargin"
         | "layoutMode" | "viewerBackground" | "viewerPageMargin"
         | "viewerSpreadGap" | "cursorAutoHideMs"
       >
@@ -3027,6 +3047,9 @@ export function App({
         autoSpreadMinViewportAspectPercent: spreadRules.autoViewportMinAspectPercent,
         spreadFirstPageSingle: spreadRules.firstPageSingle,
         spreadPairing: spreadRules.pairing,
+        fitAllowUpscale: fitRules.allowUpscale,
+        fitBasis: fitRules.basis,
+        fitIncludePageMargin: fitRules.includePageMargin,
         layoutMode,
         readingDirection,
         scaleMode: viewerScaleMode,
@@ -3241,6 +3264,7 @@ export function App({
           generation={viewerGeneration.current}
           initialMode={viewMode}
           spreadRules={spreadRules}
+          fitRules={fitRules}
           initialDirection={readingDirection}
           initialScaleMode={viewerScaleMode}
           initialScale={viewerScale}

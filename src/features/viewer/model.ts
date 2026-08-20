@@ -31,6 +31,22 @@ export const DEFAULT_SPREAD_RULES: SpreadRules = {
 };
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
+export const FIT_BASES = ["spread", "page"] as const;
+export type FitBasis = (typeof FIT_BASES)[number];
+export const FIT_BASIS_LABELS: Record<FitBasis, string> = {
+  spread: "見開き全体",
+  page: "各ページ",
+};
+export interface FitRules {
+  allowUpscale: boolean;
+  basis: FitBasis;
+  includePageMargin: boolean;
+}
+export const DEFAULT_FIT_RULES: FitRules = {
+  allowUpscale: false,
+  basis: "spread",
+  includePageMargin: true,
+};
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
 export type ZoomRetention = "global" | "book" | "page";
 export type ViewerGridColor = "light" | "dark";
@@ -222,6 +238,42 @@ export type ViewerScaleAction =
 export function normalizeScale(value: number): number {
   const safeValue = Number.isFinite(value) ? value : DEFAULT_SCALE;
   return Number(Math.min(MAX_SCALE, Math.max(MIN_SCALE, safeValue)).toFixed(4));
+}
+
+export interface NaturalPageSize {
+  width: number;
+  height: number;
+}
+
+export function fitScaleForPages(
+  pages: readonly NaturalPageSize[],
+  viewportWidth: number,
+  viewportHeight: number,
+  pageMargin: number,
+  spreadGap: number,
+  rules: FitRules = DEFAULT_FIT_RULES,
+): number | null {
+  if (
+    pages.length === 0
+    || pages.some((page) => !Number.isFinite(page.width) || page.width <= 0
+      || !Number.isFinite(page.height) || page.height <= 0)
+    || !Number.isFinite(viewportWidth) || viewportWidth <= 0
+    || !Number.isFinite(viewportHeight) || viewportHeight <= 0
+  ) return null;
+  const margin = rules.includePageMargin ? Math.max(0, pageMargin) * 2 : 0;
+  const availableWidth = Math.max(1, viewportWidth - margin);
+  const availableHeight = Math.max(1, viewportHeight - margin);
+  const fixedSpreadGap = rules.basis === "spread"
+    ? Math.max(0, pages.length - 1) * Math.max(0, spreadGap)
+    : 0;
+  const widthAvailableToImages = Math.max(1, availableWidth - fixedSpreadGap);
+  const contentWidth = rules.basis === "spread"
+    ? pages.reduce((sum, page) => sum + page.width, 0)
+    : Math.max(...pages.map((page) => page.width));
+  const contentHeight = Math.max(...pages.map((page) => page.height));
+  let result = Math.min(widthAvailableToImages / contentWidth, availableHeight / contentHeight);
+  if (!rules.allowUpscale) result = Math.min(1, result);
+  return normalizeScale(result);
 }
 
 export function createViewerScaleState(

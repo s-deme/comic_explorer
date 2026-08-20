@@ -44,6 +44,8 @@ import {
   VIEW_MODE_LABELS,
   SPREAD_PAIRING_LABELS,
   SPREAD_PAIRINGS,
+  FIT_BASES,
+  FIT_BASIS_LABELS,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -368,6 +370,21 @@ export function SettingsDialog({
       id: "scale-mode",
       category: "viewer",
       text: `倍率モード 拡大 縮小 フィット 原寸 任意 ${SCALE_MODE_LABELS[draft.scaleMode]} 画像を画面へ収める方法を選びます`,
+    },
+    {
+      id: "fit-upscale",
+      category: "viewer",
+      text: `全体フィット 小画像 拡大 縮小のみ ${draft.fitAllowUpscale ? "拡大許可" : "縮小のみ"}`,
+    },
+    {
+      id: "fit-basis",
+      category: "viewer",
+      text: `全体フィット 見開き 基準 各ページ ${FIT_BASIS_LABELS[draft.fitBasis]}`,
+    },
+    {
+      id: "fit-margin",
+      category: "viewer",
+      text: `全体フィット 余白 計算 ${draft.fitIncludePageMargin ? "含む" : "含めない"}`,
     },
     {
       id: "custom-scale",
@@ -785,6 +802,23 @@ export function SettingsDialog({
                 <select aria-label="profile倍率モード" value={draft.scaleMode} onChange={(event) => update({ scaleMode: event.target.value as ScaleMode })}>
                   {Object.entries(SCALE_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
+              </SettingRow>
+              <SettingRow id="fit-upscale" title="小画像のフィット拡大" description="全体フィット時に100%未満の小画像を表示領域まで拡大します。" hidden={rowHidden("fit-upscale")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile小画像のフィット拡大" checked={draft.fitAllowUpscale} onChange={(event) => update({ fitAllowUpscale: event.target.checked })} />
+                  <span>{draft.fitAllowUpscale ? "拡大を許可" : "縮小のみ"}</span>
+                </label>
+              </SettingRow>
+              <SettingRow id="fit-basis" title="見開きフィット基準" description="見開き全体を収めるか、各ページを単独領域基準で合わせるかを選びます。" hidden={rowHidden("fit-basis")}>
+                <select aria-label="profile見開きフィット基準" value={draft.fitBasis} onChange={(event) => update({ fitBasis: event.target.value as SettingsProfile["fitBasis"] })}>
+                  {FIT_BASES.map((basis) => <option key={basis} value={basis}>{FIT_BASIS_LABELS[basis]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="fit-margin" title="余白をフィット計算に含める" description="ページ周囲の余白を差し引いて画像倍率を計算します。" hidden={rowHidden("fit-margin")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile余白をフィット計算に含める" checked={draft.fitIncludePageMargin} onChange={(event) => update({ fitIncludePageMargin: event.target.checked })} />
+                  <span>{draft.fitIncludePageMargin ? "含める" : "含めない"}</span>
+                </label>
               </SettingRow>
               <SettingRow id="custom-scale" title="任意倍率" description="任意倍率を1%から800%の範囲で指定します。" hidden={rowHidden("custom-scale")}>
                 <div className="settings-number-control">

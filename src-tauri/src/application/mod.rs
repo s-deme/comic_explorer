@@ -294,6 +294,9 @@ pub struct CatalogSettings {
     pub auto_spread_min_viewport_aspect_percent: u16,
     pub spread_first_page_single: bool,
     pub spread_pairing: String,
+    pub fit_allow_upscale: bool,
+    pub fit_basis: String,
+    pub fit_include_page_margin: bool,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -347,6 +350,9 @@ pub struct SettingsProfileInput {
     pub auto_spread_min_viewport_aspect_percent: u16,
     pub spread_first_page_single: bool,
     pub spread_pairing: String,
+    pub fit_allow_upscale: bool,
+    pub fit_basis: String,
+    pub fit_include_page_margin: bool,
     pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
@@ -812,6 +818,13 @@ fn spread_pairing(settings: &crate::state::Settings) -> String {
     }
 }
 
+fn fit_basis(settings: &crate::state::Settings) -> String {
+    match settings.fit_basis.as_str() {
+        "spread" | "page" => settings.fit_basis.clone(),
+        _ => "spread".into(),
+    }
+}
+
 fn viewer_cursor_auto_hide_ms(settings: &crate::state::Settings) -> u32 {
     settings
         .cursor_auto_hide_ms
@@ -881,6 +894,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         125,
     );
     let spread_pairing = spread_pairing(&settings);
+    let fit_basis = fit_basis(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
     let viewer_background = viewer_background(&settings);
@@ -907,6 +921,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         auto_spread_min_viewport_aspect_percent,
         spread_first_page_single: settings.spread_first_page_single,
         spread_pairing,
+        fit_allow_upscale: settings.fit_allow_upscale,
+        fit_basis,
+        fit_include_page_margin: settings.fit_include_page_margin,
         layout_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
@@ -2171,6 +2188,9 @@ pub fn set_viewer_settings(
     auto_spread_min_viewport_aspect_percent: u16,
     spread_first_page_single: bool,
     spread_pairing: String,
+    fit_allow_upscale: bool,
+    fit_basis: String,
+    fit_include_page_margin: bool,
     layout_mode: String,
     reading_direction: String,
     scale_mode: String,
@@ -2190,6 +2210,7 @@ pub fn set_viewer_settings(
         || !(MIN_AUTO_VIEWPORT_ASPECT_PERCENT..=MAX_AUTO_VIEWPORT_ASPECT_PERCENT)
             .contains(&auto_spread_min_viewport_aspect_percent)
         || !matches!(spread_pairing.as_str(), "continuous" | "odd" | "even")
+        || !matches!(fit_basis.as_str(), "spread" | "page")
         || !matches!(
             layout_mode.as_str(),
             "paged" | "vertical_scroll" | "horizontal_scroll"
@@ -2229,6 +2250,9 @@ pub fn set_viewer_settings(
             auto_spread_min_viewport_aspect_percent.to_string();
         settings.spread_first_page_single = spread_first_page_single;
         settings.spread_pairing = spread_pairing;
+        settings.fit_allow_upscale = fit_allow_upscale;
+        settings.fit_basis = fit_basis;
+        settings.fit_include_page_margin = fit_include_page_margin;
         settings.layout_mode = layout_mode;
         settings.reading_direction = reading_direction;
         settings.scale_mode = scale_mode;
@@ -2285,6 +2309,7 @@ fn validate_settings_profile(
             profile.spread_pairing.as_str(),
             "continuous" | "odd" | "even"
         )
+        || !matches!(profile.fit_basis.as_str(), "spread" | "page")
         || ![
             profile.catalog_thumbnail_sizes.small_thumbnail,
             profile.catalog_thumbnail_sizes.cover_list,
@@ -2400,6 +2425,9 @@ pub fn set_settings_profile(
             profile.auto_spread_min_viewport_aspect_percent.to_string();
         settings.spread_first_page_single = profile.spread_first_page_single;
         settings.spread_pairing = profile.spread_pairing;
+        settings.fit_allow_upscale = profile.fit_allow_upscale;
+        settings.fit_basis = profile.fit_basis;
+        settings.fit_include_page_margin = profile.fit_include_page_margin;
         settings.layout_mode = profile.layout_mode;
         settings.reading_direction = profile.reading_direction;
         settings.scale_mode = profile.scale_mode;
@@ -4138,6 +4166,16 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p2_006_fit_basis_defaults_invalid_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(fit_basis(&settings), "spread");
+        settings.fit_basis = "page".into();
+        assert_eq!(fit_basis(&settings), "page");
+        settings.fit_basis = "viewport-width".into();
+        assert_eq!(fit_basis(&settings), "spread");
+    }
+
+    #[test]
     fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(
@@ -4187,6 +4225,9 @@ mod shutdown_tests {
             auto_spread_min_viewport_aspect_percent: 125,
             spread_first_page_single: false,
             spread_pairing: "continuous".into(),
+            fit_allow_upscale: false,
+            fit_basis: "spread".into(),
+            fit_include_page_margin: true,
             layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
@@ -4265,6 +4306,12 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.spread_pairing = "even".into();
+        profile.fit_basis = "viewport".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.fit_basis = "page".into();
 
         profile.navigation_selection_policy = "middle".into();
         assert_eq!(

@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 8,
+    profileVersion: 9,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -23,6 +23,9 @@ function validProfile(): SettingsProfile {
     autoSpreadMinViewportAspectPercent: 125,
     spreadFirstPageSingle: false,
     spreadPairing: "continuous",
+    fitAllowUpscale: false,
+    fitBasis: "spread",
+    fitIncludePageMargin: true,
     layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
@@ -97,7 +100,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 9, 99, "8", undefined])(
+  it.each([0, 10, 99, "9", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -192,6 +195,31 @@ describe("settings profile", () => {
       spreadFirstPageSingle: true,
       spreadPairing: "even",
     }));
+  });
+
+  it("REQ-LEY-P2-006 migrates a v8 profile with safe fit defaults", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 8;
+    delete legacy.fitAllowUpscale;
+    delete legacy.fitBasis;
+    delete legacy.fitIncludePageMargin;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P2-006 accepts fit detail settings and rejects malformed values", () => {
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      fitAllowUpscale: true,
+      fitBasis: "page",
+      fitIncludePageMargin: false,
+    })).toEqual(expect.objectContaining({
+      fitAllowUpscale: true,
+      fitBasis: "page",
+      fitIncludePageMargin: false,
+    }));
+    expect(normalizeSettingsProfile(withField("fitAllowUpscale", "true"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("fitBasis", "width"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("fitIncludePageMargin", 1))).toBeNull();
   });
 
   it.each([

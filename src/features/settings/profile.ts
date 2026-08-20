@@ -24,6 +24,7 @@ import {
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
   DEFAULT_SPREAD_RULES,
+  DEFAULT_FIT_RULES,
   DEFAULT_SCALE,
   isViewerCursorAutoHideMs,
   isPanFactor,
@@ -39,12 +40,14 @@ import {
   VIEWER_LAYOUT_MODES,
   VIEW_MODES,
   SPREAD_PAIRINGS,
+  FIT_BASES,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
   type ViewerLayoutMode,
   type ViewMode,
   type SpreadPairing,
+  type FitBasis,
   type ZoomRetention,
   ZOOM_RETENTIONS,
 } from "../viewer/model";
@@ -56,7 +59,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 8;
+export const SETTINGS_PROFILE_VERSION = 9;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -118,6 +121,9 @@ export interface SettingsProfile {
   autoSpreadMinViewportAspectPercent: number;
   spreadFirstPageSingle: boolean;
   spreadPairing: SpreadPairing;
+  fitAllowUpscale: boolean;
+  fitBasis: FitBasis;
+  fitIncludePageMargin: boolean;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -162,6 +168,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     autoSpreadMinViewportAspectPercent: DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent,
     spreadFirstPageSingle: DEFAULT_SPREAD_RULES.firstPageSingle,
     spreadPairing: DEFAULT_SPREAD_RULES.pairing,
+    fitAllowUpscale: DEFAULT_FIT_RULES.allowUpscale,
+    fitBasis: DEFAULT_FIT_RULES.basis,
+    fitIncludePageMargin: DEFAULT_FIT_RULES.includePageMargin,
     layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
@@ -305,6 +314,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const spreadPairing = legacySpreadRules
     ? DEFAULT_SPREAD_RULES.pairing
     : enumValue(candidate.spreadPairing, SPREAD_PAIRINGS);
+  const legacyFitRules = legacySpreadRules || candidate.profileVersion === 8;
+  const fitAllowUpscale = legacyFitRules
+    ? DEFAULT_FIT_RULES.allowUpscale
+    : candidate.fitAllowUpscale;
+  const fitBasis = legacyFitRules
+    ? DEFAULT_FIT_RULES.basis
+    : enumValue(candidate.fitBasis, FIT_BASES);
+  const fitIncludePageMargin = legacyFitRules
+    ? DEFAULT_FIT_RULES.includePageMargin
+    : candidate.fitIncludePageMargin;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -313,6 +332,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 5
       && candidate.profileVersion !== 6
       && candidate.profileVersion !== 7
+      && candidate.profileVersion !== 8
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -324,6 +344,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isAutoViewportAspectPercent(autoSpreadMinViewportAspectPercent) ||
     typeof spreadFirstPageSingle !== "boolean" ||
     spreadPairing === null ||
+    typeof fitAllowUpscale !== "boolean" ||
+    fitBasis === null ||
+    typeof fitIncludePageMargin !== "boolean" ||
     layoutMode === null ||
     readingDirection === null ||
     scaleMode === null ||
@@ -371,6 +394,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     autoSpreadMinViewportAspectPercent,
     spreadFirstPageSingle,
     spreadPairing,
+    fitAllowUpscale,
+    fitBasis,
+    fitIncludePageMargin,
     layoutMode,
     readingDirection,
     scaleMode,

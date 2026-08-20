@@ -19,6 +19,7 @@ import type {
   ViewerLayoutMode,
   ViewMode,
   SpreadPairing,
+  FitBasis,
   ZoomRetention,
 } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
@@ -113,6 +114,9 @@ export interface CatalogSettings {
   autoSpreadMinViewportAspectPercent: number;
   spreadFirstPageSingle: boolean;
   spreadPairing: SpreadPairing;
+  fitAllowUpscale: boolean;
+  fitBasis: FitBasis;
+  fitIncludePageMargin: boolean;
   layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
@@ -162,6 +166,9 @@ export async function saveViewerSettings(
     | "autoSpreadMinViewportAspectPercent"
     | "spreadFirstPageSingle"
     | "spreadPairing"
+    | "fitAllowUpscale"
+    | "fitBasis"
+    | "fitIncludePageMargin"
     | "layoutMode"
     | "readingDirection"
     | "scaleMode"
@@ -181,6 +188,9 @@ export async function saveViewerSettings(
     autoSpreadMinViewportAspectPercent: settings.autoSpreadMinViewportAspectPercent,
     spreadFirstPageSingle: settings.spreadFirstPageSingle,
     spreadPairing: settings.spreadPairing,
+    fitAllowUpscale: settings.fitAllowUpscale,
+    fitBasis: settings.fitBasis,
+    fitIncludePageMargin: settings.fitIncludePageMargin,
     layoutMode: settings.layoutMode,
     readingDirection: settings.readingDirection,
     scaleMode: settings.scaleMode,
@@ -210,6 +220,9 @@ export async function saveSettingsProfile(
       autoSpreadMinViewportAspectPercent: profile.autoSpreadMinViewportAspectPercent,
       spreadFirstPageSingle: profile.spreadFirstPageSingle,
       spreadPairing: profile.spreadPairing,
+      fitAllowUpscale: profile.fitAllowUpscale,
+      fitBasis: profile.fitBasis,
+      fitIncludePageMargin: profile.fitIncludePageMargin,
       layoutMode: profile.layoutMode,
       readingDirection: profile.readingDirection,
       scaleMode: profile.scaleMode,

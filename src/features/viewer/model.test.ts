@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoSpreadForViewport,
   isPagePairable,
+  fitScaleForPages,
   clampLoupePointer,
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
@@ -125,6 +126,26 @@ describe("viewer page model", () => {
       spreadRules: coverEvenRules,
     });
     expect(afterPair.index).toBe(3);
+  });
+
+  it("REQ-LEY-P2-006 calculates bounded fit scales for spread, page, margin, and upscale rules", () => {
+    const pages = [{ width: 400, height: 600 }, { width: 400, height: 600 }];
+    expect(fitScaleForPages(pages, 1000, 800, 20, 10, {
+      allowUpscale: false, basis: "spread", includePageMargin: true,
+    })).toBe(1);
+    expect(fitScaleForPages(pages, 500, 800, 20, 10, {
+      allowUpscale: false, basis: "spread", includePageMargin: true,
+    })).toBeCloseTo(450 / 800, 4);
+    expect(fitScaleForPages(pages, 500, 800, 20, 10, {
+      allowUpscale: false, basis: "page", includePageMargin: true,
+    })).toBe(1);
+    expect(fitScaleForPages([{ width: 100, height: 100 }], 400, 300, 0, 0, {
+      allowUpscale: true, basis: "spread", includePageMargin: true,
+    })).toBe(3);
+    expect(fitScaleForPages([{ width: 100, height: 100 }], 400, 300, 0, 0, {
+      allowUpscale: false, basis: "spread", includePageMargin: true,
+    })).toBe(1);
+    expect(fitScaleForPages([{ width: 0, height: 100 }], 400, 300, 0, 0)).toBeNull();
   });
 
   it("uses display-unit history so previous is reversible", () => {
