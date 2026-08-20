@@ -98,6 +98,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build Comic Explorer");
     app.run(|app_handle, event| {
+        if let tauri::RunEvent::WindowEvent { label, event, .. } = &event {
+            tray::handle_main_window_event(app_handle, label, event);
+        }
         if matches!(
             event,
             tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit

@@ -76,12 +76,16 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 14;
+export const SETTINGS_PROFILE_VERSION = 15;
 export const APP_VERSION = packageMetadata.version;
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
 export type FullscreenEscapeBehavior = (typeof FULLSCREEN_ESCAPE_BEHAVIORS)[number];
 export const DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR: FullscreenEscapeBehavior = "exitFullscreen";
+export const TRAY_CLOSE_BEHAVIORS = ["quit", "store"] as const;
+export type TrayCloseBehavior = (typeof TRAY_CLOSE_BEHAVIORS)[number];
+export const TRAY_RESTORE_GESTURES = ["singleClick", "doubleClick"] as const;
+export type TrayRestoreGesture = (typeof TRAY_RESTORE_GESTURES)[number];
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
 export type NavigationSelectionPolicy = (typeof NAVIGATION_SELECTION_POLICIES)[number];
@@ -157,6 +161,9 @@ export interface SettingsProfile {
   prefetchMemoryMiB: number;
   fullscreenEscapeBehavior: FullscreenEscapeBehavior;
   preventDisplaySleepFullscreen: boolean;
+  trayStoreOnMinimize: boolean;
+  trayCloseBehavior: TrayCloseBehavior;
+  trayRestoreGesture: TrayRestoreGesture;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -215,6 +222,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     prefetchMemoryMiB: DEFAULT_PREFETCH_MEMORY_MIB,
     fullscreenEscapeBehavior: DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
     preventDisplaySleepFullscreen: false,
+    trayStoreOnMinimize: false,
+    trayCloseBehavior: "quit",
+    trayRestoreGesture: "singleClick",
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -401,6 +411,14 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const preventDisplaySleepFullscreen = legacyFullscreenPreferences
     ? false
     : candidate.preventDisplaySleepFullscreen;
+  const legacyTrayPreferences = legacyFullscreenPreferences || candidate.profileVersion === 14;
+  const trayStoreOnMinimize = legacyTrayPreferences ? false : candidate.trayStoreOnMinimize;
+  const trayCloseBehavior = legacyTrayPreferences
+    ? "quit"
+    : enumValue(candidate.trayCloseBehavior, TRAY_CLOSE_BEHAVIORS);
+  const trayRestoreGesture = legacyTrayPreferences
+    ? "singleClick"
+    : enumValue(candidate.trayRestoreGesture, TRAY_RESTORE_GESTURES);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -415,6 +433,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 11
       && candidate.profileVersion !== 12
       && candidate.profileVersion !== 13
+      && candidate.profileVersion !== 14
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -444,6 +463,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isPrefetchMemoryMiB(prefetchMemoryMiB) ||
     fullscreenEscapeBehavior === null ||
     typeof preventDisplaySleepFullscreen !== "boolean" ||
+    typeof trayStoreOnMinimize !== "boolean" ||
+    trayCloseBehavior === null ||
+    trayRestoreGesture === null ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -502,6 +524,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     prefetchMemoryMiB,
     fullscreenEscapeBehavior,
     preventDisplaySleepFullscreen,
+    trayStoreOnMinimize,
+    trayCloseBehavior,
+    trayRestoreGesture,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

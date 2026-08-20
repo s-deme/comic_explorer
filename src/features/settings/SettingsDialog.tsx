@@ -73,6 +73,8 @@ import {
   THUMBNAIL_GENERATION_SCOPES,
   MOUSE_GESTURE_ACTIONS,
   FULLSCREEN_ESCAPE_BEHAVIORS,
+  TRAY_CLOSE_BEHAVIORS,
+  TRAY_RESTORE_GESTURES,
   type MouseGestureAction,
   type MouseGestureName,
   type SettingsProfile,
@@ -81,6 +83,14 @@ import {
 const FULLSCREEN_ESCAPE_LABELS: Record<SettingsProfile["fullscreenEscapeBehavior"], string> = {
   exitFullscreen: "全画面だけ解除",
   closeViewer: "全画面を解除してビューワを閉じる",
+};
+const TRAY_CLOSE_LABELS: Record<SettingsProfile["trayCloseBehavior"], string> = {
+  quit: "アプリを終了",
+  store: "タスクトレイへ格納",
+};
+const TRAY_RESTORE_LABELS: Record<SettingsProfile["trayRestoreGesture"], string> = {
+  singleClick: "左シングルクリック",
+  doubleClick: "左ダブルクリック",
 };
 
 const CATALOG_PALETTE_LABELS: Record<SettingsProfile["catalogPalette"], string> = {
@@ -443,6 +453,11 @@ export function SettingsDialog({
       category: "interface" as const,
       text: `${label} 画面 表示 非表示 ${visible ? "表示" : "非表示"} ${description}`,
     })),
+    {
+      id: "tray-lifecycle",
+      category: "interface",
+      text: `タスクトレイ 通知領域 最小化 ${draft.trayStoreOnMinimize ? "自動格納" : "手動のみ"} 閉じる ${TRAY_CLOSE_LABELS[draft.trayCloseBehavior]} 復帰 ${TRAY_RESTORE_LABELS[draft.trayRestoreGesture]}`,
+    },
     ...SHORTCUT_COMMANDS.map((command) => ({
       id: `shortcut-${command}`,
       category: "commands" as const,
@@ -1025,6 +1040,41 @@ export function SettingsDialog({
                   />
                   <span>{draft.alwaysOnTop ? "有効" : "無効"}</span>
                 </label>
+              </SettingRow>
+              <SettingRow id="tray-lifecycle" title="タスクトレイ" description="最小化・閉じる操作の格納条件と、通知領域からの復帰操作を指定します。明示的な終了は常にアプリを終了します。" hidden={rowHidden("tray-lifecycle")}>
+                <div className="settings-inline-actions">
+                  <label>
+                    <input
+                      type="checkbox"
+                      aria-label="profile最小化時にタスクトレイへ格納"
+                      checked={draft.trayStoreOnMinimize}
+                      onChange={(event) => update({ trayStoreOnMinimize: event.target.checked })}
+                    />
+                    最小化時に格納
+                  </label>
+                  <select
+                    aria-label="profile閉じる操作"
+                    value={draft.trayCloseBehavior}
+                    onChange={(event) => update({
+                      trayCloseBehavior: event.target.value as SettingsProfile["trayCloseBehavior"],
+                    })}
+                  >
+                    {TRAY_CLOSE_BEHAVIORS.map((behavior) => (
+                      <option key={behavior} value={behavior}>{TRAY_CLOSE_LABELS[behavior]}</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="profileタスクトレイ復帰操作"
+                    value={draft.trayRestoreGesture}
+                    onChange={(event) => update({
+                      trayRestoreGesture: event.target.value as SettingsProfile["trayRestoreGesture"],
+                    })}
+                  >
+                    {TRAY_RESTORE_GESTURES.map((gesture) => (
+                      <option key={gesture} value={gesture}>{TRAY_RESTORE_LABELS[gesture]}</option>
+                    ))}
+                  </select>
+                </div>
               </SettingRow>
             </section>
 

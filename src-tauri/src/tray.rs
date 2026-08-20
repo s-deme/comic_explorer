@@ -5,7 +5,7 @@ use std::sync::{
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    App, AppHandle, Manager, Runtime, State, WebviewWindow,
+    App, AppHandle, Manager, Runtime, State, WebviewWindow, WindowEvent,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -32,6 +32,9 @@ pub struct TrayState {
     available: AtomicBool,
     stored: AtomicBool,
     reason: Mutex<Option<String>>,
+    store_on_minimize: AtomicBool,
+    close_to_tray: AtomicBool,
+    restore_on_double_click: AtomicBool,
 }
 
 impl Default for TrayState {
@@ -40,11 +43,28 @@ impl Default for TrayState {
             available: AtomicBool::new(false),
             stored: AtomicBool::new(false),
             reason: Mutex::new(Some("タスクトレイを初期化しています。".into())),
+            store_on_minimize: AtomicBool::new(false),
+            close_to_tray: AtomicBool::new(false),
+            restore_on_double_click: AtomicBool::new(false),
         }
     }
 }
 
 impl TrayState {
+    pub fn apply_preferences(
+        &self,
+        store_on_minimize: bool,
+        close_behavior: &str,
+        restore_gesture: &str,
+    ) {
+        self.store_on_minimize
+            .store(store_on_minimize, Ordering::Release);
+        self.close_to_tray
+            .store(close_behavior == "store", Ordering::Release);
+        self.restore_on_double_click
+            .store(restore_gesture == "doubleClick", Ordering::Release);
+    }
+
     pub fn status(&self) -> TrayStatus {
         TrayStatus {
             available: self.available.load(Ordering::Acquire),
@@ -181,6 +201,59 @@ fn restore_main_window<R: Runtime>(
     }
 }
 
+fn recover_visible_window(window: &impl MainWindowController, state: &TrayState, reason: String) {
+    let _ = window.show();
+    let _ = window.unminimize();
+    let _ = window.focus();
+    state.mark_failure(false, reason);
+}
+
+fn store_for_lifecycle_event(
+    window: &impl MainWindowController,
+    state: &TrayState,
+    close_requested: bool,
+) -> bool {
+    let configured = if close_requested {
+        state.close_to_tray.load(Ordering::Acquire)
+    } else {
+        state.store_on_minimize.load(Ordering::Acquire)
+    };
+    if !configured || state.status().stored {
+        return close_requested && configured;
+    }
+    if let Err(error) = store_window(window, state) {
+        if close_requested {
+            recover_visible_window(window, state, error);
+        }
+    }
+    close_requested
+}
+
+fn should_restore_from_tray(state: &TrayState, double_click: bool) -> bool {
+    state.status().stored && double_click == state.restore_on_double_click.load(Ordering::Acquire)
+}
+
+pub fn handle_main_window_event<R: Runtime>(app: &AppHandle<R>, label: &str, event: &WindowEvent) {
+    if label != MAIN_WINDOW_LABEL {
+        return;
+    }
+    let state = app.state::<TrayState>();
+    let Ok(window) = main_window(app) else {
+        return;
+    };
+    match event {
+        WindowEvent::CloseRequested { api, .. } => {
+            if store_for_lifecycle_event(&window, &state, true) {
+                api.prevent_close();
+            }
+        }
+        WindowEvent::Resized(_) if window.is_minimized().unwrap_or(false) => {
+            store_for_lifecycle_event(&window, &state, false);
+        }
+        _ => {}
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn build_native_tray<R: Runtime>(app: &App<R>) -> Result<(), String> {
     let show = MenuItem::with_id(
@@ -233,7 +306,10 @@ fn build_native_tray<R: Runtime>(app: &App<R>) -> Result<(), String> {
             if restore {
                 let app = tray.app_handle();
                 let state = app.state::<TrayState>();
-                let _ = restore_main_window(app, &state);
+                let double_click = matches!(event, TrayIconEvent::DoubleClick { .. });
+                if should_restore_from_tray(&state, double_click) {
+                    let _ = restore_main_window(app, &state);
+                }
             }
         })
         .build(app)
@@ -252,6 +328,12 @@ fn record_initialization(state: &TrayState, result: Result<(), String>) {
 
 pub fn initialize<R: Runtime>(app: &App<R>) {
     let state = app.state::<TrayState>();
+    if let Ok((store_on_minimize, close_behavior, restore_gesture)) = app
+        .state::<crate::application::AppState>()
+        .tray_preferences()
+    {
+        state.apply_preferences(store_on_minimize, &close_behavior, &restore_gesture);
+    }
     #[cfg(target_os = "windows")]
     let result = build_native_tray(app);
     #[cfg(not(target_os = "windows"))]
@@ -507,5 +589,63 @@ mod tests {
             *window.calls.lock().unwrap(),
             ["show", "unminimize", "focus"]
         );
+    }
+
+    #[test]
+    fn req_ley_p2_012_minimize_storage_is_configurable_and_idempotent() {
+        let state = TrayState::default();
+        state.mark_available();
+        let window = MockWindow::default();
+
+        assert!(!store_for_lifecycle_event(&window, &state, false));
+        assert!(window.calls.lock().unwrap().is_empty());
+        state.apply_preferences(true, "quit", "singleClick");
+        assert!(!store_for_lifecycle_event(&window, &state, false));
+        assert!(!store_for_lifecycle_event(&window, &state, false));
+        assert_eq!(*window.calls.lock().unwrap(), ["hide"]);
+        assert!(state.status().stored);
+    }
+
+    #[test]
+    fn req_ley_p2_012_close_to_tray_prevents_quit_and_recovers_after_hide_failure() {
+        let state = TrayState::default();
+        state.mark_available();
+        state.apply_preferences(false, "store", "doubleClick");
+        let window = MockWindow::failing("hide");
+
+        assert!(store_for_lifecycle_event(&window, &state, true));
+        assert_eq!(
+            *window.calls.lock().unwrap(),
+            ["hide", "show", "unminimize", "focus"]
+        );
+        assert!(!state.status().stored);
+        assert!(state.status().reason.unwrap().contains("hide failed"));
+        assert!(state.restore_on_double_click.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn req_ley_p2_012_quit_close_behavior_does_not_intercept_close() {
+        let state = TrayState::default();
+        state.mark_available();
+        state.apply_preferences(true, "quit", "singleClick");
+        let window = MockWindow::default();
+
+        assert!(!store_for_lifecycle_event(&window, &state, true));
+        assert!(window.calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn req_ley_p2_012_restore_gesture_matches_exactly_while_stored() {
+        let state = TrayState::default();
+        state.mark_available();
+        state.mark_stored(true);
+        state.apply_preferences(false, "quit", "singleClick");
+        assert!(should_restore_from_tray(&state, false));
+        assert!(!should_restore_from_tray(&state, true));
+        state.apply_preferences(false, "quit", "doubleClick");
+        assert!(!should_restore_from_tray(&state, false));
+        assert!(should_restore_from_tray(&state, true));
+        state.mark_stored(false);
+        assert!(!should_restore_from_tray(&state, true));
     }
 }

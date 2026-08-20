@@ -140,6 +140,9 @@ export interface CatalogSettings {
   prefetchMemoryMiB: number;
   fullscreenEscapeBehavior: SettingsProfile["fullscreenEscapeBehavior"];
   preventDisplaySleepFullscreen: boolean;
+  trayStoreOnMinimize: boolean;
+  trayCloseBehavior: SettingsProfile["trayCloseBehavior"];
+  trayRestoreGesture: SettingsProfile["trayRestoreGesture"];
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -257,6 +260,9 @@ export async function saveSettingsProfile(
       prefetchMemoryMiB: profile.prefetchMemoryMiB,
       fullscreenEscapeBehavior: profile.fullscreenEscapeBehavior,
       preventDisplaySleepFullscreen: profile.preventDisplaySleepFullscreen,
+      trayStoreOnMinimize: profile.trayStoreOnMinimize,
+      trayCloseBehavior: profile.trayCloseBehavior,
+      trayRestoreGesture: profile.trayRestoreGesture,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

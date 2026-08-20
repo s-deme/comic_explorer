@@ -221,6 +221,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは250.079秒で全12 stageがexit 0。Rust canonical、release executable/freshness、GUI権限付きshortcut product回帰11.033秒、cleanup audit、CoDD scan/check/verifyを含む。 |
 | 性能・製品直接観測 | PARTIAL | OS requestのdebug test直接実行とrelease buildはPASS。release WebView2で抑止を有効にしたまま実スクリーンセーバー待機・monitor消灯時間を待つ長時間観測、group policy・remote desktop・battery別挙動は未測定。 |
 
+## Leeyes P2-L タスクトレイ
+
+対象はLEY-SHELL-014の1件。既存の手動tray格納と明示Quitに、最小化時の自動格納、閉じる操作のtray格納、single/double click復帰を追加する。profile v15、SQLite、設定dialog、main window event、tray icon eventを接続し、v1〜v14は既存互換の自動格納無効・閉じると終了・single click復帰へ移行する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | profile・Appの対象testで、v14 migration、不正値拒否、最小化・close・復帰設定のatomic保存、既存手動格納とQuit回帰を確認。FAIL 0。 |
+| TypeScript typecheck | PASS | Windows runnerでexit 0。 |
+| Windows tests / build | PASS | Python 59件、frontend 27 files / 391件、FAIL 0。frontend 68 modules build、bundle 513.77kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust lifecycle | PASS | 最小化の設定有無と重複防止、close-to-trayのclose prevent・hide失敗回復、quit設定時の非介入、stored状態と完全一致gestureだけの復帰を4件で確認。canonical lib全件とshutdown process 1件もPASS。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは359.415秒で全12 stageがexit 0。Rust canonical 150.790秒、release executable/freshness、GUI権限付きshortcut product回帰12.839秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・製品直接観測 | PARTIAL | event処理にtimer・polling・追加workerは導入していない。release通知領域で実際に最小化・閉じる・single/double click・明示Quitを操作する直接観測、複数monitor/DPI、Explorer再起動後のtray再登録は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

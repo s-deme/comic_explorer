@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 14,
+    profileVersion: 15,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -38,6 +38,9 @@ function validProfile(): SettingsProfile {
     prefetchMemoryMiB: 256,
     fullscreenEscapeBehavior: "exitFullscreen",
     preventDisplaySleepFullscreen: false,
+    trayStoreOnMinimize: false,
+    trayCloseBehavior: "quit",
+    trayRestoreGesture: "singleClick",
     viewerBackground: "checker",
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
@@ -111,7 +114,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 15, 99, "14", undefined])(
+  it.each([0, 16, 99, "15", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -332,6 +335,28 @@ describe("settings profile", () => {
     }));
     expect(normalizeSettingsProfile(withField("fullscreenEscapeBehavior", "ignore"))).toBeNull();
     expect(normalizeSettingsProfile(withField("preventDisplaySleepFullscreen", 1))).toBeNull();
+  });
+
+  it("REQ-LEY-P2-012 migrates v14 and validates tray lifecycle settings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 14;
+    delete legacy.trayStoreOnMinimize;
+    delete legacy.trayCloseBehavior;
+    delete legacy.trayRestoreGesture;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      trayStoreOnMinimize: true,
+      trayCloseBehavior: "store",
+      trayRestoreGesture: "doubleClick",
+    })).toEqual(expect.objectContaining({
+      trayStoreOnMinimize: true,
+      trayCloseBehavior: "store",
+      trayRestoreGesture: "doubleClick",
+    }));
+    expect(normalizeSettingsProfile(withField("trayStoreOnMinimize", "true"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("trayCloseBehavior", "ask"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("trayRestoreGesture", "middleClick"))).toBeNull();
   });
 
   it.each([

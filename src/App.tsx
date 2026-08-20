@@ -498,6 +498,11 @@ export function App({
   const [fullscreenEscapeBehavior, setFullscreenEscapeBehavior] =
     useState<FullscreenEscapeBehavior>(DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR);
   const [preventDisplaySleepFullscreen, setPreventDisplaySleepFullscreen] = useState(false);
+  const [trayStoreOnMinimize, setTrayStoreOnMinimize] = useState(false);
+  const [trayCloseBehavior, setTrayCloseBehavior] =
+    useState<SettingsProfile["trayCloseBehavior"]>("quit");
+  const [trayRestoreGesture, setTrayRestoreGesture] =
+    useState<SettingsProfile["trayRestoreGesture"]>("singleClick");
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -928,6 +933,9 @@ export function App({
             : DEFAULT_PREFETCH_MEMORY_MIB);
           setFullscreenEscapeBehavior(response.data.fullscreenEscapeBehavior);
           setPreventDisplaySleepFullscreen(response.data.preventDisplaySleepFullscreen === true);
+          setTrayStoreOnMinimize(response.data.trayStoreOnMinimize === true);
+          setTrayCloseBehavior(response.data.trayCloseBehavior);
+          setTrayRestoreGesture(response.data.trayRestoreGesture);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -2528,6 +2536,9 @@ export function App({
       prefetchMemoryMiB,
       fullscreenEscapeBehavior,
       preventDisplaySleepFullscreen,
+      trayStoreOnMinimize,
+      trayCloseBehavior,
+      trayRestoreGesture,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2628,6 +2639,9 @@ export function App({
       setPrefetchMemoryMiB(normalized.prefetchMemoryMiB);
       setFullscreenEscapeBehavior(normalized.fullscreenEscapeBehavior);
       setPreventDisplaySleepFullscreen(normalized.preventDisplaySleepFullscreen);
+      setTrayStoreOnMinimize(normalized.trayStoreOnMinimize);
+      setTrayCloseBehavior(normalized.trayCloseBehavior);
+      setTrayRestoreGesture(normalized.trayRestoreGesture);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2798,6 +2812,7 @@ export function App({
     viewerScaleMode, viewerScale, loupeEnabled, loupeSize, loupeZoom,
     prefetchAhead, prefetchBehind, prefetchMemoryMiB,
     fullscreenEscapeBehavior, preventDisplaySleepFullscreen,
+    trayStoreOnMinimize, trayCloseBehavior, trayRestoreGesture,
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,

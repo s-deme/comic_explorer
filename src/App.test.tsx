@@ -209,6 +209,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   prefetchMemoryMiB: 256,
   fullscreenEscapeBehavior: "exitFullscreen",
   preventDisplaySleepFullscreen: false,
+  trayStoreOnMinimize: false,
+  trayCloseBehavior: "quit",
+  trayRestoreGesture: "singleClick",
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -2927,7 +2930,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 14,
+        profileVersion: 15,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -3035,6 +3038,32 @@ describe("application shell", () => {
 
     chooseAppMenuItem("ファイル", /終了/);
     expect(quitApplicationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("REQ-LEY-P2-012 persists tray minimize, close, and restore behavior atomically", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByLabelText("profile最小化時にタスクトレイへ格納"));
+    fireEvent.change(within(dialog).getByLabelText("profile閉じる操作"), {
+      target: { value: "store" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profileタスクトレイ復帰操作"), {
+      target: { value: "doubleClick" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileVersion: 15,
+        trayStoreOnMinimize: true,
+        trayCloseBehavior: "store",
+        trayRestoreGesture: "doubleClick",
+      }),
+      expect.any(Number),
+    ));
   });
 
   it("FT-B19-004 exposes offline general help from the Help menu", async () => {

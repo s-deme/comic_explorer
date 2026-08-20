@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 10 | 6 |
+| P2 閲覧中核 | 16 | 12 | 4 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **31** | **72** |
+| **合計** | **103** | **33** | **70** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -68,6 +68,8 @@ P2-IではLEY-VIEWER-029をPublishedとした。既存pointerルーペへ80〜40
 P2-JではLEY-VIEWER-032をPublishedとした。先読みを進行方向0〜4page・戻り方向0〜4page、media grant 16〜512MiBとしてprofile v13・SQLite・設定dialogへ接続した。page/continuous共通window、0page時のvisible優先on-demand、window外frontend解放、native期限切れ/LRU解放を実装し、単一過大pageだけは表示可能性を保つ。synthetic 2,048 grantではtest上限を維持したが、releaseの巨大画像、低速disk/archive、process working set、100ms基準は未測定として残す。
 
 P2-KではLEY-VIEWER-033をPublishedとした。Escを全画面解除だけ、またはnative全画面解除後にviewerも閉じる動作から選択できるようにし、全画面中だけWindows display-required requestを保持するopt-inをprofile v14・SQLite・設定dialog・Viewer lifecycleへ接続した。取得失敗rollback、解除失敗時再取得、unmount/application shutdown解放を実装し、OSの永続電源設定は変更しない。Windows power APIの短時間直接testとcanonical release buildはPASSしたが、release製品で実スクリーンセーバー・monitor消灯時間を待つ長時間観測、group policy・remote desktop・battery別挙動は未測定として残す。
+
+P2-LではLEY-SHELL-014をPublishedとした。既存の手動tray格納に、最小化時の自動格納、閉じる操作のtray格納、single/double click復帰をprofile v15・SQLite・設定dialog・native window eventへ接続した。close-to-trayはcloseを先にpreventし、tray unavailableまたはhide失敗時はwindowをshow・unminimize・focusへ回復する。File menuとtray menuの明示Quitは設定にかかわらず終了する。Windows canonicalとrelease buildはPASSしたが、release通知領域での最小化・閉じる・icon click・明示Quitの直接操作は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

@@ -86,6 +86,9 @@ pub struct Settings {
     pub prefetch_memory_mib: String,
     pub fullscreen_escape_behavior: String,
     pub prevent_display_sleep_fullscreen: bool,
+    pub tray_store_on_minimize: bool,
+    pub tray_close_behavior: String,
+    pub tray_restore_gesture: String,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -167,6 +170,9 @@ impl Default for Settings {
             prefetch_memory_mib: "256".into(),
             fullscreen_escape_behavior: "exitFullscreen".into(),
             prevent_display_sleep_fullscreen: false,
+            tray_store_on_minimize: false,
+            tray_close_behavior: "quit".into(),
+            tray_restore_gesture: "singleClick".into(),
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -290,6 +296,9 @@ impl StateStore {
                 "preventDisplaySleepFullscreen" => {
                     settings.prevent_display_sleep_fullscreen = value == "true"
                 }
+                "trayStoreOnMinimize" => settings.tray_store_on_minimize = value == "true",
+                "trayCloseBehavior" => settings.tray_close_behavior = value,
+                "trayRestoreGesture" => settings.tray_restore_gesture = value,
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -404,6 +413,12 @@ impl StateStore {
                 "preventDisplaySleepFullscreen",
                 settings.prevent_display_sleep_fullscreen.to_string(),
             ),
+            (
+                "trayStoreOnMinimize",
+                settings.tray_store_on_minimize.to_string(),
+            ),
+            ("trayCloseBehavior", settings.tray_close_behavior.clone()),
+            ("trayRestoreGesture", settings.tray_restore_gesture.clone()),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
@@ -1465,6 +1480,9 @@ mod tests {
                 prefetch_memory_mib: "192".into(),
                 fullscreen_escape_behavior: "closeViewer".into(),
                 prevent_display_sleep_fullscreen: true,
+                tray_store_on_minimize: true,
+                tray_close_behavior: "store".into(),
+                tray_restore_gesture: "doubleClick".into(),
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1564,6 +1582,9 @@ mod tests {
         assert_eq!(restored.prefetch_memory_mib, "192");
         assert_eq!(restored.fullscreen_escape_behavior, "closeViewer");
         assert!(restored.prevent_display_sleep_fullscreen);
+        assert!(restored.tray_store_on_minimize);
+        assert_eq!(restored.tray_close_behavior, "store");
+        assert_eq!(restored.tray_restore_gesture, "doubleClick");
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

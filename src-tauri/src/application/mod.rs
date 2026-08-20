@@ -172,6 +172,23 @@ impl AppState {
         self.shutting_down.load(Ordering::Acquire)
     }
 
+    pub(crate) fn tray_preferences(&self) -> Result<(bool, String, String), String> {
+        let settings = self
+            .store
+            .lock()
+            .map_err(|_| "state poisoned")?
+            .as_ref()
+            .map(|store| store.load_settings())
+            .transpose()
+            .map_err(|error| error.message)?
+            .unwrap_or_default();
+        Ok((
+            settings.tray_store_on_minimize,
+            settings.tray_close_behavior,
+            settings.tray_restore_gesture,
+        ))
+    }
+
     fn take_recovery_notice(&self) -> Result<bool, String> {
         Ok(std::mem::take(
             &mut *self
@@ -316,6 +333,9 @@ pub struct CatalogSettings {
     pub prefetch_memory_mib: u16,
     pub fullscreen_escape_behavior: String,
     pub prevent_display_sleep_fullscreen: bool,
+    pub tray_store_on_minimize: bool,
+    pub tray_close_behavior: String,
+    pub tray_restore_gesture: String,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -384,6 +404,9 @@ pub struct SettingsProfileInput {
     pub prefetch_memory_mib: u16,
     pub fullscreen_escape_behavior: String,
     pub prevent_display_sleep_fullscreen: bool,
+    pub tray_store_on_minimize: bool,
+    pub tray_close_behavior: String,
+    pub tray_restore_gesture: String,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -1054,6 +1077,15 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             _ => "exitFullscreen".into(),
         },
         prevent_display_sleep_fullscreen: settings.prevent_display_sleep_fullscreen,
+        tray_store_on_minimize: settings.tray_store_on_minimize,
+        tray_close_behavior: match settings.tray_close_behavior.as_str() {
+            "quit" | "store" => settings.tray_close_behavior,
+            _ => "quit".into(),
+        },
+        tray_restore_gesture: match settings.tray_restore_gesture.as_str() {
+            "singleClick" | "doubleClick" => settings.tray_restore_gesture,
+            _ => "singleClick".into(),
+        },
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -2493,6 +2525,11 @@ fn validate_settings_profile(
             profile.fullscreen_escape_behavior.as_str(),
             "exitFullscreen" | "closeViewer"
         )
+        || !matches!(profile.tray_close_behavior.as_str(), "quit" | "store")
+        || !matches!(
+            profile.tray_restore_gesture.as_str(),
+            "singleClick" | "doubleClick"
+        )
         || !matches!(
             profile.viewer_background.as_str(),
             "checker" | "dark" | "black" | "light"
@@ -2540,6 +2577,7 @@ fn validate_settings_profile(
 #[tauri::command]
 pub fn set_settings_profile(
     state: tauri::State<'_, AppState>,
+    tray_state: tauri::State<'_, crate::tray::TrayState>,
     context: RequestContext,
     profile: SettingsProfileInput,
 ) -> Result<Response<CatalogSettings>, String> {
@@ -2607,6 +2645,9 @@ pub fn set_settings_profile(
         settings.prefetch_memory_mib = profile.prefetch_memory_mib.to_string();
         settings.fullscreen_escape_behavior = profile.fullscreen_escape_behavior;
         settings.prevent_display_sleep_fullscreen = profile.prevent_display_sleep_fullscreen;
+        settings.tray_store_on_minimize = profile.tray_store_on_minimize;
+        settings.tray_close_behavior = profile.tray_close_behavior;
+        settings.tray_restore_gesture = profile.tray_restore_gesture;
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -2638,6 +2679,11 @@ pub fn set_settings_profile(
         if let Err(error) = store.save_settings(&settings) {
             return Ok(error_response(&context, error));
         }
+        tray_state.apply_preferences(
+            settings.tray_store_on_minimize,
+            &settings.tray_close_behavior,
+            &settings.tray_restore_gesture,
+        );
         settings
     };
     Ok(Response::Ok {
@@ -4509,6 +4555,9 @@ mod shutdown_tests {
             prefetch_memory_mib: 256,
             fullscreen_escape_behavior: "exitFullscreen".into(),
             prevent_display_sleep_fullscreen: false,
+            tray_store_on_minimize: false,
+            tray_close_behavior: "quit".into(),
+            tray_restore_gesture: "singleClick".into(),
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
@@ -4625,6 +4674,18 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.prefetch_memory_mib = 192;
+        profile.tray_close_behavior = "ask".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.tray_close_behavior = "store".into();
+        profile.tray_restore_gesture = "middleClick".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.tray_restore_gesture = "doubleClick".into();
         profile.scroll_step_percent = 9;
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
