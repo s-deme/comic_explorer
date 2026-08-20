@@ -15,6 +15,7 @@ import {
   getThumbnail,
   listTags,
   listReadingHistory,
+  listWindowsKnownFolders,
   clearReadingHistory,
   openComic,
   pickLibraryRoot,
@@ -65,6 +66,7 @@ import {
   type ReadingHistoryEntry,
   type TrayStatus,
   type ViewerSession,
+  type WindowsKnownFolder,
 } from "./features/library/client";
 import {
   CatalogContextMenu,
@@ -177,6 +179,7 @@ import {
   APP_VERSION,
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
+  DEFAULT_CATALOG_PALETTE,
   DEFAULT_NAVIGATION_SELECTION_POLICY,
   DEFAULT_STARTUP_LOCATION,
   DEFAULT_THUMBNAIL_GENERATION_SCOPE,
@@ -184,6 +187,7 @@ import {
   normalizeMouseGestures,
   normalizeSettingsProfile,
   type MouseGestureAction,
+  type CatalogPalette,
   type MouseGestureBindings,
   type MouseGestureName,
   type NavigationSelectionPolicy,
@@ -500,6 +504,11 @@ export function App({
   );
   const [startupLocation, setStartupLocation] = useState<StartupLocation>(DEFAULT_STARTUP_LOCATION);
   const startupLocationRef = useRef<StartupLocation>(DEFAULT_STARTUP_LOCATION);
+  const [showHiddenFiles, setShowHiddenFiles] = useState(false);
+  const [catalogPalette, setCatalogPalette] = useState<CatalogPalette>(DEFAULT_CATALOG_PALETTE);
+  const [restoreLastViewer, setRestoreLastViewer] = useState(false);
+  const restoreLastViewerRef = useRef(false);
+  const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [trayNotice, setTrayNotice] = useState<string | null>(null);
@@ -879,6 +888,14 @@ export function App({
           setThumbnailGenerationScope(restoredThumbnailScope as ThumbnailGenerationScope);
           startupLocationRef.current = restoredStartupLocation;
           setStartupLocation(restoredStartupLocation);
+          setShowHiddenFiles(response.data.showHiddenFiles === true);
+          setCatalogPalette(
+            ["system", "paper", "midnight", "highContrast"].includes(response.data.catalogPalette)
+              ? response.data.catalogPalette as CatalogPalette
+              : DEFAULT_CATALOG_PALETTE,
+          );
+          restoreLastViewerRef.current = response.data.restoreLastViewer === true;
+          setRestoreLastViewer(restoreLastViewerRef.current);
           const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
           void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
             if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
@@ -892,6 +909,11 @@ export function App({
     void takeRecoveryNotice(settingsGeneration.current)
       .then((response) => {
         if (response.status === "ok") setRecoveryNotice(response.data);
+      })
+      .catch(() => undefined);
+    void listWindowsKnownFolders(settingsGeneration.current)
+      .then((response) => {
+        if (response.status === "ok") setKnownFolders(response.data);
       })
       .catch(() => undefined);
     generation.current += 1;
@@ -931,7 +953,7 @@ export function App({
       .catch(() => undefined)
       .finally(() => {
         setRestoring(false);
-        void refreshHistory();
+        void refreshHistory(restoreLastViewerRef.current);
       });
   }, [alwaysOnTopAdapter]);
 
@@ -1757,6 +1779,15 @@ export function App({
     }
   }
 
+  async function navigateKnownFolder(folder: WindowsKnownFolder) {
+    const address = parseWindowsDriveAddress(folder.absolutePath);
+    if (address === null) {
+      setSelectionNotice(`${folder.name}のWindowsパスを解決できませんでした。`);
+      return;
+    }
+    await selectDrive(address.driveRoot, address.relativePath);
+  }
+
   function navigate(
     path: string,
     history:
@@ -1994,7 +2025,7 @@ export function App({
     }
   }
 
-  async function refreshHistory() {
+  async function refreshHistory(openMostRecent = false) {
     const requestGeneration = ++historyGeneration.current;
     setHistoryLoading(true);
     setHistoryNotice(null);
@@ -2006,6 +2037,9 @@ export function App({
         setRecentEntries(response.data.slice(0, 20).map((entry) =>
           recentCatalogEntry(entry.itemIdentity),
         ));
+        if (openMostRecent && response.data.length > 0) {
+          await openComicEntry(recentCatalogEntry(response.data[0].itemIdentity));
+        }
       } else if (response.status === "error") {
         setHistoryNotice(presentError(response.error));
       }
@@ -2326,6 +2360,9 @@ export function App({
       navigationSelectionPolicy,
       thumbnailGenerationScope,
       startupLocation,
+      showHiddenFiles,
+      catalogPalette,
+      restoreLastViewer,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -2404,11 +2441,19 @@ export function App({
       setThumbnailGenerationScope(normalized.thumbnailGenerationScope);
       startupLocationRef.current = normalized.startupLocation;
       setStartupLocation(normalized.startupLocation);
+      const hiddenVisibilityChanged = normalized.showHiddenFiles !== showHiddenFiles;
+      setShowHiddenFiles(normalized.showHiddenFiles);
+      setCatalogPalette(normalized.catalogPalette);
+      restoreLastViewerRef.current = normalized.restoreLastViewer;
+      setRestoreLastViewer(normalized.restoreLastViewer);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
       setSettingsDraft(null);
       setSelectionNotice("設定profileを適用しました。");
+      if (hiddenVisibilityChanged && libraryRoot !== null) {
+        void load(navigation.current, selectedPaths);
+      }
     } catch {
       if (requestGeneration === settingsGeneration.current) {
         if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
@@ -2542,7 +2587,8 @@ export function App({
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, treeVisible,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
-    startupLocation, shortcuts, mouseGestures,
+    startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
+    shortcuts, mouseGestures,
   ]);
 
   function queueThumbnail(
@@ -3322,6 +3368,25 @@ export function App({
               >
                 ファイルを開く…
               </button>
+              {knownFolders.length > 0 && (
+                <>
+                  <div className="menu-separator" role="separator" />
+                  <span className="menu-heading">特殊フォルダ</span>
+                  {knownFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      role="menuitem"
+                      tabIndex={-1}
+                      onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                      onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                      onClick={() => runMenuAction(() => void navigateKnownFolder(folder))}
+                    >
+                      {folder.name}へ移動
+                    </button>
+                  ))}
+                </>
+              )}
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">履歴</span>
               {navigation.back.length === 0 && navigation.forward.length === 0 ? (
@@ -4786,6 +4851,7 @@ export function App({
               selectedPaths={selectedPaths}
               viewMode={catalogViewMode}
               thumbnailSizes={catalogThumbnailSizes}
+              palette={catalogPalette}
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}

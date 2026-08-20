@@ -17,9 +17,11 @@ use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
 use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
+#[cfg(test)]
+use crate::catalog::enumerate_folder_pages;
 use crate::catalog::{
-    CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages,
-    enumerate_pdf_pages, render_pdf_page,
+    CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages_with_hidden,
+    enumerate_folder_with_hidden, enumerate_pdf_pages, render_pdf_page,
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
@@ -269,6 +271,14 @@ pub struct WindowsDrive {
     pub name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowsKnownFolder {
+    pub id: String,
+    pub name: String,
+    pub absolute_path: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogSettings {
@@ -302,6 +312,9 @@ pub struct CatalogSettings {
     pub navigation_selection_policy: String,
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
+    pub show_hidden_files: bool,
+    pub catalog_palette: String,
+    pub restore_last_viewer: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -348,6 +361,9 @@ pub struct SettingsProfileInput {
     pub navigation_selection_policy: String,
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
+    pub show_hidden_files: bool,
+    pub catalog_palette: String,
+    pub restore_last_viewer: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -869,6 +885,12 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             "last" | "driveRoot" => settings.startup_location,
             _ => "last".into(),
         },
+        show_hidden_files: settings.show_hidden_files,
+        catalog_palette: match settings.catalog_palette.as_str() {
+            "system" | "paper" | "midnight" | "highContrast" => settings.catalog_palette,
+            _ => "system".into(),
+        },
+        restore_last_viewer: settings.restore_last_viewer,
         shortcuts,
         mouse_gestures,
     }
@@ -1013,6 +1035,32 @@ pub fn list_windows_drives(
                 }
             })
             .collect(),
+    })
+}
+
+#[tauri::command]
+pub fn list_windows_known_folders(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<WindowsKnownFolder>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    #[cfg(target_os = "windows")]
+    let folders = library_root::windows_known_folders()
+        .into_iter()
+        .map(|(id, name, path)| WindowsKnownFolder {
+            id: id.into(),
+            name: name.into(),
+            absolute_path: library_root::display_path(&path),
+        })
+        .collect();
+    #[cfg(not(target_os = "windows"))]
+    let folders = Vec::new();
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: folders,
     })
 }
 
@@ -2007,6 +2055,10 @@ fn validate_settings_profile(
             "visible" | "near" | "all"
         )
         || !matches!(profile.startup_location.as_str(), "last" | "driveRoot")
+        || !matches!(
+            profile.catalog_palette.as_str(),
+            "system" | "paper" | "midnight" | "highContrast"
+        )
     {
         return Err(request_error(
             ErrorCode::InvalidRequest,
@@ -2089,6 +2141,9 @@ pub fn set_settings_profile(
         settings.navigation_selection_policy = profile.navigation_selection_policy;
         settings.thumbnail_generation_scope = profile.thumbnail_generation_scope;
         settings.startup_location = profile.startup_location;
+        settings.show_hidden_files = profile.show_hidden_files;
+        settings.catalog_palette = profile.catalog_palette;
+        settings.restore_last_viewer = profile.restore_last_viewer;
         settings.shortcut_bindings = shortcuts;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
@@ -2292,11 +2347,23 @@ pub async fn list_folder(
         .lock()
         .map_err(|_| "state poisoned")?
         .begin(context.generation);
+    let show_hidden = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .is_some_and(|settings| settings.show_hidden_files);
     reset_thumbnail_pins_for_navigation(&state.thumbnail_pins).map_err(|error| error.message)?;
     let requested_directory = root.join(relative_path.as_str());
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        enumerate_folder_port(&worker_root, &requested_directory, &cancellation)
+        enumerate_folder_port(
+            &worker_root,
+            &requested_directory,
+            show_hidden,
+            &cancellation,
+        )
     })
     .await
     .map_err(|error| format!("catalog worker failed: {error}"))?;
@@ -2788,12 +2855,13 @@ fn strict_moved_favorite_resolve_target<'a>(
 fn enumerate_folder_port(
     root: &std::path::Path,
     directory: &std::path::Path,
+    show_hidden: bool,
     cancellation: &CancellationToken,
 ) -> Result<Vec<CatalogEntry>, AppError> {
     if cancellation.is_cancelled() {
         return Err(AppError::cancelled());
     }
-    let result = enumerate_folder(root, directory);
+    let result = enumerate_folder_with_hidden(root, directory, show_hidden);
     if cancellation.is_cancelled() {
         Err(AppError::cancelled())
     } else {
@@ -3036,6 +3104,7 @@ fn enumerate_pages_port(
     item: &std::path::Path,
     item_relative: &RelativePath,
     kind: OpenItemKind,
+    show_hidden: bool,
     cancellation: &CancellationToken,
 ) -> Result<Vec<RelativePath>, AppError> {
     if cancellation.is_cancelled() {
@@ -3043,7 +3112,7 @@ fn enumerate_pages_port(
     }
     let result = match kind {
         OpenItemKind::Archive => enumerate_archive_pages(item),
-        OpenItemKind::Folder => enumerate_folder_pages(root, item),
+        OpenItemKind::Folder => enumerate_folder_pages_with_hidden(root, item, show_hidden),
         OpenItemKind::Image => {
             let mut file = std::fs::File::open(item).map_err(|error| AppError {
                 code: if error.kind() == std::io::ErrorKind::NotFound {
@@ -3187,8 +3256,15 @@ pub async fn list_tree_children(
         }
     };
     let requested_directory = root.join(relative_path.as_str());
+    let show_hidden = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .is_some_and(|settings| settings.show_hidden_files);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        enumerate_folder(&root, &requested_directory).map(|entries| {
+        enumerate_folder_with_hidden(&root, &requested_directory, show_hidden).map(|entries| {
             entries
                 .into_iter()
                 .filter(|entry| {
@@ -3318,6 +3394,13 @@ pub async fn open_comic(
         Ok(path) => path,
         Err(error) => return Ok(error_response(&context, error)),
     };
+    let show_hidden = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .is_some_and(|settings| settings.show_hidden_files);
     let item_kind = match open_item_kind(&item_path, &item_relative) {
         Ok(kind) => kind,
         Err(error) => return Ok(error_response(&context, error)),
@@ -3336,6 +3419,7 @@ pub async fn open_comic(
             &worker_item,
             &worker_relative,
             item_kind,
+            show_hidden,
             &viewer_cancellation,
         )
     })
@@ -3778,6 +3862,9 @@ mod shutdown_tests {
             navigation_selection_policy: "restore".into(),
             thumbnail_generation_scope: "near".into(),
             startup_location: "last".into(),
+            show_hidden_files: false,
+            catalog_palette: "system".into(),
+            restore_last_viewer: false,
             shortcuts: default_shortcuts(),
             mouse_gestures: default_mouse_gestures(),
         };
@@ -3817,6 +3904,13 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.navigation_selection_policy = "restore".into();
+
+        profile.catalog_palette = "custom".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.catalog_palette = "system".into();
         profile.thumbnail_generation_scope = "unlimited".into();
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
@@ -3902,6 +3996,7 @@ mod shutdown_tests {
             &viewer_item,
             &viewer_relative,
             viewer_kind,
+            false,
             &CancellationToken::new(),
         )
         .unwrap();
@@ -4211,10 +4306,11 @@ mod shutdown_tests {
             .canonicalize()
             .unwrap();
         let active = CancellationToken::new();
-        let entries = enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), &active).unwrap();
+        let entries =
+            enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), false, &active).unwrap();
         assert!(!entries.is_empty());
         assert_eq!(
-            enumerate_folder_port(&root, &root.join("missing"), &active)
+            enumerate_folder_port(&root, &root.join("missing"), false, &active)
                 .unwrap_err()
                 .code,
             ErrorCode::NotFound
@@ -4225,6 +4321,7 @@ mod shutdown_tests {
             &root.join(archive_relative.as_str()),
             &archive_relative,
             OpenItemKind::Archive,
+            false,
             &active,
         )
         .unwrap();
@@ -4233,7 +4330,7 @@ mod shutdown_tests {
         let cancelled = CancellationToken::new();
         cancelled.cancel();
         assert_eq!(
-            enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), &cancelled)
+            enumerate_folder_port(&root, &root.join("FIX-NESTED-001"), false, &cancelled)
                 .unwrap_err()
                 .code,
             ErrorCode::Cancelled
@@ -4244,6 +4341,7 @@ mod shutdown_tests {
                 &root.join("FIX-ZIP-001/standard.cbz"),
                 &archive_relative,
                 OpenItemKind::Archive,
+                false,
                 &cancelled,
             )
             .unwrap_err()
@@ -4421,7 +4519,8 @@ mod shutdown_tests {
             .canonicalize()
             .unwrap();
         let cancellation = CancellationToken::new();
-        let success = enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), &cancellation);
+        let success =
+            enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), false, &cancellation);
         let context = RequestContext {
             api_version: crate::api::API_VERSION,
             request_id: RequestId::parse("fixture-success").unwrap(),
@@ -4443,7 +4542,7 @@ mod shutdown_tests {
             response => panic!("unexpected success response: {response:?}"),
         }
 
-        let missing = enumerate_folder_port(&root, &root.join("missing"), &cancellation);
+        let missing = enumerate_folder_port(&root, &root.join("missing"), false, &cancellation);
         let context = RequestContext {
             api_version: crate::api::API_VERSION,
             request_id: RequestId::parse("fixture-error").unwrap(),
@@ -4462,7 +4561,8 @@ mod shutdown_tests {
             response => panic!("unexpected error response: {response:?}"),
         }
 
-        let stale = enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), &cancellation);
+        let stale =
+            enumerate_folder_port(&root, &root.join("FIX-LIBRARY-001"), false, &cancellation);
         let context = RequestContext {
             api_version: crate::api::API_VERSION,
             request_id: RequestId::parse("fixture-stale").unwrap(),

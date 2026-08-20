@@ -246,6 +246,31 @@ pub fn pick_supported_file() -> Result<Option<PathBuf>, AppError> {
 }
 
 #[cfg(target_os = "windows")]
+pub fn windows_known_folders() -> Vec<(&'static str, &'static str, PathBuf)> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{
+        FOLDERID_Desktop, FOLDERID_Documents, FOLDERID_Downloads, FOLDERID_Pictures,
+        KF_FLAG_DEFAULT, SHGetKnownFolderPath,
+    };
+
+    [
+        ("desktop", "デスクトップ", FOLDERID_Desktop),
+        ("downloads", "ダウンロード", FOLDERID_Downloads),
+        ("documents", "ドキュメント", FOLDERID_Documents),
+        ("pictures", "ピクチャ", FOLDERID_Pictures),
+    ]
+    .into_iter()
+    .filter_map(|(id, name, folder_id)| unsafe {
+        let value = SHGetKnownFolderPath(&folder_id, KF_FLAG_DEFAULT, None).ok()?;
+        let path = value.to_string().ok().map(PathBuf::from);
+        CoTaskMemFree(Some(value.0.cast()));
+        let canonical = path?.canonicalize().ok()?;
+        canonical.is_dir().then_some((id, name, canonical))
+    })
+    .collect()
+}
+
+#[cfg(target_os = "windows")]
 fn picker_error(error: impl std::fmt::Display) -> AppError {
     AppError {
         code: ErrorCode::Internal,
@@ -278,6 +303,20 @@ mod tests {
             drive_roots_from_mask((1 << 2) | (1 << 4)),
             vec![PathBuf::from(r"C:\"), PathBuf::from(r"E:\")]
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn resolves_only_supported_existing_windows_known_folders() {
+        let folders = windows_known_folders();
+        let allowed = ["desktop", "downloads", "documents", "pictures"];
+        for (id, name, path) in folders {
+            assert!(allowed.contains(&id));
+            assert!(!name.is_empty());
+            assert!(path.is_absolute());
+            assert!(path.is_dir());
+            assert_eq!(path, path.canonicalize().unwrap());
+        }
     }
 
     #[test]

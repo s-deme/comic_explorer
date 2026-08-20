@@ -940,6 +940,43 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: #eef6ff;
 }
 .empty-state, .error-panel { margin: 32px; }
+.catalog-scroll[data-catalog-palette="paper"] {
+  color: #352f24;
+  background: #f7f0dc;
+  --catalog-muted: #665c48;
+  --catalog-hover: #e8dcc0;
+  --catalog-selected: #c9dcf2;
+}
+.catalog-scroll[data-catalog-palette="midnight"] {
+  color: #edf2f8;
+  background: #17202b;
+  --catalog-muted: #b8c4d2;
+  --catalog-hover: #28384a;
+  --catalog-selected: #315d88;
+}
+.catalog-scroll[data-catalog-palette="highContrast"] {
+  color: #fff;
+  background: #000;
+  --catalog-muted: #fff;
+  --catalog-hover: #272727;
+  --catalog-selected: #005fcc;
+}
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .catalog-item,
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .catalog-list-header {
+  color: inherit;
+  background: transparent;
+}
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .item-metadata,
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .item-kind,
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .reference-tile-kind {
+  color: var(--catalog-muted);
+}
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .catalog-item:hover {
+  background: var(--catalog-hover);
+}
+.catalog-scroll[data-catalog-palette]:not([data-catalog-palette="system"]) .catalog-item[data-selected="true"] {
+  background: var(--catalog-selected);
+}
 .error-panel { max-width: 680px; padding: 24px; border: 1px solid #db9b9b; background: #fff7f7; }
 .error-panel button + button { margin-left: 8px; }
 .status-bar {

@@ -144,6 +144,65 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("selects normalized prefix matches and cycles repeated incremental-search keys", () => {
+    const onSelect = vi.fn();
+    const searchable: CatalogEntry[] = ["alpha.cbz", "Ｂeta.cbz", "beta-two.cbz"]
+      .map((relativePath) => ({
+        relativePath: relativePath as never,
+        kind: "archive",
+        archiveKind: "cbz",
+      }));
+    render(
+      <CatalogGrid
+        entries={searchable}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /alpha\.cbz/ }), { key: "b" });
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ relativePath: "Ｂeta.cbz" }),
+    );
+    fireEvent.keyDown(screen.getByRole("button", { name: /Ｂeta\.cbz/ }), { key: "b" });
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ relativePath: "beta-two.cbz" }),
+    );
+  });
+
+  it("ignores incremental search while composing text or using command modifiers", () => {
+    const onSelect = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(3)}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+      />,
+    );
+    const first = screen.getByRole("button", { name: /book-0/ });
+    fireEvent.keyDown(first, { key: "b", isComposing: true });
+    fireEvent.keyDown(first, { key: "b", ctrlKey: true });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("exposes the selected safe catalog palette as a rendering contract", () => {
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        palette="midnight"
+      />,
+    );
+    expect(screen.getByRole("grid")).toHaveAttribute("data-catalog-palette", "midnight");
+  });
+
   it("extends the pointer-compatible range with Shift+Arrow", () => {
     const onSelect = vi.fn();
     render(

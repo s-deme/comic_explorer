@@ -148,6 +148,17 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P1-014 | LEY-SETTING-005 | 起動場所を「前回のfolder」「前回driveのroot」から選び、存在しない・読めない保存pathではshellを維持して安全にdrive選択へ戻す。初期選択はREQ-LEY-P1-010のpolicyを共有し、設定をstrict profileとapp-local SQLiteへ保存する。 |
 | REQ-LEY-P1-015 | LEY-HELP-001 | 同梱dataだけで閲覧できる利用者向けoffline helpへ、開始、folder/list、viewer、検索、file操作、設定、privacy・安全上の制約、現在のshortcutを章立てして収録する。topic検索とkeyboard操作を提供し、外部URLやnetworkを要求しない。 |
 
+## Leeyes P1-C 独立S機能の受入条件
+
+| Requirement | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-LEY-P1-016 | LEY-FILER-007 | File menuからWindowsのDesktop、Downloads、Documents、Picturesへ移動できる。known-folder APIが返した実filesystem pathだけを使い、通常のdrive登録・canonical containment境界を経由する。取得不能な場所は表示せず、shell virtual extensionや任意codeを読み込まない。PCは既存tree入口を正とする。 |
+| REQ-LEY-P1-017 | LEY-FILER-011 | Windows hidden属性または先頭dotを持つ項目を既定で一覧・folder page列挙から除外し、「隠し項目を表示」で一覧に含められる。設定は再起動とprofileで復元し、symlink/reparse point、root containment、対応形式の既存安全境界を変更しない。 |
+| REQ-LEY-P1-018 | LEY-FILER-014 | catalogにkeyboard focusがあるとき、IME composition外の表示可能文字を1秒以内に続けて入力すると、NFKC・case insensitiveな名前前方一致で次の項目へ選択とfocusを移す。同じ文字列の再入力は現在位置の次から循環し、input・dialog・viewerのshortcutを奪わない。 |
+| REQ-LEY-P1-019 | LEY-FILER-018 | catalog配色をsystem、paper、midnight、high contrastの検証済みpresetから選び、背景、文字、補助文字、hover、選択を一体で変更する。原本・thumbnailを加工せず、profileと再起動で復元する。任意色による判読不能な組合せは導入しない。 |
+| REQ-LEY-P1-020 | LEY-VIEWER-006 | 2page以上のviewerで現在page以外を一様に選ぶrandom移動commandを提供し、1pageでは何も変更しない。page sequence、読書位置保存、prefetch上限、原本を変更せず、選択結果を通常page移動と同じ境界へ渡す。 |
+| REQ-LEY-P1-021 | LEY-SETTING-006 | 「前回の画像を再表示」を明示的に有効化した場合だけ、前回root復元後に最新の成功した閲覧作品と保存pageを再度開く。既定は無効とし、cancel・失敗openを対象にせず、missing・access拒否・removable drive不在ではshellを維持して局所errorを表示する。設定はprofileとSQLiteへ保存する。 |
+
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |

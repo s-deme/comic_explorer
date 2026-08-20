@@ -21,6 +21,7 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  randomPageIndex,
   scaleForPixelDimension,
   scaleReducer,
   VIEWER_LAYOUT_MODES,
@@ -37,6 +38,15 @@ const initial: ViewerState = {
 };
 
 describe("viewer page model", () => {
+  it("maps random values uniformly onto every page except the current page", () => {
+    expect(randomPageIndex(2, 5, 0)).toBe(0);
+    expect(randomPageIndex(2, 5, 0.24)).toBe(0);
+    expect(randomPageIndex(2, 5, 0.25)).toBe(1);
+    expect(randomPageIndex(2, 5, 0.5)).toBe(3);
+    expect(randomPageIndex(2, 5, 0.999999)).toBe(4);
+    expect(randomPageIndex(0, 1, 0.5)).toBe(0);
+  });
+
   it("keeps the leading page when mode or direction changes", () => {
     let state = viewerReducer(initial, { type: "mode", mode: "single" });
     state = viewerReducer(state, { type: "toggleDirection" });

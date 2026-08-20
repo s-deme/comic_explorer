@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 6,
+    profileVersion: 7,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -43,6 +43,9 @@ function validProfile(): SettingsProfile {
     navigationSelectionPolicy: "restore",
     thumbnailGenerationScope: "near",
     startupLocation: "last",
+    showHiddenFiles: false,
+    catalogPalette: "system",
+    restoreLastViewer: false,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -85,7 +88,7 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 7, 99, "6", undefined])(
+  it.each([0, 8, 99, "7", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -147,6 +150,15 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
+  it("migrates a v6 profile with the P1-C catalog and restore defaults", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 6;
+    delete legacy.showHiddenFiles;
+    delete legacy.catalogPalette;
+    delete legacy.restoreLastViewer;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
   it.each([
     { smallThumbnail: 63, coverList: 144, cardGrid: 216, referenceTile: 128 },
     { smallThumbnail: 104, coverList: 321, cardGrid: 216, referenceTile: 128 },
@@ -194,6 +206,12 @@ describe("settings profile", () => {
   });
 
   it.each([
+    ["catalogPalette", "custom"],
+  ])("rejects an invalid P1-C profile field %s=%s", (field, value) => {
+    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+  });
+
+  it.each([
     "sortDescending",
     "loupeEnabled",
     "treeVisible",
@@ -203,6 +221,8 @@ describe("settings profile", () => {
     "addressBarVisible",
     "statusBarVisible",
     "alwaysOnTop",
+    "showHiddenFiles",
+    "restoreLastViewer",
   ])("requires %s to be a boolean", (field) => {
     expect(normalizeSettingsProfile(withField(field, "false"))).toBeNull();
     expect(normalizeSettingsProfile(withField(field, undefined))).toBeNull();

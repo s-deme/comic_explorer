@@ -50,7 +50,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 6;
+export const SETTINGS_PROFILE_VERSION = 7;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -62,6 +62,9 @@ export const DEFAULT_THUMBNAIL_GENERATION_SCOPE: ThumbnailGenerationScope = "nea
 export const STARTUP_LOCATIONS = ["last", "driveRoot"] as const;
 export type StartupLocation = (typeof STARTUP_LOCATIONS)[number];
 export const DEFAULT_STARTUP_LOCATION: StartupLocation = "last";
+export const CATALOG_PALETTES = ["system", "paper", "midnight", "highContrast"] as const;
+export type CatalogPalette = (typeof CATALOG_PALETTES)[number];
+export const DEFAULT_CATALOG_PALETTE: CatalogPalette = "system";
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
 export type MouseGestureAction = (typeof MOUSE_GESTURE_ACTIONS)[number];
@@ -129,6 +132,9 @@ export interface SettingsProfile {
   navigationSelectionPolicy: NavigationSelectionPolicy;
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
+  showHiddenFiles: boolean;
+  catalogPalette: CatalogPalette;
+  restoreLastViewer: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -166,6 +172,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     navigationSelectionPolicy: DEFAULT_NAVIGATION_SELECTION_POLICY,
     thumbnailGenerationScope: DEFAULT_THUMBNAIL_GENERATION_SCOPE,
     startupLocation: DEFAULT_STARTUP_LOCATION,
+    showHiddenFiles: false,
+    catalogPalette: DEFAULT_CATALOG_PALETTE,
+    restoreLastViewer: false,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -263,12 +272,19 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const startupLocation = legacyP1BPreferences
     ? DEFAULT_STARTUP_LOCATION
     : enumValue(candidate.startupLocation, STARTUP_LOCATIONS);
+  const legacyP1CPreferences = legacyP1BPreferences || candidate.profileVersion === 6;
+  const showHiddenFiles = legacyP1CPreferences ? false : candidate.showHiddenFiles;
+  const catalogPalette = legacyP1CPreferences
+    ? DEFAULT_CATALOG_PALETTE
+    : enumValue(candidate.catalogPalette, CATALOG_PALETTES);
+  const restoreLastViewer = legacyP1CPreferences ? false : candidate.restoreLastViewer;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
       && candidate.profileVersion !== 3
       && candidate.profileVersion !== 4
       && candidate.profileVersion !== 5
+      && candidate.profileVersion !== 6
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -303,6 +319,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     navigationSelectionPolicy === null ||
     thumbnailGenerationScope === null ||
     startupLocation === null ||
+    typeof showHiddenFiles !== "boolean" ||
+    catalogPalette === null ||
+    typeof restoreLastViewer !== "boolean" ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -340,6 +359,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     navigationSelectionPolicy,
     thumbnailGenerationScope,
     startupLocation,
+    showHiddenFiles,
+    catalogPalette,
+    restoreLastViewer,
     shortcuts,
     mouseGestures,
   };

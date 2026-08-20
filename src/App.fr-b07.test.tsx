@@ -51,6 +51,9 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "drives", generation: 1,
     data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
   })),
+  listWindowsKnownFolders: vi.fn(async () => ({
+    status: "ok", requestId: "known-folders", generation: 1, data: [],
+  })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   addFavorite: vi.fn(),
@@ -189,6 +192,9 @@ const defaultSettings: CatalogSettings = {
   navigationSelectionPolicy: "restore",
   thumbnailGenerationScope: "near",
   startupLocation: "last",
+  showHiddenFiles: false,
+  catalogPalette: "system",
+  restoreLastViewer: false,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };

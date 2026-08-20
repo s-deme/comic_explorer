@@ -44,6 +44,7 @@ import {
 } from "../viewer/model";
 import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
+  CATALOG_PALETTES,
   NAVIGATION_SELECTION_POLICIES,
   STARTUP_LOCATIONS,
   THUMBNAIL_GENERATION_SCOPES,
@@ -52,6 +53,10 @@ import {
   type MouseGestureName,
   type SettingsProfile,
 } from "./profile";
+
+const CATALOG_PALETTE_LABELS: Record<SettingsProfile["catalogPalette"], string> = {
+  system: "システム", paper: "紙面", midnight: "夜間", highContrast: "高コントラスト",
+};
 
 const NAVIGATION_SELECTION_LABELS: Record<SettingsProfile["navigationSelectionPolicy"], string> = {
   none: "選択なし", first: "先頭", last: "末尾", restore: "前回選択を復元",
@@ -277,6 +282,16 @@ export function SettingsDialog({
       text: `サムネイル 生成 範囲 表示 近傍 全項目 ${THUMBNAIL_GENERATION_LABELS[draft.thumbnailGenerationScope]}`,
     },
     {
+      id: "show-hidden-files",
+      category: "catalog",
+      text: `隠し 項目 ファイル folder 表示 ${draft.showHiddenFiles ? "有効" : "無効"}`,
+    },
+    {
+      id: "catalog-palette",
+      category: "catalog",
+      text: `一覧 配色 背景 文字 選択 contrast ${CATALOG_PALETTE_LABELS[draft.catalogPalette]}`,
+    },
+    {
       id: "viewer-view-mode",
       category: "viewer",
       text: `閲覧モード 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 1ページずつまたは見開きで表示します`,
@@ -393,6 +408,11 @@ export function SettingsDialog({
       id: "startup-location",
       category: "profile",
       text: `起動 場所 前回 フォルダ ドライブ ルート ${STARTUP_LOCATION_LABELS[draft.startupLocation]}`,
+    },
+    {
+      id: "restore-last-viewer",
+      category: "profile",
+      text: `前回 画像 page 再表示 起動 ${draft.restoreLastViewer ? "有効" : "無効"}`,
     },
     {
       id: "profile-safety",
@@ -579,6 +599,17 @@ export function SettingsDialog({
               <SettingRow id="thumbnail-generation-scope" title="サムネイル生成範囲" description="worker上限を保ったまま、先読みする範囲を選びます。" hidden={rowHidden("thumbnail-generation-scope")}>
                 <select aria-label="profileサムネイル生成範囲" value={draft.thumbnailGenerationScope} onChange={(event) => update({ thumbnailGenerationScope: event.target.value as SettingsProfile["thumbnailGenerationScope"] })}>
                   {THUMBNAIL_GENERATION_SCOPES.map((scope) => <option key={scope} value={scope}>{THUMBNAIL_GENERATION_LABELS[scope]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="show-hidden-files" title="隠し項目を表示" description="Windows hidden属性と先頭dotの項目を一覧へ含めます。" hidden={rowHidden("show-hidden-files")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile隠し項目を表示" checked={draft.showHiddenFiles} onChange={(event) => update({ showHiddenFiles: event.target.checked })} />
+                  <span>{draft.showHiddenFiles ? "表示" : "非表示"}</span>
+                </label>
+              </SettingRow>
+              <SettingRow id="catalog-palette" title="一覧配色" description="判読性を確認した背景・文字・選択色の組を選びます。" hidden={rowHidden("catalog-palette")}>
+                <select aria-label="profile一覧配色" value={draft.catalogPalette} onChange={(event) => update({ catalogPalette: event.target.value as SettingsProfile["catalogPalette"] })}>
+                  {CATALOG_PALETTES.map((palette) => <option key={palette} value={palette}>{CATALOG_PALETTE_LABELS[palette]}</option>)}
                 </select>
               </SettingRow>
             </section>
@@ -889,6 +920,12 @@ export function SettingsDialog({
                 <select aria-label="profile起動場所" value={draft.startupLocation} onChange={(event) => update({ startupLocation: event.target.value as SettingsProfile["startupLocation"] })}>
                   {STARTUP_LOCATIONS.map((location) => <option key={location} value={location}>{STARTUP_LOCATION_LABELS[location]}</option>)}
                 </select>
+              </SettingRow>
+              <SettingRow id="restore-last-viewer" title="前回の画像を再表示" description="有効時だけ、最新の成功した閲覧作品を起動後に再度開きます。" hidden={rowHidden("restore-last-viewer")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile前回の画像を再表示" checked={draft.restoreLastViewer} onChange={(event) => update({ restoreLastViewer: event.target.checked })} />
+                  <span>{draft.restoreLastViewer ? "有効" : "無効"}</span>
+                </label>
               </SettingRow>
               <SettingRow id="profile-transfer" title="設定を移行する" description="現在の設定をJSONへ書き出すか、別の端末で書き出した設定を下書きへ読み込みます。" hidden={rowHidden("profile-transfer")}>
                 <div className="settings-inline-actions">

@@ -96,7 +96,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(17);
+    expect(buttons).toHaveLength(18);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -109,6 +109,35 @@ describe("Viewer settings", () => {
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
     expect(close).toHaveTextContent("↩");
     expect(close).not.toHaveTextContent("一覧へ戻る");
+  });
+
+  it("moves to a random non-current page and disables the action for a single page", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.75);
+    const { rerender } = render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "ランダムページ" }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+
+    rerender(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "ランダムページ" })).toBeDisabled();
+    vi.restoreAllMocks();
   });
 
   it("FT-B23-001 shifts a paged spread by one page without invoking volume navigation", () => {

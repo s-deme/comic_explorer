@@ -69,6 +69,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | CoDD | PASS（red 0） | 最終文書・tracker同期後のscan/check/verifyはexit 0。scan 5 documents / 63 nodes / 139 edges、check red failure 0。advisory、SKIP、VACUOUSを機能PASSへ合算しない。 |
 | 性能・製品直接観測 | PARTIAL / NOT RUN | 自動testで50 archiveに対する表示中scope 25要求とhistory 25件から20件への上限を直接観測。基準PC時間・memoryは未測定。release WebView2のnative picker操作、欠落recent file、help visual/DPIは未測定。 |
 
+## Leeyes P1-C 独立S機能
+
+対象はLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件。Windows known folder移動、隠し項目表示、incremental search、catalog配色preset、random page、opt-inの前回viewer復元をprofile v7とapp-local SQLiteへ接続した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 27 files / 340件、FAIL 0。known folderのdrive境界、dot/Windows hidden属性、NFKC前方一致と循環、IME/modifier抑止、palette contract、現在page除外random、profile v6→v7移行、設定保存・一覧再読込、opt-in startup viewer復元を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Windows frontend build / SBOM | PASS | 68 modules、SBOM 729 components、unknown/prohibited license 0。`dist/`は生成物としてcommitしない。 |
+| Rust canonical | PASS | `cargo fmt --check`、`cargo check --locked`、hidden属性・known folder・profile enum・SQLite再起動復元を含むlib 163件 + shutdown process 1件、FAIL 0。既存dead-code warning 2件。 |
+| release / product回帰 | PASS | release executable freshness PASS。GUI権限付きshortcut product harnessはremap・conflict・viewer command・reset・restart復元と原本差分0でPASS。P1-C固有操作のrelease直接観測ではない。 |
+| CoDD | PASS（red 0） | formal canonical内のscan/check/verifyはexit 0。文書・tracker最終同期後にもscan/check/verifyを再実行する。SKIP、VACUOUS、advisoryを機能PASSへ合算しない。 |
+| 性能・製品直接観測 | NOT RUN | このS機能batchに専用性能閾値はない。10,000項目virtual DOMの既存回帰はPASSだがincremental searchの基準PC時間、random分布の統計測定、known folder全種類、hidden実folder、4配色、IME、removable drive欠落をrelease WebView2では未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

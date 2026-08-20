@@ -49,6 +49,9 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "drives", generation: 1,
     data: [{ absolutePath: "C:\\", name: "ローカル ディスク (C:)" }],
   })),
+  listWindowsKnownFolders: vi.fn(async () => ({
+    status: "ok", requestId: "known-folders", generation: 1, data: [],
+  })),
   loadPage: vi.fn(),
   openComic: vi.fn(),
   pickLibraryRoot: vi.fn(),

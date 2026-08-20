@@ -24,6 +24,7 @@ import {
   normalizeViewerSpacing,
   normalizeViewerGridColor,
   normalizeZoomRetention,
+  randomPageIndex,
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
@@ -404,6 +405,14 @@ export function Viewer({
       return;
     }
     dispatch({ type: "previous" });
+  }
+
+  function randomPage() {
+    if (session.pages.length <= 1) return;
+    dispatch({
+      type: "go",
+      index: randomPageIndex(state.index, session.pages.length),
+    });
   }
 
   useEffect(() => {
@@ -997,6 +1006,15 @@ export function Viewer({
           onClick={next}
         >
           <span aria-hidden="true">▶</span>
+        </button>
+        <button
+          className="viewer-icon-button"
+          aria-label="ランダムページ"
+          title="現在以外のページへランダム移動"
+          disabled={session.pages.length <= 1}
+          onClick={randomPage}
+        >
+          <span aria-hidden="true">⤨</span>
         </button>
         <button
           className="viewer-icon-button"

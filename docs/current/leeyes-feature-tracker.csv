@@ -19,18 +19,18 @@ LEY-FILER-003,ファイラ,書庫内階層閲覧,Partial,Selected,PartialExistin
 LEY-FILER-004,ファイラ,入れ子書庫閲覧,Partial,Selected,PartialExisting,L,P4,10,archive virtual pathと既存上限を再利用,,,,,,書庫基盤,zip bomb・一時容量,2026-08-21,
 LEY-FILER-005,ファイラ,アドレス移動,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILER-006,ファイラ,戻る・進む履歴,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
-LEY-FILER-007,ファイラ,特殊フォルダ移動,Missing,Selected,NotStarted,S,P1,12,利用頻度が高い独立S機能,,,,,,Windows known folders,,2026-08-21,
+LEY-FILER-007,ファイラ,特殊フォルダ移動,Missing,Selected,Published,S,P1,12,利用頻度が高い独立S機能,REQ-LEY-P1-016,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src-tauri/src/application/library_root.rs;src-tauri/src/application/mod.rs;src-tauri/src/lib.rs;src/App.tsx;src/features/library/client.ts,src-tauri/src/application/library_root.rs;src/App.test.tsx,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Rust canonical PASS;Windows build PASS;CoDD PASS,Windows known folders,,2026-08-21,SELF
 LEY-FILER-008,ファイラ,親階層へ,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILER-009,ファイラ,手動更新,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILER-010,ファイラ,自動更新,Missing,Selected,NotStarted,M,P3,6,filesystem watcher基盤,,,,,,filesystem watcher,event storm,2026-08-21,
-LEY-FILER-011,ファイラ,隠しファイル表示,Missing,Selected,NotStarted,S,P1,13,利用頻度が高い独立S機能,,,,,,platform属性,,2026-08-21,
+LEY-FILER-011,ファイラ,隠しファイル表示,Missing,Selected,Published,S,P1,13,利用頻度が高い独立S機能,REQ-LEY-P1-017,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src-tauri/src/catalog/folder.rs;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs;src/App.tsx;src/features/settings/SettingsDialog.tsx;src/features/settings/profile.ts,src-tauri/src/catalog/folder.rs;src-tauri/src/state/repository.rs;src/App.test.tsx;src/features/settings/profile.test.ts,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Rust canonical PASS;Windows build PASS;CoDD PASS,platform属性,,2026-08-21,SELF
 LEY-FILER-012,ファイラ,未対応ファイル表示,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILER-013,ファイラ,書庫サブフォルダ平坦化,Alternative,ReviewAlternative,AlternativeExisting,NA,,,,,,,,,書庫ページ列,path traversal防止,2026-08-20,
-LEY-FILER-014,ファイラ,インクリメンタル検索,Missing,Selected,NotStarted,S,P1,14,利用頻度が高い独立S機能,,,,,,一覧focus,IME,2026-08-21,
+LEY-FILER-014,ファイラ,インクリメンタル検索,Missing,Selected,Published,S,P1,14,利用頻度が高い独立S機能,REQ-LEY-P1-018,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src/features/catalog/CatalogGrid.tsx,src/features/catalog/CatalogGrid.test.tsx,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Windows build PASS;CoDD PASS,一覧focus,IME実入力は未測定,2026-08-21,SELF
 LEY-FILER-015,ファイラ,ツリー詳細動作,Partial,Selected,PartialExisting,M,P3,7,既存tree動作のPartialを完成,,,,,,ツリー設定,,2026-08-21,
 LEY-FILER-016,ファイラ,移動後初期選択,Partial,Selected,Published,S,P1,2,既存navigation上のPartialを先に完成,REQ-LEY-P1-010,docs/current/requirements.md#leeyes-p1-b-既存機能完成の受入条件,src/App.tsx;src/features/settings/SettingsDialog.tsx;src/features/settings/profile.ts;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs,src/App.test.tsx;src/features/settings/profile.test.ts;src-tauri/src/application/mod.rs,docs/current/verification.md#leeyes-p1-b-既存機能完成;Windows tests PASS;Rust canonical PASS;Windows build PASS, navigation state,,2026-08-21,SELF
 LEY-FILER-017,ファイラ,フォルダ・画像を開く規則,Partial,Selected,PartialExisting,M,P3,8,共通command registryへ接続,,,,,,command registry,,2026-08-21,
-LEY-FILER-018,ファイラ,一覧配色,Missing,Selected,NotStarted,S,P1,15,局所的な表示設定,,,,,,theme,contrast,2026-08-21,
+LEY-FILER-018,ファイラ,一覧配色,Missing,Selected,Published,S,P1,15,局所的な表示設定,REQ-LEY-P1-019,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src/styles.css;src/features/catalog/CatalogGrid.tsx;src/features/settings/SettingsDialog.tsx;src/features/settings/profile.ts;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs,src/features/catalog/CatalogGrid.test.tsx;src/features/settings/profile.test.ts;src/App.test.tsx;src-tauri/src/state/repository.rs,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Rust canonical PASS;Windows build PASS;CoDD PASS,theme,release contrast目視は未測定,2026-08-21,SELF
 LEY-FILER-019,ファイラ,一覧罫線・詳細書式,Partial,Selected,PartialExisting,M,P3,9,既存detail listのPartialを完成,,,,,,list layout,accessibility,2026-08-21,
 LEY-FILER-020,ファイラ,Explorerシェルメニュー,Alternative,ReviewAlternative,AlternativeExisting,NA,,,,,,,,,既定アプリ・場所表示,shell拡張をプロセス内実行しない,2026-08-20,
 LEY-SHELF-001,本棚,名前付き本棚作成,Missing,Selected,NotStarted,L,P4,1,名前付き仮想本棚のDB基盤,,,,,,DB schema・tree UI,,2026-08-21,
@@ -108,7 +108,7 @@ LEY-VIEWER-002,Viewer,先頭・末尾移動,Alternative,ReviewAlternative,Altern
 LEY-VIEWER-003,Viewer,表示単位移動,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-VIEWER-004,Viewer,1ファイル単位移動,Missing,Selected,Published,S,,,,REQ-FR-B23-001,docs/current/requirements.md#leeyes-viewer操作外観の受入条件,src/features/viewer/model.ts;src/features/viewer/Viewer.tsx,src/features/viewer/model.test.ts;src/features/viewer/Viewer.test.tsx,docs/current/verification.md#fr-b23-leeyes-viewer操作外観;Windows tests PASS;Rust canonical PASS;CoDD PASS,spread state,,2026-08-20,SELF
 LEY-VIEWER-005,Viewer,ページ番号ジャンプ,Alternative,ReviewAlternative,AlternativeExisting,NA,,,,,,,,,page selector,,2026-08-20,
-LEY-VIEWER-006,Viewer,ランダム移動,Missing,Selected,NotStarted,S,P1,16,独立したviewer操作,,,,,,page sequence,random policy,2026-08-21,
+LEY-VIEWER-006,Viewer,ランダム移動,Missing,Selected,Published,S,P1,16,独立したviewer操作,REQ-LEY-P1-020,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src/features/viewer/Viewer.tsx;src/features/viewer/model.ts,src/features/viewer/Viewer.test.tsx;src/features/viewer/model.test.ts,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Windows build PASS;CoDD PASS,page sequence,統計分布は未測定,2026-08-21,SELF
 LEY-VIEWER-007,Viewer,スライドショー,Partial,Selected,PartialExisting,M,P2,1,slideshow基盤のPartialを先に完成,,,,,,timer/background,,2026-08-21,
 LEY-VIEWER-008,Viewer,スライド詳細設定,Missing,Selected,NotStarted,M,P2,13,slideshow基盤に依存,,,,,,LEY-VIEWER-007,timing・focus,2026-08-21,
 LEY-VIEWER-009,Viewer,境界動作,Partial,Selected,PartialExisting,M,P2,2,既存巻末policyのPartialを先に完成,,,,,,library ordering,,2026-08-21,
@@ -171,7 +171,7 @@ LEY-SETTING-002,設定,名前付き設定保存,Equivalent,NoAction,Existing,NA,
 LEY-SETTING-003,設定,設定読込,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-SETTING-004,設定,使用設定ファイル切替,Missing,Selected,NotStarted,M,P3,22,既存strict profileの選択機能,,,,,,profile selector,schema semantics,2026-08-21,
 LEY-SETTING-005,設定,起動場所・初期選択,Partial,Selected,Published,M,P1,9,既存復元状態のPartialを先に完成,REQ-LEY-P1-014,docs/current/requirements.md#leeyes-p1-b-既存機能完成の受入条件,src/App.tsx;src/features/settings/SettingsDialog.tsx;src/features/settings/profile.ts;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs,src/App.test.tsx;src/features/settings/profile.test.ts;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs,docs/current/verification.md#leeyes-p1-b-既存機能完成;Windows tests PASS;Rust canonical PASS;Windows build PASS,restore state,missing path・privacy,2026-08-21,SELF
-LEY-SETTING-006,設定,前回画像再表示,Missing,Selected,NotStarted,S,P1,21,既存読書位置を使う復元機能,,,,,,restore state,privacy・removable path,2026-08-21,
+LEY-SETTING-006,設定,前回画像再表示,Missing,Selected,Published,S,P1,21,既存読書位置を使う復元機能,REQ-LEY-P1-021,docs/current/requirements.md#leeyes-p1-c-独立s機能の受入条件,src/App.tsx;src/features/settings/SettingsDialog.tsx;src/features/settings/profile.ts;src-tauri/src/application/mod.rs;src-tauri/src/state/repository.rs,src/App.test.tsx;src/features/settings/profile.test.ts;src-tauri/src/state/repository.rs,docs/current/verification.md#leeyes-p1-c-独立s機能;Windows tests PASS;Rust canonical PASS;Windows build PASS;CoDD PASS,restore state,privacy・removable path製品観測は未測定,2026-08-21,SELF
 LEY-SETTING-007,設定,ポータブル・レジストリ非依存,Alternative,ReviewAlternative,AlternativeExisting,NA,,,,,,,,,profile export/import,実行folder書込を避ける,2026-08-20,
 LEY-IO-001,入出力,CSV出力プリセット,Missing,Selected,NotStarted,M,P3,23,CSV preset共通基盤,,,,,,CSV export基盤,format versioning,2026-08-21,
 LEY-IO-002,入出力,CSV項目・順序,Missing,Selected,NotStarted,M,P3,24,CSV preset基盤に依存,,,,,,LEY-IO-001・metadata schema,,2026-08-21,

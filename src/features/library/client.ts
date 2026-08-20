@@ -25,6 +25,7 @@ import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
 import type {
   MouseGestureBindings,
+  CatalogPalette,
   NavigationSelectionPolicy,
   SettingsProfile,
   StartupLocation,
@@ -87,6 +88,18 @@ export async function listWindowsDrives(
   });
 }
 
+export interface WindowsKnownFolder {
+  id: "desktop" | "downloads" | "documents" | "pictures";
+  name: string;
+  absolutePath: string;
+}
+
+export async function listWindowsKnownFolders(
+  generation: number,
+): Promise<ApiResponse<WindowsKnownFolder[]>> {
+  return invoke("list_windows_known_folders", { context: context(generation) });
+}
+
 export interface CatalogSettings {
   sortField: "name" | "modified" | "size" | "kind";
   sortDescending: boolean;
@@ -118,6 +131,9 @@ export interface CatalogSettings {
   navigationSelectionPolicy: NavigationSelectionPolicy;
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
+  showHiddenFiles: boolean;
+  catalogPalette: CatalogPalette;
+  restoreLastViewer: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -200,6 +216,9 @@ export async function saveSettingsProfile(
       navigationSelectionPolicy: profile.navigationSelectionPolicy,
       thumbnailGenerationScope: profile.thumbnailGenerationScope,
       startupLocation: profile.startupLocation,
+      showHiddenFiles: profile.showHiddenFiles,
+      catalogPalette: profile.catalogPalette,
+      restoreLastViewer: profile.restoreLastViewer,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },

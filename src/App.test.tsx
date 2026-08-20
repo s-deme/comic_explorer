@@ -56,6 +56,7 @@ import {
   revealFileItem,
   openFileItemDefault,
   openFileItemWith,
+  listWindowsKnownFolders,
   type CatalogSettings,
   type FavoriteEntry,
   type ItemMetadata,
@@ -77,6 +78,9 @@ vi.mock("./features/library/client", () => ({
       { absolutePath: "C:\\", name: "ローカル ディスク (C:)" },
       { absolutePath: "E:\\", name: "ボリューム (E:)" },
     ],
+  })),
+  listWindowsKnownFolders: vi.fn(async () => ({
+    status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
@@ -167,6 +171,7 @@ const pasteFileItemsMock = vi.mocked(pasteFileItems);
 const revealFileItemMock = vi.mocked(revealFileItem);
 const openFileItemDefaultMock = vi.mocked(openFileItemDefault);
 const openFileItemWithMock = vi.mocked(openFileItemWith);
+const knownFoldersMock = vi.mocked(listWindowsKnownFolders);
 
 const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   sortField: "name",
@@ -199,6 +204,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   navigationSelectionPolicy: "restore",
   thumbnailGenerationScope: "near",
   startupLocation: "last",
+  showHiddenFiles: false,
+  catalogPalette: "system",
+  restoreLastViewer: false,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -428,6 +436,10 @@ describe("application shell", () => {
     revealFileItemMock.mockReset();
     openFileItemDefaultMock.mockReset();
     openFileItemWithMock.mockReset();
+    knownFoldersMock.mockReset();
+    knownFoldersMock.mockResolvedValue({
+      status: "ok", requestId: "known-folders" as never, generation: 1 as never, data: [],
+    });
     renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
     createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
@@ -643,6 +655,30 @@ describe("application shell", () => {
       ),
     );
     expect(registerMock).toHaveBeenCalledWith("C:\\", expect.any(Number));
+  });
+
+  it("REQ-LEY-P1-016 navigates to Windows known folders through the normal drive boundary", async () => {
+    knownFoldersMock.mockResolvedValue({
+      status: "ok",
+      requestId: "known-folders" as never,
+      generation: 1 as never,
+      data: [{
+        id: "desktop",
+        name: "デスクトップ",
+        absolutePath: "C:\\Users\\Test\\Desktop",
+      }],
+    });
+    await registerTestLibrary([]);
+    listMock.mockClear();
+
+    chooseAppMenuItem("ファイル", "デスクトップへ移動");
+
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith(
+      "Users/Test/Desktop",
+      expect.any(Number),
+    ));
+    expect(registerMock).toHaveBeenLastCalledWith("C:\\", expect.any(Number));
+    expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Users\\Test\\Desktop");
   });
 
   it("REQ-LEY-P1-012 opens a supported file returned by the native picker", async () => {
@@ -2573,6 +2609,26 @@ describe("application shell", () => {
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   }, 10_000);
 
+  it("REQ-LEY-P1-017 and P1-019 persist hidden visibility and a safe catalog palette", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
+    listMock.mockClear();
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByLabelText("profile隠し項目を表示"));
+    fireEvent.change(within(dialog).getByLabelText("profile一覧配色"), {
+      target: { value: "midnight" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showHiddenFiles: true, catalogPalette: "midnight" }),
+      expect.any(Number),
+    );
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+    expect(screen.getByRole("grid")).toHaveAttribute("data-catalog-palette", "midnight");
+  });
+
   it("REQ-LEY-P1-001, P1-002, and P1-005 connect keyboard settings, shell surfaces, and topmost atomically", async () => {
     const alwaysOnTopAdapter = { setAlwaysOnTop: vi.fn().mockResolvedValue(undefined) };
     await registerTestLibrary([], undefined, alwaysOnTopAdapter);
@@ -2670,7 +2726,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 6,
+        profileVersion: 7,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -2808,6 +2864,43 @@ describe("application shell", () => {
       "Books/volume.cbz",
       expect.any(Number),
     ));
+  });
+
+  it("REQ-LEY-P1-021 reopens the latest successful item only when startup restore is enabled", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-restore-viewer" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, restoreLastViewer: true },
+    });
+    historyMock.mockResolvedValue(historyResponse([{
+      itemIdentity: "Books/latest.cbz" as never,
+      lastViewedAtMs: 1_700_000_000_000,
+    }]));
+    openMock.mockResolvedValue(viewerResponse("Books/latest.cbz"));
+
+    restoreMock.mockResolvedValue({
+      status: "ok", requestId: "restore" as never, generation: 1 as never,
+      data: { absolutePath: "C:\\" },
+    });
+    registerMock.mockResolvedValue({
+      status: "ok", requestId: "register" as never, generation: 1 as never,
+      data: { absolutePath: "C:\\" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok", requestId: "list" as never, generation: 2 as never, data: [],
+    });
+    thumbnailMock.mockResolvedValue({
+      status: "error", requestId: "thumbnail" as never, generation: 1 as never,
+      error: { code: "NOT_FOUND", message: "missing", retryable: true },
+    });
+    render(<App />);
+
+    await waitFor(() => expect(openMock).toHaveBeenCalledWith(
+      "Books/latest.cbz",
+      expect.any(Number),
+    ));
+    expect(await screen.findByLabelText("Books/latest.cbz ビューワ")).toBeInTheDocument();
   });
 
   it("REQ-LEY-P1-013 clears persistent reading history through the history dialog", async () => {

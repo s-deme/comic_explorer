@@ -90,6 +90,9 @@ pub struct Settings {
     pub navigation_selection_policy: String,
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
+    pub show_hidden_files: bool,
+    pub catalog_palette: String,
+    pub restore_last_viewer: bool,
     pub shortcut_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
@@ -141,6 +144,9 @@ impl Default for Settings {
             navigation_selection_policy: "restore".into(),
             thumbnail_generation_scope: "near".into(),
             startup_location: "last".into(),
+            show_hidden_files: false,
+            catalog_palette: "system".into(),
+            restore_last_viewer: false,
             shortcut_bindings: default_shortcut_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
@@ -237,6 +243,9 @@ impl StateStore {
                 "navigationSelectionPolicy" => settings.navigation_selection_policy = value,
                 "thumbnailGenerationScope" => settings.thumbnail_generation_scope = value,
                 "startupLocation" => settings.startup_location = value,
+                "showHiddenFiles" => settings.show_hidden_files = value == "true",
+                "catalogPalette" => settings.catalog_palette = value,
+                "restoreLastViewer" => settings.restore_last_viewer = value == "true",
                 "shortcutBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.shortcut_bindings = bindings;
@@ -324,6 +333,12 @@ impl StateStore {
                 settings.thumbnail_generation_scope.clone(),
             ),
             ("startupLocation", settings.startup_location.clone()),
+            ("showHiddenFiles", settings.show_hidden_files.to_string()),
+            ("catalogPalette", settings.catalog_palette.clone()),
+            (
+                "restoreLastViewer",
+                settings.restore_last_viewer.to_string(),
+            ),
             ("shortcutBindings", shortcut_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
@@ -1215,6 +1230,9 @@ mod tests {
                 navigation_selection_policy: "last".into(),
                 thumbnail_generation_scope: "all".into(),
                 startup_location: "driveRoot".into(),
+                show_hidden_files: true,
+                catalog_palette: "midnight".into(),
+                restore_last_viewer: true,
                 shortcut_bindings: [
                     ("nextPage".into(), "N".into()),
                     ("previousPage".into(), "P".into()),
@@ -1293,6 +1311,9 @@ mod tests {
         assert_eq!(restored.navigation_selection_policy, "last");
         assert_eq!(restored.thumbnail_generation_scope, "all");
         assert_eq!(restored.startup_location, "driveRoot");
+        assert!(restored.show_hidden_files);
+        assert_eq!(restored.catalog_palette, "midnight");
+        assert!(restored.restore_last_viewer);
         assert_eq!(restored.shortcut_bindings["nextPage"], "N");
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],

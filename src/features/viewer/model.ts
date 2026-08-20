@@ -60,6 +60,17 @@ export const MIN_WHEEL_DEAD_ZONE = 0;
 export const MAX_WHEEL_DEAD_ZONE = 200;
 export const DEFAULT_WHEEL_DEAD_ZONE = 0;
 
+export function randomPageIndex(
+  currentIndex: number,
+  pageCount: number,
+  randomValue: number = Math.random(),
+): number {
+  if (pageCount <= 1) return Math.max(0, Math.min(currentIndex, pageCount - 1));
+  const bounded = Math.max(0, Math.min(randomValue, 1 - Number.EPSILON));
+  const candidate = Math.floor(bounded * (pageCount - 1));
+  return candidate >= currentIndex ? candidate + 1 : candidate;
+}
+
 export function normalizeViewerBackground(value: unknown): ViewerBackground {
   return typeof value === "string"
     && VIEWER_BACKGROUNDS.includes(value as ViewerBackground)

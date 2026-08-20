@@ -26,6 +26,7 @@ interface CatalogGridProps {
   onRead: (entry: CatalogEntry) => void;
   viewMode?: CatalogViewMode;
   thumbnailSizes?: CatalogThumbnailSizes;
+  palette?: "system" | "paper" | "midnight" | "highContrast";
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
   isFavorite?: (entry: CatalogEntry) => boolean;
@@ -175,6 +176,7 @@ export function CatalogGrid({
   onRead,
   viewMode = "cover_list",
   thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
+  palette = "system",
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
   isFavorite = () => false,
@@ -190,10 +192,15 @@ export function CatalogGrid({
   const folderScrollPositions = useRef(new Map<string, number>());
   const previousFolderPath = useRef(currentFolderPath);
   const pendingScrollRestoration = useRef<{ path: string; scrollTop: number } | null>(null);
+  const incrementalSearch = useRef({ value: "", updatedAt: 0 });
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
   const layout = catalogLayoutFor(viewMode, thumbnailSizes);
   const columnCount = catalogColumnCountFor(viewMode, scrollWidth, thumbnailSizes);
+
+  useEffect(() => {
+    incrementalSearch.current = { value: "", updatedAt: 0 };
+  }, [currentFolderPath]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -314,6 +321,7 @@ export function CatalogGrid({
       data-catalog-view-mode={viewMode}
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
+      data-catalog-palette={palette}
       style={{
         "--catalog-column-count": String(columnCount),
         "--catalog-column-gap": `${modeConfig.columnGap}px`,
@@ -480,6 +488,38 @@ export function CatalogGrid({
                               offset,
                               event.shiftKey ? "range" : undefined,
                             );
+                            return;
+                          }
+                          if (
+                            !event.nativeEvent.isComposing
+                            && !event.ctrlKey
+                            && !event.metaKey
+                            && !event.altKey
+                            && event.key.length === 1
+                            && event.key.trim() !== ""
+                          ) {
+                            const now = Date.now();
+                            const key = event.key.normalize("NFKC").toLocaleLowerCase("ja");
+                            const previous = now - incrementalSearch.current.updatedAt <= 1_000
+                              ? incrementalSearch.current.value
+                              : "";
+                            const query = previous.length === 1 && previous === key
+                              ? key
+                              : `${previous}${key}`;
+                            incrementalSearch.current = { value: query, updatedAt: now };
+                            const match = Array.from({ length: entries.length }, (_, offsetIndex) =>
+                              (itemIndex + 1 + offsetIndex) % entries.length)
+                              .find((candidateIndex) => displayName(entries[candidateIndex])
+                                .normalize("NFKC")
+                                .toLocaleLowerCase("ja")
+                                .startsWith(query));
+                            if (match !== undefined) {
+                              event.preventDefault();
+                              const next = entries[match];
+                              onSelect(next);
+                              virtualizer.scrollToIndex(Math.floor(match / columnCount));
+                              requestAnimationFrame(() => itemRefs.current.get(next.relativePath)?.focus());
+                            }
                             return;
                           }
                           if (event.key === "Enter") {

@@ -68,6 +68,14 @@ fn archive_kind_for_name(name: &str) -> Option<ArchiveKind> {
 }
 
 pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntry>, AppError> {
+    enumerate_folder_with_hidden(root, directory, false)
+}
+
+pub fn enumerate_folder_with_hidden(
+    root: &Path,
+    directory: &Path,
+    show_hidden: bool,
+) -> Result<Vec<CatalogEntry>, AppError> {
     let root = canonical_directory(root)?;
     let directory = canonical_directory(directory)?;
     ensure_contained(&root, &directory)?;
@@ -78,14 +86,14 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
             Ok(entry) => entry,
             Err(_) => continue,
         };
-        if is_hidden_name(&entry.file_name().to_string_lossy()) {
-            continue;
-        }
         let path = entry.path();
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
+        if !show_hidden && is_hidden(&entry.file_name().to_string_lossy(), &metadata) {
+            continue;
+        }
         if metadata.file_type().is_symlink() {
             let canonical = match path.canonicalize() {
                 Ok(canonical) => canonical,
@@ -140,11 +148,19 @@ pub fn enumerate_folder(root: &Path, directory: &Path) -> Result<Vec<CatalogEntr
 }
 
 pub fn enumerate_folder_pages(root: &Path, comic: &Path) -> Result<Vec<RelativePath>, AppError> {
+    enumerate_folder_pages_with_hidden(root, comic, false)
+}
+
+pub fn enumerate_folder_pages_with_hidden(
+    root: &Path,
+    comic: &Path,
+    show_hidden: bool,
+) -> Result<Vec<RelativePath>, AppError> {
     let root = canonical_directory(root)?;
     let comic = canonical_directory(comic)?;
     ensure_contained(&root, &comic)?;
     let mut pages = Vec::new();
-    walk_pages(&root, &comic, &mut pages)?;
+    walk_pages(&root, &comic, show_hidden, &mut pages)?;
     pages.sort_by(|left, right| natural_cmp(left.as_str(), right.as_str()));
     Ok(pages)
 }
@@ -152,6 +168,7 @@ pub fn enumerate_folder_pages(root: &Path, comic: &Path) -> Result<Vec<RelativeP
 fn walk_pages(
     root: &Path,
     directory: &Path,
+    show_hidden: bool,
     pages: &mut Vec<RelativePath>,
 ) -> Result<(), AppError> {
     let iterator = match fs::read_dir(directory) {
@@ -164,19 +181,19 @@ fn walk_pages(
             Ok(entry) => entry,
             Err(_) => continue,
         };
-        if is_hidden_name(&entry.file_name().to_string_lossy()) {
-            continue;
-        }
         let path = entry.path();
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
+        if !show_hidden && is_hidden(&entry.file_name().to_string_lossy(), &metadata) {
+            continue;
+        }
         if metadata.file_type().is_symlink() {
             continue;
         }
         if metadata.is_dir() {
-            walk_pages(root, &path, pages)?;
+            walk_pages(root, &path, show_hidden, pages)?;
         } else if classify_file_name(&entry.file_name().to_string_lossy()) == FileKind::Image {
             let relative = path
                 .strip_prefix(root)
@@ -211,8 +228,21 @@ fn ensure_contained(root: &Path, path: &Path) -> Result<(), AppError> {
     }
 }
 
-fn is_hidden_name(name: &str) -> bool {
-    name.starts_with('.')
+fn is_hidden(name: &str, metadata: &fs::Metadata) -> bool {
+    if name.starts_with('.') {
+        return true;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+        metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = metadata;
+        false
+    }
 }
 
 fn outside_error(path: &Path) -> AppError {
@@ -310,6 +340,55 @@ mod tests {
                 "book/10.jpg",
                 "book/chapter/3.jpeg"
             ]
+        );
+        let visible_hidden = enumerate_folder_pages_with_hidden(&root, &comic, true)
+            .unwrap()
+            .into_iter()
+            .map(|path| path.to_string())
+            .collect::<Vec<_>>();
+        assert!(visible_hidden.contains(&"book/.hidden.png".to_owned()));
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn hides_dot_entries_by_default_and_can_include_them_explicitly() {
+        let root = temporary_root("dot-hidden");
+        fs::create_dir_all(root.join(".private")).unwrap();
+        fs::write(root.join(".cover.jpg"), b"hidden").unwrap();
+        fs::write(root.join("visible.jpg"), b"visible").unwrap();
+
+        let default_entries = enumerate_folder(&root, &root).unwrap();
+        assert_eq!(default_entries.len(), 1);
+        assert_eq!(default_entries[0].relative_path.as_str(), "visible.jpg");
+        let all_entries = enumerate_folder_with_hidden(&root, &root, true).unwrap();
+        assert_eq!(all_entries.len(), 3);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn honors_the_windows_hidden_attribute() {
+        use std::os::windows::ffi::OsStrExt;
+        use windows::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, SetFileAttributesW};
+        use windows::core::PCWSTR;
+
+        let root = temporary_root("windows-hidden");
+        fs::create_dir_all(&root).unwrap();
+        let hidden = root.join("hidden.jpg");
+        fs::write(&hidden, b"hidden").unwrap();
+        let wide = hidden
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>();
+        unsafe { SetFileAttributesW(PCWSTR(wide.as_ptr()), FILE_ATTRIBUTE_HIDDEN) }.unwrap();
+
+        assert!(enumerate_folder(&root, &root).unwrap().is_empty());
+        assert_eq!(
+            enumerate_folder_with_hidden(&root, &root, true)
+                .unwrap()
+                .len(),
+            1
         );
         fs::remove_dir_all(&root).unwrap();
     }
