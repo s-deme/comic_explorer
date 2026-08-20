@@ -208,6 +208,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Rust / release / CoDD | PASS | final formal canonicalは179.9秒で全12 stageがexit 0。Rust lib 172件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰11.7秒、cleanup audit、CoDD scan/check/verifyを含む。事前product回帰で`MiB` acronymの自動camelCase差を検出し、明示serde名とJSON往復testを追加した後のrelease直接回帰もPASS。 |
 | 性能・製品直接観測 | PARTIAL | synthetic 2,048 grantのbounded testはPASS。release WebView2の巨大画像、256MiB実上限、低速disk/archiveでのpage移動100ms基準、process working setは未測定。 |
 
+## Leeyes P2-K 全画面終了・スクリーンセーバー制御
+
+対象はLEY-VIEWER-033の1件。Escで全画面だけを解除する既存挙動に、全画面を解除してviewerも閉じる選択肢と、全画面中だけWindows display-required要求を保持するopt-inを追加する。profile v14、SQLite、設定dialog、Viewer lifecycle、Windows power requestを接続し、v1〜v13は既存互換の解除のみ・抑止無効へ移行する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | fullscreen adapter・Viewer・profile・Appを含む138件、FAIL 0。power要求の取得/解放順、Esc close、取得失敗rollback、v13 migration、不正値拒否、App接続を含む。既存atomic settings長時間testは20秒上限へ実測に合わせ、10.35秒でPASS。 |
+| TypeScript typecheck | PASS | Windows runnerと直接実行の双方でexit 0。 |
+| Windows tests / build | PASS | Python 59件、frontend 27 files / 389件、FAIL 0。frontend 68 modules build、bundle 511.55kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust / OS power API | PASS | Windows canonicalのlib 173件中、実`PowerCreateRequest`・`PowerSetRequest`・`PowerClearRequest`・`CloseHandle`による取得、重複取得、解放、重複解放を1件で直接実行。shutdown process 1件もPASS。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは250.079秒で全12 stageがexit 0。Rust canonical、release executable/freshness、GUI権限付きshortcut product回帰11.033秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・製品直接観測 | PARTIAL | OS requestのdebug test直接実行とrelease buildはPASS。release WebView2で抑止を有効にしたまま実スクリーンセーバー待機・monitor消灯時間を待つ長時間観測、group policy・remote desktop・battery別挙動は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

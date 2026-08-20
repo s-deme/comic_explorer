@@ -72,10 +72,16 @@ import {
   STARTUP_LOCATIONS,
   THUMBNAIL_GENERATION_SCOPES,
   MOUSE_GESTURE_ACTIONS,
+  FULLSCREEN_ESCAPE_BEHAVIORS,
   type MouseGestureAction,
   type MouseGestureName,
   type SettingsProfile,
 } from "./profile";
+
+const FULLSCREEN_ESCAPE_LABELS: Record<SettingsProfile["fullscreenEscapeBehavior"], string> = {
+  exitFullscreen: "全画面だけ解除",
+  closeViewer: "全画面を解除してビューワを閉じる",
+};
 
 const CATALOG_PALETTE_LABELS: Record<SettingsProfile["catalogPalette"], string> = {
   system: "システム", paper: "紙面", midnight: "夜間", highContrast: "高コントラスト",
@@ -358,6 +364,11 @@ export function SettingsDialog({
       id: "viewer-prefetch",
       category: "viewer",
       text: `先読み 進行方向 ${draft.prefetchAhead}ページ 戻り方向 ${draft.prefetchBehind}ページ メモリ ${draft.prefetchMemoryMiB}MiB ページ移動前に近傍画像を読み込みます`,
+    },
+    {
+      id: "viewer-fullscreen-lifecycle",
+      category: "viewer",
+      text: `全画面 終了 Esc ${FULLSCREEN_ESCAPE_LABELS[draft.fullscreenEscapeBehavior]} スクリーンセーバー ${draft.preventDisplaySleepFullscreen ? "抑止" : "許可"}`,
     },
     {
       id: "viewer-background",
@@ -797,6 +808,29 @@ export function SettingsDialog({
                     上限
                     <input type="number" aria-label="profile先読みメモリ上限（MiB）" min={MIN_PREFETCH_MEMORY_MIB} max={MAX_PREFETCH_MEMORY_MIB} step="16" value={draft.prefetchMemoryMiB} onChange={(event) => update({ prefetchMemoryMiB: Math.min(MAX_PREFETCH_MEMORY_MIB, Math.max(MIN_PREFETCH_MEMORY_MIB, Math.round(Number(event.target.value)))) })} />
                     <span>MiB</span>
+                  </label>
+                </div>
+              </SettingRow>
+              <SettingRow id="viewer-fullscreen-lifecycle" title="全画面の終了と画面消灯" description="Escの動作と、全画面中だけスクリーンセーバー・画面消灯を抑止するかを指定します。" hidden={rowHidden("viewer-fullscreen-lifecycle")}>
+                <div className="settings-inline-actions">
+                  <select
+                    aria-label="profile全画面Esc動作"
+                    value={draft.fullscreenEscapeBehavior}
+                    onChange={(event) => update({
+                      fullscreenEscapeBehavior: event.target.value as SettingsProfile["fullscreenEscapeBehavior"],
+                    })}
+                  >
+                    {FULLSCREEN_ESCAPE_BEHAVIORS.map((behavior) => (
+                      <option key={behavior} value={behavior}>{FULLSCREEN_ESCAPE_LABELS[behavior]}</option>
+                    ))}
+                  </select>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={draft.preventDisplaySleepFullscreen}
+                      onChange={(event) => update({ preventDisplaySleepFullscreen: event.target.checked })}
+                    />
+                    全画面中はスクリーンセーバーと画面消灯を抑止
                   </label>
                 </div>
               </SettingRow>

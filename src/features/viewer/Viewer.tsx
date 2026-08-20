@@ -86,6 +86,7 @@ import {
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import {
   normalizeMouseGestures,
+  type FullscreenEscapeBehavior,
   type MouseGestureAction,
   type MouseGestureBindings,
 } from "../settings/profile";
@@ -138,6 +139,8 @@ interface ViewerProps {
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
   initialFullscreen?: boolean;
+  fullscreenEscapeBehavior?: FullscreenEscapeBehavior;
+  preventDisplaySleepFullscreen?: boolean;
   slideshowIntervalMs?: number;
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
@@ -208,6 +211,8 @@ export function Viewer({
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
   initialFullscreen = false,
+  fullscreenEscapeBehavior = "exitFullscreen",
+  preventDisplaySleepFullscreen = false,
   slideshowIntervalMs,
   bookmarks = [],
   onPageChange,
@@ -328,6 +333,9 @@ export function Viewer({
   const cursorInsideStageRef = useRef(false);
   const cursorHideTimerRef = useRef<number | null>(null);
   const initialFullscreenRequested = useRef(false);
+  const displayAwakeHeldRef = useRef(false);
+  const fullscreenRef = useRef(false);
+  const lifecycleMountedRef = useRef(true);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -624,16 +632,57 @@ export function Viewer({
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
     try {
-      if (next) await fullscreenAdapter.enter();
-      else await fullscreenAdapter.exit();
+      if (next) {
+        await fullscreenAdapter.enter();
+        if (!lifecycleMountedRef.current) {
+          await fullscreenAdapter.exit().catch(() => undefined);
+          return false;
+        }
+        if (preventDisplaySleepFullscreen) {
+          try {
+            if (fullscreenAdapter.setDisplayAwake === undefined) {
+              throw new Error("display awake control unavailable");
+            }
+            await fullscreenAdapter.setDisplayAwake(true);
+            displayAwakeHeldRef.current = true;
+            if (!lifecycleMountedRef.current) {
+              await fullscreenAdapter.setDisplayAwake(false).catch(() => undefined);
+              displayAwakeHeldRef.current = false;
+              await fullscreenAdapter.exit().catch(() => undefined);
+              return false;
+            }
+          } catch (error) {
+            await fullscreenAdapter.exit().catch(() => undefined);
+            throw error;
+          }
+        }
+      } else {
+        const hadDisplayRequest = displayAwakeHeldRef.current;
+        if (hadDisplayRequest) {
+          await fullscreenAdapter.setDisplayAwake?.(false);
+          displayAwakeHeldRef.current = false;
+        }
+        try {
+          await fullscreenAdapter.exit();
+        } catch (error) {
+          if (hadDisplayRequest) {
+            await fullscreenAdapter.setDisplayAwake?.(true);
+            displayAwakeHeldRef.current = true;
+          }
+          throw error;
+        }
+      }
       if (next) fullscreenButtonRef.current?.blur();
       setFullscreenToolbarVisible(!next);
       setFullscreenPageNavigatorVisible(!next);
+      fullscreenRef.current = next;
       setFullscreen(next);
       if (!next) requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
       return true;
     } catch {
-      setFullscreenError("全画面表示を切り替えられません。もう一度お試しください。");
+      if (lifecycleMountedRef.current) {
+        setFullscreenError("全画面表示を切り替えられません。もう一度お試しください。");
+      }
       return false;
     }
   }
@@ -642,6 +691,11 @@ export function Viewer({
     if (fullscreen && !(await requestFullscreen(false))) return;
     await flushReadingPosition();
     onClose();
+  }
+
+  function handleCloseCommand() {
+    if (!fullscreen || fullscreenEscapeBehavior === "closeViewer") void close();
+    else void requestFullscreen(false);
   }
 
   function changeMode(mode: ViewMode) {
@@ -792,16 +846,33 @@ export function Viewer({
 
   useEffect(() => {
     let mounted = true;
+    lifecycleMountedRef.current = true;
     void fullscreenAdapter
       .isFullscreen()
       .then((current) => {
-        if (mounted) setFullscreen(current);
+        if (mounted) {
+          fullscreenRef.current = current;
+          setFullscreen(current);
+        }
       })
       .catch(() => undefined);
     return () => {
       mounted = false;
+      lifecycleMountedRef.current = false;
+      void (async () => {
+        if (displayAwakeHeldRef.current) {
+          displayAwakeHeldRef.current = false;
+          if (fullscreenAdapter.setDisplayAwake !== undefined) {
+            await fullscreenAdapter.setDisplayAwake(false).catch(() => undefined);
+          }
+        }
+        if (fullscreenRef.current) {
+          fullscreenRef.current = false;
+          await fullscreenAdapter.exit().catch(() => undefined);
+        }
+      })();
     };
-  }, [fullscreenAdapter]);
+  }, [fullscreenAdapter, preventDisplaySleepFullscreen]);
 
   useEffect(() => {
     setFullscreenToolbarVisible(!fullscreen);
@@ -928,8 +999,7 @@ export function Viewer({
     function handleKey(event: KeyboardEvent) {
       if (detached && event.key === "Escape") {
         event.preventDefault();
-        if (fullscreen) void requestFullscreen(false);
-        else void close();
+        handleCloseCommand();
         return;
       }
       const customCommand = customShortcutCommand(event, activeShortcuts);
@@ -940,8 +1010,7 @@ export function Viewer({
       event.preventDefault();
       switch (command) {
         case "closeViewer":
-          if (fullscreen) void requestFullscreen(false);
-          else void close();
+          handleCloseCommand();
           break;
         case "nextPage":
           next();

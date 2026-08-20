@@ -79,6 +79,16 @@ export async function restoreLibraryRoot(
   });
 }
 
+export async function setFullscreenDisplayAwake(
+  enabled: boolean,
+  generation: number,
+): Promise<ApiResponse<boolean>> {
+  return invoke("set_fullscreen_display_awake", {
+    context: context(generation),
+    enabled,
+  });
+}
+
 export interface WindowsDrive {
   absolutePath: string;
   name: string;
@@ -128,6 +138,8 @@ export interface CatalogSettings {
   prefetchAhead: number;
   prefetchBehind: number;
   prefetchMemoryMiB: number;
+  fullscreenEscapeBehavior: SettingsProfile["fullscreenEscapeBehavior"];
+  preventDisplaySleepFullscreen: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -243,6 +255,8 @@ export async function saveSettingsProfile(
       prefetchAhead: profile.prefetchAhead,
       prefetchBehind: profile.prefetchBehind,
       prefetchMemoryMiB: profile.prefetchMemoryMiB,
+      fullscreenEscapeBehavior: profile.fullscreenEscapeBehavior,
+      preventDisplaySleepFullscreen: profile.preventDisplaySleepFullscreen,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

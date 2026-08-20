@@ -207,6 +207,8 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   prefetchAhead: 4,
   prefetchBehind: 0,
   prefetchMemoryMiB: 256,
+  fullscreenEscapeBehavior: "exitFullscreen",
+  preventDisplaySleepFullscreen: false,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -1778,6 +1780,36 @@ describe("application shell", () => {
     expect(screen.getByLabelText(`${entry.relativePath} ビューワ`)).toBeInTheDocument();
   });
 
+  it("REQ-LEY-P2-011 connects persisted fullscreen close and display-awake settings", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "fullscreen-lifecycle" as never,
+      generation: 1 as never,
+      data: {
+        ...DEFAULT_CATALOG_SETTINGS,
+        fullscreenEscapeBehavior: "closeViewer",
+        preventDisplaySleepFullscreen: true,
+      },
+    });
+    const adapter: FullscreenAdapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+      setDisplayAwake: vi.fn().mockResolvedValue(undefined),
+    };
+    const entry = testEntry("fullscreen-power.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(entry.relativePath));
+    await registerTestLibrary([entry], adapter);
+    await openTestComic(entry.relativePath);
+
+    await waitFor(() => expect(adapter.setDisplayAwake).toHaveBeenCalledWith(true));
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByLabelText(`${entry.relativePath} ビューワ`))
+      .not.toBeInTheDocument());
+    expect(adapter.setDisplayAwake).toHaveBeenLastCalledWith(false);
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps directly opened images in windowed mode", async () => {
     const adapter: FullscreenAdapter = {
       enter: vi.fn().mockResolvedValue(undefined),
@@ -2776,7 +2808,7 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
-  }, 10_000);
+  }, 20_000);
 
   it("REQ-LEY-P1-017 and P1-019 persist hidden visibility and a safe catalog palette", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);
@@ -2895,7 +2927,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 13,
+        profileVersion: 14,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

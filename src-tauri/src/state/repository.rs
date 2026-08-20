@@ -84,6 +84,8 @@ pub struct Settings {
     pub prefetch_ahead: String,
     pub prefetch_behind: String,
     pub prefetch_memory_mib: String,
+    pub fullscreen_escape_behavior: String,
+    pub prevent_display_sleep_fullscreen: bool,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -163,6 +165,8 @@ impl Default for Settings {
             prefetch_ahead: "4".into(),
             prefetch_behind: "0".into(),
             prefetch_memory_mib: "256".into(),
+            fullscreen_escape_behavior: "exitFullscreen".into(),
+            prevent_display_sleep_fullscreen: false,
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -282,6 +286,10 @@ impl StateStore {
                 "prefetchAhead" => settings.prefetch_ahead = value,
                 "prefetchBehind" => settings.prefetch_behind = value,
                 "prefetchMemoryMiB" => settings.prefetch_memory_mib = value,
+                "fullscreenEscapeBehavior" => settings.fullscreen_escape_behavior = value,
+                "preventDisplaySleepFullscreen" => {
+                    settings.prevent_display_sleep_fullscreen = value == "true"
+                }
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -388,6 +396,14 @@ impl StateStore {
             ("prefetchAhead", settings.prefetch_ahead.clone()),
             ("prefetchBehind", settings.prefetch_behind.clone()),
             ("prefetchMemoryMiB", settings.prefetch_memory_mib.clone()),
+            (
+                "fullscreenEscapeBehavior",
+                settings.fullscreen_escape_behavior.clone(),
+            ),
+            (
+                "preventDisplaySleepFullscreen",
+                settings.prevent_display_sleep_fullscreen.to_string(),
+            ),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
@@ -1447,6 +1463,8 @@ mod tests {
                 prefetch_ahead: "3".into(),
                 prefetch_behind: "2".into(),
                 prefetch_memory_mib: "192".into(),
+                fullscreen_escape_behavior: "closeViewer".into(),
+                prevent_display_sleep_fullscreen: true,
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1544,6 +1562,8 @@ mod tests {
         assert_eq!(restored.prefetch_ahead, "3");
         assert_eq!(restored.prefetch_behind, "2");
         assert_eq!(restored.prefetch_memory_mib, "192");
+        assert_eq!(restored.fullscreen_escape_behavior, "closeViewer");
+        assert!(restored.prevent_display_sleep_fullscreen);
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

@@ -28,12 +28,15 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 tokio-util = "0.7"
 unrar = "=0.5.8"
 windows = { version = "0.62", features = [
+  "Win32_Foundation",
   "Win32_Graphics_Imaging",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_DataExchange",
   "Win32_System_Memory",
   "Win32_System_Ole",
+  "Win32_System_Power",
+  "Win32_System_Threading",
   "Win32_System_Variant",
   "Win32_System_WinRT",
   "Win32_Storage_FileSystem",

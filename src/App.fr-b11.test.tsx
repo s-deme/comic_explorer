@@ -131,6 +131,8 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       prefetchAhead: 4,
       prefetchBehind: 0,
       prefetchMemoryMiB: 256,
+      fullscreenEscapeBehavior: "exitFullscreen",
+      preventDisplaySleepFullscreen: false,
       viewerBackground: "checker" as const,
       viewerPageMargin: 0,
       viewerSpreadGap: 8,

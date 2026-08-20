@@ -207,6 +207,7 @@ import {
   APP_VERSION,
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
+  DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
   DEFAULT_CATALOG_PALETTE,
   DEFAULT_NAVIGATION_SELECTION_POLICY,
   DEFAULT_STARTUP_LOCATION,
@@ -220,6 +221,7 @@ import {
   type MouseGestureName,
   type NavigationSelectionPolicy,
   type SettingsProfile,
+  type FullscreenEscapeBehavior,
   type StartupLocation,
   type ThumbnailGenerationScope,
 } from "./features/settings/profile";
@@ -493,6 +495,9 @@ export function App({
   const [prefetchAhead, setPrefetchAhead] = useState(DEFAULT_PREFETCH_AHEAD);
   const [prefetchBehind, setPrefetchBehind] = useState(DEFAULT_PREFETCH_BEHIND);
   const [prefetchMemoryMiB, setPrefetchMemoryMiB] = useState(DEFAULT_PREFETCH_MEMORY_MIB);
+  const [fullscreenEscapeBehavior, setFullscreenEscapeBehavior] =
+    useState<FullscreenEscapeBehavior>(DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR);
+  const [preventDisplaySleepFullscreen, setPreventDisplaySleepFullscreen] = useState(false);
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -921,6 +926,8 @@ export function App({
           setPrefetchMemoryMiB(isPrefetchMemoryMiB(response.data.prefetchMemoryMiB)
             ? response.data.prefetchMemoryMiB
             : DEFAULT_PREFETCH_MEMORY_MIB);
+          setFullscreenEscapeBehavior(response.data.fullscreenEscapeBehavior);
+          setPreventDisplaySleepFullscreen(response.data.preventDisplaySleepFullscreen === true);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -2519,6 +2526,8 @@ export function App({
       prefetchAhead,
       prefetchBehind,
       prefetchMemoryMiB,
+      fullscreenEscapeBehavior,
+      preventDisplaySleepFullscreen,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2617,6 +2626,8 @@ export function App({
       setPrefetchAhead(normalized.prefetchAhead);
       setPrefetchBehind(normalized.prefetchBehind);
       setPrefetchMemoryMiB(normalized.prefetchMemoryMiB);
+      setFullscreenEscapeBehavior(normalized.fullscreenEscapeBehavior);
+      setPreventDisplaySleepFullscreen(normalized.preventDisplaySleepFullscreen);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2786,6 +2797,7 @@ export function App({
     catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
     viewerScaleMode, viewerScale, loupeEnabled, loupeSize, loupeZoom,
     prefetchAhead, prefetchBehind, prefetchMemoryMiB,
+    fullscreenEscapeBehavior, preventDisplaySleepFullscreen,
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
@@ -3372,6 +3384,8 @@ export function App({
           }}
           fullscreenAdapter={fullscreenAdapter}
           initialFullscreen={viewerLaunchMode === "fullscreen"}
+          fullscreenEscapeBehavior={fullscreenEscapeBehavior}
+          preventDisplaySleepFullscreen={preventDisplaySleepFullscreen}
           slideshowIntervalMs={viewerLaunchMode === "slideshow" ? 3_000 : undefined}
           onScaleChange={(next: ViewerScaleState) => {
             if (zoomRetention !== "global") return;

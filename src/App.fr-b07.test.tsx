@@ -185,6 +185,8 @@ const defaultSettings: CatalogSettings = {
   prefetchAhead: 4,
   prefetchBehind: 0,
   prefetchMemoryMiB: 256,
+  fullscreenEscapeBehavior: "exitFullscreen",
+  preventDisplaySleepFullscreen: false,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,

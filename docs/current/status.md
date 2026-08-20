@@ -67,6 +67,8 @@ P2-IではLEY-VIEWER-029をPublishedとした。既存pointerルーペへ80〜40
 
 P2-JではLEY-VIEWER-032をPublishedとした。先読みを進行方向0〜4page・戻り方向0〜4page、media grant 16〜512MiBとしてprofile v13・SQLite・設定dialogへ接続した。page/continuous共通window、0page時のvisible優先on-demand、window外frontend解放、native期限切れ/LRU解放を実装し、単一過大pageだけは表示可能性を保つ。synthetic 2,048 grantではtest上限を維持したが、releaseの巨大画像、低速disk/archive、process working set、100ms基準は未測定として残す。
 
+P2-KではLEY-VIEWER-033をPublishedとした。Escを全画面解除だけ、またはnative全画面解除後にviewerも閉じる動作から選択できるようにし、全画面中だけWindows display-required requestを保持するopt-inをprofile v14・SQLite・設定dialog・Viewer lifecycleへ接続した。取得失敗rollback、解除失敗時再取得、unmount/application shutdown解放を実装し、OSの永続電源設定は変更しない。Windows power APIの短時間直接testとcanonical release buildはPASSしたが、release製品で実スクリーンセーバー・monitor消灯時間を待つ長時間観測、group policy・remote desktop・battery別挙動は未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 71 |

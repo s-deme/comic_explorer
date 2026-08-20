@@ -1374,6 +1374,97 @@ describe("Viewer settings", () => {
     );
   });
 
+  it("REQ-LEY-P2-011 acquires display-awake after fullscreen and closes on configured Esc", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+      setDisplayAwake: vi.fn().mockResolvedValue(undefined),
+    };
+    const onClose = vi.fn();
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialFullscreen
+        fullscreenEscapeBehavior="closeViewer"
+        preventDisplaySleepFullscreen
+        fullscreenAdapter={adapter}
+        onSettingsChange={() => undefined}
+        onClose={onClose}
+      />,
+    );
+
+    await waitFor(() => expect(adapter.setDisplayAwake).toHaveBeenCalledWith(true));
+    expect(adapter.enter.mock.invocationCallOrder[0])
+      .toBeLessThan(adapter.setDisplayAwake.mock.invocationCallOrder[0]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(adapter.setDisplayAwake).toHaveBeenLastCalledWith(false);
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+    expect(adapter.setDisplayAwake.mock.invocationCallOrder[1])
+      .toBeLessThan(adapter.exit.mock.invocationCallOrder[0]);
+  });
+
+  it("REQ-LEY-P2-011 rolls back fullscreen when display-awake acquisition fails", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+      setDisplayAwake: vi.fn().mockRejectedValue(new Error("power API unavailable")),
+    };
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        preventDisplaySleepFullscreen
+        fullscreenAdapter={adapter}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "全画面表示" }));
+    expect(await screen.findByText(
+      "全画面表示を切り替えられません。もう一度お試しください。",
+    )).toBeInTheDocument();
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("region", { name: "Book ビューワ" }))
+      .toHaveAttribute("data-fullscreen", "false");
+  });
+
+  it("REQ-LEY-P2-011 releases display-awake and native fullscreen on unmount", async () => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+      setDisplayAwake: vi.fn().mockResolvedValue(undefined),
+    };
+    const view = render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialFullscreen
+        preventDisplaySleepFullscreen
+        fullscreenAdapter={adapter}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(adapter.setDisplayAwake).toHaveBeenCalledWith(true));
+
+    view.unmount();
+
+    await waitFor(() => expect(adapter.setDisplayAwake).toHaveBeenLastCalledWith(false));
+    expect(adapter.exit).toHaveBeenCalledTimes(1);
+  });
+
   it("starts context-menu fullscreen and advances slideshow pages", async () => {
     const adapter = {
       enter: vi.fn().mockResolvedValue(undefined),

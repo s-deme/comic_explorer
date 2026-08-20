@@ -36,6 +36,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             application::get_library_root,
+            application::set_fullscreen_display_awake,
             application::list_windows_drives,
             application::list_windows_known_folders,
             application::get_catalog_settings,

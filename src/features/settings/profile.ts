@@ -76,8 +76,12 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 13;
+export const SETTINGS_PROFILE_VERSION = 14;
 export const APP_VERSION = packageMetadata.version;
+
+export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
+export type FullscreenEscapeBehavior = (typeof FULLSCREEN_ESCAPE_BEHAVIORS)[number];
+export const DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR: FullscreenEscapeBehavior = "exitFullscreen";
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
 export type NavigationSelectionPolicy = (typeof NAVIGATION_SELECTION_POLICIES)[number];
@@ -151,6 +155,8 @@ export interface SettingsProfile {
   prefetchAhead: number;
   prefetchBehind: number;
   prefetchMemoryMiB: number;
+  fullscreenEscapeBehavior: FullscreenEscapeBehavior;
+  preventDisplaySleepFullscreen: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -207,6 +213,8 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     prefetchAhead: DEFAULT_PREFETCH_AHEAD,
     prefetchBehind: DEFAULT_PREFETCH_BEHIND,
     prefetchMemoryMiB: DEFAULT_PREFETCH_MEMORY_MIB,
+    fullscreenEscapeBehavior: DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
+    preventDisplaySleepFullscreen: false,
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -386,6 +394,13 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const prefetchMemoryMiB = legacyPrefetchPreferences
     ? DEFAULT_PREFETCH_MEMORY_MIB
     : candidate.prefetchMemoryMiB;
+  const legacyFullscreenPreferences = legacyPrefetchPreferences || candidate.profileVersion === 13;
+  const fullscreenEscapeBehavior = legacyFullscreenPreferences
+    ? DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR
+    : enumValue(candidate.fullscreenEscapeBehavior, FULLSCREEN_ESCAPE_BEHAVIORS);
+  const preventDisplaySleepFullscreen = legacyFullscreenPreferences
+    ? false
+    : candidate.preventDisplaySleepFullscreen;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -399,6 +414,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 10
       && candidate.profileVersion !== 11
       && candidate.profileVersion !== 12
+      && candidate.profileVersion !== 13
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -426,6 +442,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isPrefetchPageCount(prefetchAhead) ||
     !isPrefetchPageCount(prefetchBehind) ||
     !isPrefetchMemoryMiB(prefetchMemoryMiB) ||
+    fullscreenEscapeBehavior === null ||
+    typeof preventDisplaySleepFullscreen !== "boolean" ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -482,6 +500,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     prefetchAhead,
     prefetchBehind,
     prefetchMemoryMiB,
+    fullscreenEscapeBehavior,
+    preventDisplaySleepFullscreen,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

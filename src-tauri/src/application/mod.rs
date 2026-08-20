@@ -1,4 +1,5 @@
 mod coordinator;
+mod display_awake;
 pub mod file_operations;
 mod library_root;
 mod scheduler;
@@ -45,6 +46,7 @@ pub struct AppState {
     thumbnail_workers: PriorityTaskPool,
     page_workers: PriorityTaskPool,
     file_operations: Arc<Mutex<()>>,
+    display_awake: Mutex<display_awake::DisplayAwakeRequest>,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     recovery_notice: Mutex<bool>,
     shutting_down: AtomicBool,
@@ -127,6 +129,7 @@ impl Default for AppState {
             thumbnail_workers: PriorityTaskPool::new(2, 64),
             page_workers: PriorityTaskPool::new(2, 16),
             file_operations: Arc::new(Mutex::new(())),
+            display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             recovery_notice: Mutex::new(recovered),
             shutting_down: AtomicBool::new(false),
@@ -150,6 +153,9 @@ impl AppState {
         }
         if let Ok(mut media) = self.media.lock() {
             media.revoke_all();
+        }
+        if let Ok(mut display_awake) = self.display_awake.lock() {
+            let _ = display_awake.set_enabled(false);
         }
         self.thumbnail_workers.shutdown();
         self.page_workers.shutdown();
@@ -308,6 +314,8 @@ pub struct CatalogSettings {
     pub prefetch_behind: u8,
     #[serde(rename = "prefetchMemoryMiB")]
     pub prefetch_memory_mib: u16,
+    pub fullscreen_escape_behavior: String,
+    pub prevent_display_sleep_fullscreen: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -374,6 +382,8 @@ pub struct SettingsProfileInput {
     pub prefetch_behind: u8,
     #[serde(rename = "prefetchMemoryMiB")]
     pub prefetch_memory_mib: u16,
+    pub fullscreen_escape_behavior: String,
+    pub prevent_display_sleep_fullscreen: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -1039,6 +1049,11 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         prefetch_ahead,
         prefetch_behind,
         prefetch_memory_mib,
+        fullscreen_escape_behavior: match settings.fullscreen_escape_behavior.as_str() {
+            "exitFullscreen" | "closeViewer" => settings.fullscreen_escape_behavior,
+            _ => "exitFullscreen".into(),
+        },
+        prevent_display_sleep_fullscreen: settings.prevent_display_sleep_fullscreen,
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -1194,6 +1209,27 @@ pub fn get_library_root(
         request_id: context.request_id,
         generation: context.generation,
         data: root,
+    })
+}
+
+#[tauri::command]
+pub fn set_fullscreen_display_awake(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    enabled: bool,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    state
+        .display_awake
+        .lock()
+        .map_err(|_| "display awake state poisoned")?
+        .set_enabled(enabled)?;
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: enabled,
     })
 }
 
@@ -2454,6 +2490,10 @@ fn validate_settings_profile(
         || !(MIN_PREFETCH_MEMORY_MIB..=MAX_PREFETCH_MEMORY_MIB)
             .contains(&profile.prefetch_memory_mib)
         || !matches!(
+            profile.fullscreen_escape_behavior.as_str(),
+            "exitFullscreen" | "closeViewer"
+        )
+        || !matches!(
             profile.viewer_background.as_str(),
             "checker" | "dark" | "black" | "light"
         )
@@ -2565,6 +2605,8 @@ pub fn set_settings_profile(
         settings.prefetch_ahead = profile.prefetch_ahead.to_string();
         settings.prefetch_behind = profile.prefetch_behind.to_string();
         settings.prefetch_memory_mib = profile.prefetch_memory_mib.to_string();
+        settings.fullscreen_escape_behavior = profile.fullscreen_escape_behavior;
+        settings.prevent_display_sleep_fullscreen = profile.prevent_display_sleep_fullscreen;
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -4465,6 +4507,8 @@ mod shutdown_tests {
             prefetch_ahead: 4,
             prefetch_behind: 0,
             prefetch_memory_mib: 256,
+            fullscreen_escape_behavior: "exitFullscreen".into(),
+            prevent_display_sleep_fullscreen: false,
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
@@ -4790,6 +4834,7 @@ mod shutdown_tests {
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
             file_operations: Arc::new(Mutex::new(())),
+            display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(false),
             shutting_down: AtomicBool::new(false),
@@ -4835,6 +4880,7 @@ mod shutdown_tests {
             thumbnail_workers: PriorityTaskPool::new(1, 1),
             page_workers: PriorityTaskPool::new(1, 1),
             file_operations: Arc::new(Mutex::new(())),
+            display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(true),
             shutting_down: AtomicBool::new(false),
