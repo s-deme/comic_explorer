@@ -169,6 +169,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Rust / release / CoDD | PASS | formal canonicalは354.1秒で全12 stageがexit 0。Rust lib 168件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。 |
 | 性能・製品直接観測 | NOT RUN | wheel変換とcommand量計算は定数時間、慣性timerなし。release WebView2でのmouse/trackpad deltaMode、smooth animation、reduced-motion、巨大画像panの体感は未測定。 |
 
+## Leeyes P2-H N字・Z字スクロール
+
+対象はLEY-VIEWER-027の1件。標準縦送り、N字のcolumn優先、Z字のrow優先を左右の読書方向とprevious逆走へ接続し、strict profile v11・SQLite・設定dialog・viewerで共有する。v1〜v10は標準縦送りへ移行し、行/列切替はatomic scrollとする。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | model・Viewer・profile・Appの4 files / 232件、FAIL 0。N/Zのforward/reverse、左右読書方向、右端開始、atomic行列切替、v10 migration、不正値拒否、設定applyを含む。 |
+| TypeScript typecheck | PASS | exit 0。 |
+| Rust focused | PASS | persisted scan modeのvertical/n/zと不正値fallback 1件、FAIL 0。 |
+| Windows tests / build | PASS | Python 59件、frontend 27 files / 376件、FAIL 0。typecheck exit 0、frontend 68 modules build。bundle 503.37kBでViteの500kB advisoryを1件記録し、機能PASSへ読み替えない。 |
+| Rust / release / CoDD | PASS | formal canonicalは356.3秒で全12 stageがexit 0。Rust lib 169件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・製品直接観測 | NOT RUN | target計算は定数時間、追加timerなし。release WebView2の巨大画像・見開きでのN/Z経路、smooth中の連続入力、pointer pan後の再開位置は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

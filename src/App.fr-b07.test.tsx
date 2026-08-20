@@ -193,6 +193,7 @@ const defaultSettings: CatalogSettings = {
   scrollStepPercent: 90,
   wheelScrollFactor: 1,
   smoothScroll: true,
+  pageScanMode: "vertical",
   treeVisible: true,
   menuBarVisible: true,
   toolbarVisible: true,

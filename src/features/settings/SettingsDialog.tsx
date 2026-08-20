@@ -50,6 +50,8 @@ import {
   SPREAD_PAIRINGS,
   FIT_BASES,
   FIT_BASIS_LABELS,
+  PAGE_SCAN_MODES,
+  PAGE_SCAN_MODE_LABELS,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -451,6 +453,11 @@ export function SettingsDialog({
       id: "smooth-scroll",
       category: "commands",
       text: `スクロール アニメーション 滑らか ${draft.smoothScroll ? "有効" : "無効"}`,
+    },
+    {
+      id: "page-scan-mode",
+      category: "commands",
+      text: `ページ 走査 N字 Z字 読書順 ${PAGE_SCAN_MODE_LABELS[draft.pageScanMode]}`,
     },
     {
       id: "gesture-double-click",
@@ -1063,6 +1070,11 @@ export function SettingsDialog({
                   <input type="checkbox" aria-label="profileページ内スクロールアニメーション" checked={draft.smoothScroll} onChange={(event) => update({ smoothScroll: event.target.checked })} />
                   <span>{draft.smoothScroll ? "有効" : "無効"}</span>
                 </label>
+              </SettingRow>
+              <SettingRow id="page-scan-mode" title="ページ内の走査順" description="大きな画像を標準縦送り、N字（列優先）、Z字（行優先）で読書方向に走査します。" hidden={rowHidden("page-scan-mode")}>
+                <select aria-label="profileページ内の走査順" value={draft.pageScanMode} onChange={(event) => update({ pageScanMode: event.target.value as SettingsProfile["pageScanMode"] })}>
+                  {PAGE_SCAN_MODES.map((mode) => <option key={mode} value={mode}>{PAGE_SCAN_MODE_LABELS[mode]}</option>)}
+                </select>
               </SettingRow>
               {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
                 <SettingRow

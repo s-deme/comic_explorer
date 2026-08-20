@@ -315,6 +315,7 @@ pub struct CatalogSettings {
     pub scroll_step_percent: u16,
     pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
+    pub page_scan_mode: String,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -374,6 +375,7 @@ pub struct SettingsProfileInput {
     pub scroll_step_percent: u16,
     pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
+    pub page_scan_mode: String,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -906,6 +908,13 @@ fn wheel_scroll_factor(settings: &crate::state::Settings) -> f64 {
         .unwrap_or(1.0)
 }
 
+fn page_scan_mode(settings: &crate::state::Settings) -> String {
+    match settings.page_scan_mode.as_str() {
+        "vertical" | "n" | "z" => settings.page_scan_mode.clone(),
+        _ => "vertical".into(),
+    }
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -940,6 +949,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let wheel_dead_zone = wheel_dead_zone(&settings);
     let scroll_step_percent = scroll_step_percent(&settings);
     let wheel_scroll_factor = wheel_scroll_factor(&settings);
+    let page_scan_mode = page_scan_mode(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
@@ -975,6 +985,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         scroll_step_percent,
         wheel_scroll_factor,
         smooth_scroll: settings.smooth_scroll,
+        page_scan_mode,
         tree_visible: settings.tree_visible,
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
@@ -2389,6 +2400,7 @@ fn validate_settings_profile(
         || !profile.wheel_scroll_factor.is_finite()
         || !(MIN_WHEEL_SCROLL_FACTOR..=MAX_WHEEL_SCROLL_FACTOR)
             .contains(&profile.wheel_scroll_factor)
+        || !matches!(profile.page_scan_mode.as_str(), "vertical" | "n" | "z")
         || !matches!(
             profile.navigation_selection_policy.as_str(),
             "none" | "first" | "last" | "restore"
@@ -2487,6 +2499,7 @@ pub fn set_settings_profile(
         settings.scroll_step_percent = profile.scroll_step_percent.to_string();
         settings.wheel_scroll_factor = profile.wheel_scroll_factor.to_string();
         settings.smooth_scroll = profile.smooth_scroll;
+        settings.page_scan_mode = profile.page_scan_mode;
         settings.tree_visible = profile.tree_visible;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
@@ -4235,6 +4248,18 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p2_008_page_scan_mode_defaults_invalid_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        assert_eq!(page_scan_mode(&settings), "vertical");
+        settings.page_scan_mode = "n".into();
+        assert_eq!(page_scan_mode(&settings), "n");
+        settings.page_scan_mode = "z".into();
+        assert_eq!(page_scan_mode(&settings), "z");
+        settings.page_scan_mode = "diagonal".into();
+        assert_eq!(page_scan_mode(&settings), "vertical");
+    }
+
+    #[test]
     fn catalog_thumbnail_sizes_use_valid_persisted_values_and_safe_defaults() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(
@@ -4305,6 +4330,7 @@ mod shutdown_tests {
             scroll_step_percent: 90,
             wheel_scroll_factor: 1.0,
             smooth_scroll: true,
+            page_scan_mode: "vertical".into(),
             tree_visible: false,
             menu_bar_visible: true,
             toolbar_visible: false,
@@ -4386,6 +4412,12 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.wheel_scroll_factor = 1.4;
+        profile.page_scan_mode = "spiral".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.page_scan_mode = "z".into();
 
         profile.navigation_selection_policy = "middle".into();
         assert_eq!(

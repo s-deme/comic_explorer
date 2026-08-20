@@ -139,6 +139,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       scrollStepPercent: 90,
       wheelScrollFactor: 1,
       smoothScroll: true,
+      pageScanMode: "vertical" as const,
       treeVisible: true,
       menuBarVisible: true,
       toolbarVisible: true,

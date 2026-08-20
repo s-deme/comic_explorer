@@ -215,6 +215,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   scrollStepPercent: 90,
   wheelScrollFactor: 1,
   smoothScroll: true,
+  pageScanMode: "vertical",
   treeVisible: true,
   menuBarVisible: true,
   toolbarVisible: true,
@@ -2705,6 +2706,9 @@ describe("application shell", () => {
       target: { value: "140" },
     });
     fireEvent.click(within(dialog).getByLabelText("profileページ内スクロールアニメーション"));
+    fireEvent.change(within(dialog).getByLabelText("profileページ内の走査順"), {
+      target: { value: "z" },
+    });
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
@@ -2734,6 +2738,7 @@ describe("application shell", () => {
         scrollStepPercent: 75,
         wheelScrollFactor: 1.4,
         smoothScroll: false,
+        pageScanMode: "z",
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
           doubleClick: "toggleFullscreen",
@@ -2865,7 +2870,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 10,
+        profileVersion: 11,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

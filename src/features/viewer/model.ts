@@ -54,6 +54,14 @@ export type ViewerLayoutMode =
   | "paged"
   | "vertical_scroll"
   | "horizontal_scroll";
+export const PAGE_SCAN_MODES = ["vertical", "n", "z"] as const;
+export type PageScanMode = (typeof PAGE_SCAN_MODES)[number];
+export const PAGE_SCAN_MODE_LABELS: Record<PageScanMode, string> = {
+  vertical: "標準縦送り",
+  n: "N字",
+  z: "Z字",
+};
+export const DEFAULT_PAGE_SCAN_MODE: PageScanMode = "vertical";
 
 export const VIEWER_LAYOUT_MODES: ViewerLayoutMode[] = [
   "paged",
@@ -148,6 +156,71 @@ export function wheelDeltaPixels(
   const unit = deltaMode === 1 ? 16 : deltaMode === 2 ? safeViewport : 1;
   const safeFactor = isWheelScrollFactor(factor) ? factor : DEFAULT_WHEEL_SCROLL_FACTOR;
   return delta * unit * safeFactor;
+}
+
+export interface PageScanViewport {
+  left: number;
+  top: number;
+  clientWidth: number;
+  clientHeight: number;
+  scrollWidth: number;
+  scrollHeight: number;
+}
+
+export function pageScanTarget(
+  viewport: PageScanViewport,
+  mode: PageScanMode,
+  readingDirection: ReadingDirection,
+  stepPercent: number,
+  move: -1 | 1,
+): { left: number; top: number } | null {
+  const maxLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+  const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+  const left = Math.min(maxLeft, Math.max(0, viewport.left));
+  const top = Math.min(maxTop, Math.max(0, viewport.top));
+  const safePercent = isScrollStepPercent(stepPercent)
+    ? stepPercent
+    : DEFAULT_SCROLL_STEP_PERCENT;
+  const stepX = Math.max(1, Math.floor(viewport.clientWidth * safePercent / 100));
+  const stepY = Math.max(1, Math.floor(viewport.clientHeight * safePercent / 100));
+  const forwardX = readingDirection === "rightToLeft" ? -1 : 1;
+  const leadingLeft = readingDirection === "rightToLeft" ? maxLeft : 0;
+  const trailingLeft = readingDirection === "rightToLeft" ? 0 : maxLeft;
+  const canMoveX = (direction: -1 | 1) => direction > 0
+    ? left < maxLeft - 1
+    : left > 1;
+  const moveX = (direction: -1 | 1) => Math.min(
+    maxLeft,
+    Math.max(0, left + direction * stepX),
+  );
+
+  if (mode === "vertical") {
+    if (move > 0 && top < maxTop - 1) return { left, top: Math.min(maxTop, top + stepY) };
+    if (move < 0 && top > 1) return { left, top: Math.max(0, top - stepY) };
+    return null;
+  }
+
+  const forward = forwardX as -1 | 1;
+  const backward = -forward as -1 | 1;
+  if (mode === "n") {
+    if (move > 0) {
+      if (top < maxTop - 1) return { left, top: Math.min(maxTop, top + stepY) };
+      if (canMoveX(forward)) return { left: moveX(forward), top: 0 };
+    } else {
+      if (top > 1) return { left, top: Math.max(0, top - stepY) };
+      if (canMoveX(backward)) return { left: moveX(backward), top: maxTop };
+    }
+    return null;
+  }
+
+  if (move > 0) {
+    if (canMoveX(forward)) return { left: moveX(forward), top };
+    if (top < maxTop - 1) return { left: leadingLeft, top: Math.min(maxTop, top + stepY) };
+  } else {
+    if (canMoveX(backward)) return { left: moveX(backward), top };
+    if (top > 1) return { left: trailingLeft, top: Math.max(0, top - stepY) };
+  }
+  return null;
 }
 
 export function isPagePairable(

@@ -99,6 +99,7 @@ import type {
   ViewerGridColor,
   SpreadRules,
   FitRules,
+  PageScanMode,
   ZoomRetention,
 } from "./features/viewer/model";
 import {
@@ -109,6 +110,7 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
+  DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -131,6 +133,7 @@ import {
   isPortraitAspectPercent,
   SPREAD_PAIRINGS,
   FIT_BASES,
+  PAGE_SCAN_MODES,
 } from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
@@ -494,6 +497,7 @@ export function App({
   const [scrollStepPercent, setScrollStepPercent] = useState(DEFAULT_SCROLL_STEP_PERCENT);
   const [wheelScrollFactor, setWheelScrollFactor] = useState(DEFAULT_WHEEL_SCROLL_FACTOR);
   const [smoothScroll, setSmoothScroll] = useState(DEFAULT_SMOOTH_SCROLL);
+  const [pageScanMode, setPageScanMode] = useState<PageScanMode>(DEFAULT_PAGE_SCAN_MODE);
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
@@ -919,6 +923,9 @@ export function App({
             ? response.data.wheelScrollFactor
             : DEFAULT_WHEEL_SCROLL_FACTOR);
           setSmoothScroll(response.data.smoothScroll !== false);
+          setPageScanMode(PAGE_SCAN_MODES.includes(response.data.pageScanMode)
+            ? response.data.pageScanMode
+            : DEFAULT_PAGE_SCAN_MODE);
           setTreeVisible(response.data.treeVisible);
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
@@ -2491,6 +2498,7 @@ export function App({
       scrollStepPercent,
       wheelScrollFactor,
       smoothScroll,
+      pageScanMode,
       treeVisible,
       menuBarVisible,
       toolbarVisible,
@@ -2583,6 +2591,7 @@ export function App({
       setScrollStepPercent(normalized.scrollStepPercent);
       setWheelScrollFactor(normalized.wheelScrollFactor);
       setSmoothScroll(normalized.smoothScroll);
+      setPageScanMode(normalized.pageScanMode);
       setTreeVisible(normalized.treeVisible);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
@@ -2739,7 +2748,7 @@ export function App({
     viewerScaleMode, viewerScale, loupeEnabled, viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
-    wheelScrollFactor, smoothScroll, treeVisible,
+    wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
@@ -3304,6 +3313,7 @@ export function App({
           scrollStepPercent={scrollStepPercent}
           wheelScrollFactor={wheelScrollFactor}
           smoothScroll={smoothScroll}
+          pageScanMode={pageScanMode}
           shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
             setViewMode(mode);

@@ -916,6 +916,86 @@ describe("Viewer settings", () => {
     expect(spread).toHaveProperty("scrollTop", 48);
   });
 
+  it("REQ-LEY-P2-008 follows and reverses an atomic N scan before changing pages", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="leftToRight"
+        initialScaleMode="original"
+        scrollStepPercent={90}
+        smoothScroll={false}
+        pageScanMode="n"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 300 },
+    });
+    spread.scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+      if (typeof options === "number") {
+        spread.scrollLeft = options;
+        spread.scrollTop = y ?? spread.scrollTop;
+      } else {
+        spread.scrollLeft = options?.left ?? spread.scrollLeft;
+        spread.scrollTop = options?.top ?? spread.scrollTop;
+      }
+    }) as HTMLDivElement["scrollTo"];
+    const nextButton = screen.getByRole("button", { name: "次ページ" });
+    const previousButton = screen.getByRole("button", { name: "前ページ" });
+
+    fireEvent.click(nextButton);
+    expect(spread).toHaveProperty("scrollTop", 90);
+    spread.scrollTop = 200;
+    fireEvent.click(nextButton);
+    expect(spread).toHaveProperty("scrollLeft", 90);
+    expect(spread).toHaveProperty("scrollTop", 0);
+    fireEvent.click(previousButton);
+    expect(spread).toHaveProperty("scrollLeft", 0);
+    expect(spread).toHaveProperty("scrollTop", 200);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P2-008 starts a right-to-left Z scan at the right edge", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="original"
+        scrollStepPercent={90}
+        smoothScroll={false}
+        pageScanMode="z"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 300 },
+    });
+    spread.scrollTo = vi.fn((options?: ScrollToOptions | number) => {
+      if (typeof options !== "number") {
+        spread.scrollLeft = options?.left ?? spread.scrollLeft;
+        spread.scrollTop = options?.top ?? spread.scrollTop;
+      }
+    }) as HTMLDivElement["scrollTo"];
+    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    expect(spread).toHaveProperty("scrollLeft", 110);
+    expect(spread).toHaveProperty("scrollTop", 0);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
   it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
     render(
       <Viewer

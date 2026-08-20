@@ -23,6 +23,7 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
+  DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
@@ -46,6 +47,7 @@ import {
   VIEW_MODES,
   SPREAD_PAIRINGS,
   FIT_BASES,
+  PAGE_SCAN_MODES,
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
@@ -53,6 +55,7 @@ import {
   type ViewMode,
   type SpreadPairing,
   type FitBasis,
+  type PageScanMode,
   type ZoomRetention,
   ZOOM_RETENTIONS,
 } from "../viewer/model";
@@ -64,7 +67,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 10;
+export const SETTINGS_PROFILE_VERSION = 11;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -147,6 +150,7 @@ export interface SettingsProfile {
   scrollStepPercent: number;
   wheelScrollFactor: number;
   smoothScroll: boolean;
+  pageScanMode: PageScanMode;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -197,6 +201,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     scrollStepPercent: DEFAULT_SCROLL_STEP_PERCENT,
     wheelScrollFactor: DEFAULT_WHEEL_SCROLL_FACTOR,
     smoothScroll: DEFAULT_SMOOTH_SCROLL,
+    pageScanMode: DEFAULT_PAGE_SCAN_MODE,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -345,6 +350,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const smoothScroll = legacyScrollPreferences
     ? DEFAULT_SMOOTH_SCROLL
     : candidate.smoothScroll;
+  const legacyPageScan = legacyScrollPreferences || candidate.profileVersion === 10;
+  const pageScanMode = legacyPageScan
+    ? DEFAULT_PAGE_SCAN_MODE
+    : enumValue(candidate.pageScanMode, PAGE_SCAN_MODES);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -355,6 +364,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 7
       && candidate.profileVersion !== 8
       && candidate.profileVersion !== 9
+      && candidate.profileVersion !== 10
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -390,6 +400,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isScrollStepPercent(scrollStepPercent) ||
     !isWheelScrollFactor(wheelScrollFactor) ||
     typeof smoothScroll !== "boolean" ||
+    pageScanMode === null ||
     typeof candidate.treeVisible !== "boolean" ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
@@ -440,6 +451,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     scrollStepPercent,
     wheelScrollFactor,
     smoothScroll,
+    pageScanMode,
     treeVisible: candidate.treeVisible,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,

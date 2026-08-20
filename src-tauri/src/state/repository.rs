@@ -92,6 +92,7 @@ pub struct Settings {
     pub scroll_step_percent: String,
     pub wheel_scroll_factor: String,
     pub smooth_scroll: bool,
+    pub page_scan_mode: String,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -165,6 +166,7 @@ impl Default for Settings {
             scroll_step_percent: "90".into(),
             wheel_scroll_factor: "1".into(),
             smooth_scroll: true,
+            page_scan_mode: "vertical".into(),
             tree_visible: true,
             menu_bar_visible: true,
             toolbar_visible: true,
@@ -278,6 +280,7 @@ impl StateStore {
                 "scrollStepPercent" => settings.scroll_step_percent = value,
                 "wheelScrollFactor" => settings.wheel_scroll_factor = value,
                 "smoothScroll" => settings.smooth_scroll = value == "true",
+                "pageScanMode" => settings.page_scan_mode = value,
                 "treeVisible" => settings.tree_visible = value == "true",
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
@@ -381,6 +384,7 @@ impl StateStore {
             ("scrollStepPercent", settings.scroll_step_percent.clone()),
             ("wheelScrollFactor", settings.wheel_scroll_factor.clone()),
             ("smoothScroll", settings.smooth_scroll.to_string()),
+            ("pageScanMode", settings.page_scan_mode.clone()),
             ("treeVisible", settings.tree_visible.to_string()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
@@ -1431,6 +1435,7 @@ mod tests {
                 scroll_step_percent: "75".into(),
                 wheel_scroll_factor: "1.4".into(),
                 smooth_scroll: false,
+                page_scan_mode: "z".into(),
                 tree_visible: false,
                 menu_bar_visible: false,
                 toolbar_visible: true,
@@ -1522,6 +1527,7 @@ mod tests {
         assert_eq!(restored.scroll_step_percent, "75");
         assert_eq!(restored.wheel_scroll_factor, "1.4");
         assert!(!restored.smooth_scroll);
+        assert_eq!(restored.page_scan_mode, "z");
         assert!(!restored.tree_visible);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);

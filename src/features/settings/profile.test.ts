@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 10,
+    profileVersion: 11,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -44,6 +44,7 @@ function validProfile(): SettingsProfile {
     scrollStepPercent: 90,
     wheelScrollFactor: 1,
     smoothScroll: true,
+    pageScanMode: "vertical",
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -103,7 +104,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 11, 99, "10", undefined])(
+  it.each([0, 12, 99, "11", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -252,6 +253,18 @@ describe("settings profile", () => {
     ] as const) {
       expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
     }
+  });
+
+  it("REQ-LEY-P2-008 migrates v10 and validates the page scan mode", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 10;
+    delete legacy.pageScanMode;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({ ...validProfile(), pageScanMode: "n" }))
+      .toEqual(expect.objectContaining({ pageScanMode: "n" }));
+    expect(normalizeSettingsProfile({ ...validProfile(), pageScanMode: "z" }))
+      .toEqual(expect.objectContaining({ pageScanMode: "z" }));
+    expect(normalizeSettingsProfile(withField("pageScanMode", "spiral"))).toBeNull();
   });
 
   it.each([

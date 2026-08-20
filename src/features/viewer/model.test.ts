@@ -27,6 +27,7 @@ import {
   isScrollStepPercent,
   isWheelScrollFactor,
   wheelDeltaPixels,
+  pageScanTarget,
   randomPageIndex,
   scaleForPixelDimension,
   scaleReducer,
@@ -277,6 +278,29 @@ describe("FR-B01 scale model", () => {
     expect(wheelDeltaPixels(2, 1, 400, 1.5)).toBe(48);
     expect(wheelDeltaPixels(1, 2, 400, 0.5)).toBe(200);
     expect(wheelDeltaPixels(Number.NaN, 0, 400, 1)).toBe(0);
+  });
+
+  it("REQ-LEY-P2-008 traverses N and Z paths reversibly in both reading directions", () => {
+    const viewport = {
+      left: 0, top: 0, clientWidth: 100, clientHeight: 100,
+      scrollWidth: 300, scrollHeight: 300,
+    };
+    expect(pageScanTarget(viewport, "n", "leftToRight", 90, 1)).toEqual({ left: 0, top: 90 });
+    expect(pageScanTarget({ ...viewport, top: 200 }, "n", "leftToRight", 90, 1))
+      .toEqual({ left: 90, top: 0 });
+    expect(pageScanTarget({ ...viewport, left: 90 }, "n", "leftToRight", 90, -1))
+      .toEqual({ left: 0, top: 200 });
+    expect(pageScanTarget({ ...viewport, left: 200, top: 200 }, "n", "rightToLeft", 90, 1))
+      .toEqual({ left: 110, top: 0 });
+    expect(pageScanTarget(viewport, "z", "leftToRight", 90, 1)).toEqual({ left: 90, top: 0 });
+    expect(pageScanTarget({ ...viewport, left: 200 }, "z", "leftToRight", 90, 1))
+      .toEqual({ left: 0, top: 90 });
+    expect(pageScanTarget({ ...viewport, top: 90 }, "z", "leftToRight", 90, -1))
+      .toEqual({ left: 200, top: 0 });
+    expect(pageScanTarget({ ...viewport, left: 0 }, "z", "rightToLeft", 90, 1))
+      .toEqual({ left: 200, top: 90 });
+    expect(pageScanTarget({ ...viewport, left: 200, top: 200 }, "n", "leftToRight", 90, 1))
+      .toBeNull();
   });
 });
 

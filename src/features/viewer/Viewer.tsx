@@ -22,6 +22,7 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
+  DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_ZOOM_RETENTION,
   LOUPE_SIZE,
   LOUPE_ZOOM,
@@ -39,6 +40,8 @@ import {
   isPagePairable,
   fitScaleForPages,
   wheelDeltaPixels,
+  pageScanTarget,
+  PAGE_SCAN_MODES,
   scaleForPixelDimension,
   scaleReducer,
   viewerReducer,
@@ -54,6 +57,7 @@ import {
   type ViewMode,
   type SpreadRules,
   type FitRules,
+  type PageScanMode,
   type ViewerLayoutMode,
   type ZoomRetention,
 } from "./model";
@@ -119,6 +123,7 @@ interface ViewerProps {
   scrollStepPercent?: number;
   wheelScrollFactor?: number;
   smoothScroll?: boolean;
+  pageScanMode?: PageScanMode;
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
@@ -184,6 +189,7 @@ export function Viewer({
   scrollStepPercent: initialScrollStepPercent = DEFAULT_SCROLL_STEP_PERCENT,
   wheelScrollFactor: initialWheelScrollFactor = DEFAULT_WHEEL_SCROLL_FACTOR,
   smoothScroll: initialSmoothScroll = DEFAULT_SMOOTH_SCROLL,
+  pageScanMode: initialPageScanMode = DEFAULT_PAGE_SCAN_MODE,
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
@@ -228,6 +234,9 @@ export function Viewer({
   const smoothScroll = typeof initialSmoothScroll === "boolean"
     ? initialSmoothScroll
     : DEFAULT_SMOOTH_SCROLL;
+  const pageScanMode = PAGE_SCAN_MODES.includes(initialPageScanMode)
+    ? initialPageScanMode
+    : DEFAULT_PAGE_SCAN_MODE;
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
     mode: initialMode,
@@ -289,6 +298,7 @@ export function Viewer({
   const pageRequests = useRef(new Set<number>());
   const scrollAnchorFrameRef = useRef<number | null>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
+  const pageScanInitializedRef = useRef(false);
   const rightButtonHeldRef = useRef(false);
   const [panning, setPanning] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
@@ -453,31 +463,40 @@ export function Viewer({
     await saveReadingPosition(session, state.index, generation);
   }
 
-  function scrollVerticalOverflow(direction: -1 | 1): boolean {
+  function scrollPageOverflow(move: -1 | 1): boolean {
     if (layoutMode !== "paged") return false;
     const spread = spreadRef.current;
     if (!spread) return false;
-    const maxScrollTop = Math.max(0, spread.scrollHeight - spread.clientHeight);
-    if (maxScrollTop <= 1) return false;
-    if (direction > 0 && spread.scrollTop >= maxScrollTop - 1) return false;
-    if (direction < 0 && spread.scrollTop <= 1) return false;
-    const step = Math.max(1, Math.floor(spread.clientHeight * scrollStepPercent / 100));
-    const nextScrollTop = Math.min(maxScrollTop, Math.max(0, spread.scrollTop + direction * step));
+    const maxScrollLeft = Math.max(0, spread.scrollWidth - spread.clientWidth);
+    const initialLeft = pageScanMode !== "vertical" && !pageScanInitializedRef.current
+      ? state.direction === "rightToLeft" ? maxScrollLeft : 0
+      : spread.scrollLeft;
+    const target = pageScanTarget({
+      left: initialLeft,
+      top: spread.scrollTop,
+      clientWidth: spread.clientWidth,
+      clientHeight: spread.clientHeight,
+      scrollWidth: spread.scrollWidth,
+      scrollHeight: spread.scrollHeight,
+    }, pageScanMode, state.direction, scrollStepPercent, move);
+    pageScanInitializedRef.current = true;
+    if (target === null) return false;
     if (typeof spread.scrollTo === "function") {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
       spread.scrollTo({
-        top: nextScrollTop,
-        left: spread.scrollLeft,
+        top: target.top,
+        left: target.left,
         behavior: smoothScroll && !reducedMotion ? "smooth" : "auto",
       });
     } else {
-      spread.scrollTop = nextScrollTop;
+      spread.scrollLeft = target.left;
+      spread.scrollTop = target.top;
     }
     return true;
   }
 
   function next() {
-    if (scrollVerticalOverflow(1)) return;
+    if (scrollPageOverflow(1)) return;
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
       void flushReadingPosition().finally(() =>
         onNextItem?.(),
@@ -503,11 +522,15 @@ export function Viewer({
   useLayoutEffect(() => {
     if (layoutMode !== "paged") return;
     const spread = spreadRef.current;
-    if (spread) spread.scrollTop = 0;
-  }, [layoutMode, state.index]);
+    pageScanInitializedRef.current = false;
+    if (spread) {
+      spread.scrollLeft = 0;
+      spread.scrollTop = 0;
+    }
+  }, [layoutMode, pageScanMode, state.direction, state.index]);
 
   function previous() {
-    if (scrollVerticalOverflow(-1)) return;
+    if (scrollPageOverflow(-1)) return;
     if (state.index === 0) {
       void flushReadingPosition().finally(() => onPreviousItem?.());
       return;
@@ -1404,6 +1427,7 @@ export function Viewer({
           }
           spread.scrollLeft -= deltaX * panFactor;
           spread.scrollTop -= deltaY * panFactor;
+          pageScanInitializedRef.current = true;
           drag.lastX = event.clientX;
           drag.lastY = event.clientY;
           event.preventDefault();

@@ -20,6 +20,7 @@ import type {
   ViewMode,
   SpreadPairing,
   FitBasis,
+  PageScanMode,
   ZoomRetention,
 } from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
@@ -135,6 +136,7 @@ export interface CatalogSettings {
   scrollStepPercent: number;
   wheelScrollFactor: number;
   smoothScroll: boolean;
+  pageScanMode: PageScanMode;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -244,6 +246,7 @@ export async function saveSettingsProfile(
       scrollStepPercent: profile.scrollStepPercent,
       wheelScrollFactor: profile.wheelScrollFactor,
       smoothScroll: profile.smoothScroll,
+      pageScanMode: profile.pageScanMode,
       treeVisible: profile.treeVisible,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,
