@@ -23,7 +23,13 @@ import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
-import type { MouseGestureBindings, SettingsProfile } from "../settings/profile";
+import type {
+  MouseGestureBindings,
+  NavigationSelectionPolicy,
+  SettingsProfile,
+  StartupLocation,
+  ThumbnailGenerationScope,
+} from "../settings/profile";
 
 let requestSequence = 0;
 
@@ -52,6 +58,12 @@ export async function pickLibraryRoot(
   return invoke("pick_library_root", {
     context: context(generation),
   });
+}
+
+export async function pickLibraryFile(
+  generation: number,
+): Promise<ApiResponse<{ absolutePath: string } | null>> {
+  return invoke("pick_library_file", { context: context(generation) });
 }
 
 export async function restoreLibraryRoot(
@@ -103,6 +115,9 @@ export interface CatalogSettings {
   addressBarVisible: boolean;
   statusBarVisible: boolean;
   alwaysOnTop: boolean;
+  navigationSelectionPolicy: NavigationSelectionPolicy;
+  thumbnailGenerationScope: ThumbnailGenerationScope;
+  startupLocation: StartupLocation;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -182,6 +197,9 @@ export async function saveSettingsProfile(
       addressBarVisible: profile.addressBarVisible,
       statusBarVisible: profile.statusBarVisible,
       alwaysOnTop: profile.alwaysOnTop,
+      navigationSelectionPolicy: profile.navigationSelectionPolicy,
+      thumbnailGenerationScope: profile.thumbnailGenerationScope,
+      startupLocation: profile.startupLocation,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },
@@ -729,6 +747,12 @@ export async function listReadingHistory(
   generation: number,
 ): Promise<ApiResponse<ReadingHistoryEntry[]>> {
   return invoke("list_reading_history", { context: context(generation) });
+}
+
+export async function clearReadingHistory(
+  generation: number,
+): Promise<ApiResponse<void>> {
+  return invoke("clear_reading_history", { context: context(generation) });
 }
 
 export async function loadPage(

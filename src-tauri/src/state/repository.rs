@@ -87,6 +87,9 @@ pub struct Settings {
     pub address_bar_visible: bool,
     pub status_bar_visible: bool,
     pub always_on_top: bool,
+    pub navigation_selection_policy: String,
+    pub thumbnail_generation_scope: String,
+    pub startup_location: String,
     pub shortcut_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
@@ -135,6 +138,9 @@ impl Default for Settings {
             address_bar_visible: true,
             status_bar_visible: true,
             always_on_top: false,
+            navigation_selection_policy: "restore".into(),
+            thumbnail_generation_scope: "near".into(),
+            startup_location: "last".into(),
             shortcut_bindings: default_shortcut_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
@@ -228,6 +234,9 @@ impl StateStore {
                 "addressBarVisible" => settings.address_bar_visible = value == "true",
                 "statusBarVisible" => settings.status_bar_visible = value == "true",
                 "alwaysOnTop" => settings.always_on_top = value == "true",
+                "navigationSelectionPolicy" => settings.navigation_selection_policy = value,
+                "thumbnailGenerationScope" => settings.thumbnail_generation_scope = value,
+                "startupLocation" => settings.startup_location = value,
                 "shortcutBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.shortcut_bindings = bindings;
@@ -306,6 +315,15 @@ impl StateStore {
             ),
             ("statusBarVisible", settings.status_bar_visible.to_string()),
             ("alwaysOnTop", settings.always_on_top.to_string()),
+            (
+                "navigationSelectionPolicy",
+                settings.navigation_selection_policy.clone(),
+            ),
+            (
+                "thumbnailGenerationScope",
+                settings.thumbnail_generation_scope.clone(),
+            ),
+            ("startupLocation", settings.startup_location.clone()),
             ("shortcutBindings", shortcut_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
@@ -428,7 +446,8 @@ impl StateStore {
             .prepare(
                 "SELECT item_identity, last_viewed_at_ms
                  FROM reading_history
-                 ORDER BY last_viewed_at_ms DESC, item_identity ASC",
+                 ORDER BY last_viewed_at_ms DESC, item_identity ASC
+                 LIMIT 20",
             )
             .map_err(database_error)?;
         let values = statement
@@ -439,6 +458,13 @@ impl StateStore {
         values
             .map(|value| value.map_err(database_error))
             .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn clear_reading_history(&self) -> Result<(), AppError> {
+        self.connection
+            .execute("DELETE FROM reading_history", [])
+            .map_err(database_error)?;
+        Ok(())
     }
 
     pub fn record_reading_history(
@@ -1186,6 +1212,9 @@ mod tests {
                 address_bar_visible: false,
                 status_bar_visible: false,
                 always_on_top: true,
+                navigation_selection_policy: "last".into(),
+                thumbnail_generation_scope: "all".into(),
+                startup_location: "driveRoot".into(),
                 shortcut_bindings: [
                     ("nextPage".into(), "N".into()),
                     ("previousPage".into(), "P".into()),
@@ -1261,6 +1290,9 @@ mod tests {
         assert!(!restored.address_bar_visible);
         assert!(!restored.status_bar_visible);
         assert!(restored.always_on_top);
+        assert_eq!(restored.navigation_selection_policy, "last");
+        assert_eq!(restored.thumbnail_generation_scope, "all");
+        assert_eq!(restored.startup_location, "driveRoot");
         assert_eq!(restored.shortcut_bindings["nextPage"], "N");
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],
@@ -1281,6 +1313,26 @@ mod tests {
                 modified_ms: Some(42),
             }]
         );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn p1_b_reading_history_is_bounded_newest_first_and_clearable() {
+        let paths = temporary_paths("p1-b-reading-history");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        for index in 0..25 {
+            store
+                .record_reading_history(&format!("Series/{index:02}.cbz"), index)
+                .unwrap();
+        }
+
+        let history = store.list_reading_history().unwrap();
+        assert_eq!(history.len(), 20);
+        assert_eq!(history.first(), Some(&("Series/24.cbz".into(), 24)));
+        assert_eq!(history.last(), Some(&("Series/05.cbz".into(), 5)));
+        store.clear_reading_history().unwrap();
+        assert!(store.list_reading_history().unwrap().is_empty());
         drop(store);
         fs::remove_dir_all(paths.root).unwrap();
     }

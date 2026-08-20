@@ -3,6 +3,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::domain::{AppError, ErrorCode};
+use crate::domain::{FileKind, classify_file_name};
 
 pub fn display_path(path: &Path) -> String {
     let raw = path.to_string_lossy();
@@ -85,6 +86,34 @@ pub fn validate_library_root(requested: &Path) -> Result<PathBuf, AppError> {
     Ok(canonical)
 }
 
+pub fn validate_library_file(requested: &Path) -> Result<PathBuf, AppError> {
+    let canonical = requested
+        .canonicalize()
+        .map_err(|error| path_error(requested, error))?;
+    if !canonical.is_file() {
+        return Err(AppError {
+            code: ErrorCode::InvalidPath,
+            message: "選択したパスはファイルではありません。".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    let name = canonical
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if classify_file_name(name) == FileKind::Unsupported {
+        return Err(AppError {
+            code: ErrorCode::UnsupportedFormat,
+            message: "選択したファイル形式には対応していません。".into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    fs::File::open(&canonical).map_err(|error| path_error(&canonical, error))?;
+    Ok(canonical)
+}
+
 fn path_error(path: &Path, error: io::Error) -> AppError {
     let (code, message, retryable) = match error.kind() {
         io::ErrorKind::NotFound => (
@@ -136,6 +165,63 @@ pub fn pick_folder() -> Result<Option<PathBuf>, AppError> {
             dialog
                 .SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)
                 .map_err(picker_error)?;
+            if let Err(error) = dialog.Show(None) {
+                return if error.code() == CANCELLED {
+                    Ok(None)
+                } else {
+                    Err(picker_error(error))
+                };
+            }
+            let item = dialog.GetResult().map_err(picker_error)?;
+            let display_name = item
+                .GetDisplayName(SIGDN_FILESYSPATH)
+                .map_err(picker_error)?;
+            let path = display_name
+                .to_string()
+                .map(PathBuf::from)
+                .map_err(picker_error);
+            CoTaskMemFree(Some(display_name.0.cast()));
+            path.map(Some)
+        })();
+        CoUninitialize();
+        result
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn pick_supported_file() -> Result<Option<PathBuf>, AppError> {
+    use windows::Win32::System::Com::{
+        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
+        CoTaskMemFree, CoUninitialize,
+    };
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+    use windows::Win32::UI::Shell::{
+        FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PATHMUSTEXIST, FileOpenDialog, IFileOpenDialog,
+        SIGDN_FILESYSPATH,
+    };
+    use windows::core::{HRESULT, PCWSTR};
+
+    const CANCELLED: HRESULT = HRESULT(0x800704C7_u32 as i32);
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+            .ok()
+            .map_err(picker_error)?;
+        let result = (|| {
+            let dialog: IFileOpenDialog =
+                CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
+                    .map_err(picker_error)?;
+            let options = dialog.GetOptions().map_err(picker_error)?;
+            dialog
+                .SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST)
+                .map_err(picker_error)?;
+            let label: Vec<u16> = "対応する漫画・画像\0".encode_utf16().collect();
+            let pattern: Vec<u16> = "*.bmp;*.jpg;*.jpeg;*.png;*.webp;*.gif;*.tif;*.tiff;*.ico;*.svg;*.avif;*.zip;*.cbz;*.epub;*.rar;*.cbr;*.7z;*.cb7;*.lzh;*.lha;*.pdf\0"
+                .encode_utf16().collect();
+            let filters = [COMDLG_FILTERSPEC {
+                pszName: PCWSTR(label.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            }];
+            dialog.SetFileTypes(&filters).map_err(picker_error)?;
             if let Err(error) = dialog.Show(None) {
                 return if error.code() == CANCELLED {
                     Ok(None)
@@ -226,6 +312,32 @@ mod tests {
                 .unwrap_err()
                 .code,
             ErrorCode::NotFound
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn validates_supported_regular_files_and_rejects_unsupported_files() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-file-picker-validation-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let supported = root.join("book.CBZ");
+        let unsupported = root.join("notes.txt");
+        fs::write(&supported, b"fixture").unwrap();
+        fs::write(&unsupported, b"fixture").unwrap();
+        assert_eq!(
+            validate_library_file(&supported).unwrap(),
+            supported.canonicalize().unwrap()
+        );
+        assert_eq!(
+            validate_library_file(&unsupported).unwrap_err().code,
+            ErrorCode::UnsupportedFormat
+        );
+        assert_eq!(
+            validate_library_file(&root).unwrap_err().code,
+            ErrorCode::InvalidPath
         );
         fs::remove_dir_all(root).unwrap();
     }

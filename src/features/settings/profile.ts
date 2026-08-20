@@ -50,8 +50,18 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 5;
+export const SETTINGS_PROFILE_VERSION = 6;
 export const APP_VERSION = packageMetadata.version;
+
+export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
+export type NavigationSelectionPolicy = (typeof NAVIGATION_SELECTION_POLICIES)[number];
+export const DEFAULT_NAVIGATION_SELECTION_POLICY: NavigationSelectionPolicy = "restore";
+export const THUMBNAIL_GENERATION_SCOPES = ["visible", "near", "all"] as const;
+export type ThumbnailGenerationScope = (typeof THUMBNAIL_GENERATION_SCOPES)[number];
+export const DEFAULT_THUMBNAIL_GENERATION_SCOPE: ThumbnailGenerationScope = "near";
+export const STARTUP_LOCATIONS = ["last", "driveRoot"] as const;
+export type StartupLocation = (typeof STARTUP_LOCATIONS)[number];
+export const DEFAULT_STARTUP_LOCATION: StartupLocation = "last";
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
 export type MouseGestureAction = (typeof MOUSE_GESTURE_ACTIONS)[number];
@@ -116,6 +126,9 @@ export interface SettingsProfile {
   addressBarVisible: boolean;
   statusBarVisible: boolean;
   alwaysOnTop: boolean;
+  navigationSelectionPolicy: NavigationSelectionPolicy;
+  thumbnailGenerationScope: ThumbnailGenerationScope;
+  startupLocation: StartupLocation;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -150,6 +163,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     addressBarVisible: true,
     statusBarVisible: true,
     alwaysOnTop: false,
+    navigationSelectionPolicy: DEFAULT_NAVIGATION_SELECTION_POLICY,
+    thumbnailGenerationScope: DEFAULT_THUMBNAIL_GENERATION_SCOPE,
+    startupLocation: DEFAULT_STARTUP_LOCATION,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -237,11 +253,22 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const addressBarVisible = legacyP1Preferences ? true : candidate.addressBarVisible;
   const statusBarVisible = legacyP1Preferences ? true : candidate.statusBarVisible;
   const alwaysOnTop = legacyP1Preferences ? false : candidate.alwaysOnTop;
+  const legacyP1BPreferences = legacyP1Preferences || candidate.profileVersion === 5;
+  const navigationSelectionPolicy = legacyP1BPreferences
+    ? DEFAULT_NAVIGATION_SELECTION_POLICY
+    : enumValue(candidate.navigationSelectionPolicy, NAVIGATION_SELECTION_POLICIES);
+  const thumbnailGenerationScope = legacyP1BPreferences
+    ? DEFAULT_THUMBNAIL_GENERATION_SCOPE
+    : enumValue(candidate.thumbnailGenerationScope, THUMBNAIL_GENERATION_SCOPES);
+  const startupLocation = legacyP1BPreferences
+    ? DEFAULT_STARTUP_LOCATION
+    : enumValue(candidate.startupLocation, STARTUP_LOCATIONS);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
       && candidate.profileVersion !== 3
       && candidate.profileVersion !== 4
+      && candidate.profileVersion !== 5
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -273,6 +300,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof addressBarVisible !== "boolean" ||
     typeof statusBarVisible !== "boolean" ||
     typeof alwaysOnTop !== "boolean" ||
+    navigationSelectionPolicy === null ||
+    thumbnailGenerationScope === null ||
+    startupLocation === null ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -307,6 +337,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     addressBarVisible,
     statusBarVisible,
     alwaysOnTop,
+    navigationSelectionPolicy,
+    thumbnailGenerationScope,
+    startupLocation,
     shortcuts,
     mouseGestures,
   };

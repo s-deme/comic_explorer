@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 5,
+    profileVersion: 6,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -40,6 +40,9 @@ function validProfile(): SettingsProfile {
     addressBarVisible: true,
     statusBarVisible: true,
     alwaysOnTop: false,
+    navigationSelectionPolicy: "restore",
+    thumbnailGenerationScope: "near",
+    startupLocation: "last",
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -82,7 +85,7 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 6, 99, "5", undefined])(
+  it.each([0, 7, 99, "6", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -135,6 +138,15 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
+  it("migrates a v5 profile with the P1-B navigation defaults", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 5;
+    delete legacy.navigationSelectionPolicy;
+    delete legacy.thumbnailGenerationScope;
+    delete legacy.startupLocation;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
   it.each([
     { smallThumbnail: 63, coverList: 144, cardGrid: 216, referenceTile: 128 },
     { smallThumbnail: 104, coverList: 321, cardGrid: 216, referenceTile: 128 },
@@ -170,6 +182,14 @@ describe("settings profile", () => {
     ["wheelDeadZone", -1],
     ["wheelDeadZone", 201],
   ])("rejects an invalid P1-A profile field %s=%s", (field, value) => {
+    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+  });
+
+  it.each([
+    ["navigationSelectionPolicy", "middle"],
+    ["thumbnailGenerationScope", "unlimited"],
+    ["startupLocation", "desktop"],
+  ])("rejects an invalid P1-B profile field %s=%s", (field, value) => {
     expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
   });
 

@@ -299,6 +299,9 @@ pub struct CatalogSettings {
     pub address_bar_visible: bool,
     pub status_bar_visible: bool,
     pub always_on_top: bool,
+    pub navigation_selection_policy: String,
+    pub thumbnail_generation_scope: String,
+    pub startup_location: String,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -342,6 +345,9 @@ pub struct SettingsProfileInput {
     pub address_bar_visible: bool,
     pub status_bar_visible: bool,
     pub always_on_top: bool,
+    pub navigation_selection_policy: String,
+    pub thumbnail_generation_scope: String,
+    pub startup_location: String,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -851,6 +857,18 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         address_bar_visible: settings.address_bar_visible,
         status_bar_visible: settings.status_bar_visible,
         always_on_top: settings.always_on_top,
+        navigation_selection_policy: match settings.navigation_selection_policy.as_str() {
+            "none" | "first" | "last" | "restore" => settings.navigation_selection_policy,
+            _ => "restore".into(),
+        },
+        thumbnail_generation_scope: match settings.thumbnail_generation_scope.as_str() {
+            "visible" | "near" | "all" => settings.thumbnail_generation_scope,
+            _ => "near".into(),
+        },
+        startup_location: match settings.startup_location.as_str() {
+            "last" | "driveRoot" => settings.startup_location,
+            _ => "last".into(),
+        },
         shortcuts,
         mouse_gestures,
     }
@@ -1619,6 +1637,31 @@ pub fn list_reading_history(
 }
 
 #[tauri::command]
+pub fn clear_reading_history(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<()>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(ErrorCode::Internal, "Local metadata is unavailable."),
+        ));
+    };
+    if let Err(error) = store.clear_reading_history() {
+        return Ok(error_response(&context, error));
+    }
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: (),
+    })
+}
+
+#[tauri::command]
 pub fn set_catalog_sort(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
@@ -1955,6 +1998,15 @@ fn validate_settings_profile(
         || !profile.pan_factor.is_finite()
         || !(MIN_PAN_FACTOR..=MAX_PAN_FACTOR).contains(&profile.pan_factor)
         || profile.wheel_dead_zone > MAX_WHEEL_DEAD_ZONE
+        || !matches!(
+            profile.navigation_selection_policy.as_str(),
+            "none" | "first" | "last" | "restore"
+        )
+        || !matches!(
+            profile.thumbnail_generation_scope.as_str(),
+            "visible" | "near" | "all"
+        )
+        || !matches!(profile.startup_location.as_str(), "last" | "driveRoot")
     {
         return Err(request_error(
             ErrorCode::InvalidRequest,
@@ -2034,6 +2086,9 @@ pub fn set_settings_profile(
         settings.address_bar_visible = profile.address_bar_visible;
         settings.status_bar_visible = profile.status_bar_visible;
         settings.always_on_top = profile.always_on_top;
+        settings.navigation_selection_policy = profile.navigation_selection_policy;
+        settings.thumbnail_generation_scope = profile.thumbnail_generation_scope;
+        settings.startup_location = profile.startup_location;
         settings.shortcut_bindings = shortcuts;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
@@ -2129,6 +2184,52 @@ pub async fn pick_library_root(
             request_id,
             generation,
         },
+    })
+}
+
+#[tauri::command]
+pub async fn pick_library_file(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Option<LibraryRoot>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    #[cfg(target_os = "windows")]
+    let picked = tauri::async_runtime::spawn_blocking(library_root::pick_supported_file)
+        .await
+        .map_err(|error| format!("file picker worker failed: {error}"))?;
+    #[cfg(not(target_os = "windows"))]
+    let picked: Result<Option<PathBuf>, AppError> = Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "ファイル選択画面はWindows版で利用できます。",
+    ));
+    let picked = match picked {
+        Ok(Some(path)) => path,
+        Ok(None) => {
+            return Ok(Response::Ok {
+                request_id: context.request_id,
+                generation: context.generation,
+                data: None,
+            });
+        }
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let canonical = match tauri::async_runtime::spawn_blocking(move || {
+        library_root::validate_library_file(&picked)
+    })
+    .await
+    {
+        Ok(Ok(path)) => path,
+        Ok(Err(error)) => return Ok(error_response(&context, error)),
+        Err(error) => return Err(format!("file picker validation worker failed: {error}")),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: Some(LibraryRoot {
+            absolute_path: library_root::display_path(&canonical),
+        }),
     })
 }
 
@@ -3674,6 +3775,9 @@ mod shutdown_tests {
             address_bar_visible: true,
             status_bar_visible: true,
             always_on_top: false,
+            navigation_selection_policy: "restore".into(),
+            thumbnail_generation_scope: "near".into(),
+            startup_location: "last".into(),
             shortcuts: default_shortcuts(),
             mouse_gestures: default_mouse_gestures(),
         };
@@ -3706,6 +3810,25 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.cursor_auto_hide_ms = 2_000;
+
+        profile.navigation_selection_policy = "middle".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.navigation_selection_policy = "restore".into();
+        profile.thumbnail_generation_scope = "unlimited".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.thumbnail_generation_scope = "near".into();
+        profile.startup_location = "desktop".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.startup_location = "last".into();
 
         profile
             .mouse_gestures

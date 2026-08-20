@@ -137,6 +137,17 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P1-008 | LEY-INPUT-010 | viewerのpointer pan係数を50%〜200%で設定し、pointer capture中の移動量へだけ適用する。swipe判定、click、drag終了、keyboard操作へは適用しない。 |
 | REQ-LEY-P1-009 | LEY-INPUT-012 | page layoutのwheel入力に0〜200の不感帯を設定し、閾値未満のdeltaはpage commandへ変換しない。Ctrl+wheel、右button+wheel、scroll layoutのnative scrollは既存境界を維持する。 |
 
+## Leeyes P1-B 既存機能完成の受入条件
+
+| 要件ID | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-LEY-P1-010 | LEY-FILER-016 | folder移動後の初期選択を「選択なし」「先頭」「末尾」「前回選択を復元」から選べる。表示中sort/filter後の項目へ適用し、空folderでは選択せず、検索結果から戻る際の明示的な対象復元を優先する。設定をprofileと再起動で復元する。 |
+| REQ-LEY-P1-011 | LEY-CATALOG-010 | 既存の一覧形式別thumbnail寸法に加え、生成範囲を「表示中のみ」「表示中と近傍」「全項目」から選べる。設定変更後は要求queueを再評価し、同一画像生成物のcache keyを不要に変えず、worker上限とcache上限を維持する。profileと再起動で復元する。 |
+| REQ-LEY-P1-012 | LEY-FILE-001 | Windows標準file dialogを対応画像・書庫・PDFのfilter付きで開き、cancelを正常終了として扱う。選択fileをcanonicalizeし、対応形式・通常fileであることをbackendで検証してから、そのdriveを安全境界として登録し直接viewerへ開く。root外path文字列を既存rootへ注入せず、失敗時は現在画面を保持する。 |
+| REQ-LEY-P1-013 | LEY-FILE-009 | 成功して開いた最近の作品を新しい順・重複なし・最大20件で表示し、項目から再度開ける。missing・access拒否は局所errorとして履歴画面を維持し、全履歴を明示的に消去できる。cancel・失敗openは追加しない。 |
+| REQ-LEY-P1-014 | LEY-SETTING-005 | 起動場所を「前回のfolder」「前回driveのroot」から選び、存在しない・読めない保存pathではshellを維持して安全にdrive選択へ戻す。初期選択はREQ-LEY-P1-010のpolicyを共有し、設定をstrict profileとapp-local SQLiteへ保存する。 |
+| REQ-LEY-P1-015 | LEY-HELP-001 | 同梱dataだけで閲覧できる利用者向けoffline helpへ、開始、folder/list、viewer、検索、file操作、設定、privacy・安全上の制約、現在のshortcutを章立てして収録する。topic検索とkeyboard操作を提供し、外部URLやnetworkを要求しない。 |
+
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |

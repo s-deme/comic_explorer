@@ -186,6 +186,9 @@ const defaultSettings: CatalogSettings = {
   addressBarVisible: true,
   statusBarVisible: true,
   alwaysOnTop: false,
+  navigationSelectionPolicy: "restore",
+  thumbnailGenerationScope: "near",
+  startupLocation: "last",
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };

@@ -15,8 +15,10 @@ import {
   getThumbnail,
   listTags,
   listReadingHistory,
+  clearReadingHistory,
   openComic,
   pickLibraryRoot,
+  pickLibraryFile,
   registerLibraryRoot,
   restoreLibraryRoot,
   saveCatalogSort,
@@ -175,15 +177,22 @@ import {
   APP_VERSION,
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
+  DEFAULT_NAVIGATION_SELECTION_POLICY,
+  DEFAULT_STARTUP_LOCATION,
+  DEFAULT_THUMBNAIL_GENERATION_SCOPE,
   SETTINGS_PROFILE_VERSION,
   normalizeMouseGestures,
   normalizeSettingsProfile,
   type MouseGestureAction,
   type MouseGestureBindings,
   type MouseGestureName,
+  type NavigationSelectionPolicy,
   type SettingsProfile,
+  type StartupLocation,
+  type ThumbnailGenerationScope,
 } from "./features/settings/profile";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
+import { OfflineHelp } from "./features/help/OfflineHelp";
 import {
   addBookshelfItemResult,
   listBookmarks,
@@ -268,6 +277,19 @@ const MENU_MNEMONICS: Record<string, MenuId> = {
 
 function entryDisplayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
+}
+
+function recentCatalogEntry(relativePath: string): CatalogEntry {
+  const lower = relativePath.toLocaleLowerCase("en-US");
+  if (lower.endsWith(".pdf")) return { relativePath: relativePath as CatalogEntry["relativePath"], kind: "pdf" };
+  const archiveKind = archiveKindFromPath(relativePath);
+  if (archiveKind !== undefined) {
+    return { relativePath: relativePath as CatalogEntry["relativePath"], kind: "archive", archiveKind };
+  }
+  if (/\.(bmp|jpe?g|png|webp|gif|tiff?|ico|svg|avif)$/i.test(relativePath)) {
+    return { relativePath: relativePath as CatalogEntry["relativePath"], kind: "page" };
+  }
+  return { relativePath: relativePath as CatalogEntry["relativePath"], kind: "comicFolder" };
 }
 
 function nonNegativeNumber(value: string): number {
@@ -381,6 +403,7 @@ export function App({
   const [legacyThumbnailDataPresent, setLegacyThumbnailDataPresent] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const rememberedCatalogSelections = useRef(new Map<string, string>());
   const selectionAnchor = useRef<string | null>(null);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [fileMask, setFileMask] = useState("");
@@ -465,6 +488,18 @@ export function App({
   const [addressBarVisible, setAddressBarVisible] = useState(true);
   const [statusBarVisible, setStatusBarVisible] = useState(true);
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [navigationSelectionPolicy, setNavigationSelectionPolicy] =
+    useState<NavigationSelectionPolicy>(DEFAULT_NAVIGATION_SELECTION_POLICY);
+  const navigationSelectionPolicyRef = useRef<NavigationSelectionPolicy>(
+    DEFAULT_NAVIGATION_SELECTION_POLICY,
+  );
+  const [thumbnailGenerationScope, setThumbnailGenerationScope] =
+    useState<ThumbnailGenerationScope>(DEFAULT_THUMBNAIL_GENERATION_SCOPE);
+  const thumbnailGenerationScopeRef = useRef<ThumbnailGenerationScope>(
+    DEFAULT_THUMBNAIL_GENERATION_SCOPE,
+  );
+  const [startupLocation, setStartupLocation] = useState<StartupLocation>(DEFAULT_STARTUP_LOCATION);
+  const startupLocationRef = useRef<StartupLocation>(DEFAULT_STARTUP_LOCATION);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [trayNotice, setTrayNotice] = useState<string | null>(null);
@@ -775,7 +810,7 @@ export function App({
     settingsGeneration.current += 1;
     const settingsRequestGeneration = settingsGeneration.current;
     const policyRevisionAtRequest = endOfVolumePolicyRevision.current;
-    void getCatalogSettings(settingsRequestGeneration)
+    const settingsLoad = getCatalogSettings(settingsRequestGeneration)
       .then((response) => {
         if (settingsRequestGeneration !== settingsGeneration.current) return;
         if (response.status === "ok") {
@@ -830,6 +865,20 @@ export function App({
           setToolbarVisible(response.data.toolbarVisible);
           setAddressBarVisible(response.data.addressBarVisible !== false);
           setStatusBarVisible(response.data.statusBarVisible !== false);
+          const restoredNavigationSelection = ["none", "first", "last", "restore"].includes(
+            response.data.navigationSelectionPolicy,
+          ) ? response.data.navigationSelectionPolicy : DEFAULT_NAVIGATION_SELECTION_POLICY;
+          const restoredThumbnailScope = ["visible", "near", "all"].includes(
+            response.data.thumbnailGenerationScope,
+          ) ? response.data.thumbnailGenerationScope : DEFAULT_THUMBNAIL_GENERATION_SCOPE;
+          const restoredStartupLocation = response.data.startupLocation === "driveRoot"
+            ? "driveRoot" : DEFAULT_STARTUP_LOCATION;
+          navigationSelectionPolicyRef.current = restoredNavigationSelection as NavigationSelectionPolicy;
+          thumbnailGenerationScopeRef.current = restoredThumbnailScope as ThumbnailGenerationScope;
+          setNavigationSelectionPolicy(restoredNavigationSelection as NavigationSelectionPolicy);
+          setThumbnailGenerationScope(restoredThumbnailScope as ThumbnailGenerationScope);
+          startupLocationRef.current = restoredStartupLocation;
+          setStartupLocation(restoredStartupLocation);
           const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
           void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
             if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
@@ -847,7 +896,11 @@ export function App({
       .catch(() => undefined);
     generation.current += 1;
     const requestGeneration = generation.current;
-    void restoreLibraryRoot(requestGeneration)
+    const settingsStartupBoundary = Promise.race([
+      settingsLoad,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 100)),
+    ]);
+    void settingsStartupBoundary.then(() => restoreLibraryRoot(requestGeneration))
       .then(async (response) => {
         if (
           requestGeneration === generation.current &&
@@ -867,13 +920,19 @@ export function App({
           );
           if (driveResponse.status === "ok") {
             activateLibraryRoot(driveResponse.data.absolutePath);
-            dispatch({ type: "reset", path: restored.relativePath });
-            await load(restored.relativePath);
+            const startupPath = startupLocationRef.current === "driveRoot"
+              ? ""
+              : restored.relativePath;
+            dispatch({ type: "reset", path: startupPath });
+            await load(startupPath);
           }
         }
       })
       .catch(() => undefined)
-      .finally(() => setRestoring(false));
+      .finally(() => {
+        setRestoring(false);
+        void refreshHistory();
+      });
   }, [alwaysOnTopAdapter]);
 
   const absoluteAddress = useMemo(() => {
@@ -920,18 +979,24 @@ export function App({
   }, [selectedPath, selectedPaths, visibleEntries]);
 
   useEffect(() => {
+    if (selectedPath !== null) rememberedCatalogSelections.current.set(navigation.current, selectedPath);
+  }, [navigation.current, selectedPath]);
+
+  useEffect(() => {
     const requestGeneration = generation.current;
     sortedEntries.forEach((entry, index) => {
       if (
         entry.kind !== "archive"
       ) return;
+      if (thumbnailGenerationScopeRef.current === "visible" && index >= 25) return;
+      if (thumbnailGenerationScopeRef.current === "near" && index >= 40) return;
       if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
       if (thumbnails[entry.relativePath] !== undefined) return;
       const priority =
-        index < 15 ? "visible" : index < 40 ? "near" : "background";
+        index < 25 ? "visible" : index < 40 ? "near" : "background";
       queueThumbnail(entry, requestGeneration, priority);
     });
-  }, [managedThumbnails, sortedEntries, thumbnails]);
+  }, [managedThumbnails, sortedEntries, thumbnailGenerationScope, thumbnails]);
 
   async function load(relativePath: string, selectionPathsToRestore: readonly string[] = []) {
     generation.current += 1;
@@ -946,8 +1011,25 @@ export function App({
         rememberCatalogSnapshot(relativePath, response.data);
         setEntries(response.data);
         setLoadedCatalogPath(relativePath);
-        const available = new Set<string>(response.data.map((entry) => entry.relativePath));
-        const nextSelection = selectionPathsToRestore.filter((path) => available.has(path));
+        const displayEntries = sortCatalogEntries(
+          response.data.filter((entry) => matchesMask(entry, fileMask)),
+          sortField,
+          sortDescending ? "descending" : "ascending",
+        );
+        const available = new Set<string>(displayEntries.map((entry) => entry.relativePath));
+        let nextSelection = selectionPathsToRestore.filter((path) => available.has(path));
+        if (nextSelection.length === 0) {
+          const policyCandidate = navigationSelectionPolicyRef.current === "restore"
+            ? rememberedCatalogSelections.current.get(relativePath)
+            : navigationSelectionPolicyRef.current === "first"
+              ? displayEntries.at(0)?.relativePath
+              : navigationSelectionPolicyRef.current === "last"
+                ? displayEntries.at(-1)?.relativePath
+                : undefined;
+          if (policyCandidate !== undefined && available.has(policyCandidate)) {
+            nextSelection = [policyCandidate];
+          }
+        }
         setSelectedPaths(nextSelection);
         const nextActive = nextSelection.at(-1) ?? null;
         selectionAnchor.current = nextActive;
@@ -1198,7 +1280,7 @@ export function App({
     setRecentEntries((current) => [
       entry,
       ...current.filter((candidate) => candidate.relativePath !== entry.relativePath),
-    ].slice(0, 12));
+    ].slice(0, 20));
   }
 
   function refreshBookmarks(itemKey: string) {
@@ -1654,6 +1736,27 @@ export function App({
     }
   }
 
+  async function chooseFileWithPicker() {
+    generation.current += 1;
+    const response = await pickLibraryFile(generation.current);
+    if (response.status === "ok" && response.data) {
+      const address = parseWindowsDriveAddress(response.data.absolutePath);
+      if (address === null || address.relativePath === "") {
+        setSelectionNotice("選択したファイルのWindowsパスを解決できませんでした。");
+        return;
+      }
+      const folder = parentPath(address.relativePath) ?? "";
+      if (await selectDrive(address.driveRoot, folder)) {
+        const entry = recentCatalogEntry(address.relativePath);
+        setSelectedPaths([entry.relativePath]);
+        setSelectedPath(entry.relativePath);
+        await openComicEntry(entry);
+      }
+    } else if (response.status === "error") {
+      setSelectionNotice(presentError(response.error));
+    }
+  }
+
   function navigate(
     path: string,
     history:
@@ -1900,6 +2003,9 @@ export function App({
       if (requestGeneration !== historyGeneration.current) return;
       if (response.status === "ok") {
         setReadingHistory(response.data);
+        setRecentEntries(response.data.slice(0, 20).map((entry) =>
+          recentCatalogEntry(entry.itemIdentity),
+        ));
       } else if (response.status === "error") {
         setHistoryNotice(presentError(response.error));
       }
@@ -1911,6 +2017,26 @@ export function App({
       if (requestGeneration === historyGeneration.current) {
         setHistoryLoading(false);
       }
+    }
+  }
+
+  async function clearRecentHistory() {
+    const requestGeneration = ++historyGeneration.current;
+    setHistoryLoading(true);
+    setHistoryNotice(null);
+    try {
+      const response = await clearReadingHistory(requestGeneration);
+      if (requestGeneration !== historyGeneration.current) return;
+      if (response.status === "ok") {
+        setReadingHistory([]);
+        setRecentEntries([]);
+      } else if (response.status === "error") {
+        setHistoryNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === historyGeneration.current) setHistoryNotice(presentUnexpectedError());
+    } finally {
+      if (requestGeneration === historyGeneration.current) setHistoryLoading(false);
     }
   }
 
@@ -2197,6 +2323,9 @@ export function App({
       addressBarVisible,
       statusBarVisible,
       alwaysOnTop,
+      navigationSelectionPolicy,
+      thumbnailGenerationScope,
+      startupLocation,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -2269,6 +2398,12 @@ export function App({
       setAddressBarVisible(normalized.addressBarVisible);
       setStatusBarVisible(normalized.statusBarVisible);
       setAlwaysOnTop(normalized.alwaysOnTop);
+      navigationSelectionPolicyRef.current = normalized.navigationSelectionPolicy;
+      thumbnailGenerationScopeRef.current = normalized.thumbnailGenerationScope;
+      setNavigationSelectionPolicy(normalized.navigationSelectionPolicy);
+      setThumbnailGenerationScope(normalized.thumbnailGenerationScope);
+      startupLocationRef.current = normalized.startupLocation;
+      setStartupLocation(normalized.startupLocation);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -2406,7 +2541,8 @@ export function App({
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, treeVisible,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
-    alwaysOnTop, shortcuts, mouseGestures,
+    alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
+    startupLocation, shortcuts, mouseGestures,
   ]);
 
   function queueThumbnail(
@@ -2766,7 +2902,7 @@ export function App({
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
     startAt: "restored" | "first" | "last" = "restored",
-  ) {
+  ): Promise<boolean> {
     const resolvedLaunchMode = launchMode === "normal" && entry.kind === "archive"
       ? "fullscreen"
       : launchMode;
@@ -2778,7 +2914,7 @@ export function App({
     const requestGeneration = viewerGeneration.current;
     try {
       const response = await openComic(entry.relativePath, requestGeneration);
-      if (requestGeneration !== viewerGeneration.current) return;
+      if (requestGeneration !== viewerGeneration.current) return false;
       if (response.status === "ok") {
         rememberRecent(entry);
         refreshBookmarks(response.data.itemKey);
@@ -2792,6 +2928,7 @@ export function App({
         });
         setLoadState({ status: "ready" });
         void loadItemMetadata(response.data.itemKey);
+        return true;
       } else if (response.status === "error") {
         setLoadState({
           status: "error",
@@ -2811,6 +2948,7 @@ export function App({
         });
       }
     }
+    return false;
   }
 
   async function viewerVolumeCatalog(
@@ -3173,6 +3311,16 @@ export function App({
               >
                 選択項目を開く
                 <span className="menu-shortcut">Enter</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
+                onClick={() => runMenuAction(() => void chooseFileWithPicker())}
+              >
+                ファイルを開く…
               </button>
               <div className="menu-separator" role="separator" />
               <span className="menu-heading">履歴</span>
@@ -4848,39 +4996,7 @@ export function App({
           </section>
         </div>
       )}
-      {helpOpen && (
-        <div className="dialog-backdrop">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="help-title"
-            className="help-dialog"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") closeHelp();
-            }}
-          >
-            <h2 id="help-title">キー操作とショートカット</h2>
-            <section aria-label="一般ヘルプ">
-              <h3>一般ヘルプ</h3>
-              <p>フォルダを登録し、フォルダ・漫画・単独画像をEnterで開きます。漫画はCtrl+Enterまたはダブルクリックでも読み始めます。</p>
-            </section>
-            <p>Enter: 選択項目を開く / Ctrl+Enter: 漫画として読む</p>
-            <p>Esc: アドレス編集を戻す / 矢印: 項目を移動</p>
-            <section aria-label="現在のショートカット">
-              <h3>現在のショートカット</h3>
-              <dl>
-                {SHORTCUT_COMMANDS.map((command) => (
-                  <div key={command}>
-                    <dt>{SHORTCUT_LABELS[command]}</dt>
-                    <dd>{shortcuts[command]}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-            <button data-product-id="shortcut-dialog-close" autoFocus onClick={closeHelp}>閉じる</button>
-          </div>
-        </div>
-      )}
+      {helpOpen && <OfflineHelp shortcuts={shortcuts} onClose={closeHelp} />}
       {versionOpen && (
         <div className="dialog-backdrop">
           <div
@@ -5124,6 +5240,13 @@ export function App({
                   >
                     <span>{entry.itemIdentity}</span>
                     <span>{entry.lastViewedAtMs}</span>
+                    <button
+                      type="button"
+                      onClick={() => void openComicEntry(recentCatalogEntry(entry.itemIdentity))
+                        .then((opened) => { if (opened) setHistoryOpen(false); })}
+                    >
+                      開く
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -5134,6 +5257,13 @@ export function App({
               onClick={() => void refreshHistory()}
             >
               更新
+            </button>
+            <button
+              type="button"
+              disabled={historyLoading || readingHistory.length === 0}
+              onClick={() => void clearRecentHistory()}
+            >
+              履歴を消去
             </button>
             <button
               type="button"

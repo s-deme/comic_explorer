@@ -188,7 +188,9 @@ dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入�
 名前・説明・現在値を対象にした検索で意味単位のsectionを切り替える。各設定は説明付きのrowとして表示し、
 狭幅時はnavigationと内容を1列layoutにする。既定値復元、profile import、個別編集は同じdraftを更新し、
 明示的な適用時だけ既存のatomic profile保存へ渡す。
-Leeyes viewer外観設定はfrontendとbackendで同じenum・数値範囲を検証し、app-local SQLiteへ既存設定と同じtransactionで保存する。strict profile v5は背景preset、page周囲余白、見開き間隔、cursor自動非表示時間、倍率保持scope、grid、pan係数、wheel不感帯、shell surface、always-on-topを必須fieldとし、profile v1〜v4およびkeyがない既存SQLiteには既定値を補う。gridは画像と原本から独立した`pointer-events: none`のoverlayとする。always-on-topはnative window APIを先に適用し、失敗時はprofileを保存せず、backend保存失敗時はnative状態を元へ戻す。
+Leeyes viewer外観設定はfrontendとbackendで同じenum・数値範囲を検証し、app-local SQLiteへ既存設定と同じtransactionで保存する。strict profile v6は背景preset、page周囲余白、見開き間隔、cursor自動非表示時間、倍率保持scope、grid、pan係数、wheel不感帯、shell surface、always-on-top、移動後初期選択、thumbnail生成範囲、起動場所を必須fieldとし、profile v1〜v5およびkeyがない既存SQLiteには導入時の既定値を補う。gridは画像と原本から独立した`pointer-events: none`のoverlayとする。always-on-topはnative window APIを先に適用し、失敗時はprofileを保存せず、backend保存失敗時はnative状態を元へ戻す。
+folder移動後の選択は無選択・先頭・末尾・folder別の直前選択復元を共有policyとして扱い、検索結果から親へ戻る明示選択を常に優先する。thumbnail生成範囲は表示中25件、表示中と近傍40件、全項目を選べるが、いずれも既存bounded worker、LRU、negative cacheを迂回しない。起動復元は前回folderまたは同じdrive rootを選び、設定取得が停止してもshell起動を100msより長く待たせない。
+native file pickerはWindows `IFileOpenDialog`へ対応拡張子filterを渡し、返されたregular fileをcanonicalize・readability・対応形式で再検証する。任意codeや外部appは起動しない。最近使った項目はSQLiteの読書履歴を新しい順20件に制限してFile menuと履歴dialogへ共有し、明示消去をrepository transaction境界で実行する。offline helpは同梱topicと現在のshortcutだけを検索・表示し、network locationを開かない。
 巻末動作は閲覧している作品の文脈でviewer toolbarから変更し、app-local設定へ保存する。
 
 keyboard focusとselectionは別状態で、menuはroving focusを使う。tree/catalog/viewerの主要操作はkeyboard、

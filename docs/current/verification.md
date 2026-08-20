@@ -56,6 +56,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | CoDD | PASS（red 0） | scan/check/verifyの最終結果を記録。advisory、SKIP、VACUOUSを機能PASSへ合算しない。 |
 | 性能・製品直接観測 | NOT RUN | この設定中心batchに専用性能目標はない。release WebView2のtopmost、grid目視、mouse/trackpad別の操作感は未測定。 |
 
+## Leeyes P1-B 既存機能完成
+
+対象はLEY-FILER-016、LEY-CATALOG-010、LEY-FILE-001/009、LEY-SETTING-005、LEY-HELP-001の6件。初期選択4 policy、thumbnail生成3 scope、Windows native file picker、recent上限20件・再起動復元・消去、起動場所2 policy、同梱help検索をprofile v6とapp-local SQLiteへ接続した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 27 files / 328件、FAIL 0。tracker/manifest 5件、profile v5→v6移行、不正enum拒否、初期選択、表示中25件のthumbnail scope、file picker接続、recent復元・消去、drive root起動、offline help検索を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Windows frontend build / SBOM | PASS | 68 modules、SBOM 729 components、unknown/prohibited license 0。`dist/`は生成物としてcommitしない。 |
+| Rust focused/canonical | PASS | file path再検証、profile enum検証、SQLite設定復元、history newest 20件・消去を含むlib 160件 + shutdown process 1件、`fmt --check`、`check --locked`、FAIL 0。既存dead-code warning 2件。 |
+| CoDD | PASS（red 0） | 最終文書・tracker同期後のscan/check/verifyはexit 0。scan 5 documents / 63 nodes / 139 edges、check red failure 0。advisory、SKIP、VACUOUSを機能PASSへ合算しない。 |
+| 性能・製品直接観測 | PARTIAL / NOT RUN | 自動testで50 archiveに対する表示中scope 25要求とhistory 25件から20件への上限を直接観測。基準PC時間・memoryは未測定。release WebView2のnative picker操作、欠落recent file、help visual/DPIは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

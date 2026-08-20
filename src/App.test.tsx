@@ -22,7 +22,9 @@ import {
   listTreeChildren,
   listFolder,
   listReadingHistory,
+  clearReadingHistory,
   openComic,
+  pickLibraryFile,
   pickLibraryRoot,
   registerLibraryRoot,
   removeFavorite,
@@ -65,6 +67,7 @@ import { APP_VERSION, DEFAULT_MOUSE_GESTURES } from "./features/settings/profile
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
+  pickLibraryFile: vi.fn(),
   pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
   listTreeChildren: vi.fn(),
@@ -101,6 +104,7 @@ vi.mock("./features/library/client", () => ({
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
+  clearReadingHistory: vi.fn(),
   renameFileItem: vi.fn(),
   createFileFolder: vi.fn(),
   copyFileItemsToFolder: vi.fn(),
@@ -122,6 +126,7 @@ function markViewerPrefetchReady(): void {
 
 const registerMock = vi.mocked(registerLibraryRoot);
 const pickerMock = vi.mocked(pickLibraryRoot);
+const filePickerMock = vi.mocked(pickLibraryFile);
 const listMock = vi.mocked(listFolder);
 const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
@@ -148,6 +153,7 @@ const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
+const clearHistoryMock = vi.mocked(clearReadingHistory);
 const diagnoseMock = vi.mocked(diagnoseLibrary);
 const renameFileItemMock = vi.mocked(renameFileItem);
 const createFileFolderMock = vi.mocked(createFileFolder);
@@ -190,6 +196,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   addressBarVisible: true,
   statusBarVisible: true,
   alwaysOnTop: false,
+  navigationSelectionPolicy: "restore",
+  thumbnailGenerationScope: "near",
+  startupLocation: "last",
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -378,6 +387,7 @@ describe("application shell", () => {
   beforeEach(() => {
     registerMock.mockReset();
     pickerMock.mockReset();
+    filePickerMock.mockReset();
     listMock.mockReset();
     treeMock.mockReset();
     restoreMock.mockReset();
@@ -404,6 +414,7 @@ describe("application shell", () => {
     searchMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
+    clearHistoryMock.mockReset();
     diagnoseMock.mockReset();
     renameFileItemMock.mockReset();
     createFileFolderMock.mockReset();
@@ -448,6 +459,12 @@ describe("application shell", () => {
       metadataResponse(itemIdentity, { rating }),
     );
     historyMock.mockResolvedValue(historyResponse([]));
+    clearHistoryMock.mockResolvedValue({
+      status: "ok",
+      requestId: "clear-history" as never,
+      generation: 1 as never,
+      data: undefined,
+    });
     listFavoritesMock.mockResolvedValue(favoritesResponse([]));
     addFavoriteMock.mockResolvedValue(favoritesResponse([]));
     removeFavoriteMock.mockResolvedValue(favoritesResponse([]));
@@ -523,6 +540,12 @@ describe("application shell", () => {
     pickerMock.mockResolvedValue({
       status: "ok",
       requestId: "picker" as never,
+      generation: 1 as never,
+      data: null,
+    });
+    filePickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-picker" as never,
       generation: 1 as never,
       data: null,
     });
@@ -620,6 +643,85 @@ describe("application shell", () => {
       ),
     );
     expect(registerMock).toHaveBeenCalledWith("C:\\", expect.any(Number));
+  });
+
+  it("REQ-LEY-P1-012 opens a supported file returned by the native picker", async () => {
+    await registerTestLibrary([]);
+    filePickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-picker" as never,
+      generation: 2 as never,
+      data: { absolutePath: "C:\\Picked\\volume.cbz" },
+    });
+    openMock.mockResolvedValue(viewerResponse("Picked/volume.cbz"));
+
+    chooseAppMenuItem("ファイル", "ファイルを開く…");
+
+    await waitFor(() => expect(openMock).toHaveBeenCalledWith(
+      "Picked/volume.cbz",
+      expect.any(Number),
+    ));
+    expect(registerMock).toHaveBeenLastCalledWith("C:\\", expect.any(Number));
+  });
+
+  it("REQ-LEY-P1-010 applies the configured initial-selection policy after navigation", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-selection" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, navigationSelectionPolicy: "last" },
+    });
+    await registerTestLibrary([testEntry("a.cbz"), testEntry("z.cbz")]);
+
+    expect(screen.getByRole("gridcell", { name: /z\.cbz/ }))
+      .toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("gridcell", { name: /a\.cbz/ }))
+      .toHaveAttribute("aria-selected", "false");
+  });
+
+  it("REQ-LEY-P1-011 limits automatic thumbnail work to the visible window", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-thumbnails" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, thumbnailGenerationScope: "visible" },
+    });
+    await registerTestLibrary(Array.from({ length: 50 }, (_, index) =>
+      testEntry(`volume-${String(index).padStart(2, "0")}.cbz`)));
+
+    await waitFor(() => expect(thumbnailMock).toHaveBeenCalledTimes(25));
+  });
+
+  it("REQ-LEY-P1-014 starts at the drive root when that startup policy is stored", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-startup" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, startupLocation: "driveRoot" },
+    });
+    restoreMock.mockResolvedValue({
+      status: "ok",
+      requestId: "restore-startup" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\Books\\Series" },
+    });
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "register-startup" as never,
+      generation: 1 as never,
+      data: { absolutePath: "C:\\" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "list-startup" as never,
+      generation: 2 as never,
+      data: [],
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"));
+    expect(listMock).toHaveBeenCalledWith("", expect.any(Number));
   });
 
   it("renders a sanitized, recoverable folder error without removing navigation", async () => {
@@ -1039,6 +1141,12 @@ describe("application shell", () => {
   });
 
   it("submits visible, near and background thumbnails with bounded-worker priorities", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-all-thumbnails" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, thumbnailGenerationScope: "all" },
+    });
     const entries: CatalogEntry[] = Array.from({ length: 45 }, (_, index) => ({
       relativePath: `book-${index.toString().padStart(2, "0")}.cbz` as never,
       kind: "archive",
@@ -2562,7 +2670,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 5,
+        profileVersion: 6,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -2682,6 +2790,40 @@ describe("application shell", () => {
     );
     expect(within(help).getByText(/Esc: アドレス編集を戻す/)).toBeInTheDocument();
     expect(within(help).queryByText(new RegExp(`バージョン ${APP_VERSION}`))).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P1-013 restores recent files across startup and opens them from the File menu", async () => {
+    historyMock.mockResolvedValue(historyResponse([{
+      itemIdentity: "Books/volume.cbz" as never,
+      lastViewedAtMs: 1_700_000_000_000,
+    }]));
+    openMock.mockResolvedValue(viewerResponse("Books/volume.cbz"));
+    await registerTestLibrary([]);
+
+    const fileMenu = openAppMenu("ファイル");
+    const recent = await within(fileMenu).findByRole("menuitem", { name: "volume.cbz" });
+    fireEvent.click(recent);
+
+    await waitFor(() => expect(openMock).toHaveBeenCalledWith(
+      "Books/volume.cbz",
+      expect.any(Number),
+    ));
+  });
+
+  it("REQ-LEY-P1-013 clears persistent reading history through the history dialog", async () => {
+    historyMock.mockResolvedValue(historyResponse([{
+      itemIdentity: "Books/volume.cbz" as never,
+      lastViewedAtMs: 1_700_000_000_000,
+    }]));
+    await registerTestLibrary([]);
+
+    chooseAppMenuItem("オプション", "閲覧履歴");
+    const dialog = await screen.findByRole("dialog", { name: "閲覧履歴" });
+    expect(within(dialog).getByText("Books/volume.cbz")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "履歴を消去" }));
+
+    await waitFor(() => expect(clearHistoryMock).toHaveBeenCalledOnce());
+    expect(within(dialog).queryByText("Books/volume.cbz")).not.toBeInTheDocument();
   });
 
   it("FT-B19-005 exposes version information and an offline license notice separately from help", async () => {

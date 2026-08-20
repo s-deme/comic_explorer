@@ -44,11 +44,24 @@ import {
 } from "../viewer/model";
 import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
+  NAVIGATION_SELECTION_POLICIES,
+  STARTUP_LOCATIONS,
+  THUMBNAIL_GENERATION_SCOPES,
   MOUSE_GESTURE_ACTIONS,
   type MouseGestureAction,
   type MouseGestureName,
   type SettingsProfile,
 } from "./profile";
+
+const NAVIGATION_SELECTION_LABELS: Record<SettingsProfile["navigationSelectionPolicy"], string> = {
+  none: "選択なし", first: "先頭", last: "末尾", restore: "前回選択を復元",
+};
+const THUMBNAIL_GENERATION_LABELS: Record<SettingsProfile["thumbnailGenerationScope"], string> = {
+  visible: "表示中のみ", near: "表示中と近傍", all: "全項目",
+};
+const STARTUP_LOCATION_LABELS: Record<SettingsProfile["startupLocation"], string> = {
+  last: "前回のフォルダ", driveRoot: "前回ドライブのルート",
+};
 
 type SettingsCategory = "catalog" | "viewer" | "interface" | "commands" | "profile";
 
@@ -254,6 +267,16 @@ export function SettingsDialog({
       text: `情報カード 横長 属性 表紙 サムネイル サイズ 幅 ${draft.catalogThumbnailSizes.referenceTile}px`,
     },
     {
+      id: "navigation-selection-policy",
+      category: "catalog",
+      text: `移動後 初期選択 先頭 末尾 復元 選択なし ${NAVIGATION_SELECTION_LABELS[draft.navigationSelectionPolicy]}`,
+    },
+    {
+      id: "thumbnail-generation-scope",
+      category: "catalog",
+      text: `サムネイル 生成 範囲 表示 近傍 全項目 ${THUMBNAIL_GENERATION_LABELS[draft.thumbnailGenerationScope]}`,
+    },
+    {
       id: "viewer-view-mode",
       category: "viewer",
       text: `閲覧モード 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 1ページずつまたは見開きで表示します`,
@@ -365,6 +388,11 @@ export function SettingsDialog({
       id: "profile-transfer",
       category: "profile",
       text: "設定 profile プロファイル 書き出し 読み込み 移行 バックアップ json",
+    },
+    {
+      id: "startup-location",
+      category: "profile",
+      text: `起動 場所 前回 フォルダ ドライブ ルート ${STARTUP_LOCATION_LABELS[draft.startupLocation]}`,
     },
     {
       id: "profile-safety",
@@ -543,6 +571,16 @@ export function SettingsDialog({
                   </div>
                 </SettingRow>
               ))}
+              <SettingRow id="navigation-selection-policy" title="移動後の初期選択" description="フォルダへ移動した直後に選ぶ項目を指定します。" hidden={rowHidden("navigation-selection-policy")}>
+                <select aria-label="profile移動後の初期選択" value={draft.navigationSelectionPolicy} onChange={(event) => update({ navigationSelectionPolicy: event.target.value as SettingsProfile["navigationSelectionPolicy"] })}>
+                  {NAVIGATION_SELECTION_POLICIES.map((policy) => <option key={policy} value={policy}>{NAVIGATION_SELECTION_LABELS[policy]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="thumbnail-generation-scope" title="サムネイル生成範囲" description="worker上限を保ったまま、先読みする範囲を選びます。" hidden={rowHidden("thumbnail-generation-scope")}>
+                <select aria-label="profileサムネイル生成範囲" value={draft.thumbnailGenerationScope} onChange={(event) => update({ thumbnailGenerationScope: event.target.value as SettingsProfile["thumbnailGenerationScope"] })}>
+                  {THUMBNAIL_GENERATION_SCOPES.map((scope) => <option key={scope} value={scope}>{THUMBNAIL_GENERATION_LABELS[scope]}</option>)}
+                </select>
+              </SettingRow>
             </section>
 
             <section className="settings-panel" aria-label="ビューワ設定" hidden={panelHidden("viewer")}>
@@ -847,6 +885,11 @@ export function SettingsDialog({
 
             <section className="settings-panel" aria-label="プロファイル設定" hidden={panelHidden("profile")}>
               <h3>プロファイル</h3>
+              <SettingRow id="startup-location" title="起動場所" description="前回のフォルダ、または前回ドライブのルートから開始します。" hidden={rowHidden("startup-location")}>
+                <select aria-label="profile起動場所" value={draft.startupLocation} onChange={(event) => update({ startupLocation: event.target.value as SettingsProfile["startupLocation"] })}>
+                  {STARTUP_LOCATIONS.map((location) => <option key={location} value={location}>{STARTUP_LOCATION_LABELS[location]}</option>)}
+                </select>
+              </SettingRow>
               <SettingRow id="profile-transfer" title="設定を移行する" description="現在の設定をJSONへ書き出すか、別の端末で書き出した設定を下書きへ読み込みます。" hidden={rowHidden("profile-transfer")}>
                 <div className="settings-inline-actions">
                   <button type="button" onClick={onExport}>profileを書き出す</button>
