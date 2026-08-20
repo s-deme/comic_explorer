@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 15,
+    profileVersion: 16,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -41,6 +41,9 @@ function validProfile(): SettingsProfile {
     trayStoreOnMinimize: false,
     trayCloseBehavior: "quit",
     trayRestoreGesture: "singleClick",
+    slideshowIntervalMs: 3_000,
+    slideshowOrder: "forward",
+    slideshowRepeatCurrentItem: false,
     viewerBackground: "checker",
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
@@ -114,7 +117,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 16, 99, "15", undefined])(
+  it.each([0, 17, 99, "16", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -357,6 +360,29 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(withField("trayStoreOnMinimize", "true"))).toBeNull();
     expect(normalizeSettingsProfile(withField("trayCloseBehavior", "ask"))).toBeNull();
     expect(normalizeSettingsProfile(withField("trayRestoreGesture", "middleClick"))).toBeNull();
+  });
+
+  it("REQ-LEY-P2-013 migrates v15 and validates slideshow detail settings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 15;
+    delete legacy.slideshowIntervalMs;
+    delete legacy.slideshowOrder;
+    delete legacy.slideshowRepeatCurrentItem;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      slideshowIntervalMs: 7_500,
+      slideshowOrder: "random",
+      slideshowRepeatCurrentItem: true,
+    })).toEqual(expect.objectContaining({
+      slideshowIntervalMs: 7_500,
+      slideshowOrder: "random",
+      slideshowRepeatCurrentItem: true,
+    }));
+    expect(normalizeSettingsProfile(withField("slideshowIntervalMs", 499))).toBeNull();
+    expect(normalizeSettingsProfile(withField("slideshowIntervalMs", 60_001))).toBeNull();
+    expect(normalizeSettingsProfile(withField("slideshowOrder", "shuffleForever"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("slideshowRepeatCurrentItem", "true"))).toBeNull();
   });
 
   it.each([

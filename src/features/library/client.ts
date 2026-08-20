@@ -143,6 +143,9 @@ export interface CatalogSettings {
   trayStoreOnMinimize: boolean;
   trayCloseBehavior: SettingsProfile["trayCloseBehavior"];
   trayRestoreGesture: SettingsProfile["trayRestoreGesture"];
+  slideshowIntervalMs: number;
+  slideshowOrder: SettingsProfile["slideshowOrder"];
+  slideshowRepeatCurrentItem: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -263,6 +266,9 @@ export async function saveSettingsProfile(
       trayStoreOnMinimize: profile.trayStoreOnMinimize,
       trayCloseBehavior: profile.trayCloseBehavior,
       trayRestoreGesture: profile.trayRestoreGesture,
+      slideshowIntervalMs: profile.slideshowIntervalMs,
+      slideshowOrder: profile.slideshowOrder,
+      slideshowRepeatCurrentItem: profile.slideshowRepeatCurrentItem,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

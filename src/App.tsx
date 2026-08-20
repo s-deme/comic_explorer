@@ -103,6 +103,13 @@ import type {
   ZoomRetention,
 } from "./features/viewer/model";
 import {
+  DEFAULT_SLIDESHOW_INTERVAL_MS,
+  DEFAULT_SLIDESHOW_ORDER,
+  isSlideshowIntervalMs,
+  isSlideshowOrder,
+  type SlideshowOrder,
+} from "./features/viewer/slideshow";
+import {
   DEFAULT_PAN_FACTOR,
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
@@ -503,6 +510,11 @@ export function App({
     useState<SettingsProfile["trayCloseBehavior"]>("quit");
   const [trayRestoreGesture, setTrayRestoreGesture] =
     useState<SettingsProfile["trayRestoreGesture"]>("singleClick");
+  const [slideshowIntervalMs, setSlideshowIntervalMs] =
+    useState(DEFAULT_SLIDESHOW_INTERVAL_MS);
+  const [slideshowOrder, setSlideshowOrder] =
+    useState<SlideshowOrder>(DEFAULT_SLIDESHOW_ORDER);
+  const [slideshowRepeatCurrentItem, setSlideshowRepeatCurrentItem] = useState(false);
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -936,6 +948,13 @@ export function App({
           setTrayStoreOnMinimize(response.data.trayStoreOnMinimize === true);
           setTrayCloseBehavior(response.data.trayCloseBehavior);
           setTrayRestoreGesture(response.data.trayRestoreGesture);
+          setSlideshowIntervalMs(isSlideshowIntervalMs(response.data.slideshowIntervalMs)
+            ? response.data.slideshowIntervalMs
+            : DEFAULT_SLIDESHOW_INTERVAL_MS);
+          setSlideshowOrder(isSlideshowOrder(response.data.slideshowOrder)
+            ? response.data.slideshowOrder
+            : DEFAULT_SLIDESHOW_ORDER);
+          setSlideshowRepeatCurrentItem(response.data.slideshowRepeatCurrentItem === true);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -2539,6 +2558,9 @@ export function App({
       trayStoreOnMinimize,
       trayCloseBehavior,
       trayRestoreGesture,
+      slideshowIntervalMs,
+      slideshowOrder,
+      slideshowRepeatCurrentItem,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2642,6 +2664,9 @@ export function App({
       setTrayStoreOnMinimize(normalized.trayStoreOnMinimize);
       setTrayCloseBehavior(normalized.trayCloseBehavior);
       setTrayRestoreGesture(normalized.trayRestoreGesture);
+      setSlideshowIntervalMs(normalized.slideshowIntervalMs);
+      setSlideshowOrder(normalized.slideshowOrder);
+      setSlideshowRepeatCurrentItem(normalized.slideshowRepeatCurrentItem);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2813,6 +2838,7 @@ export function App({
     prefetchAhead, prefetchBehind, prefetchMemoryMiB,
     fullscreenEscapeBehavior, preventDisplaySleepFullscreen,
     trayStoreOnMinimize, trayCloseBehavior, trayRestoreGesture,
+    slideshowIntervalMs, slideshowOrder, slideshowRepeatCurrentItem,
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
@@ -3401,7 +3427,10 @@ export function App({
           initialFullscreen={viewerLaunchMode === "fullscreen"}
           fullscreenEscapeBehavior={fullscreenEscapeBehavior}
           preventDisplaySleepFullscreen={preventDisplaySleepFullscreen}
-          slideshowIntervalMs={viewerLaunchMode === "slideshow" ? 3_000 : undefined}
+          initialSlideshow={viewerLaunchMode === "slideshow"}
+          slideshowIntervalMs={slideshowIntervalMs}
+          slideshowOrder={slideshowOrder}
+          slideshowRepeatCurrentItem={slideshowRepeatCurrentItem}
           onScaleChange={(next: ViewerScaleState) => {
             if (zoomRetention !== "global") return;
             setViewerScaleMode(next.mode);

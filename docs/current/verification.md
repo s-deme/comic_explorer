@@ -234,6 +234,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは359.415秒で全12 stageがexit 0。Rust canonical 150.790秒、release executable/freshness、GUI権限付きshortcut product回帰12.839秒、cleanup audit、CoDD scan/check/verifyを含む。 |
 | 性能・製品直接観測 | PARTIAL | event処理にtimer・polling・追加workerは導入していない。release通知領域で実際に最小化・閉じる・single/double click・明示Quitを操作する直接観測、複数monitor/DPI、Explorer再起動後のtray再登録は未測定。 |
 
+## Leeyes P2-M slideshow詳細設定
+
+対象はLEY-VIEWER-008の1件。P2-Aの単一timer slideshowへ0.5〜60秒の間隔、順方向・逆方向・random、現在作品内の反復を追加し、profile v16、SQLite、設定dialog、通常/slideshow起動viewerで共有する。Leeyesのrandom重複規則は未確認のため、page数以下のFisher-Yates shuffle-bagで1 cycle内の重複を防ぐ独自挙動を採用した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend | PASS | slideshow helper・Viewer・profile・Appの4 files / 229件、FAIL 0。0.5〜60秒境界、v15 migration、不正値拒否、atomic設定、逆順反復、random 1 cycleの全page一意・自動停止を含む。 |
+| TypeScript typecheck | PASS | Windows runnerでexit 0。 |
+| Windows tests / build | PASS | Python 59件、frontend 28 files / 397件、FAIL 0。frontend 69 modules build、bundle 517.52kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust settings / canonical | PASS | profileの間隔・順序invalid拒否、SQLiteの7.5秒・random・反復保存と再openをfocused 2件で確認。canonical lib 177件とshutdown process 1件、FAIL 0。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは364.735秒で全12 stageがexit 0。Rust canonical 152.466秒、release executable/freshness、GUI権限付きshortcut product回帰13.477秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能 | PASS / 限定 | `vite-node`で100,000 pageから現在pageを除くqueueを生成し、99,999件・全件一意・22.315ms。queueはpage数以下、同時timeoutは1件。単回synthetic測定でありrelease WebView2の長時間timer精度やprocess memoryを示さない。 |
+| 製品直接観測 | NOT RUN | release WebView2での長時間timer精度、background/focus復帰、実archiveのdecode/prefetch待機、順序・反復全組合せ、長時間memoryは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

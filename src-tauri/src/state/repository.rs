@@ -89,6 +89,9 @@ pub struct Settings {
     pub tray_store_on_minimize: bool,
     pub tray_close_behavior: String,
     pub tray_restore_gesture: String,
+    pub slideshow_interval_ms: String,
+    pub slideshow_order: String,
+    pub slideshow_repeat_current_item: bool,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -173,6 +176,9 @@ impl Default for Settings {
             tray_store_on_minimize: false,
             tray_close_behavior: "quit".into(),
             tray_restore_gesture: "singleClick".into(),
+            slideshow_interval_ms: "3000".into(),
+            slideshow_order: "forward".into(),
+            slideshow_repeat_current_item: false,
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -299,6 +305,11 @@ impl StateStore {
                 "trayStoreOnMinimize" => settings.tray_store_on_minimize = value == "true",
                 "trayCloseBehavior" => settings.tray_close_behavior = value,
                 "trayRestoreGesture" => settings.tray_restore_gesture = value,
+                "slideshowIntervalMs" => settings.slideshow_interval_ms = value,
+                "slideshowOrder" => settings.slideshow_order = value,
+                "slideshowRepeatCurrentItem" => {
+                    settings.slideshow_repeat_current_item = value == "true"
+                }
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -419,6 +430,15 @@ impl StateStore {
             ),
             ("trayCloseBehavior", settings.tray_close_behavior.clone()),
             ("trayRestoreGesture", settings.tray_restore_gesture.clone()),
+            (
+                "slideshowIntervalMs",
+                settings.slideshow_interval_ms.clone(),
+            ),
+            ("slideshowOrder", settings.slideshow_order.clone()),
+            (
+                "slideshowRepeatCurrentItem",
+                settings.slideshow_repeat_current_item.to_string(),
+            ),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
@@ -1483,6 +1503,9 @@ mod tests {
                 tray_store_on_minimize: true,
                 tray_close_behavior: "store".into(),
                 tray_restore_gesture: "doubleClick".into(),
+                slideshow_interval_ms: "7500".into(),
+                slideshow_order: "random".into(),
+                slideshow_repeat_current_item: true,
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1585,6 +1608,9 @@ mod tests {
         assert!(restored.tray_store_on_minimize);
         assert_eq!(restored.tray_close_behavior, "store");
         assert_eq!(restored.tray_restore_gesture, "doubleClick");
+        assert_eq!(restored.slideshow_interval_ms, "7500");
+        assert_eq!(restored.slideshow_order, "random");
+        assert!(restored.slideshow_repeat_current_item);
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

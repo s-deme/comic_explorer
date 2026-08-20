@@ -95,9 +95,16 @@ import {
   normalizeEndOfVolumePolicy,
   type EndOfVolumePolicy,
 } from "../catalog/end-of-volume";
+import {
+  createRandomSlideshowQueue,
+  DEFAULT_SLIDESHOW_INTERVAL_MS,
+  DEFAULT_SLIDESHOW_ORDER,
+  isSlideshowIntervalMs,
+  isSlideshowOrder,
+  type SlideshowOrder,
+} from "./slideshow";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
-const DEFAULT_SLIDESHOW_INTERVAL_MS = 3_000;
 
 interface ViewerProps {
   session: ViewerSession;
@@ -141,7 +148,10 @@ interface ViewerProps {
   initialFullscreen?: boolean;
   fullscreenEscapeBehavior?: FullscreenEscapeBehavior;
   preventDisplaySleepFullscreen?: boolean;
+  initialSlideshow?: boolean;
   slideshowIntervalMs?: number;
+  slideshowOrder?: SlideshowOrder;
+  slideshowRepeatCurrentItem?: boolean;
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
   mouseGestures?: MouseGestureBindings;
@@ -213,7 +223,10 @@ export function Viewer({
   initialFullscreen = false,
   fullscreenEscapeBehavior = "exitFullscreen",
   preventDisplaySleepFullscreen = false,
+  initialSlideshow,
   slideshowIntervalMs,
+  slideshowOrder: initialSlideshowOrder = DEFAULT_SLIDESHOW_ORDER,
+  slideshowRepeatCurrentItem = false,
   bookmarks = [],
   onPageChange,
   mouseGestures,
@@ -264,6 +277,12 @@ export function Viewer({
   const pageScanMode = PAGE_SCAN_MODES.includes(initialPageScanMode)
     ? initialPageScanMode
     : DEFAULT_PAGE_SCAN_MODE;
+  const activeSlideshowIntervalMs = isSlideshowIntervalMs(slideshowIntervalMs)
+    ? slideshowIntervalMs
+    : DEFAULT_SLIDESHOW_INTERVAL_MS;
+  const slideshowOrder = isSlideshowOrder(initialSlideshowOrder)
+    ? initialSlideshowOrder
+    : DEFAULT_SLIDESHOW_ORDER;
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
     mode: initialMode,
@@ -302,7 +321,7 @@ export function Viewer({
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [slideshowRunning, setSlideshowRunning] = useState(
-    slideshowIntervalMs !== undefined && session.pages.length > 1,
+    (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
   );
   const [slideshowPlaybackAllowed, setSlideshowPlaybackAllowed] = useState(
     () => document.visibilityState !== "hidden",
@@ -336,6 +355,7 @@ export function Viewer({
   const displayAwakeHeldRef = useRef(false);
   const fullscreenRef = useRef(false);
   const lifecycleMountedRef = useRef(true);
+  const randomSlideshowQueueRef = useRef<number[]>([]);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -616,6 +636,47 @@ export function Viewer({
     });
   }
 
+  function advanceSlideshow() {
+    if (slideshowOrder === "random") {
+      let queue = randomSlideshowQueueRef.current.filter((index) => index !== state.index);
+      if (queue.length === 0) {
+        queue = createRandomSlideshowQueue(session.pages.length, state.index);
+      }
+      const [target, ...remaining] = queue;
+      if (target === undefined) {
+        setSlideshowRunning(false);
+        return;
+      }
+      randomSlideshowQueueRef.current = remaining;
+      dispatch({ type: "go", index: target });
+      if (remaining.length === 0 && !slideshowRepeatCurrentItem) {
+        setSlideshowRunning(false);
+      }
+      return;
+    }
+    if (slideshowOrder === "reverse") {
+      if (slideshowRepeatCurrentItem && state.index === 0) {
+        dispatch({ type: "go", index: session.pages.length - 1 });
+      } else {
+        previous();
+      }
+      return;
+    }
+    const atEnd = state.index + Math.max(1, visible.length) >= session.pages.length;
+    if (slideshowRepeatCurrentItem && atEnd) {
+      dispatch({ type: "go", index: 0 });
+    } else {
+      next();
+    }
+  }
+
+  function toggleSlideshow() {
+    setSlideshowRunning((current) => {
+      if (!current && slideshowOrder === "random") randomSlideshowQueueRef.current = [];
+      return !current;
+    });
+  }
+
   useEffect(() => {
     if (pendingNextIndex === null || pendingNextIndex !== nextStartIndex) return;
     if (nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))) return;
@@ -886,8 +947,14 @@ export function Viewer({
   }, [initialFullscreen]);
 
   useEffect(() => {
-    setSlideshowRunning(slideshowIntervalMs !== undefined && session.pages.length > 1);
-  }, [session.itemKey, session.pages.length, slideshowIntervalMs]);
+    setSlideshowRunning(
+      (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
+    );
+  }, [initialSlideshow, session.itemKey, session.pages.length, slideshowIntervalMs]);
+
+  useEffect(() => {
+    randomSlideshowQueueRef.current = [];
+  }, [session.itemKey, session.pages.length, slideshowOrder]);
 
   useEffect(() => {
     const updateVisibility = () => {
@@ -909,14 +976,15 @@ export function Viewer({
 
   useEffect(() => {
     if (!slideshowRunning || !slideshowPlaybackAllowed || session.pages.length <= 1) return;
-    const interval = Math.max(500, slideshowIntervalMs ?? DEFAULT_SLIDESHOW_INTERVAL_MS);
-    const timer = window.setTimeout(next, interval);
+    const timer = window.setTimeout(advanceSlideshow, activeSlideshowIntervalMs);
     return () => window.clearTimeout(timer);
   }, [
+    activeSlideshowIntervalMs,
     session.pages.length,
-    slideshowIntervalMs,
     slideshowPlaybackAllowed,
     slideshowRunning,
+    slideshowOrder,
+    slideshowRepeatCurrentItem,
     state.index,
     state.mode,
     visible.length,
@@ -1156,6 +1224,8 @@ export function Viewer({
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
       data-page-navigator-visible={!fullscreen || fullscreenPageNavigatorVisible}
       data-slideshow={slideshowRunning}
+      data-slideshow-order={slideshowOrder}
+      data-slideshow-repeat-current={slideshowRepeatCurrentItem}
       onPointerMove={(event) => {
         if (
           fullscreen
@@ -1339,10 +1409,12 @@ export function Viewer({
         <button
           className="viewer-icon-button"
           aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
-          title={slideshowRunning ? "スライドショーを停止" : "3秒間隔でスライドショーを開始"}
+          title={slideshowRunning
+            ? "スライドショーを停止"
+            : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
           aria-pressed={slideshowRunning}
           disabled={session.pages.length <= 1}
-          onClick={() => setSlideshowRunning((current) => !current)}
+          onClick={toggleSlideshow}
         >
           <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
         </button>

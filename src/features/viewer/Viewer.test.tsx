@@ -1555,6 +1555,76 @@ describe("Viewer settings", () => {
     }
   });
 
+  it("REQ-LEY-P2-013 uses the configured reverse interval and repeats inside the item", async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Viewer
+          session={{ ...multiPageSession, startIndex: 0 }}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialSlideshow
+          slideshowIntervalMs={500}
+          slideshowOrder="reverse"
+          slideshowRepeatCurrentItem
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTime(499));
+      expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTime(1));
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+      expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow-order", "reverse");
+      expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow-repeat-current", "true");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("REQ-LEY-P2-013 visits every random page once and stops after one bounded cycle", async () => {
+    vi.useFakeTimers();
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const randomSession = {
+        ...multiPageSession,
+        pages: [
+          ...multiPageSession.pages,
+          { id: "page-3" as never, relativePath: "3.png" as never, mediaUri: "comic://localhost/three" },
+          { id: "page-4" as never, relativePath: "4.png" as never, mediaUri: "comic://localhost/four" },
+        ],
+      };
+      render(
+        <Viewer
+          session={randomSession}
+          generation={1}
+          initialMode="single"
+          initialDirection="rightToLeft"
+          initialSlideshow
+          slideshowIntervalMs={500}
+          slideshowOrder="random"
+          onSettingsChange={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+      const visited = new Set([screen.getByText(/1 \/ 4/).textContent]);
+      for (let step = 0; step < 3; step += 1) {
+        await act(async () => vi.advanceTimersByTime(500));
+        visited.add(screen.getByText(/\d \/ 4/).textContent);
+      }
+      expect(visited.size).toBe(4);
+      expect(document.querySelector(".viewer")).toHaveAttribute("data-slideshow", "false");
+      const finalPage = screen.getByText(/\d \/ 4/).textContent;
+      await act(async () => vi.advanceTimersByTime(1_000));
+      expect(screen.getByText(/\d \/ 4/).textContent).toBe(finalPage);
+    } finally {
+      random.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("FT-B15-001 resolves stale bookmark ordinals by pageKey and opens them from the list", async () => {
     render(
       <Viewer

@@ -66,6 +66,11 @@ import {
   type ZoomRetention,
 } from "../viewer/model";
 import {
+  MAX_SLIDESHOW_INTERVAL_MS,
+  MIN_SLIDESHOW_INTERVAL_MS,
+  SLIDESHOW_ORDERS,
+} from "../viewer/slideshow";
+import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
   CATALOG_PALETTES,
   NAVIGATION_SELECTION_POLICIES,
@@ -91,6 +96,11 @@ const TRAY_CLOSE_LABELS: Record<SettingsProfile["trayCloseBehavior"], string> = 
 const TRAY_RESTORE_LABELS: Record<SettingsProfile["trayRestoreGesture"], string> = {
   singleClick: "左シングルクリック",
   doubleClick: "左ダブルクリック",
+};
+const SLIDESHOW_ORDER_LABELS: Record<SettingsProfile["slideshowOrder"], string> = {
+  forward: "順方向",
+  reverse: "逆方向",
+  random: "ランダム（1巡内で重複なし）",
 };
 
 const CATALOG_PALETTE_LABELS: Record<SettingsProfile["catalogPalette"], string> = {
@@ -441,6 +451,11 @@ export function SettingsDialog({
       category: "viewer",
       text: `グリッド 格子 間隔 ${draft.viewerGridSize}px ${VIEWER_GRID_COLOR_LABELS[draft.viewerGridColor]}`,
     },
+    {
+      id: "slideshow-settings",
+      category: "viewer",
+      text: `スライドショー 間隔 ${draft.slideshowIntervalMs / 1000}秒 順序 ${SLIDESHOW_ORDER_LABELS[draft.slideshowOrder]} 反復 ${draft.slideshowRepeatCurrentItem ? "現在の作品を繰り返す" : "巻末動作に従う"}`,
+    },
     ...([
       ["tree-visible", "フォルダツリー", draft.treeVisible, "ライブラリの階層を左側へ表示します"],
       ["menu-visible", "メニューバー", draft.menuBarVisible, "すべてのアプリメニューを画面上部へ表示します"],
@@ -783,6 +798,48 @@ export function SettingsDialog({
                 <select aria-label="profile巻末動作" value={draft.endOfVolumePolicy} onChange={(event) => update({ endOfVolumePolicy: normalizeEndOfVolumePolicy(event.target.value) })}>
                   {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
+              </SettingRow>
+              <SettingRow id="slideshow-settings" title="スライドショー" description="自動送りの間隔・順序と、現在の作品内で繰り返すかを指定します。ランダムは1巡内で同じページを重ねません。" hidden={rowHidden("slideshow-settings")}>
+                <div className="settings-inline-actions">
+                  <label className="settings-number-control">
+                    間隔
+                    <input
+                      type="number"
+                      aria-label="profileスライドショー間隔（秒）"
+                      min={MIN_SLIDESHOW_INTERVAL_MS / 1000}
+                      max={MAX_SLIDESHOW_INTERVAL_MS / 1000}
+                      step="0.5"
+                      value={draft.slideshowIntervalMs / 1000}
+                      onChange={(event) => update({
+                        slideshowIntervalMs: Math.min(
+                          MAX_SLIDESHOW_INTERVAL_MS,
+                          Math.max(MIN_SLIDESHOW_INTERVAL_MS, Math.round(Number(event.target.value) * 1000)),
+                        ),
+                      })}
+                    />
+                    <span>秒</span>
+                  </label>
+                  <select
+                    aria-label="profileスライドショー順序"
+                    value={draft.slideshowOrder}
+                    onChange={(event) => update({
+                      slideshowOrder: event.target.value as SettingsProfile["slideshowOrder"],
+                    })}
+                  >
+                    {SLIDESHOW_ORDERS.map((order) => (
+                      <option key={order} value={order}>{SLIDESHOW_ORDER_LABELS[order]}</option>
+                    ))}
+                  </select>
+                  <label className="settings-switch">
+                    <input
+                      type="checkbox"
+                      aria-label="profile現在の作品を繰り返す"
+                      checked={draft.slideshowRepeatCurrentItem}
+                      onChange={(event) => update({ slideshowRepeatCurrentItem: event.target.checked })}
+                    />
+                    <span>{draft.slideshowRepeatCurrentItem ? "反復する" : "反復しない"}</span>
+                  </label>
+                </div>
               </SettingRow>
               <SettingRow id="reading-direction" title="読み方向" description="見開きの配置と左右キーの進行方向を揃えます。" hidden={rowHidden("reading-direction")}>
                 <select aria-label="profile読み方向" value={draft.readingDirection} onChange={(event) => update({ readingDirection: event.target.value as SettingsProfile["readingDirection"] })}>

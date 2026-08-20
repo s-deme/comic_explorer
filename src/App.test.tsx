@@ -212,6 +212,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   trayStoreOnMinimize: false,
   trayCloseBehavior: "quit",
   trayRestoreGesture: "singleClick",
+  slideshowIntervalMs: 3_000,
+  slideshowOrder: "forward",
+  slideshowRepeatCurrentItem: false,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -2930,7 +2933,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 15,
+        profileVersion: 16,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -3057,10 +3060,36 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 15,
+        profileVersion: 16,
         trayStoreOnMinimize: true,
         trayCloseBehavior: "store",
         trayRestoreGesture: "doubleClick",
+      }),
+      expect.any(Number),
+    ));
+  });
+
+  it("REQ-LEY-P2-013 persists slideshow interval, order, and repeat atomically", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
+    fireEvent.change(within(dialog).getByLabelText("profileスライドショー間隔（秒）"), {
+      target: { value: "7.5" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profileスライドショー順序"), {
+      target: { value: "random" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profile現在の作品を繰り返す"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileVersion: 16,
+        slideshowIntervalMs: 7_500,
+        slideshowOrder: "random",
+        slideshowRepeatCurrentItem: true,
       }),
       expect.any(Number),
     ));

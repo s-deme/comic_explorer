@@ -73,10 +73,17 @@ import {
   END_OF_VOLUME_POLICIES,
   type EndOfVolumePolicy,
 } from "../catalog/end-of-volume";
+import {
+  DEFAULT_SLIDESHOW_INTERVAL_MS,
+  DEFAULT_SLIDESHOW_ORDER,
+  isSlideshowIntervalMs,
+  isSlideshowOrder,
+  type SlideshowOrder,
+} from "../viewer/slideshow";
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 15;
+export const SETTINGS_PROFILE_VERSION = 16;
 export const APP_VERSION = packageMetadata.version;
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
@@ -164,6 +171,9 @@ export interface SettingsProfile {
   trayStoreOnMinimize: boolean;
   trayCloseBehavior: TrayCloseBehavior;
   trayRestoreGesture: TrayRestoreGesture;
+  slideshowIntervalMs: number;
+  slideshowOrder: SlideshowOrder;
+  slideshowRepeatCurrentItem: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -225,6 +235,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     trayStoreOnMinimize: false,
     trayCloseBehavior: "quit",
     trayRestoreGesture: "singleClick",
+    slideshowIntervalMs: DEFAULT_SLIDESHOW_INTERVAL_MS,
+    slideshowOrder: DEFAULT_SLIDESHOW_ORDER,
+    slideshowRepeatCurrentItem: false,
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -419,6 +432,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const trayRestoreGesture = legacyTrayPreferences
     ? "singleClick"
     : enumValue(candidate.trayRestoreGesture, TRAY_RESTORE_GESTURES);
+  const legacySlideshowPreferences = legacyTrayPreferences || candidate.profileVersion === 15;
+  const slideshowIntervalMs = legacySlideshowPreferences
+    ? DEFAULT_SLIDESHOW_INTERVAL_MS
+    : candidate.slideshowIntervalMs;
+  const slideshowOrder = legacySlideshowPreferences
+    ? DEFAULT_SLIDESHOW_ORDER
+    : isSlideshowOrder(candidate.slideshowOrder) ? candidate.slideshowOrder : null;
+  const slideshowRepeatCurrentItem = legacySlideshowPreferences
+    ? false
+    : candidate.slideshowRepeatCurrentItem;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -434,6 +457,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 12
       && candidate.profileVersion !== 13
       && candidate.profileVersion !== 14
+      && candidate.profileVersion !== 15
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -466,6 +490,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof trayStoreOnMinimize !== "boolean" ||
     trayCloseBehavior === null ||
     trayRestoreGesture === null ||
+    !isSlideshowIntervalMs(slideshowIntervalMs) ||
+    slideshowOrder === null ||
+    typeof slideshowRepeatCurrentItem !== "boolean" ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -527,6 +554,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     trayStoreOnMinimize,
     trayCloseBehavior,
     trayRestoreGesture,
+    slideshowIntervalMs,
+    slideshowOrder,
+    slideshowRepeatCurrentItem,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

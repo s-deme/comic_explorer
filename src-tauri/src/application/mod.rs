@@ -336,6 +336,9 @@ pub struct CatalogSettings {
     pub tray_store_on_minimize: bool,
     pub tray_close_behavior: String,
     pub tray_restore_gesture: String,
+    pub slideshow_interval_ms: u32,
+    pub slideshow_order: String,
+    pub slideshow_repeat_current_item: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -407,6 +410,9 @@ pub struct SettingsProfileInput {
     pub tray_store_on_minimize: bool,
     pub tray_close_behavior: String,
     pub tray_restore_gesture: String,
+    pub slideshow_interval_ms: u32,
+    pub slideshow_order: String,
+    pub slideshow_repeat_current_item: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -475,6 +481,8 @@ const MAX_LOUPE_ZOOM: f64 = 8.0;
 const MAX_PREFETCH_PAGE_COUNT: u8 = 4;
 const MIN_PREFETCH_MEMORY_MIB: u16 = 16;
 const MAX_PREFETCH_MEMORY_MIB: u16 = 512;
+const MIN_SLIDESHOW_INTERVAL_MS: u32 = 500;
+const MAX_SLIDESHOW_INTERVAL_MS: u32 = 60_000;
 const DEFAULT_PREFETCH_AHEAD: u8 = 4;
 const DEFAULT_PREFETCH_BEHIND: u8 = 0;
 const DEFAULT_PREFETCH_MEMORY_MIB: u16 = 256;
@@ -1005,6 +1013,24 @@ fn prefetch_memory_mib(settings: &crate::state::Settings) -> u16 {
         .unwrap_or(DEFAULT_PREFETCH_MEMORY_MIB)
 }
 
+fn slideshow_interval_ms(settings: &crate::state::Settings) -> u32 {
+    settings
+        .slideshow_interval_ms
+        .parse::<u32>()
+        .ok()
+        .filter(|interval| {
+            (MIN_SLIDESHOW_INTERVAL_MS..=MAX_SLIDESHOW_INTERVAL_MS).contains(interval)
+        })
+        .unwrap_or(3_000)
+}
+
+fn slideshow_order(settings: &crate::state::Settings) -> String {
+    match settings.slideshow_order.as_str() {
+        "forward" | "reverse" | "random" => settings.slideshow_order.clone(),
+        _ => "forward".into(),
+    }
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -1027,6 +1053,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let fit_basis = fit_basis(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
     let layout_mode = viewer_layout_mode(&settings);
+    let slideshow_interval_ms = slideshow_interval_ms(&settings);
+    let slideshow_order = slideshow_order(&settings);
     let viewer_background = viewer_background(&settings);
     let viewer_page_margin =
         viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN);
@@ -1086,6 +1114,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             "singleClick" | "doubleClick" => settings.tray_restore_gesture,
             _ => "singleClick".into(),
         },
+        slideshow_interval_ms,
+        slideshow_order,
+        slideshow_repeat_current_item: settings.slideshow_repeat_current_item,
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -2530,6 +2561,12 @@ fn validate_settings_profile(
             profile.tray_restore_gesture.as_str(),
             "singleClick" | "doubleClick"
         )
+        || !(MIN_SLIDESHOW_INTERVAL_MS..=MAX_SLIDESHOW_INTERVAL_MS)
+            .contains(&profile.slideshow_interval_ms)
+        || !matches!(
+            profile.slideshow_order.as_str(),
+            "forward" | "reverse" | "random"
+        )
         || !matches!(
             profile.viewer_background.as_str(),
             "checker" | "dark" | "black" | "light"
@@ -2648,6 +2685,9 @@ pub fn set_settings_profile(
         settings.tray_store_on_minimize = profile.tray_store_on_minimize;
         settings.tray_close_behavior = profile.tray_close_behavior;
         settings.tray_restore_gesture = profile.tray_restore_gesture;
+        settings.slideshow_interval_ms = profile.slideshow_interval_ms.to_string();
+        settings.slideshow_order = profile.slideshow_order;
+        settings.slideshow_repeat_current_item = profile.slideshow_repeat_current_item;
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -4558,6 +4598,9 @@ mod shutdown_tests {
             tray_store_on_minimize: false,
             tray_close_behavior: "quit".into(),
             tray_restore_gesture: "singleClick".into(),
+            slideshow_interval_ms: 3_000,
+            slideshow_order: "forward".into(),
+            slideshow_repeat_current_item: false,
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
@@ -4599,6 +4642,18 @@ mod shutdown_tests {
                 .prefetch_memory_mib,
             256
         );
+        profile.slideshow_interval_ms = 499;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.slideshow_interval_ms = 3_000;
+        profile.slideshow_order = "shuffleForever".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.slideshow_order = "random".into();
 
         profile.catalog_thumbnail_sizes.small_thumbnail = 63;
         assert_eq!(
