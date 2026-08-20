@@ -24,14 +24,23 @@ import {
 } from "../input/shortcuts";
 import {
   MAX_VIEWER_SPACING,
+  MAX_PAN_FACTOR,
+  MAX_VIEWER_GRID_SIZE,
+  MAX_WHEEL_DEAD_ZONE,
+  MIN_PAN_FACTOR,
+  MIN_VIEWER_GRID_SIZE,
+  MIN_WHEEL_DEAD_ZONE,
   MIN_VIEWER_SPACING,
   normalizeViewerLayoutMode,
   VIEWER_BACKGROUNDS,
   VIEWER_CURSOR_AUTO_HIDE_DELAYS,
+  VIEWER_GRID_COLORS,
   VIEWER_LAYOUT_MODE_LABELS,
   VIEWER_LAYOUT_MODES,
   type ScaleMode,
   type ViewerBackground,
+  type ViewerGridColor,
+  type ZoomRetention,
 } from "../viewer/model";
 import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
@@ -96,6 +105,17 @@ const CURSOR_AUTO_HIDE_LABELS: Record<number, string> = {
   2000: "2秒",
   3000: "3秒",
   5000: "5秒",
+};
+
+const ZOOM_RETENTION_LABELS: Record<ZoomRetention, string> = {
+  global: "すべての作品で保持",
+  book: "現在の作品だけ",
+  page: "現在のページだけ",
+};
+
+const VIEWER_GRID_COLOR_LABELS: Record<ViewerGridColor, string> = {
+  light: "明色",
+  dark: "暗色",
 };
 
 const GESTURE_LABELS: Record<MouseGestureName, string> = {
@@ -292,12 +312,25 @@ export function SettingsDialog({
     {
       id: "custom-scale",
       category: "viewer",
-      text: `任意倍率 パーセント ${Math.round(draft.scale * 100)}% 25%から400%の範囲で指定します`,
+      text: `任意倍率 パーセント ${Math.round(draft.scale * 100)}% 1%から800%の範囲で指定します`,
+    },
+    {
+      id: "zoom-retention",
+      category: "viewer",
+      text: `倍率 保持 作品 ページ 全体 ${ZOOM_RETENTION_LABELS[draft.zoomRetention]}`,
+    },
+    {
+      id: "viewer-grid",
+      category: "viewer",
+      text: `グリッド 格子 間隔 ${draft.viewerGridSize}px ${VIEWER_GRID_COLOR_LABELS[draft.viewerGridColor]}`,
     },
     ...([
       ["tree-visible", "フォルダツリー", draft.treeVisible, "ライブラリの階層を左側へ表示します"],
       ["menu-visible", "メニューバー", draft.menuBarVisible, "すべてのアプリメニューを画面上部へ表示します"],
       ["toolbar-visible", "ツールバー", draft.toolbarVisible, "移動や検索などよく使う操作を表示します"],
+      ["address-visible", "アドレスバー", draft.addressBarVisible, "現在位置と直接移動欄を表示します"],
+      ["status-visible", "ステータスバー", draft.statusBarVisible, "選択件数と処理状態を表示します"],
+      ["always-on-top", "常に手前", draft.alwaysOnTop, "main windowを他のwindowより手前に保ちます"],
     ] as const).map(([id, label, visible, description]) => ({
       id,
       category: "interface" as const,
@@ -313,6 +346,16 @@ export function SettingsDialog({
       category: "commands" as const,
       text: `${GESTURE_LABELS[name]} マウス ジェスチャー ${gestureActionLabel(draft.mouseGestures[name])} ${GESTURE_DESCRIPTIONS[name]}`,
     })),
+    {
+      id: "pan-factor",
+      category: "commands",
+      text: `ドラッグ パン 感度 係数 ${Math.round(draft.panFactor * 100)}%`,
+    },
+    {
+      id: "wheel-dead-zone",
+      category: "commands",
+      text: `ホイール 不感帯 閾値 ${draft.wheelDeadZone}`,
+    },
     {
       id: "gesture-double-click",
       category: "commands",
@@ -603,13 +646,13 @@ export function SettingsDialog({
                   {Object.entries(SCALE_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </SettingRow>
-              <SettingRow id="custom-scale" title="任意倍率" description="任意倍率を25%から400%の範囲で指定します。" hidden={rowHidden("custom-scale")}>
+              <SettingRow id="custom-scale" title="任意倍率" description="任意倍率を1%から800%の範囲で指定します。" hidden={rowHidden("custom-scale")}>
                 <div className="settings-number-control">
                   <input
                     type="number"
                     aria-label="profile任意倍率（%）"
-                    min="25"
-                    max="400"
+                    min="1"
+                    max="800"
                     step="1"
                     value={Math.round(draft.scale * 100)}
                     onChange={(event) => {
@@ -620,6 +663,57 @@ export function SettingsDialog({
                   <span>%</span>
                 </div>
               </SettingRow>
+              <SettingRow id="zoom-retention" title="倍率の保持" description="倍率を全作品、現在の作品、現在のページのどこまで保持するか選びます。" hidden={rowHidden("zoom-retention")}>
+                <select
+                  aria-label="profile倍率の保持"
+                  value={draft.zoomRetention}
+                  onChange={(event) => update({ zoomRetention: event.target.value as ZoomRetention })}
+                >
+                  {Object.entries(ZOOM_RETENTION_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </SettingRow>
+              <SettingRow id="viewer-grid" title="グリッド" description="画像の上へ非破壊の格子を重ねます。" hidden={rowHidden("viewer-grid")}>
+                <div className="settings-inline-actions">
+                  <label className="settings-switch">
+                    <input
+                      type="checkbox"
+                      aria-label="profileグリッド"
+                      checked={draft.viewerGridEnabled}
+                      onChange={(event) => update({ viewerGridEnabled: event.target.checked })}
+                    />
+                    <span>{draft.viewerGridEnabled ? "有効" : "無効"}</span>
+                  </label>
+                  <label className="settings-number-control">
+                    間隔
+                    <input
+                      type="number"
+                      aria-label="profileグリッド間隔（px）"
+                      min={MIN_VIEWER_GRID_SIZE}
+                      max={MAX_VIEWER_GRID_SIZE}
+                      step="1"
+                      value={draft.viewerGridSize}
+                      onChange={(event) => update({
+                        viewerGridSize: Math.min(
+                          MAX_VIEWER_GRID_SIZE,
+                          Math.max(MIN_VIEWER_GRID_SIZE, Math.round(Number(event.target.value))),
+                        ),
+                      })}
+                    />
+                    <span>px</span>
+                  </label>
+                  <select
+                    aria-label="profileグリッド色"
+                    value={draft.viewerGridColor}
+                    onChange={(event) => update({ viewerGridColor: event.target.value as ViewerGridColor })}
+                  >
+                    {VIEWER_GRID_COLORS.map((color) => (
+                      <option key={color} value={color}>{VIEWER_GRID_COLOR_LABELS[color]}</option>
+                    ))}
+                  </select>
+                </div>
+              </SettingRow>
             </section>
 
             <section className="settings-panel" aria-label="画面設定" hidden={panelHidden("interface")}>
@@ -628,6 +722,8 @@ export function SettingsDialog({
                 ["tree-visible", "treeVisible", "フォルダツリー", "ライブラリの階層を左側へ表示します。"],
                 ["menu-visible", "menuBarVisible", "メニューバー", "すべてのアプリメニューを画面上部へ表示します。"],
                 ["toolbar-visible", "toolbarVisible", "ツールバー", "移動や検索など、よく使う操作を表示します。"],
+                ["address-visible", "addressBarVisible", "アドレスバー", "現在位置と直接移動欄を表示します。"],
+                ["status-visible", "statusBarVisible", "ステータスバー", "選択件数と処理状態を表示します。"],
               ] as const).map(([id, field, label, description]) => (
                 <SettingRow key={id} id={id} title={label} description={description} hidden={rowHidden(id)}>
                   <label className="settings-switch">
@@ -641,6 +737,17 @@ export function SettingsDialog({
                   </label>
                 </SettingRow>
               ))}
+              <SettingRow id="always-on-top" title="常に手前" description="main windowを他のwindowより手前に保ちます。" hidden={rowHidden("always-on-top")}>
+                <label className="settings-switch">
+                  <input
+                    type="checkbox"
+                    aria-label="profile常に手前"
+                    checked={draft.alwaysOnTop}
+                    onChange={(event) => update({ alwaysOnTop: event.target.checked })}
+                  />
+                  <span>{draft.alwaysOnTop ? "有効" : "無効"}</span>
+                </label>
+              </SettingRow>
             </section>
 
             <section className="settings-panel settings-panel--commands" aria-label="ショートカット設定" hidden={panelHidden("commands")}>
@@ -685,6 +792,41 @@ export function SettingsDialog({
                 </div>
               ))}
               <h3 className="settings-subheading">マウスジェスチャー</h3>
+              <SettingRow id="pan-factor" title="ドラッグ移動係数" description="画像をpointerでpanするときの移動量だけを50%〜200%で調整します。" hidden={rowHidden("pan-factor")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profileドラッグ移動係数（%）"
+                    min={MIN_PAN_FACTOR * 100}
+                    max={MAX_PAN_FACTOR * 100}
+                    step="10"
+                    value={Math.round(draft.panFactor * 100)}
+                    onChange={(event) => update({
+                      panFactor: Math.min(
+                        MAX_PAN_FACTOR,
+                        Math.max(MIN_PAN_FACTOR, Number(event.target.value) / 100),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="wheel-dead-zone" title="ホイール不感帯" description="ページ送りに変換しない小さなwheel deltaを0〜200で指定します。" hidden={rowHidden("wheel-dead-zone")}>
+                <input
+                  type="number"
+                  aria-label="profileホイール不感帯"
+                  min={MIN_WHEEL_DEAD_ZONE}
+                  max={MAX_WHEEL_DEAD_ZONE}
+                  step="1"
+                  value={draft.wheelDeadZone}
+                  onChange={(event) => update({
+                    wheelDeadZone: Math.min(
+                      MAX_WHEEL_DEAD_ZONE,
+                      Math.max(MIN_WHEEL_DEAD_ZONE, Math.round(Number(event.target.value))),
+                    ),
+                  })}
+                />
+              </SettingRow>
               {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
                 <SettingRow
                   key={name}

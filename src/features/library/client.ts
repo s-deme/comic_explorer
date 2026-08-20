@@ -12,7 +12,13 @@ import type {
   RelativePath,
   RequestId,
 } from "../../types/domain";
-import type { ScaleMode, ViewerBackground, ViewerLayoutMode } from "../viewer/model";
+import type {
+  ScaleMode,
+  ViewerBackground,
+  ViewerGridColor,
+  ViewerLayoutMode,
+  ZoomRetention,
+} from "../viewer/model";
 import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import type { SearchRequestOptions } from "../catalog/search-options";
@@ -85,9 +91,18 @@ export interface CatalogSettings {
   viewerPageMargin: number;
   viewerSpreadGap: number;
   cursorAutoHideMs: number;
+  zoomRetention: ZoomRetention;
+  viewerGridEnabled: boolean;
+  viewerGridSize: number;
+  viewerGridColor: ViewerGridColor;
+  panFactor: number;
+  wheelDeadZone: number;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
+  addressBarVisible: boolean;
+  statusBarVisible: boolean;
+  alwaysOnTop: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -155,9 +170,18 @@ export async function saveSettingsProfile(
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,
       cursorAutoHideMs: profile.cursorAutoHideMs,
+      zoomRetention: profile.zoomRetention,
+      viewerGridEnabled: profile.viewerGridEnabled,
+      viewerGridSize: profile.viewerGridSize,
+      viewerGridColor: profile.viewerGridColor,
+      panFactor: profile.panFactor,
+      wheelDeadZone: profile.wheelDeadZone,
       treeVisible: profile.treeVisible,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,
+      addressBarVisible: profile.addressBarVisible,
+      statusBarVisible: profile.statusBarVisible,
+      alwaysOnTop: profile.alwaysOnTop,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },

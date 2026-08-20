@@ -11,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { FullscreenAdapter } from "./features/viewer/fullscreen";
+import type { AlwaysOnTopAdapter } from "./features/workspace/window";
 import {
   getCatalogSettings,
   getItemMetadata,
@@ -177,9 +178,18 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
   cursorAutoHideMs: 0,
+  zoomRetention: "global",
+  viewerGridEnabled: false,
+  viewerGridSize: 32,
+  viewerGridColor: "light",
+  panFactor: 1,
+  wheelDeadZone: 0,
   treeVisible: true,
   menuBarVisible: true,
   toolbarVisible: true,
+  addressBarVisible: true,
+  statusBarVisible: true,
+  alwaysOnTop: false,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -287,6 +297,7 @@ function historyResponse(data: ReadingHistoryEntry[]) {
 async function registerTestLibrary(
   entries: CatalogEntry[],
   fullscreenAdapter?: FullscreenAdapter,
+  alwaysOnTopAdapter?: AlwaysOnTopAdapter,
 ) {
   restoreMock.mockResolvedValue({
     status: "ok",
@@ -316,7 +327,7 @@ async function registerTestLibrary(
       retryable: true,
     },
   });
-  render(<App fullscreenAdapter={fullscreenAdapter} />);
+  render(<App fullscreenAdapter={fullscreenAdapter} alwaysOnTopAdapter={alwaysOnTopAdapter} />);
   await screen.findByRole("grid", { name: "現在のフォルダの項目" });
 }
 
@@ -2383,8 +2394,8 @@ describe("application shell", () => {
       name: "profile任意倍率（%）",
     });
     expect(draftScale).toHaveValue(100);
-    expect(draftScale).toHaveAttribute("min", "25");
-    expect(draftScale).toHaveAttribute("max", "400");
+    expect(draftScale).toHaveAttribute("min", "1");
+    expect(draftScale).toHaveAttribute("max", "800");
     expect(draftScale).toHaveAttribute("step", "1");
     fireEvent.change(draftScale, { target: { value: "175" } });
     fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
@@ -2454,6 +2465,50 @@ describe("application shell", () => {
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   }, 10_000);
 
+  it("REQ-LEY-P1-001, P1-002, and P1-005 connect keyboard settings, shell surfaces, and topmost atomically", async () => {
+    const alwaysOnTopAdapter = { setAlwaysOnTop: vi.fn().mockResolvedValue(undefined) };
+    await registerTestLibrary([], undefined, alwaysOnTopAdapter);
+    expect(alwaysOnTopAdapter.setAlwaysOnTop).toHaveBeenCalledWith(false);
+
+    fireEvent.keyDown(window, { key: ",", ctrlKey: true });
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByLabelText("profileアドレスバー"));
+    fireEvent.click(within(dialog).getByLabelText("profileステータスバー"));
+    fireEvent.click(within(dialog).getByLabelText("profile常に手前"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(alwaysOnTopAdapter.setAlwaysOnTop).toHaveBeenLastCalledWith(true);
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        addressBarVisible: false,
+        statusBarVisible: false,
+        alwaysOnTop: true,
+      }),
+      expect.any(Number),
+    );
+    expect(screen.queryByLabelText("アドレス")).not.toBeInTheDocument();
+    expect(document.querySelector(".status-bar")).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P1-002 keeps settings unchanged when native topmost apply fails", async () => {
+    const alwaysOnTopAdapter = { setAlwaysOnTop: vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("window unavailable")) };
+    await registerTestLibrary([], undefined, alwaysOnTopAdapter);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByLabelText("profile常に手前"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    expect(await within(dialog).findByText(/常に手前を切り替えられません/)).toBeInTheDocument();
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "統合設定" })).toBeInTheDocument();
+  });
+
   it("FT-B19-006 searches categorized settings and resets the whole draft", async () => {
     await registerTestLibrary([]);
     chooseAppMenuItem("オプション", "統合設定…");
@@ -2507,7 +2562,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 4,
+        profileVersion: 5,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

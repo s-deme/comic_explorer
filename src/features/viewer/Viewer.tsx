@@ -12,11 +12,22 @@ import {
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_PAN_FACTOR,
+  DEFAULT_VIEWER_GRID_COLOR,
+  DEFAULT_VIEWER_GRID_SIZE,
+  DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_ZOOM_RETENTION,
   LOUPE_SIZE,
   LOUPE_ZOOM,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
   normalizeViewerSpacing,
+  normalizeViewerGridColor,
+  normalizeZoomRetention,
+  isPanFactor,
+  isViewerGridSize,
+  isWheelDeadZone,
+  scaleForPixelDimension,
   scaleReducer,
   viewerReducer,
   visibleIndices,
@@ -25,8 +36,10 @@ import {
   type ViewerScaleAction,
   type ViewerScaleState,
   type ViewerBackground,
+  type ViewerGridColor,
   type ViewMode,
   type ViewerLayoutMode,
+  type ZoomRetention,
 } from "./model";
 import {
   VIEWER_LAYOUT_MODE_LABELS,
@@ -78,6 +91,12 @@ interface ViewerProps {
   initialPageMargin?: number;
   initialSpreadGap?: number;
   initialCursorAutoHideMs?: number;
+  zoomRetention?: ZoomRetention;
+  viewerGridEnabled?: boolean;
+  viewerGridSize?: number;
+  viewerGridColor?: ViewerGridColor;
+  panFactor?: number;
+  wheelDeadZone?: number;
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
@@ -131,6 +150,12 @@ export function Viewer({
   initialPageMargin = DEFAULT_VIEWER_PAGE_MARGIN,
   initialSpreadGap = DEFAULT_VIEWER_SPREAD_GAP,
   initialCursorAutoHideMs = DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  zoomRetention: initialZoomRetention = DEFAULT_ZOOM_RETENTION,
+  viewerGridEnabled = false,
+  viewerGridSize: initialViewerGridSize = DEFAULT_VIEWER_GRID_SIZE,
+  viewerGridColor: initialViewerGridColor = DEFAULT_VIEWER_GRID_COLOR,
+  panFactor: initialPanFactor = DEFAULT_PAN_FACTOR,
+  wheelDeadZone: initialWheelDeadZone = DEFAULT_WHEEL_DEAD_ZONE,
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
@@ -156,6 +181,15 @@ export function Viewer({
   const cursorAutoHideMs = normalizeViewerCursorAutoHideMs(
     initialCursorAutoHideMs,
   );
+  const zoomRetention = normalizeZoomRetention(initialZoomRetention);
+  const viewerGridSize = isViewerGridSize(initialViewerGridSize)
+    ? initialViewerGridSize
+    : DEFAULT_VIEWER_GRID_SIZE;
+  const viewerGridColor = normalizeViewerGridColor(initialViewerGridColor);
+  const panFactor = isPanFactor(initialPanFactor) ? initialPanFactor : DEFAULT_PAN_FACTOR;
+  const wheelDeadZone = isWheelDeadZone(initialWheelDeadZone)
+    ? initialWheelDeadZone
+    : DEFAULT_WHEEL_DEAD_ZONE;
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
     mode: initialMode,
@@ -181,6 +215,9 @@ export function Viewer({
   const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [loupe, setLoupe] = useState<LoupeState | null>(null);
+  const [pixelWidthInput, setPixelWidthInput] = useState("");
+  const [pixelHeightInput, setPixelHeightInput] = useState("");
+  const [pixelScaleError, setPixelScaleError] = useState<string | null>(null);
   const activeShortcuts = useMemo(
     () => normalizeShortcutBindings(shortcuts),
     [shortcuts],
@@ -454,6 +491,29 @@ export function Viewer({
     onScaleChange?.(next);
     if (!next.loupeEnabled) setLoupe(null);
   }
+
+  function applyPixelDimension(axis: "width" | "height", value: string) {
+    const image = spreadRef.current?.querySelector<HTMLImageElement>(
+      `img[data-page-index="${state.index}"]:not(.prefetch-page)`,
+    );
+    const requested = Number(value);
+    const natural = axis === "width" ? image?.naturalWidth : image?.naturalHeight;
+    const next = scaleForPixelDimension(requested, natural ?? 0);
+    if (next === null) {
+      setPixelScaleError("1〜32768pxかつ1〜800%に収まる寸法を指定してください。");
+      return;
+    }
+    setPixelScaleError(null);
+    applyScale({ type: "scale", scale: next });
+  }
+
+  useEffect(() => {
+    if (zoomRetention !== "page") return;
+    const reset = createViewerScaleState(initialScaleMode, initialScale, initialLoupeEnabled);
+    setScale(reset);
+    setDisplayedScale(reset.scale);
+    setLoupe(null);
+  }, [state.index, zoomRetention]);
 
   useLayoutEffect(() => {
     if (scale.mode === "custom") {
@@ -865,8 +925,8 @@ export function Viewer({
           <input
             aria-label="任意倍率（%）"
             type="number"
-            min="25"
-            max="400"
+            min="1"
+            max="800"
             step="1"
             value={Math.round(scale.scale * 100)}
             disabled={scale.mode !== "custom"}
@@ -877,6 +937,51 @@ export function Viewer({
           />
           <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
         </label>
+        <label className="viewer-pixel-control">
+          幅px
+          <input
+            aria-label="表示幅（px）"
+            type="number"
+            min="1"
+            max="32768"
+            step="1"
+            value={pixelWidthInput}
+            onChange={(event) => setPixelWidthInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") applyPixelDimension("width", pixelWidthInput);
+            }}
+          />
+          <button
+            type="button"
+            className="viewer-icon-button"
+            aria-label="表示幅を適用"
+            title="表示幅を適用"
+            onClick={() => applyPixelDimension("width", pixelWidthInput)}
+          >適用</button>
+        </label>
+        <label className="viewer-pixel-control">
+          高さpx
+          <input
+            aria-label="表示高さ（px）"
+            type="number"
+            min="1"
+            max="32768"
+            step="1"
+            value={pixelHeightInput}
+            onChange={(event) => setPixelHeightInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") applyPixelDimension("height", pixelHeightInput);
+            }}
+          />
+          <button
+            type="button"
+            className="viewer-icon-button"
+            aria-label="表示高さを適用"
+            title="表示高さを適用"
+            onClick={() => applyPixelDimension("height", pixelHeightInput)}
+          >適用</button>
+        </label>
+        {pixelScaleError && <span className="viewer-control-error" role="alert">{pixelScaleError}</span>}
         <button
           className="viewer-icon-button"
           aria-label="前ページ"
@@ -1096,8 +1201,8 @@ export function Viewer({
           if (Math.abs(event.clientX - drag.startX) >= 4 || Math.abs(event.clientY - drag.startY) >= 4) {
             setPanning(true);
           }
-          spread.scrollLeft -= deltaX;
-          spread.scrollTop -= deltaY;
+          spread.scrollLeft -= deltaX * panFactor;
+          spread.scrollTop -= deltaY * panFactor;
           drag.lastX = event.clientX;
           drag.lastY = event.clientY;
           event.preventDefault();
@@ -1202,6 +1307,7 @@ export function Viewer({
               event.preventDefault();
             }
           } else if (!scrollLayout && event.deltaY !== 0) {
+            if (Math.abs(event.deltaY) < wheelDeadZone) return;
             event.preventDefault();
             applyMouseGesture(
               event.deltaY > 0
@@ -1236,6 +1342,14 @@ export function Viewer({
             ),
           )}
         </div>
+        {viewerGridEnabled && (
+          <div
+            className="viewer-grid-overlay"
+            data-grid-color={viewerGridColor}
+            aria-hidden="true"
+            style={{ "--viewer-grid-size": `${viewerGridSize}px` } as CSSProperties}
+          />
+        )}
         {scale.loupeEnabled && loupe && mediaUris[loupe.index] && (
           <div
             className="viewer-loupe"

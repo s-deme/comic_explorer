@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 4,
+    profileVersion: 5,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -28,9 +28,18 @@ function validProfile(): SettingsProfile {
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
     cursorAutoHideMs: 0,
+    zoomRetention: "global",
+    viewerGridEnabled: false,
+    viewerGridSize: 32,
+    viewerGridColor: "light",
+    panFactor: 1,
+    wheelDeadZone: 0,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
+    addressBarVisible: true,
+    statusBarVisible: true,
+    alwaysOnTop: false,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -73,7 +82,7 @@ describe("settings profile", () => {
     expect(profile).not.toHaveProperty("secretToken");
   });
 
-  it.each([0, 5, 99, "4", undefined])(
+  it.each([0, 6, 99, "5", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -116,6 +125,16 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 
+  it("migrates a v4 profile with the P1-A viewer and shell defaults", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 4;
+    for (const field of [
+      "zoomRetention", "viewerGridEnabled", "viewerGridSize", "viewerGridColor",
+      "panFactor", "wheelDeadZone", "addressBarVisible", "statusBarVisible", "alwaysOnTop",
+    ]) delete legacy[field];
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
   it.each([
     { smallThumbnail: 63, coverList: 144, cardGrid: 216, referenceTile: 128 },
     { smallThumbnail: 104, coverList: 321, cardGrid: 216, referenceTile: 128 },
@@ -142,17 +161,34 @@ describe("settings profile", () => {
   });
 
   it.each([
+    ["zoomRetention", "forever"],
+    ["viewerGridColor", "red"],
+    ["viewerGridSize", 7],
+    ["viewerGridSize", 257],
+    ["panFactor", 0.49],
+    ["panFactor", 2.01],
+    ["wheelDeadZone", -1],
+    ["wheelDeadZone", 201],
+  ])("rejects an invalid P1-A profile field %s=%s", (field, value) => {
+    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+  });
+
+  it.each([
     "sortDescending",
     "loupeEnabled",
     "treeVisible",
     "menuBarVisible",
     "toolbarVisible",
+    "viewerGridEnabled",
+    "addressBarVisible",
+    "statusBarVisible",
+    "alwaysOnTop",
   ])("requires %s to be a boolean", (field) => {
     expect(normalizeSettingsProfile(withField(field, "false"))).toBeNull();
     expect(normalizeSettingsProfile(withField(field, undefined))).toBeNull();
   });
 
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0.24, 4.01, "1"])(
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 0, 8.01, "1"])(
     "rejects a non-finite, non-numeric, or out-of-range scale (%s)",
     (scale) => {
       expect(normalizeSettingsProfile(withField("scale", scale))).toBeNull();

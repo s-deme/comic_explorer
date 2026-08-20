@@ -75,9 +75,18 @@ pub struct Settings {
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
     pub cursor_auto_hide_ms: String,
+    pub zoom_retention: String,
+    pub viewer_grid_enabled: bool,
+    pub viewer_grid_size: String,
+    pub viewer_grid_color: String,
+    pub pan_factor: String,
+    pub wheel_dead_zone: String,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
+    pub address_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub always_on_top: bool,
     pub shortcut_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
@@ -114,9 +123,18 @@ impl Default for Settings {
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
             cursor_auto_hide_ms: "0".into(),
+            zoom_retention: "global".into(),
+            viewer_grid_enabled: false,
+            viewer_grid_size: "32".into(),
+            viewer_grid_color: "light".into(),
+            pan_factor: "1".into(),
+            wheel_dead_zone: "0".into(),
             tree_visible: true,
             menu_bar_visible: true,
             toolbar_visible: true,
+            address_bar_visible: true,
+            status_bar_visible: true,
+            always_on_top: false,
             shortcut_bindings: default_shortcut_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
@@ -198,9 +216,18 @@ impl StateStore {
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
                 "cursorAutoHideMs" => settings.cursor_auto_hide_ms = value,
+                "zoomRetention" => settings.zoom_retention = value,
+                "viewerGridEnabled" => settings.viewer_grid_enabled = value == "true",
+                "viewerGridSize" => settings.viewer_grid_size = value,
+                "viewerGridColor" => settings.viewer_grid_color = value,
+                "panFactor" => settings.pan_factor = value,
+                "wheelDeadZone" => settings.wheel_dead_zone = value,
                 "treeVisible" => settings.tree_visible = value == "true",
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
+                "addressBarVisible" => settings.address_bar_visible = value == "true",
+                "statusBarVisible" => settings.status_bar_visible = value == "true",
+                "alwaysOnTop" => settings.always_on_top = value == "true",
                 "shortcutBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.shortcut_bindings = bindings;
@@ -261,9 +288,24 @@ impl StateStore {
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
             ("viewerSpreadGap", settings.viewer_spread_gap.clone()),
             ("cursorAutoHideMs", settings.cursor_auto_hide_ms.clone()),
+            ("zoomRetention", settings.zoom_retention.clone()),
+            (
+                "viewerGridEnabled",
+                settings.viewer_grid_enabled.to_string(),
+            ),
+            ("viewerGridSize", settings.viewer_grid_size.clone()),
+            ("viewerGridColor", settings.viewer_grid_color.clone()),
+            ("panFactor", settings.pan_factor.clone()),
+            ("wheelDeadZone", settings.wheel_dead_zone.clone()),
             ("treeVisible", settings.tree_visible.to_string()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
+            (
+                "addressBarVisible",
+                settings.address_bar_visible.to_string(),
+            ),
+            ("statusBarVisible", settings.status_bar_visible.to_string()),
+            ("alwaysOnTop", settings.always_on_top.to_string()),
             ("shortcutBindings", shortcut_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
@@ -1132,9 +1174,18 @@ mod tests {
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
                 cursor_auto_hide_ms: "2000".into(),
+                zoom_retention: "book".into(),
+                viewer_grid_enabled: true,
+                viewer_grid_size: "48".into(),
+                viewer_grid_color: "dark".into(),
+                pan_factor: "1.5".into(),
+                wheel_dead_zone: "24".into(),
                 tree_visible: false,
                 menu_bar_visible: false,
                 toolbar_visible: true,
+                address_bar_visible: false,
+                status_bar_visible: false,
+                always_on_top: true,
                 shortcut_bindings: [
                     ("nextPage".into(), "N".into()),
                     ("previousPage".into(), "P".into()),
@@ -1198,9 +1249,18 @@ mod tests {
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");
         assert_eq!(restored.cursor_auto_hide_ms, "2000");
+        assert_eq!(restored.zoom_retention, "book");
+        assert!(restored.viewer_grid_enabled);
+        assert_eq!(restored.viewer_grid_size, "48");
+        assert_eq!(restored.viewer_grid_color, "dark");
+        assert_eq!(restored.pan_factor, "1.5");
+        assert_eq!(restored.wheel_dead_zone, "24");
         assert!(!restored.tree_visible);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);
+        assert!(!restored.address_bar_visible);
+        assert!(!restored.status_bar_visible);
+        assert!(restored.always_on_top);
         assert_eq!(restored.shortcut_bindings["nextPage"], "N");
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],

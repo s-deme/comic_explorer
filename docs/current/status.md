@@ -30,16 +30,18 @@ codd:
 
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
-| P1 即効改善 | 21 | 0 | 21 |
+| P1 即効改善 | 21 | 9 | 12 |
 | P2 閲覧中核 | 16 | 0 | 16 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **0** | **103** |
+| **合計** | **103** | **9** | **94** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
 Leeyes互換方式へ変更しない。
+
+P1-AではLEY-SHELL-012/013、LEY-VIEWER-020/021/022/031、LEY-INPUT-004/010/012の9件をPublishedとした。shell 5面の独立表示、常に手前、1〜800%倍率、pixel寸法指定、倍率保持scope、非破壊grid、設定/shortcut reset、pan係数、wheel不感帯をprofile v5とSQLiteへ接続した。Windows自動gateはPASS。release WebView2でのtopmost、grid目視、実mouse/trackpad差は未測定であり、性能値や製品直接観測のPASSへ合算しない。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
@@ -67,9 +69,9 @@ Leeyes互換方式へ変更しない。
 
 | Lane | 対象 | 現在状態 | 未完了境界 |
 |---|---|---|---|
-| FR-B01 | 表示倍率 | Implemented / PASS | page layoutの横幅フィットはviewer stage全幅・全高を使い、見開きではpage間gapだけを残す。stageより低い画像の上下中央配置と、高い画像を上端から下端まで末尾の固定余白なしでscrollできるstyle contractをWindows testで検証済み。 |
+| FR-B01 | 表示倍率 | Implemented / PASS | page layoutのfitに加え、1〜800%の直接入力、原寸から1〜32768pxの幅/高さ指定、global/book/page保持scopeをWindows testで検証済み。 |
 | FR-B02 | 巻末policy | Implemented / PASS | folder内画像を1冊として閲覧した巻末では親catalogのsort順から次巻を選び、次項目が通常folderでもbackendのfolder画像列挙へ渡して先頭pageを開くことをWindows frontend testで検証済み。 |
-| FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッド、情報カードの順序・名称、4形式別の固定thumbnail幅、表紙中心の縦型grid、外枠と内側余白を省いて4px間隔で並べる大判表紙だけのカードグリッド、属性付き横長情報カードの区別、ファイル名非重複、profile v1/v2からv3への移行とprofile v4での保持、SQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
+| FR-B03 | catalog表示形式 | Implemented / PASS | 詳細、小サムネイル、表紙グリッド、カードグリッド、情報カードの順序・名称、4形式別の固定thumbnail幅、表紙中心の縦型grid、外枠と内側余白を省いて4px間隔で並べる大判表紙だけのカードグリッド、属性付き横長情報カードの区別、ファイル名非重複、profile v1/v2からv3への移行とprofile v4/v5での保持、SQLite再起動復元をWindows frontend/Rust/Python testで検証。 |
 | FR-B05 | 名前検索 | Implemented / PASS | 10,000項目/1秒はNFR gate。 |
 | FR-B06 | quick access・favorite保存 | Implemented / PASS | — |
 | FR-B07 | memo・history・rating | Implemented / PASS | — |
@@ -89,7 +91,7 @@ Leeyes互換方式へ変更しない。
 | FR-B20 / P10 | thumbnail maintenance | Implemented / BLOCKED | 製品file picker、実JPEG保存、一括import未測定。 |
 | FR-B21 | standalone PDF | Implemented / PASS | Windows.Data.Pdfの実render、canonical path正規化、上限・分類・root containmentに加え、release WebView2のviewer・thumbnail実decodeを日本語名PDFで直接観測済み。 |
 | FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、Shell delete path正規化、catalog/tree context menu・keyboard操作・右click宛先paste・catalog/tree双方を起点とするdrag move・tree folder削除後の安全な親folder遷移・操作後tree再列挙・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorerとの実paste、アプリ選択の製品直接観測は未測定。 |
-| FR-B23 | Leeyes viewer操作・外観 | Implemented / PASS | LEY-VIEWER-004、025、028を選択範囲として、見開きanchorの1page移動、4背景preset、0〜64pxの周囲余白・見開き間隔、無効/1/2/3/5秒のstage cursor自動非表示、profile v4・SQLite保存、v1〜v3移行、不正値拒否をWindows frontend 296件、Python 56件、Rust canonical、typecheck、buildで検証済み。release WebView2上の目視・操作は未測定であり、自動検証PASSへ合算しない。 |
+| FR-B23 | Leeyes viewer操作・外観 | Implemented / PASS | 既存3件にP1-Aのviewer/input 6件を加え、1〜800%倍率、pixel寸法、倍率scope、grid、pan係数、wheel不感帯、profile v5・SQLite保存、v1〜v4移行、不正値拒否をWindows frontend 316件、Python 59件、Rust canonical、typecheck、buildで検証済み。release WebView2上の目視・実device操作は未測定。 |
 
 ## CandidateとRejected
 

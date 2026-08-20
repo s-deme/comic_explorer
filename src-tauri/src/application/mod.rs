@@ -287,9 +287,18 @@ pub struct CatalogSettings {
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
     pub cursor_auto_hide_ms: u32,
+    pub zoom_retention: String,
+    pub viewer_grid_enabled: bool,
+    pub viewer_grid_size: u16,
+    pub viewer_grid_color: String,
+    pub pan_factor: f64,
+    pub wheel_dead_zone: u16,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
+    pub address_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub always_on_top: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -321,9 +330,18 @@ pub struct SettingsProfileInput {
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
     pub cursor_auto_hide_ms: u32,
+    pub zoom_retention: String,
+    pub viewer_grid_enabled: bool,
+    pub viewer_grid_size: u16,
+    pub viewer_grid_color: String,
+    pub pan_factor: f64,
+    pub wheel_dead_zone: u16,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
+    pub address_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub always_on_top: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -347,9 +365,14 @@ pub struct FavoriteEntry {
     pub status: FavoriteStatus,
 }
 
-const MIN_VIEWER_SCALE: f64 = 0.25;
-const MAX_VIEWER_SCALE: f64 = 4.0;
+const MIN_VIEWER_SCALE: f64 = 0.01;
+const MAX_VIEWER_SCALE: f64 = 8.0;
 const MAX_VIEWER_SPACING: u16 = 64;
+const MIN_VIEWER_GRID_SIZE: u16 = 8;
+const MAX_VIEWER_GRID_SIZE: u16 = 256;
+const MIN_PAN_FACTOR: f64 = 0.5;
+const MAX_PAN_FACTOR: f64 = 2.0;
+const MAX_WHEEL_DEAD_ZONE: u16 = 200;
 const DEFAULT_VIEWER_PAGE_MARGIN: u16 = 0;
 const DEFAULT_VIEWER_SPREAD_GAP: u16 = 8;
 const MIN_CATALOG_THUMBNAIL_SIZE: u16 = 64;
@@ -739,6 +762,47 @@ fn viewer_cursor_auto_hide_ms(settings: &crate::state::Settings) -> u32 {
         .unwrap_or(0)
 }
 
+fn zoom_retention(settings: &crate::state::Settings) -> String {
+    match settings.zoom_retention.as_str() {
+        "global" | "book" | "page" => settings.zoom_retention.clone(),
+        _ => "global".into(),
+    }
+}
+
+fn viewer_grid_size(settings: &crate::state::Settings) -> u16 {
+    settings
+        .viewer_grid_size
+        .parse::<u16>()
+        .ok()
+        .filter(|size| (MIN_VIEWER_GRID_SIZE..=MAX_VIEWER_GRID_SIZE).contains(size))
+        .unwrap_or(32)
+}
+
+fn viewer_grid_color(settings: &crate::state::Settings) -> String {
+    match settings.viewer_grid_color.as_str() {
+        "light" | "dark" => settings.viewer_grid_color.clone(),
+        _ => "light".into(),
+    }
+}
+
+fn pan_factor(settings: &crate::state::Settings) -> f64 {
+    settings
+        .pan_factor
+        .parse::<f64>()
+        .ok()
+        .filter(|factor| factor.is_finite() && (MIN_PAN_FACTOR..=MAX_PAN_FACTOR).contains(factor))
+        .unwrap_or(1.0)
+}
+
+fn wheel_dead_zone(settings: &crate::state::Settings) -> u16 {
+    settings
+        .wheel_dead_zone
+        .parse::<u16>()
+        .ok()
+        .filter(|threshold| *threshold <= MAX_WHEEL_DEAD_ZONE)
+        .unwrap_or(0)
+}
+
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
@@ -751,6 +815,11 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         viewer_spacing(&settings.viewer_page_margin, DEFAULT_VIEWER_PAGE_MARGIN);
     let viewer_spread_gap = viewer_spacing(&settings.viewer_spread_gap, DEFAULT_VIEWER_SPREAD_GAP);
     let cursor_auto_hide_ms = viewer_cursor_auto_hide_ms(&settings);
+    let zoom_retention = zoom_retention(&settings);
+    let viewer_grid_size = viewer_grid_size(&settings);
+    let viewer_grid_color = viewer_grid_color(&settings);
+    let pan_factor = pan_factor(&settings);
+    let wheel_dead_zone = wheel_dead_zone(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
@@ -770,9 +839,18 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         viewer_page_margin,
         viewer_spread_gap,
         cursor_auto_hide_ms,
+        zoom_retention,
+        viewer_grid_enabled: settings.viewer_grid_enabled,
+        viewer_grid_size,
+        viewer_grid_color,
+        pan_factor,
+        wheel_dead_zone,
         tree_visible: settings.tree_visible,
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
+        address_bar_visible: settings.address_bar_visible,
+        status_bar_visible: settings.status_bar_visible,
+        always_on_top: settings.always_on_top,
         shortcuts,
         mouse_gestures,
     }
@@ -1871,6 +1949,12 @@ fn validate_settings_profile(
             profile.cursor_auto_hide_ms,
             0 | 1_000 | 2_000 | 3_000 | 5_000
         )
+        || !matches!(profile.zoom_retention.as_str(), "global" | "book" | "page")
+        || !(MIN_VIEWER_GRID_SIZE..=MAX_VIEWER_GRID_SIZE).contains(&profile.viewer_grid_size)
+        || !matches!(profile.viewer_grid_color.as_str(), "light" | "dark")
+        || !profile.pan_factor.is_finite()
+        || !(MIN_PAN_FACTOR..=MAX_PAN_FACTOR).contains(&profile.pan_factor)
+        || profile.wheel_dead_zone > MAX_WHEEL_DEAD_ZONE
     {
         return Err(request_error(
             ErrorCode::InvalidRequest,
@@ -1938,9 +2022,18 @@ pub fn set_settings_profile(
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
         settings.cursor_auto_hide_ms = profile.cursor_auto_hide_ms.to_string();
+        settings.zoom_retention = profile.zoom_retention;
+        settings.viewer_grid_enabled = profile.viewer_grid_enabled;
+        settings.viewer_grid_size = profile.viewer_grid_size.to_string();
+        settings.viewer_grid_color = profile.viewer_grid_color;
+        settings.pan_factor = profile.pan_factor.to_string();
+        settings.wheel_dead_zone = profile.wheel_dead_zone.to_string();
         settings.tree_visible = profile.tree_visible;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
+        settings.address_bar_visible = profile.address_bar_visible;
+        settings.status_bar_visible = profile.status_bar_visible;
+        settings.always_on_top = profile.always_on_top;
         settings.shortcut_bindings = shortcuts;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
@@ -3569,9 +3662,18 @@ mod shutdown_tests {
             viewer_page_margin: 0,
             viewer_spread_gap: 8,
             cursor_auto_hide_ms: 0,
+            zoom_retention: "global".into(),
+            viewer_grid_enabled: false,
+            viewer_grid_size: 32,
+            viewer_grid_color: "light".into(),
+            pan_factor: 1.0,
+            wheel_dead_zone: 0,
             tree_visible: false,
             menu_bar_visible: true,
             toolbar_visible: false,
+            address_bar_visible: true,
+            status_bar_visible: true,
+            always_on_top: false,
             shortcuts: default_shortcuts(),
             mouse_gestures: default_mouse_gestures(),
         };

@@ -1558,7 +1558,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .viewer-toolbar > span,
 .viewer-layout-control,
 .viewer-end-of-volume-control,
-.viewer-scale-control {
+.viewer-scale-control,
+.viewer-pixel-control {
   flex: 0 0 auto;
 }
 .viewer-icon-button {
@@ -1570,6 +1571,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   place-items: center;
 }
 .viewer-scale-control,
+.viewer-pixel-control,
 .viewer-layout-control,
 .viewer-end-of-volume-control {
   display: inline-flex;
@@ -1578,6 +1580,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   white-space: nowrap;
 }
 .viewer-scale-control input[type="number"] { width: 64px; }
+.viewer-pixel-control input[type="number"] { width: 72px; }
+.viewer-pixel-control button { padding: 2px 6px; }
+.viewer-control-error { color: #ffd6d6; font-size: .75rem; }
 .fullscreen-error {
   flex-basis: 100%;
   color: #ffd6d6;
@@ -1606,6 +1611,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .viewer-stage[data-background="light"] { background-color: #e6e8eb; }
 .viewer-stage[data-panning="true"] { cursor: grabbing; }
 .viewer-stage[data-cursor-hidden="true"][data-panning="false"] { cursor: none; }
+.viewer-grid-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--viewer-grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--viewer-grid-color) 1px, transparent 1px);
+  background-size: var(--viewer-grid-size) var(--viewer-grid-size);
+}
+.viewer-grid-overlay[data-grid-color="light"] { --viewer-grid-color: rgb(255 255 255 / 45%); }
+.viewer-grid-overlay[data-grid-color="dark"] { --viewer-grid-color: rgb(0 0 0 / 55%); }
 .page-spread {
   z-index: 1;
   display: flex;

@@ -89,8 +89,15 @@ import type {
   ViewMode,
   ViewerScaleState,
   ViewerLayoutMode,
+  ViewerGridColor,
+  ZoomRetention,
 } from "./features/viewer/model";
 import {
+  DEFAULT_PAN_FACTOR,
+  DEFAULT_VIEWER_GRID_COLOR,
+  DEFAULT_VIEWER_GRID_SIZE,
+  DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
   DEFAULT_VIEWER_PAGE_MARGIN,
@@ -99,6 +106,11 @@ import {
   normalizeViewerCursorAutoHideMs,
   normalizeViewerLayoutMode,
   normalizeViewerSpacing,
+  normalizeViewerGridColor,
+  normalizeZoomRetention,
+  isPanFactor,
+  isViewerGridSize,
+  isWheelDeadZone,
 } from "./features/viewer/model";
 import {
   DEFAULT_SHORTCUTS,
@@ -154,6 +166,11 @@ import {
   trayStatusAvailable,
   workspaceGridColumns,
 } from "./features/workspace/display";
+import {
+  applyAlwaysOnTop,
+  tauriAlwaysOnTopAdapter,
+  type AlwaysOnTopAdapter,
+} from "./features/workspace/window";
 import {
   APP_VERSION,
   createDefaultSettingsProfile,
@@ -214,6 +231,7 @@ type SearchState =
 
 interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
+  alwaysOnTopAdapter?: AlwaysOnTopAdapter;
 }
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
@@ -295,7 +313,10 @@ function absoluteLoadTarget(libraryRoot: string | null, path: string): string {
   return `${normalizeWindowsDisplayPath(libraryRoot).replace(/[\\/]+$/, "")}\\${path.replaceAll("/", "\\")}`;
 }
 
-export function App({ fullscreenAdapter }: AppProps = {}) {
+export function App({
+  fullscreenAdapter,
+  alwaysOnTopAdapter = tauriAlwaysOnTopAdapter,
+}: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
@@ -415,6 +436,13 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     useState(DEFAULT_VIEWER_SPREAD_GAP);
   const [cursorAutoHideMs, setCursorAutoHideMs] =
     useState(DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS);
+  const [zoomRetention, setZoomRetention] = useState<ZoomRetention>(DEFAULT_ZOOM_RETENTION);
+  const [viewerGridEnabled, setViewerGridEnabled] = useState(false);
+  const [viewerGridSize, setViewerGridSize] = useState(DEFAULT_VIEWER_GRID_SIZE);
+  const [viewerGridColor, setViewerGridColor] =
+    useState<ViewerGridColor>(DEFAULT_VIEWER_GRID_COLOR);
+  const [panFactor, setPanFactor] = useState(DEFAULT_PAN_FACTOR);
+  const [wheelDeadZone, setWheelDeadZone] = useState(DEFAULT_WHEEL_DEAD_ZONE);
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
@@ -434,6 +462,9 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
   const [treeVisible, setTreeVisible] = useState(true);
   const [menuBarVisible, setMenuBarVisible] = useState(true);
   const [toolbarVisible, setToolbarVisible] = useState(true);
+  const [addressBarVisible, setAddressBarVisible] = useState(true);
+  const [statusBarVisible, setStatusBarVisible] = useState(true);
+  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [trayNotice, setTrayNotice] = useState<string | null>(null);
@@ -782,9 +813,28 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           setCursorAutoHideMs(normalizeViewerCursorAutoHideMs(
             response.data.cursorAutoHideMs,
           ));
+          setZoomRetention(normalizeZoomRetention(response.data.zoomRetention));
+          setViewerGridEnabled(response.data.viewerGridEnabled === true);
+          setViewerGridSize(isViewerGridSize(response.data.viewerGridSize)
+            ? response.data.viewerGridSize
+            : DEFAULT_VIEWER_GRID_SIZE);
+          setViewerGridColor(normalizeViewerGridColor(response.data.viewerGridColor));
+          setPanFactor(isPanFactor(response.data.panFactor)
+            ? response.data.panFactor
+            : DEFAULT_PAN_FACTOR);
+          setWheelDeadZone(isWheelDeadZone(response.data.wheelDeadZone)
+            ? response.data.wheelDeadZone
+            : DEFAULT_WHEEL_DEAD_ZONE);
           setTreeVisible(response.data.treeVisible);
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
+          setAddressBarVisible(response.data.addressBarVisible !== false);
+          setStatusBarVisible(response.data.statusBarVisible !== false);
+          const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
+          void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
+            if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
+            else setSelectionNotice("常に手前を復元できませんでした。");
+          });
           setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
           setMouseGestures(normalizeMouseGestures(response.data.mouseGestures));
         }
@@ -824,7 +874,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       })
       .catch(() => undefined)
       .finally(() => setRestoring(false));
-  }, []);
+  }, [alwaysOnTopAdapter]);
 
   const absoluteAddress = useMemo(() => {
     if (libraryRoot === null || navigation.current === "") {
@@ -2135,9 +2185,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       viewerPageMargin,
       viewerSpreadGap,
       cursorAutoHideMs,
+      zoomRetention,
+      viewerGridEnabled,
+      viewerGridSize,
+      viewerGridColor,
+      panFactor,
+      wheelDeadZone,
       treeVisible,
       menuBarVisible,
       toolbarVisible,
+      addressBarVisible,
+      statusBarVisible,
+      alwaysOnTop,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -2159,10 +2218,19 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setSettingsSaving(true);
     setProfileNotice("設定を保存しています。");
     const requestGeneration = ++settingsGeneration.current;
+    const nativeTopmostChanged = normalized.alwaysOnTop !== alwaysOnTop;
     try {
+      if (
+        nativeTopmostChanged
+        && !(await applyAlwaysOnTop(alwaysOnTopAdapter, normalized.alwaysOnTop))
+      ) {
+        setProfileNotice("常に手前を切り替えられませんでした。設定は保存していません。");
+        return;
+      }
       const response = await saveSettingsProfile(normalized, requestGeneration);
       if (requestGeneration !== settingsGeneration.current) return;
       if (response.status !== "ok") {
+        if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
         setProfileNotice(
           response.status === "error"
             ? presentError(response.error)
@@ -2189,9 +2257,18 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
       setCursorAutoHideMs(normalized.cursorAutoHideMs);
+      setZoomRetention(normalized.zoomRetention);
+      setViewerGridEnabled(normalized.viewerGridEnabled);
+      setViewerGridSize(normalized.viewerGridSize);
+      setViewerGridColor(normalized.viewerGridColor);
+      setPanFactor(normalized.panFactor);
+      setWheelDeadZone(normalized.wheelDeadZone);
       setTreeVisible(normalized.treeVisible);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
+      setAddressBarVisible(normalized.addressBarVisible);
+      setStatusBarVisible(normalized.statusBarVisible);
+      setAlwaysOnTop(normalized.alwaysOnTop);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -2199,6 +2276,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
       setSelectionNotice("設定profileを適用しました。");
     } catch {
       if (requestGeneration === settingsGeneration.current) {
+        if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
         setProfileNotice("設定を保存できませんでした。変更は適用していません。");
       }
     } finally {
@@ -2311,6 +2389,25 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     setSettingsDraft(createDefaultSettingsProfile());
     setProfileNotice("すべての設定を既定値へ戻しました。適用するまで現在の設定は変わりません。");
   }
+
+  useEffect(() => {
+    function openSettingsFromKeyboard(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key !== ",") return;
+      if (viewerSession !== null || settingsOpen) return;
+      event.preventDefault();
+      openSettingsDialog();
+    }
+    window.addEventListener("keydown", openSettingsFromKeyboard);
+    return () => window.removeEventListener("keydown", openSettingsFromKeyboard);
+  }, [
+    settingsOpen, viewerSession, sortField, sortDescending, endOfVolumePolicy,
+    catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
+    viewerScaleMode, viewerScale, loupeEnabled, viewerBackground, viewerPageMargin,
+    viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
+    viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, treeVisible,
+    menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
+    alwaysOnTop, shortcuts, mouseGestures,
+  ]);
 
   function queueThumbnail(
     entry: CatalogEntry,
@@ -2847,6 +2944,12 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           initialPageMargin={viewerPageMargin}
           initialSpreadGap={viewerSpreadGap}
           initialCursorAutoHideMs={cursorAutoHideMs}
+          zoomRetention={zoomRetention}
+          viewerGridEnabled={viewerGridEnabled}
+          viewerGridSize={viewerGridSize}
+          viewerGridColor={viewerGridColor}
+          panFactor={panFactor}
+          wheelDeadZone={wheelDeadZone}
           shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
             setViewMode(mode);
@@ -2862,6 +2965,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           initialFullscreen={viewerLaunchMode === "fullscreen"}
           slideshowIntervalMs={viewerLaunchMode === "slideshow" ? 3_000 : undefined}
           onScaleChange={(next: ViewerScaleState) => {
+            if (zoomRetention !== "global") return;
             setViewerScaleMode(next.mode);
             setViewerScale(next.scale);
             setLoupeEnabled(next.loupeEnabled);
@@ -2991,10 +3095,17 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
     <main
       className="app-shell"
       style={{
-        gridTemplateRows: shellGridRows({ menuBarVisible, toolbarVisible }),
+        gridTemplateRows: shellGridRows({
+          menuBarVisible,
+          toolbarVisible,
+          addressBarVisible,
+          statusBarVisible,
+        }),
       }}
       data-menu-visible={menuBarVisible}
       data-toolbar-visible={toolbarVisible}
+      data-address-visible={addressBarVisible}
+      data-status-visible={statusBarVisible}
       data-tree-visible={treeVisible}
     >
       {recoveryNotice && (
@@ -3426,6 +3537,8 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
                   setTreeVisible(restored.treeVisible);
                   setToolbarVisible(restored.toolbarVisible);
                   setMenuBarVisible(restored.menuBarVisible);
+                  setAddressBarVisible(restored.addressBarVisible);
+                  setStatusBarVisible(restored.statusBarVisible);
                 })}
               >
                 UIを表示
@@ -3955,7 +4068,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           </section>
         </div>
       )}
-      <form
+      {addressBarVisible && <form
         className="address-bar"
         onSubmit={(event) => {
           event.preventDefault();
@@ -3998,7 +4111,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
         >
           <span aria-hidden="true">➜</span>
         </button>
-      </form>
+      </form>}
       <div
         className="workspace"
         style={{
@@ -4552,7 +4665,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           ) : null}
         </section>
       </div>
-      <footer className="status-bar" aria-live="polite">
+      {statusBarVisible && <footer className="status-bar" aria-live="polite">
         <span>
           現在位置: {selectedPath === null ? "—" : `${Math.max(1, visibleEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${visibleEntries.length}`}
         </span>
@@ -4569,7 +4682,7 @@ export function App({ fullscreenAdapter }: AppProps = {}) {
           </span>
         )}
         {trayNotice !== null && <span role="alert">{trayNotice}</span>}
-      </footer>
+      </footer>}
       {catalogContextMenu !== null && (
         <CatalogContextMenu
           entry={catalogContextMenu.entry}

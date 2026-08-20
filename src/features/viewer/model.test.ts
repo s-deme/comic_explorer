@@ -5,6 +5,8 @@ import {
   createViewerScaleState,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_GRID_COLOR,
+  DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
   MAX_SCALE,
@@ -14,6 +16,12 @@ import {
   normalizeViewerSpacing,
   normalizeScale,
   normalizeViewerLayoutMode,
+  normalizeViewerGridColor,
+  normalizeZoomRetention,
+  isPanFactor,
+  isViewerGridSize,
+  isWheelDeadZone,
+  scaleForPixelDimension,
   scaleReducer,
   VIEWER_LAYOUT_MODES,
   viewerReducer,
@@ -135,6 +143,29 @@ describe("FR-B01 scale model", () => {
       scale: 1.7,
       loupeEnabled: true,
     });
+  });
+
+  it("REQ-LEY-P1-003 and REQ-LEY-P1-006 support 1–800% and safe pixel dimensions", () => {
+    expect(MIN_SCALE).toBe(0.01);
+    expect(MAX_SCALE).toBe(8);
+    expect(scaleForPixelDimension(1, 100)).toBe(0.01);
+    expect(scaleForPixelDimension(8_000, 1_000)).toBe(8);
+    expect(scaleForPixelDimension(32_769, 1_000)).toBeNull();
+    expect(scaleForPixelDimension(100, 0)).toBeNull();
+    expect(scaleForPixelDimension(100.5, 1_000)).toBeNull();
+  });
+
+  it("validates P1-A retention, grid, pan, and wheel preferences", () => {
+    expect(normalizeZoomRetention("book")).toBe("book");
+    expect(normalizeZoomRetention("forever")).toBe(DEFAULT_ZOOM_RETENTION);
+    expect(normalizeViewerGridColor("dark")).toBe("dark");
+    expect(normalizeViewerGridColor("red")).toBe(DEFAULT_VIEWER_GRID_COLOR);
+    expect(isViewerGridSize(8)).toBe(true);
+    expect(isViewerGridSize(257)).toBe(false);
+    expect(isPanFactor(0.5)).toBe(true);
+    expect(isPanFactor(2.01)).toBe(false);
+    expect(isWheelDeadZone(200)).toBe(true);
+    expect(isWheelDeadZone(200.5)).toBe(false);
   });
 });
 

@@ -43,6 +43,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 
 この段階では実装対象を選択・順序固定しただけであり、103件をImplemented、Verified、Publishedへ推定しない。
 
+## Leeyes P1-A 即効改善
+
+対象はLEY-SHELL-012/013、LEY-VIEWER-020/021/022/031、LEY-INPUT-004/010/012の9件。shell面、native topmost、倍率・pixel寸法・保持scope・grid、設定reset、pan/wheel調整をprofile v5とapp-local SQLiteのatomic保存へ接続した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 26 files / 316件、FAIL 0。profile v1〜v4移行とstrict v5、1〜800%・pixel範囲、page保持、grid overlay、pan係数、wheel不感帯、shell面、Ctrl/Cmd+`,`、native topmost成功/失敗を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Rust focused/canonical | PASS | settings profile focused 1件、canonical lib 158件 + shutdown process 1件、`fmt --check`、`check --locked`、FAIL 0。既存dead-code warning 2件。 |
+| Windows frontend build | PASS | 67 modules、exit 0。`dist/`は生成物としてcommitしない。 |
+| CoDD | PASS（red 0） | scan/check/verifyの最終結果を記録。advisory、SKIP、VACUOUSを機能PASSへ合算しない。 |
+| 性能・製品直接観測 | NOT RUN | この設定中心batchに専用性能目標はない。release WebView2のtopmost、grid目視、mouse/trackpad別の操作感は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -96,7 +96,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(15);
+    expect(buttons).toHaveLength(17);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -432,8 +432,8 @@ describe("Viewer settings", () => {
     expect(spread).toHaveAttribute("data-scale", "1.7");
     const scaleInput = screen.getByRole("spinbutton", { name: "任意倍率（%）" });
     expect(scaleInput).toHaveValue(170);
-    expect(scaleInput).toHaveAttribute("min", "25");
-    expect(scaleInput).toHaveAttribute("max", "400");
+    expect(scaleInput).toHaveAttribute("min", "1");
+    expect(scaleInput).toHaveAttribute("max", "800");
     expect(scaleInput).toHaveAttribute("step", "1");
 
     fireEvent.change(screen.getByRole("combobox", { name: "倍率モード" }), {
@@ -455,6 +455,74 @@ describe("Viewer settings", () => {
       mode: "custom",
       scale: 2.3,
       loupeEnabled: true,
+    });
+  });
+
+  it("REQ-LEY-P1-006 converts a requested pixel width and rejects unsafe dimensions", () => {
+    const onScaleChange = vi.fn();
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onScaleChange={onScaleChange}
+        onClose={() => undefined}
+      />,
+    );
+    const image = document.querySelector<HTMLImageElement>(".page-spread img");
+    expect(image).not.toBeNull();
+    Object.defineProperties(image!, {
+      naturalWidth: { configurable: true, value: 1_000 },
+      naturalHeight: { configurable: true, value: 2_000 },
+    });
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "表示幅（px）" }), {
+      target: { value: "2500" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "表示幅を適用" }));
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "2.5");
+    expect(onScaleChange).toHaveBeenLastCalledWith({
+      mode: "custom", scale: 2.5, loupeEnabled: false,
+    });
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "表示高さ（px）" }), {
+      target: { value: "32769" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "表示高さを適用" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("1〜32768px");
+  });
+
+  it("REQ-LEY-P1-004 resets page-scoped zoom and REQ-LEY-P1-007 overlays a non-interactive grid", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="custom"
+        initialScale={1.25}
+        zoomRetention="page"
+        viewerGridEnabled
+        viewerGridSize={48}
+        viewerGridColor="dark"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const grid = document.querySelector<HTMLElement>(".viewer-grid-overlay");
+    expect(grid).toHaveAttribute("data-grid-color", "dark");
+    expect(grid?.style.getPropertyValue("--viewer-grid-size")).toBe("48px");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "任意倍率（%）" }), {
+      target: { value: "200" },
+    });
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "2");
+    markPrefetchedPagesReady();
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+    await waitFor(() => {
+      expect(screen.getByText("2 / 2")).toBeInTheDocument();
+      expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.25");
     });
   });
 
@@ -528,7 +596,7 @@ describe("Viewer settings", () => {
     );
   });
 
-  it("pans overflowing images by dragging without changing pages", () => {
+  it("REQ-LEY-P1-008 scales pointer pan without changing pages", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -537,6 +605,7 @@ describe("Viewer settings", () => {
         initialDirection="rightToLeft"
         initialScaleMode="custom"
         initialScale={2}
+        panFactor={1.5}
         onSettingsChange={() => undefined}
         onClose={() => undefined}
         mouseGestures={{
@@ -562,8 +631,8 @@ describe("Viewer settings", () => {
 
     fireEvent.pointerDown(stage!, { pointerId: 1, clientX: 200, clientY: 180 });
     fireEvent.pointerMove(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
-    expect(spread).toHaveProperty("scrollLeft", 350);
-    expect(spread).toHaveProperty("scrollTop", 300);
+    expect(spread).toHaveProperty("scrollLeft", 400);
+    expect(spread).toHaveProperty("scrollTop", 350);
     expect(stage).toHaveAttribute("data-panning", "true");
     fireEvent.pointerUp(stage!, { pointerId: 1, clientX: 100, clientY: 80 });
 
@@ -990,7 +1059,7 @@ describe("Viewer settings", () => {
     expect(onToggleDetached).not.toHaveBeenCalled();
   });
 
-  it("FT-B19-003 connects swipe, wheel, chord, middle, and side-button gestures", () => {
+  it("FT-B19-003 and REQ-LEY-P1-009 connect gestures with a wheel dead zone", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -999,6 +1068,7 @@ describe("Viewer settings", () => {
         initialDirection="rightToLeft"
         onSettingsChange={() => undefined}
         onClose={() => undefined}
+        wheelDeadZone={60}
         mouseGestures={{
           ...DEFAULT_MOUSE_GESTURES,
           swipeLeft: "nextPage",
@@ -1018,6 +1088,8 @@ describe("Viewer settings", () => {
     fireEvent.pointerUp(stage!, { clientX: 100 });
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
+    fireEvent.wheel(stage!, { deltaY: 30 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
     fireEvent.wheel(stage!, { deltaY: 120 });
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
     fireEvent.wheel(stage!, { deltaY: -120 });

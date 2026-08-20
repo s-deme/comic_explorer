@@ -83,9 +83,9 @@ Git履歴から参照する。
 
 | Feature | 要件ID | 状態追跡ID | 現行契約 |
 |---|---|---|---|
-| FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037 | 共通scale model、25%〜400%、fit幅/高さ/全体、原寸、状態維持、正方形のpointerルーペ、再起動復元。任意倍率の入力欄は25〜400%の整数で表示・入力し、内部値と保存形式には換算した倍率を使う。`+`/`-` は現在表示中の先頭pageの実表示倍率を基準に10%ずつ増減し、連続する逆方向操作で直前の表示倍率へ戻す。画像が表示領域を超えてもscrollbarを表示せず、pointer dragで任意の表示位置へpanできる。 |
+| FR-B01 表示倍率 | REQ-FR-B01-001, REQ-FR-B01-002, REQ-FR-B01-003, REQ-FR-B01-004, REQ-FR-B01-005, REQ-LEY-P1-003, REQ-LEY-P1-004, REQ-LEY-P1-006 | FUT-C-018, FUT-C-033, FUT-C-034, FUT-C-035, FUT-C-036, FUT-C-037, LEY-VIEWER-020, LEY-VIEWER-021, LEY-VIEWER-022 | 共通scale model、1%〜800%、fit幅/高さ/全体、原寸、状態維持、正方形のpointerルーペ、再起動復元。任意倍率の入力欄は1〜800%の整数で表示・入力し、内部値と保存形式には換算した倍率を使う。`+`/`-` は現在表示中の先頭pageの実表示倍率を基準に10%ずつ増減し、連続する逆方向操作で直前の表示倍率へ戻す。画像が表示領域を超えてもscrollbarを表示せず、pointer dragで任意の表示位置へpanできる。 |
 | FR-B02 巻末動作 | REQ-FR-B02-001, REQ-FR-B02-002, REQ-FR-B02-003 | FUT-C-020, FUT-C-038, FUT-C-039, FUT-C-040, FUT-C-041 | viewer toolbarから`auto_next`、`confirm_next`、`return_library`、`stop`、`loop`を安全に適用し、sortと設定を維持する。folder内画像の閲覧では親catalogを巻順として使い、対応archive、PDF、画像folderを次巻・前巻候補とする。次巻・loop先は先頭page、巻頭からの前巻移動は末尾pageを開く。 |
-| FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `detail_list`、`small_thumbnail`、`cover_list`（表示名: 表紙グリッド）、`card_grid`（表示名: カードグリッド）、`reference_tile`（表示名: 情報カード）の順序、操作、focus、永続化を共通modelで扱う。表紙グリッドは縦長の表紙と直下のファイル名を中心にした画像優先layout、カードグリッドは表紙グリッドより大きい既定thumbnailだけを表示してファイル名・種類icon・metadataを視覚表示しない表紙専用layout、情報カードは横長cardの左側に縦長の表紙、右側に左揃えのファイル名、種別、サイズ、更新日時を置く情報優先layoutとし、外枠や色だけに依存せずシルエットと情報量で判別可能にする。カードグリッドでも項目名と種別はaccessible name、title、selection、context menuへ保持する。小サムネイルと表紙グリッドは種別ラベルを省き、画像とファイル名を別のlayout領域に置く。小サムネイルの画像はサムネイル枠の下端でclipしてファイル名領域への描画を防ぐ。カードグリッドは外側の枠線と内側余白を設けずthumbnailをcard全面へ配置し、行間・列間を他のthumbnail形式より狭い4pxにする。選択状態は外枠ではなくthumbnail上の色overlayで示す。カードグリッドのお気に入りtoggleは表紙の左上、情報カードでは情報領域の右上へ置き、card全体の既存open・selection・context menu操作と重ねない。仮想化した各rowは形式別thumbnail幅設定から導出した固定寸法、高さ、縦間隔を適用し、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。`small_thumbnail`、`cover_list`、`card_grid`、`reference_tile`の形式別thumbnail幅は安全な範囲へ検証し、profile、app-local設定、再起動復元へ含める。profile v3で導入した4つの必須幅をprofile v4でも保持し、旧profile v1/v2には新しいカードグリッドの既定幅を補って移行する。詳細リストと情報カードでは種別を表示する。 |
+| FR-B03 一覧形式 | REQ-FR-B03-001, REQ-FR-B03-002 | FUT-C-012, FUT-C-013, FUT-C-014 | `detail_list`、`small_thumbnail`、`cover_list`（表示名: 表紙グリッド）、`card_grid`（表示名: カードグリッド）、`reference_tile`（表示名: 情報カード）の順序、操作、focus、永続化を共通modelで扱う。表紙グリッドは縦長の表紙と直下のファイル名を中心にした画像優先layout、カードグリッドは表紙グリッドより大きい既定thumbnailだけを表示してファイル名・種類icon・metadataを視覚表示しない表紙専用layout、情報カードは横長cardの左側に縦長の表紙、右側に左揃えのファイル名、種別、サイズ、更新日時を置く情報優先layoutとし、外枠や色だけに依存せずシルエットと情報量で判別可能にする。カードグリッドでも項目名と種別はaccessible name、title、selection、context menuへ保持する。小サムネイルと表紙グリッドは種別ラベルを省き、画像とファイル名を別のlayout領域に置く。小サムネイルの画像はサムネイル枠の下端でclipしてファイル名領域への描画を防ぐ。カードグリッドは外側の枠線と内側余白を設けずthumbnailをcard全面へ配置し、行間・列間を他のthumbnail形式より狭い4pxにする。選択状態は外枠ではなくthumbnail上の色overlayで示す。カードグリッドのお気に入りtoggleは表紙の左上、情報カードでは情報領域の右上へ置き、card全体の既存open・selection・context menu操作と重ねない。仮想化した各rowは形式別thumbnail幅設定から導出した固定寸法、高さ、縦間隔を適用し、ウィンドウ幅変更時はthumbnailを拡縮せず列数だけを変更する。`small_thumbnail`、`cover_list`、`card_grid`、`reference_tile`の形式別thumbnail幅は安全な範囲へ検証し、profile、app-local設定、再起動復元へ含める。profile v3で導入した4つの必須幅をprofile v4/v5でも保持し、旧profile v1/v2には新しいカードグリッドの既定幅を補って移行する。詳細リストと情報カードでは種別を表示する。 |
 | FR-B05 名前検索 | REQ-FR-B05-001, REQ-FR-B05-002, REQ-FR-B05-003, REQ-FR-B05-004, REQ-FR-B05-005 | FUT-C-010 | toolbarの検索buttonで開くside paneから正規化した名前検索、mixed result、結果移動、empty/clear/error、明示rescan、local-onlyを保証する。検索条件として、サブフォルダ、folder/file種別、固定した現在folderの検索範囲、sizeの以上/以下、更新日時の以降/以前/期間を指定でき、結果を移動時にも保持するか選べる。 |
 | FR-B06 お気に入り | REQ-FR-B06-001, REQ-FR-B06-002, REQ-FR-B06-003, REQ-FR-B06-004, REQ-FR-B06-005 | FUT-C-011, FUT-C-021 | stable identity、冪等add/remove、quick access、missing/moved再解決、migrationと再起動保存を保証する。 |
 | FR-B07 読書情報 | REQ-FR-B07-001, REQ-FR-B07-002, REQ-FR-B07-003, REQ-FR-B07-004, REQ-FR-B07-005 | FUT-C-023, FUT-R-004, FUT-R-005 | item identityごとのmemo、成功open history、rating、schema migration、原本非破壊を保証する。 |
@@ -120,6 +120,23 @@ Git履歴から参照する。
 - E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、folder treeのfolderまたはdrive nodeからcut/copy/pasteを行う。選択した対象だけが変更され、アプリとWindows Explorerの双方向pasteおよび成功後のcatalog反映を確認する。
 - E2E-MVP-006: 見開きを1pageずつ前後へずらし、背景・page周囲余白・見開き間隔・cursor自動非表示時間を変更して再起動およびprofile export/import後にも復元する。設定変更と閲覧の前後でlibrary原本を変更しない。
 
+## Leeyes P1-A 即効改善の受入条件
+
+Leeyesの観察可能な操作目的を独自実装し、旧UI、文章、画像、iconはコピーしない。設定変更は
+app-local SQLiteとstrict profileへ保存し、library原本を変更しない。
+
+| 要件ID | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-LEY-P1-001 | LEY-SHELL-012 | 統合設定からmenu bar、navigation toolbar、address bar、status barを個別に表示・非表示へ切り替え、再起動とprofile export/import後に復元する。すべてを隠しても設定画面を再度開けるkeyboard入口を残す。 |
+| REQ-LEY-P1-002 | LEY-SHELL-013 | 「常に手前」を統合設定から切り替え、main windowへだけ適用する。native window APIが失敗した場合は保存済み状態と成功表示を更新せず分類した局所errorを示す。再起動とprofileで復元する。 |
+| REQ-LEY-P1-003 | LEY-VIEWER-020 | 任意倍率を1%〜800%の整数として直接入力し、範囲外と非数値を拒否する。fit、原寸、段階zoom、表示倍率表示と同じscale modelを使い、巨大なdecodeや原本変更を発生させない。 |
+| REQ-LEY-P1-004 | LEY-VIEWER-022 | zoom保持を`global`、`book`、`page`から選ぶ。globalは次の作品と再起動へ保存し、bookは現在作品を閉じるまで、pageは現在pageを離れるまで保持する。fit系modeと任意倍率を同じpolicyで扱う。 |
+| REQ-LEY-P1-005 | LEY-INPUT-004 | shortcut設定はcommandごとの既定値復元と全commandの既定値復元を区別し、いずれも予約key・重複を生じない。変更は設定dialogのdraftに留め、適用またはcancelの既存atomic境界を守る。 |
+| REQ-LEY-P1-006 | LEY-VIEWER-021 | 現在の先頭表示画像について幅または高さを1〜32768pxで指定し、実画像寸法と縦横比から安全な1%〜800%の表示scaleへ換算する。自然寸法が未取得、0、範囲外、または換算scaleが範囲外なら適用しない。 |
+| REQ-LEY-P1-007 | LEY-VIEWER-031 | viewerへ非破壊grid overlayを表示し、無効または8〜256pxの間隔と明色・暗色を選べる。overlayはpointer操作、画像decode、clipboard、thumbnail、原本に影響せず、設定を再起動とprofileで復元する。 |
+| REQ-LEY-P1-008 | LEY-INPUT-010 | viewerのpointer pan係数を50%〜200%で設定し、pointer capture中の移動量へだけ適用する。swipe判定、click、drag終了、keyboard操作へは適用しない。 |
+| REQ-LEY-P1-009 | LEY-INPUT-012 | page layoutのwheel入力に0〜200の不感帯を設定し、閾値未満のdeltaはpage commandへ変換しない。Ctrl+wheel、右button+wheel、scroll layoutのnative scrollは既存境界を維持する。 |
+
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |
@@ -138,7 +155,7 @@ FR-B04は現行の採用laneとして定義されていない。欠番を新機�
 | REQ-FR-B23-001 | LEY-VIEWER-004 | page layoutかつ見開き表示のtoolbarに「1ページ戻す」「1ページ進める」を説明付きicon buttonとして置く。操作は現在の見開きanchorを自然順で正確に1pageだけ移動し、読み方向に従う左右配置、横長pageの単独表示、読書位置保存を維持する。先頭・末尾では範囲外へ進まず、巻頭・巻末の作品移動を発火しない。単pageとscroll layoutでは無効にする。 |
 | REQ-FR-B23-002 | LEY-VIEWER-025 | viewer設定で背景を市松模様・濃灰・黒・明色から選び、page周囲余白と見開き間隔をそれぞれ0〜64pxの整数で指定する。既定値は市松模様・0px・8pxとする。設定値はpage layoutの単page・見開きおよびscroll layoutへ適用し、見開き画像の利用可能幅計算にも同じ間隔を用いる。 |
 | REQ-FR-B23-003 | LEY-VIEWER-028 | viewer設定でcursor自動非表示を無効・1秒・2秒・3秒・5秒から選ぶ。有効時はpointerが画像stage内で指定時間操作されなければstage上のcursorだけを隠し、pointer移動・再入場・button操作で直ちに再表示する。pointer drag中およびルーペ有効時はcursorを隠さず、toolbar・page移動bar上のcursorへ影響させない。既定値は無効とする。 |
-| REQ-FR-B23-004 | LEY-VIEWER-025, LEY-VIEWER-028 | 背景、余白、間隔、自動非表示時間はapp-local SQLiteと設定profile v4へ保存し、再起動とexport/importで復元する。profile v1〜v3と既存SQLiteに値がない場合はREQ-FR-B23-002・003の既定値へ移行する。frontendとbackendの両方でenum・整数範囲を検証し、不正値を適用・保存しない。 |
+| REQ-FR-B23-004 | LEY-VIEWER-025, LEY-VIEWER-028 | 背景、余白、間隔、自動非表示時間はapp-local SQLiteと設定profile v5へ保存し、再起動とexport/importで復元する。profile v1〜v4と既存SQLiteに値がない場合は安全な既定値へ移行する。frontendとbackendの両方でenum・整数範囲を検証し、不正値を適用・保存しない。 |
 
 ## PDF対応の受入条件
 

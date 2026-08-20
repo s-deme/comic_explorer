@@ -8,19 +8,19 @@ import {
 
 describe("workspace display", () => {
   it("keeps the five visible shell surfaces in their declared order", () => {
-    expect(shellGridRows({ menuBarVisible: true, toolbarVisible: true })).toBe(
+    expect(shellGridRows({ menuBarVisible: true, toolbarVisible: true, addressBarVisible: true, statusBarVisible: true })).toBe(
       "28px minmax(42px, auto) 32px minmax(0, 1fr) 28px",
     );
   });
 
   it("FT-B18-002 removes hidden menu and toolbar tracks so remaining surfaces compact", () => {
-    expect(shellGridRows({ menuBarVisible: false, toolbarVisible: true })).toBe(
+    expect(shellGridRows({ menuBarVisible: false, toolbarVisible: true, addressBarVisible: true, statusBarVisible: true })).toBe(
       "minmax(42px, auto) 32px minmax(0, 1fr) 28px",
     );
-    expect(shellGridRows({ menuBarVisible: true, toolbarVisible: false })).toBe(
+    expect(shellGridRows({ menuBarVisible: true, toolbarVisible: false, addressBarVisible: true, statusBarVisible: true })).toBe(
       "28px 32px minmax(0, 1fr) 28px",
     );
-    expect(shellGridRows({ menuBarVisible: false, toolbarVisible: false })).toBe(
+    expect(shellGridRows({ menuBarVisible: false, toolbarVisible: false, addressBarVisible: true, statusBarVisible: true })).toBe(
       "32px minmax(0, 1fr) 28px",
     );
   });
@@ -35,6 +35,8 @@ describe("workspace display", () => {
       treeVisible: true,
       menuBarVisible: true,
       toolbarVisible: true,
+      addressBarVisible: true,
+      statusBarVisible: true,
     });
   });
 

@@ -16,19 +16,31 @@ import {
 import {
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_PAN_FACTOR,
+  DEFAULT_VIEWER_GRID_COLOR,
+  DEFAULT_VIEWER_GRID_SIZE,
+  DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
   DEFAULT_SCALE,
   isViewerCursorAutoHideMs,
+  isPanFactor,
+  isViewerGridSize,
   isViewerSpacing,
+  isWheelDeadZone,
   MAX_SCALE,
   MIN_SCALE,
   VIEWER_BACKGROUNDS,
+  VIEWER_GRID_COLORS,
   VIEWER_LAYOUT_MODES,
   type ScaleMode,
   type ViewerBackground,
+  type ViewerGridColor,
   type ViewerLayoutMode,
   type ViewMode,
+  type ZoomRetention,
+  ZOOM_RETENTIONS,
 } from "../viewer/model";
 import {
   DEFAULT_END_OF_VOLUME_POLICY,
@@ -38,7 +50,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 4;
+export const SETTINGS_PROFILE_VERSION = 5;
 export const APP_VERSION = packageMetadata.version;
 
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
@@ -92,9 +104,18 @@ export interface SettingsProfile {
   viewerPageMargin: number;
   viewerSpreadGap: number;
   cursorAutoHideMs: number;
+  zoomRetention: ZoomRetention;
+  viewerGridEnabled: boolean;
+  viewerGridSize: number;
+  viewerGridColor: ViewerGridColor;
+  panFactor: number;
+  wheelDeadZone: number;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
+  addressBarVisible: boolean;
+  statusBarVisible: boolean;
+  alwaysOnTop: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -117,9 +138,18 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
     cursorAutoHideMs: DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+    zoomRetention: DEFAULT_ZOOM_RETENTION,
+    viewerGridEnabled: false,
+    viewerGridSize: DEFAULT_VIEWER_GRID_SIZE,
+    viewerGridColor: DEFAULT_VIEWER_GRID_COLOR,
+    panFactor: DEFAULT_PAN_FACTOR,
+    wheelDeadZone: DEFAULT_WHEEL_DEAD_ZONE,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
+    addressBarVisible: true,
+    statusBarVisible: true,
+    alwaysOnTop: false,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -181,6 +211,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     candidate.profileVersion === 1
     || candidate.profileVersion === 2
     || candidate.profileVersion === 3;
+  const legacyP1Preferences = legacyViewerAppearance || candidate.profileVersion === 4;
   const viewerBackground = legacyViewerAppearance
     ? DEFAULT_VIEWER_BACKGROUND
     : enumValue(candidate.viewerBackground, VIEWER_BACKGROUNDS);
@@ -193,10 +224,24 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const cursorAutoHideMs = legacyViewerAppearance
     ? DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS
     : candidate.cursorAutoHideMs;
+  const zoomRetention = legacyP1Preferences
+    ? DEFAULT_ZOOM_RETENTION
+    : enumValue(candidate.zoomRetention, ZOOM_RETENTIONS);
+  const viewerGridEnabled = legacyP1Preferences ? false : candidate.viewerGridEnabled;
+  const viewerGridSize = legacyP1Preferences ? DEFAULT_VIEWER_GRID_SIZE : candidate.viewerGridSize;
+  const viewerGridColor = legacyP1Preferences
+    ? DEFAULT_VIEWER_GRID_COLOR
+    : enumValue(candidate.viewerGridColor, VIEWER_GRID_COLORS);
+  const panFactor = legacyP1Preferences ? DEFAULT_PAN_FACTOR : candidate.panFactor;
+  const wheelDeadZone = legacyP1Preferences ? DEFAULT_WHEEL_DEAD_ZONE : candidate.wheelDeadZone;
+  const addressBarVisible = legacyP1Preferences ? true : candidate.addressBarVisible;
+  const statusBarVisible = legacyP1Preferences ? true : candidate.statusBarVisible;
+  const alwaysOnTop = legacyP1Preferences ? false : candidate.alwaysOnTop;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
       && candidate.profileVersion !== 3
+      && candidate.profileVersion !== 4
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -216,9 +261,18 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
     !isViewerCursorAutoHideMs(cursorAutoHideMs) ||
+    zoomRetention === null ||
+    typeof viewerGridEnabled !== "boolean" ||
+    !isViewerGridSize(viewerGridSize) ||
+    viewerGridColor === null ||
+    !isPanFactor(panFactor) ||
+    !isWheelDeadZone(wheelDeadZone) ||
     typeof candidate.treeVisible !== "boolean" ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
+    typeof addressBarVisible !== "boolean" ||
+    typeof statusBarVisible !== "boolean" ||
+    typeof alwaysOnTop !== "boolean" ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -241,9 +295,18 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     viewerPageMargin,
     viewerSpreadGap,
     cursorAutoHideMs,
+    zoomRetention,
+    viewerGridEnabled,
+    viewerGridSize,
+    viewerGridColor,
+    panFactor,
+    wheelDeadZone,
     treeVisible: candidate.treeVisible,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,
+    addressBarVisible,
+    statusBarVisible,
+    alwaysOnTop,
     shortcuts,
     mouseGestures,
   };

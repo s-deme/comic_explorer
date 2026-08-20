@@ -2,6 +2,8 @@ export type ViewMode = "single" | "spread";
 export type ReadingDirection = "rightToLeft" | "leftToRight";
 export type ScaleMode = "fit" | "width" | "height" | "original" | "custom";
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
+export type ZoomRetention = "global" | "book" | "page";
+export type ViewerGridColor = "light" | "dark";
 export type ViewerLayoutMode =
   | "paged"
   | "vertical_scroll"
@@ -25,8 +27,8 @@ export function normalizeViewerLayoutMode(value: string): ViewerLayoutMode {
     : "paged";
 }
 
-export const MIN_SCALE = 0.25;
-export const MAX_SCALE = 4;
+export const MIN_SCALE = 0.01;
+export const MAX_SCALE = 8;
 export const SCALE_STEP = 0.1;
 export const DEFAULT_SCALE = 1;
 export const LOUPE_ZOOM = 2;
@@ -44,6 +46,19 @@ export const DEFAULT_VIEWER_PAGE_MARGIN = 0;
 export const DEFAULT_VIEWER_SPREAD_GAP = 8;
 export const VIEWER_CURSOR_AUTO_HIDE_DELAYS = [0, 1_000, 2_000, 3_000, 5_000] as const;
 export const DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS = 0;
+export const ZOOM_RETENTIONS: ZoomRetention[] = ["global", "book", "page"];
+export const DEFAULT_ZOOM_RETENTION: ZoomRetention = "global";
+export const VIEWER_GRID_COLORS: ViewerGridColor[] = ["light", "dark"];
+export const DEFAULT_VIEWER_GRID_COLOR: ViewerGridColor = "light";
+export const MIN_VIEWER_GRID_SIZE = 8;
+export const MAX_VIEWER_GRID_SIZE = 256;
+export const DEFAULT_VIEWER_GRID_SIZE = 32;
+export const MIN_PAN_FACTOR = 0.5;
+export const MAX_PAN_FACTOR = 2;
+export const DEFAULT_PAN_FACTOR = 1;
+export const MIN_WHEEL_DEAD_ZONE = 0;
+export const MAX_WHEEL_DEAD_ZONE = 200;
+export const DEFAULT_WHEEL_DEAD_ZONE = 0;
 
 export function normalizeViewerBackground(value: unknown): ViewerBackground {
   return typeof value === "string"
@@ -74,6 +89,48 @@ export function normalizeViewerCursorAutoHideMs(value: unknown): number {
   return isViewerCursorAutoHideMs(value)
     ? value
     : DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS;
+}
+
+export function normalizeZoomRetention(value: unknown): ZoomRetention {
+  return typeof value === "string" && ZOOM_RETENTIONS.includes(value as ZoomRetention)
+    ? value as ZoomRetention
+    : DEFAULT_ZOOM_RETENTION;
+}
+
+export function normalizeViewerGridColor(value: unknown): ViewerGridColor {
+  return typeof value === "string" && VIEWER_GRID_COLORS.includes(value as ViewerGridColor)
+    ? value as ViewerGridColor
+    : DEFAULT_VIEWER_GRID_COLOR;
+}
+
+export function isViewerGridSize(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_VIEWER_GRID_SIZE && value <= MAX_VIEWER_GRID_SIZE;
+}
+
+export function isPanFactor(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value)
+    && value >= MIN_PAN_FACTOR && value <= MAX_PAN_FACTOR;
+}
+
+export function isWheelDeadZone(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_WHEEL_DEAD_ZONE && value <= MAX_WHEEL_DEAD_ZONE;
+}
+
+export function scaleForPixelDimension(
+  requestedPixels: number,
+  naturalPixels: number,
+): number | null {
+  if (
+    !Number.isInteger(requestedPixels)
+    || requestedPixels < 1
+    || requestedPixels > 32_768
+    || !Number.isFinite(naturalPixels)
+    || naturalPixels <= 0
+  ) return null;
+  const scale = requestedPixels / naturalPixels;
+  return scale >= MIN_SCALE && scale <= MAX_SCALE ? normalizeScale(scale) : null;
 }
 
 export interface ViewerScaleState {
