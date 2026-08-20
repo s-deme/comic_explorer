@@ -1122,6 +1122,34 @@ describe("Viewer settings", () => {
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
   });
 
+  it("REQ-LEY-P2-003 keeps a missing-page bookmark visible and removable", () => {
+    const onDeleteBookmark = vi.fn();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        bookmarks={[{
+          itemKey: multiPageSession.itemKey,
+          pageIndex: 12,
+          pageKey: "removed.png",
+          createdAt: 1,
+        }]}
+        onDeleteBookmark={onDeleteBookmark}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "しおり一覧" }));
+    expect(screen.getByRole("button", {
+      name: "removed.png（現在の作品では見つかりません）",
+    })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "しおりを削除: removed.png" }));
+    expect(onDeleteBookmark).toHaveBeenCalledWith("removed.png");
+  });
+
   it("FT-B18-003 closes a detached viewer with one Escape instead of only toggling its shell", async () => {
     const onClose = vi.fn();
     const onToggleDetached = vi.fn();

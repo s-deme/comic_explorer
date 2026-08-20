@@ -111,6 +111,7 @@ BMP、TIFF/TIF、ICOはboundedなpure-Rust decoderで実ピクセルを検証し
 JPEG/JPG、PNG、GIF、静止WebPは検証済みの原バイトと正しいMIMEをopaque media URLから渡す。
 pageは相対page keyの自然順で管理する。単page、見開き、読み方向、fit/scale、正方形のルーペ、巻末policy、
 bookmark、読書位置はviewer modelを介して整合させる。
+bookmarkはcanonical library root namespace、作品item key、page keyの複合identityでapp-local SQLite schema v5へ保存し、原本やsidecarへ書き込まない。保存ordinalは表示用hintに限定し、移動時は現在のpage key列から再解決する。同一pageの再保存はupsert、削除はidempotentとし、作品ごとに最大10000件を上限にする。旧root-scoped localStorage行は作品を開いた時点で最大1000件ずつnative APIへ重複なく移し、全件成功後だけ当該作品の旧行を消す。失敗・cancel・stale generationでは旧行とviewerを保持する。
 通常のopenで対応archiveを選択した場合はviewerを全画面で開始し、明示した全画面・slideshow起動モードはそのまま優先する。
 現在pageはtoolbarではなく、画像表示領域下部のrange slider式page移動barで総page数とともに示す。sliderはviewer modelの`go` commandへ接続し、任意のpageを表示する。
 全画面中のviewer toolbarとpage移動barはlayout領域を占有せず、toolbarは画面上端、page移動barは画面下端へpointerを移動したときだけ表示し、各controlから画像領域へ離れると再び隠す。

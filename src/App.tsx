@@ -15,6 +15,7 @@ import {
   getThumbnail,
   listTags,
   listReadingHistory,
+  listPageBookmarks,
   listWindowsKnownFolders,
   clearReadingHistory,
   openComic,
@@ -26,6 +27,7 @@ import {
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
   saveItemMemo,
+  savePageBookmark,
   saveSettingsProfile,
   saveViewerSettings,
   assignTag,
@@ -50,6 +52,7 @@ import {
   moveFileItemsToFolder,
   moveFileItemsToDestination,
   deleteFileItems,
+  deletePageBookmark,
   setFileClipboard,
   getFileClipboardStatus,
   pasteFileItems,
@@ -203,8 +206,8 @@ import {
   listBookshelf,
   migrateLegacyCollections,
   nextBookmark,
+  removeLegacyBookmarksForItemResult,
   removeBookshelfItemResult,
-  saveBookmarkResult,
   type PageBookmark,
 } from "./features/reading/collections";
 import {
@@ -271,6 +274,7 @@ interface FileDeleteDialogState {
 }
 
 const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
+const MAX_LEGACY_BOOKMARK_MIGRATION = 1_000;
 const MENU_MNEMONICS: Record<string, MenuId> = {
   f: "file",
   e: "edit",
@@ -1305,28 +1309,108 @@ export function App({
     ].slice(0, 20));
   }
 
-  function refreshBookmarks(itemKey: string) {
-    setBookmarks(libraryRoot === null ? [] : listBookmarks(itemKey, libraryRoot));
+  async function refreshBookmarks(itemKey: string, requestGeneration: number) {
+    const root = libraryRoot;
+    if (root === null) {
+      setBookmarks([]);
+      return;
+    }
+    const legacy = listBookmarks(itemKey, root);
     setBookmarkNotice(null);
+    try {
+      const response = await listPageBookmarks(itemKey, requestGeneration);
+      if (requestGeneration !== viewerGeneration.current) return;
+      if (response.status !== "ok") {
+        setBookmarks(legacy);
+        setBookmarkNotice(response.status === "error"
+          ? presentError(response.error)
+          : "しおりの読み込みをキャンセルしました。");
+        return;
+      }
+      let migrated = response.data;
+      if (legacy.length > MAX_LEGACY_BOOKMARK_MIGRATION) {
+        setBookmarks([...migrated, ...legacy]);
+        setBookmarkNotice("旧しおりが1000件を超えるため、自動移行を停止しました。");
+        return;
+      }
+      for (const bookmark of legacy) {
+        const migration = await savePageBookmark(bookmark, requestGeneration);
+        if (requestGeneration !== viewerGeneration.current) return;
+        if (migration.status !== "ok") {
+          setBookmarks([...migrated, ...legacy]);
+          setBookmarkNotice(migration.status === "error"
+            ? presentError(migration.error)
+            : "旧しおりの移行をキャンセルしました。");
+          return;
+        }
+        migrated = migration.data;
+      }
+      if (legacy.length > 0) {
+        const cleanup = removeLegacyBookmarksForItemResult(itemKey, root);
+        if (!cleanup.ok) {
+          setBookmarkNotice("旧しおりの後片付けに失敗しました。次回再試行します。");
+        }
+      }
+      setBookmarks(migrated);
+    } catch {
+      if (requestGeneration !== viewerGeneration.current) return;
+      setBookmarks(legacy);
+      setBookmarkNotice("しおりを読み込めませんでした。旧データは保持されています。");
+    }
   }
 
-  function saveCurrentBookmark(index: number) {
+  async function saveCurrentBookmark(index: number) {
     if (viewerSession === null) return;
     const page = viewerSession.pages[index];
     if (page === undefined) return;
     if (libraryRoot === null) return;
-    const result = saveBookmarkResult({
-      itemKey: viewerSession.itemKey,
-      pageIndex: index,
-      pageKey: page.relativePath,
-      createdAt: Date.now(),
-    }, libraryRoot);
-    setBookmarks(result.value);
-    setBookmarkNotice(
-      result.ok
-        ? `しおりを保存しました: ${index + 1}ページ`
-        : "しおりを永続化できませんでした。保存先の空き容量を確認してください。",
-    );
+    const requestGeneration = viewerGeneration.current;
+    try {
+      const response = await savePageBookmark({
+        itemKey: viewerSession.itemKey,
+        pageIndex: index,
+        pageKey: page.relativePath,
+        createdAt: Date.now(),
+      }, requestGeneration);
+      if (requestGeneration !== viewerGeneration.current) return;
+      if (response.status === "ok") {
+        setBookmarks(response.data);
+        setBookmarkNotice(`しおりを保存しました: ${index + 1}ページ`);
+      } else {
+        setBookmarkNotice(response.status === "error"
+          ? presentError(response.error)
+          : "しおりの保存をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === viewerGeneration.current) {
+        setBookmarkNotice("しおりを永続化できませんでした。保存先を確認してください。");
+      }
+    }
+  }
+
+  async function deleteCurrentBookmark(pageKey: string) {
+    if (viewerSession === null) return;
+    const requestGeneration = viewerGeneration.current;
+    try {
+      const response = await deletePageBookmark(
+        viewerSession.itemKey,
+        pageKey,
+        requestGeneration,
+      );
+      if (requestGeneration !== viewerGeneration.current) return;
+      if (response.status === "ok") {
+        setBookmarks(response.data);
+        setBookmarkNotice(`しおりを削除しました: ${pageKey}`);
+      } else {
+        setBookmarkNotice(response.status === "error"
+          ? presentError(response.error)
+          : "しおりの削除をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === viewerGeneration.current) {
+        setBookmarkNotice("しおりを削除できませんでした。");
+      }
+    }
   }
 
   function addSelectedToBookshelf() {
@@ -2963,7 +3047,7 @@ export function App({
       if (requestGeneration !== viewerGeneration.current) return false;
       if (response.status === "ok") {
         rememberRecent(entry);
-        refreshBookmarks(response.data.itemKey);
+        void refreshBookmarks(response.data.itemKey, requestGeneration);
         setViewerSession({
           ...response.data,
           startIndex: startAt === "first"
@@ -3170,6 +3254,7 @@ export function App({
           detached={viewerDetached}
           onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}
+          onDeleteBookmark={deleteCurrentBookmark}
           onNextBookmark={(index) => nextBookmark(
             bookmarks,
             viewerSession.pages.map((page) => page.relativePath),

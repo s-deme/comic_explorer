@@ -106,6 +106,18 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Rust / release / CoDD | PASS | formal canonicalは251.2秒で全12 stageがexit 0。Rust lib 163件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。製品harnessはP2-B固有の全policy直接観測ではない。 |
 | 性能・製品直接観測 | NOT RUN | resolverはbounded catalog snapshot上の同期判定。release WebView2での全5 policy、低速folder再列挙、長時間連続巻移動は未測定。 |
 
+## Leeyes P2-C しおり
+
+対象はLEY-VIEWER-010の1件。既存の複数しおり・pageKey再解決をapp-local SQLite schema v5へ移し、root分離、重複upsert、欠落page表示、個別削除、旧localStorage行の成功後cleanupを接続した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 59件、frontend 27 files / 348件、FAIL 0。Appのnative load/save/delete・旧行移行、Viewerの欠落page削除、collection cleanupを含む。 |
+| TypeScript typecheck / build | PASS | typecheck exit 0、frontend 68 modules build。 |
+| Rust focused | PASS | schema v5の永続化、root namespace分離、同一page upsert、順序、idempotent delete、restartを1件で確認。 |
+| Rust / release / CoDD | PASS | formal canonicalは349.9秒で全12 stageがexit 0。Rust lib 164件 + shutdown process 1件、release executable/freshness、GUI権限付きshortcut product回帰、cleanup audit、CoDD scan/check/verifyを含む。製品harnessはP2-C固有のSQLite再起動を直接観測するものではない。 |
+| 性能・製品直接観測 | NOT RUN | 作品ごとのDB上限10000件、旧行自動移行上限1000件は実装済み。上限件数でのmigration時間、release WebView2再起動、DB破損復旧は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

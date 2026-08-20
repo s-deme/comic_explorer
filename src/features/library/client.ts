@@ -718,6 +718,13 @@ export interface ReadingHistoryEntry {
   lastViewedAtMs: number;
 }
 
+export interface PageBookmarkEntry {
+  itemKey: string;
+  pageIndex: number;
+  pageKey: string;
+  createdAt: number;
+}
+
 export async function openComic(
   itemRelativePath: string,
   generation: number,
@@ -772,6 +779,38 @@ export async function clearReadingHistory(
   generation: number,
 ): Promise<ApiResponse<void>> {
   return invoke("clear_reading_history", { context: context(generation) });
+}
+
+export async function listPageBookmarks(
+  itemKey: string,
+  generation: number,
+): Promise<ApiResponse<PageBookmarkEntry[]>> {
+  return invoke("list_page_bookmarks", {
+    context: context(generation),
+    itemKey,
+  });
+}
+
+export async function savePageBookmark(
+  bookmark: PageBookmarkEntry,
+  generation: number,
+): Promise<ApiResponse<PageBookmarkEntry[]>> {
+  return invoke("save_page_bookmark", {
+    context: context(generation),
+    ...bookmark,
+  });
+}
+
+export async function deletePageBookmark(
+  itemKey: string,
+  pageKey: string,
+  generation: number,
+): Promise<ApiResponse<PageBookmarkEntry[]>> {
+  return invoke("delete_page_bookmark", {
+    context: context(generation),
+    itemKey,
+    pageKey,
+  });
 }
 
 export async function loadPage(

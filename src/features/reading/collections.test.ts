@@ -6,6 +6,7 @@ import {
   listBookshelf,
   migrateLegacyCollections,
   nextBookmark,
+  removeLegacyBookmarksForItemResult,
   removeBookshelfItem,
   resolveBookmarks,
   saveBookmark,
@@ -106,5 +107,16 @@ describe("reading collections", () => {
     expect(migrateLegacyCollections("root-b").ok).toBe(true);
     expect(listBookshelf("root-a")).toEqual(["Series/01.cbz"]);
     expect(listBookshelf("root-b")).toEqual(["Other/02.cbz"]);
+  });
+
+  it("REQ-LEY-P2-003 removes only successfully migrated item bookmarks", () => {
+    saveBookmark({ itemKey: "one.cbz", pageIndex: 0, pageKey: "1.png", createdAt: 1 }, "root-a");
+    saveBookmark({ itemKey: "two.cbz", pageIndex: 0, pageKey: "1.png", createdAt: 2 }, "root-a");
+    saveBookmark({ itemKey: "one.cbz", pageIndex: 0, pageKey: "1.png", createdAt: 3 }, "root-b");
+
+    expect(removeLegacyBookmarksForItemResult("one.cbz", "root-a").ok).toBe(true);
+    expect(listBookmarks("one.cbz", "root-a")).toEqual([]);
+    expect(listBookmarks("two.cbz", "root-a")).toHaveLength(1);
+    expect(listBookmarks("one.cbz", "root-b")).toHaveLength(1);
   });
 });

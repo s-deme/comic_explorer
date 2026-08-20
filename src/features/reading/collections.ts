@@ -232,6 +232,22 @@ export function saveBookmark(bookmark: PageBookmark, rootNamespace?: string): Pa
   return saveBookmarkResult(bookmark, rootNamespace).value;
 }
 
+export function removeLegacyBookmarksForItemResult(
+  itemKey: string,
+  rootNamespace: string,
+): CollectionWriteResult<PageBookmark[]> {
+  const envelope = readEnvelope();
+  const current = rootCollections(envelope, rootNamespace);
+  const retained = current.bookmarks.filter((bookmark) => bookmark.itemKey !== itemKey);
+  const failure = writeJson(
+    ROOT_COLLECTIONS_KEY,
+    replaceRootCollections(envelope, { ...current, bookmarks: retained }),
+  );
+  return failure === null
+    ? { ok: true, value: [] }
+    : { ok: false, value: sortedBookmarks(current.bookmarks, itemKey), reason: failure };
+}
+
 export function resolveBookmarks(
   bookmarks: readonly PageBookmark[],
   pageKeys: readonly string[],

@@ -165,6 +165,7 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 |---|---|---|
 | REQ-LEY-P2-001 | LEY-VIEWER-007 | 2page以上のviewerはtoolbarからslideshowを開始・停止でき、slideshow起動commandでは開始状態で開く。既定間隔3秒で通常の次page commandを1回ずつ実行し、page decode/prefetch待機と巻末policyを迂回しない。documentが非表示またはwindow focusを失った間は自動送りせず、復帰後に新しい1 intervalを待つ。1pageでは開始不可とし、停止・viewer終了・unmountでtimerを破棄する。詳細な間隔・順序・反復・random設定はLEY-VIEWER-008で要件化し、このbatchでは固定しない。 |
 | REQ-LEY-P2-002 | LEY-VIEWER-009 | 巻末動作は「次巻を自動」「次巻を確認」「libraryへ戻る」「停止」「最終巻から先頭巻へloop」の5 policyを設定dialogとviewerで選択・永続化する。archive、PDF、画像folderを同じ読み取り可能volumeとして現在のcatalog sort順で扱い、次巻は先頭page、前巻は末尾pageから開く。「libraryへ戻る」は次巻の有無にかかわらず巻末でviewerを閉じる。次巻なし、現在volume不明、一覧再取得失敗では安全に停止し、確認前・失敗時に別volumeを開かない。 |
+| REQ-LEY-P2-003 | LEY-VIEWER-010 | 作品ごとに複数の任意pageをしおりとしてapp-local SQLiteへ保存し、同じpageの再保存は重複を作らず最新ordinal hintへ更新する。viewerを開くと保存済みしおりを読込み、現在のpageKey列へ再解決して次の有効なしおりへ循環移動できる。欠落pageは一覧に残して無効と明示し、個別削除できる。既存root-scoped localStorageしおりは対象作品を初めて開いたときSQLiteへ重複なく移行し、全件成功後だけ旧行を除去する。root外path、空key、不正ordinal・時刻、過大な移行payloadは拒否し、失敗時はviewerと旧データを保持して局所errorを表示する。 |
 
 ## 非採用と将来候補の境界
 

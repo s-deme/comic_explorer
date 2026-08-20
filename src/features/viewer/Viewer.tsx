@@ -111,6 +111,7 @@ interface ViewerProps {
   onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
   onNextBookmark?: (index: number) => number | null;
+  onDeleteBookmark?: (pageKey: string) => void;
 }
 
 interface LoupeState {
@@ -170,6 +171,7 @@ export function Viewer({
   onToggleDetached,
   onSaveBookmark,
   onNextBookmark,
+  onDeleteBookmark,
 }: ViewerProps) {
   const viewerBackground = normalizeViewerBackground(initialBackground);
   const viewerPageMargin = normalizeViewerSpacing(
@@ -1230,6 +1232,13 @@ export function Viewer({
                         {resolved === undefined
                           ? `${bookmark.pageKey}（現在の作品では見つかりません）`
                           : `${resolved.pageIndex + 1}ページ: ${bookmark.pageKey}`}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`しおりを削除: ${bookmark.pageKey}`}
+                        onClick={() => onDeleteBookmark?.(bookmark.pageKey)}
+                      >
+                        削除
                       </button>
                     </li>
                   );

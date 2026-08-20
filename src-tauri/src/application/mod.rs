@@ -29,7 +29,9 @@ use crate::domain::{
     classify_file_name, item_id_for, page_id_for,
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
-use crate::state::{AppPaths, FavoriteRecord, StateStore, ThumbnailPins, ThumbnailPipeline};
+use crate::state::{
+    AppPaths, BookmarkRecord, FavoriteRecord, StateStore, ThumbnailPins, ThumbnailPipeline,
+};
 use library_root::validate_library_root;
 
 pub struct AppState {
@@ -945,6 +947,15 @@ pub struct ReadingHistoryEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PageBookmarkEntry {
+    pub item_key: RelativePath,
+    pub page_key: RelativePath,
+    pub page_index: u64,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ThumbnailResponse {
     pub item_relative_path: RelativePath,
     pub content_hash: String,
@@ -1628,6 +1639,196 @@ pub fn set_item_rating(
         return Ok(error_response(&context, error));
     }
     let data = match load_item_metadata(store, &item_identity) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+fn bookmark_path(value: String, label: &str) -> Result<RelativePath, AppError> {
+    match RelativePath::parse(value) {
+        Ok(path) if !path.as_str().is_empty() => Ok(path),
+        _ => Err(request_error(
+            ErrorCode::InvalidPath,
+            &format!("Bookmark {label} must be a non-empty relative path."),
+        )),
+    }
+}
+
+fn bookmark_entries(records: Vec<BookmarkRecord>) -> Result<Vec<PageBookmarkEntry>, AppError> {
+    records
+        .into_iter()
+        .map(|record| {
+            Ok(PageBookmarkEntry {
+                item_key: bookmark_path(record.item_key, "item key")?,
+                page_key: bookmark_path(record.page_key, "page key")?,
+                page_index: record.natural_ordinal,
+                created_at: record.created_at_ms,
+            })
+        })
+        .collect()
+}
+
+fn load_bookmarks(
+    store: &StateStore,
+    root_namespace: &str,
+    item_key: &RelativePath,
+) -> Result<Vec<PageBookmarkEntry>, AppError> {
+    bookmark_entries(store.list_bookmarks(root_namespace, item_key.as_str())?)
+}
+
+fn bookmark_root_namespace(state: &AppState) -> Result<String, AppError> {
+    state
+        .library_root
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Library root state is unavailable."))?
+        .as_ref()
+        .map(|root| root.to_string_lossy().into_owned())
+        .ok_or_else(|| request_error(ErrorCode::InvalidRequest, "A library root is required."))
+}
+
+#[tauri::command]
+pub fn list_page_bookmarks(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_key: String,
+) -> Result<Response<Vec<PageBookmarkEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_key = match bookmark_path(item_key, "item key") {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let root_namespace = match bookmark_root_namespace(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local bookmark storage is unavailable.",
+            ),
+        ));
+    };
+    let data = match load_bookmarks(store, &root_namespace, &item_key) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn save_page_bookmark(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_key: String,
+    page_key: String,
+    page_index: u64,
+    created_at: u64,
+) -> Result<Response<Vec<PageBookmarkEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_key = match bookmark_path(item_key, "item key") {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let page_key = match bookmark_path(page_key, "page key") {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if page_index > i64::MAX as u64 || created_at > i64::MAX as u64 {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Bookmark ordinal or timestamp is invalid.",
+            ),
+        ));
+    }
+    let root_namespace = match bookmark_root_namespace(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local bookmark storage is unavailable.",
+            ),
+        ));
+    };
+    if let Err(error) = store.save_bookmark(&BookmarkRecord {
+        root_namespace: root_namespace.clone(),
+        item_key: item_key.as_str().into(),
+        page_key: page_key.as_str().into(),
+        natural_ordinal: page_index,
+        created_at_ms: created_at,
+    }) {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_bookmarks(store, &root_namespace, &item_key) {
+        Ok(data) => data,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data,
+    })
+}
+
+#[tauri::command]
+pub fn delete_page_bookmark(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_key: String,
+    page_key: String,
+) -> Result<Response<Vec<PageBookmarkEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let item_key = match bookmark_path(item_key, "item key") {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let page_key = match bookmark_path(page_key, "page key") {
+        Ok(path) => path,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let root_namespace = match bookmark_root_namespace(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local bookmark storage is unavailable.",
+            ),
+        ));
+    };
+    if let Err(error) = store.delete_bookmark(&root_namespace, item_key.as_str(), page_key.as_str())
+    {
+        return Ok(error_response(&context, error));
+    }
+    let data = match load_bookmarks(store, &root_namespace, &item_key) {
         Ok(data) => data,
         Err(error) => return Ok(error_response(&context, error)),
     };

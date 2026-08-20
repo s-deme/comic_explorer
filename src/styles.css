@@ -1343,6 +1343,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: #f6f7f8;
 }
 .bookmark-dialog ul { display: grid; gap: 6px; padding-left: 22px; }
+.bookmark-dialog li { display: flex; gap: 6px; align-items: center; }
 .bookmark-dialog li button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .dialog-backdrop > .help-dialog,
 .dialog-backdrop > .end-of-volume-dialog { width: min(520px, calc(100vw - 32px)); }

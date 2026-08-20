@@ -10,7 +10,8 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
+const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 
 fn default_shortcut_bindings() -> BTreeMap<String, String> {
     [
@@ -105,6 +106,15 @@ pub struct FavoriteRecord {
     pub kind: ItemKind,
     pub size_bytes: Option<u64>,
     pub modified_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BookmarkRecord {
+    pub root_namespace: String,
+    pub item_key: String,
+    pub page_key: String,
+    pub natural_ordinal: u64,
+    pub created_at_ms: u64,
 }
 
 impl Default for Settings {
@@ -414,6 +424,111 @@ impl StateStore {
                     i64::try_from(position.natural_ordinal).unwrap_or(i64::MAX),
                     updated_at_ms
                 ],
+            )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub fn list_bookmarks(
+        &self,
+        root_namespace: &str,
+        item_key: &str,
+    ) -> Result<Vec<BookmarkRecord>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT root_namespace, item_key, page_key, natural_ordinal, created_at_ms
+                 FROM page_bookmarks
+                 WHERE root_namespace=?1 AND item_key=?2
+                 ORDER BY natural_ordinal ASC, created_at_ms ASC, page_key ASC
+                 LIMIT ?3",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map(
+                params![root_namespace, item_key, MAX_BOOKMARKS_PER_ITEM],
+                |row| {
+                    Ok(BookmarkRecord {
+                        root_namespace: row.get(0)?,
+                        item_key: row.get(1)?,
+                        page_key: row.get(2)?,
+                        natural_ordinal: row.get::<_, i64>(3)?.max(0) as u64,
+                        created_at_ms: row.get::<_, i64>(4)?.max(0) as u64,
+                    })
+                },
+            )
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn save_bookmark(&self, bookmark: &BookmarkRecord) -> Result<(), AppError> {
+        let existing = self
+            .connection
+            .query_row(
+                "SELECT 1 FROM page_bookmarks
+                 WHERE root_namespace=?1 AND item_key=?2 AND page_key=?3",
+                params![
+                    bookmark.root_namespace,
+                    bookmark.item_key,
+                    bookmark.page_key
+                ],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?
+            .is_some();
+        if !existing {
+            let count = self
+                .connection
+                .query_row(
+                    "SELECT COUNT(*) FROM page_bookmarks
+                     WHERE root_namespace=?1 AND item_key=?2",
+                    params![bookmark.root_namespace, bookmark.item_key],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(database_error)?;
+            if count >= MAX_BOOKMARKS_PER_ITEM {
+                return Err(AppError {
+                    code: ErrorCode::InvalidRequest,
+                    message: "Bookmark limit reached for this item.".into(),
+                    target: None,
+                    retryable: false,
+                });
+            }
+        }
+        self.connection
+            .execute(
+                "INSERT INTO page_bookmarks(
+                   root_namespace, item_key, page_key, natural_ordinal, created_at_ms
+                 ) VALUES(?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(root_namespace, item_key, page_key) DO UPDATE SET
+                   natural_ordinal=excluded.natural_ordinal,
+                   created_at_ms=excluded.created_at_ms",
+                params![
+                    bookmark.root_namespace,
+                    bookmark.item_key,
+                    bookmark.page_key,
+                    i64::try_from(bookmark.natural_ordinal).unwrap_or(i64::MAX),
+                    i64::try_from(bookmark.created_at_ms).unwrap_or(i64::MAX),
+                ],
+            )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub fn delete_bookmark(
+        &self,
+        root_namespace: &str,
+        item_key: &str,
+        page_key: &str,
+    ) -> Result<(), AppError> {
+        self.connection
+            .execute(
+                "DELETE FROM page_bookmarks
+                 WHERE root_namespace=?1 AND item_key=?2 AND page_key=?3",
+                params![root_namespace, item_key, page_key],
             )
             .map_err(database_error)?;
         Ok(())
@@ -1001,6 +1116,35 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![4, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", 4)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 5 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS page_bookmarks (
+                    root_namespace TEXT NOT NULL,
+                    item_key TEXT NOT NULL,
+                    page_key TEXT NOT NULL,
+                    natural_ordinal INTEGER NOT NULL CHECK(natural_ordinal >= 0),
+                    created_at_ms INTEGER NOT NULL CHECK(created_at_ms >= 0),
+                    PRIMARY KEY(root_namespace, item_key, page_key)
+                 );
+                 CREATE INDEX IF NOT EXISTS page_bookmarks_item_order
+                   ON page_bookmarks(
+                     root_namespace, item_key, natural_ordinal, created_at_ms, page_key
+                   );",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![5, unix_millis()],
             )
             .map_err(database_error)?;
         transaction
@@ -2023,7 +2167,7 @@ mod tests {
                     .connection()
                     .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
                     .unwrap(),
-                4
+                SCHEMA_VERSION
             );
             let item_identity = item_id_for("Series/01.cbz").to_string();
             store.assign_tag(&item_identity, "migrated", 10).unwrap();
@@ -2042,5 +2186,98 @@ mod tests {
         assert_eq!(fs::read(&sidecar_file).unwrap(), sidecar_before);
         fs::remove_dir_all(paths.root).unwrap();
         fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p2_003_bookmarks_persist_deduplicate_and_delete() {
+        let paths = temporary_paths("ley-p2-bookmarks");
+        {
+            let (store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            for bookmark in [
+                BookmarkRecord {
+                    root_namespace: r"C:\Comics".into(),
+                    item_key: "Series/01.cbz".into(),
+                    page_key: "pages/05.png".into(),
+                    natural_ordinal: 4,
+                    created_at_ms: 10,
+                },
+                BookmarkRecord {
+                    root_namespace: r"C:\Comics".into(),
+                    item_key: "Series/01.cbz".into(),
+                    page_key: "pages/02.png".into(),
+                    natural_ordinal: 1,
+                    created_at_ms: 20,
+                },
+                BookmarkRecord {
+                    root_namespace: r"C:\Comics".into(),
+                    item_key: "Series/01.cbz".into(),
+                    page_key: "pages/05.png".into(),
+                    natural_ordinal: 7,
+                    created_at_ms: 30,
+                },
+            ] {
+                store.save_bookmark(&bookmark).unwrap();
+            }
+            assert_eq!(
+                store.list_bookmarks(r"C:\Comics", "Series/01.cbz").unwrap(),
+                vec![
+                    BookmarkRecord {
+                        root_namespace: r"C:\Comics".into(),
+                        item_key: "Series/01.cbz".into(),
+                        page_key: "pages/02.png".into(),
+                        natural_ordinal: 1,
+                        created_at_ms: 20,
+                    },
+                    BookmarkRecord {
+                        root_namespace: r"C:\Comics".into(),
+                        item_key: "Series/01.cbz".into(),
+                        page_key: "pages/05.png".into(),
+                        natural_ordinal: 7,
+                        created_at_ms: 30,
+                    },
+                ]
+            );
+        }
+
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store
+                .list_bookmarks(r"C:\Comics", "Series/01.cbz")
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(
+            store
+                .list_bookmarks(r"D:\Other", "Series/01.cbz")
+                .unwrap()
+                .is_empty()
+        );
+        store
+            .delete_bookmark(r"C:\Comics", "Series/01.cbz", "pages/02.png")
+            .unwrap();
+        store
+            .delete_bookmark(r"C:\Comics", "Series/01.cbz", "pages/missing.png")
+            .unwrap();
+        assert_eq!(
+            store
+                .list_bookmarks(r"C:\Comics", "Series/01.cbz")
+                .unwrap()
+                .iter()
+                .map(|bookmark| bookmark.page_key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["pages/05.png"]
+        );
+        assert_eq!(
+            store
+                .connection()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
     }
 }

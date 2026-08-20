@@ -22,6 +22,7 @@ import {
   listTreeChildren,
   listFolder,
   listReadingHistory,
+  listPageBookmarks,
   clearReadingHistory,
   openComic,
   pickLibraryFile,
@@ -34,6 +35,7 @@ import {
   saveEndOfVolumePolicy,
   saveItemMemo,
   saveReadingPosition,
+  savePageBookmark,
   saveSettingsProfile,
   saveViewerSettings,
   getTrayStatus,
@@ -50,6 +52,7 @@ import {
   moveFileItemsToFolder,
   moveFileItemsToDestination,
   deleteFileItems,
+  deletePageBookmark,
   setFileClipboard,
   getFileClipboardStatus,
   pasteFileItems,
@@ -65,6 +68,7 @@ import {
 import type { CatalogEntry, ImageFormat } from "./types/domain";
 import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
 import { APP_VERSION, DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
+import { listBookmarks } from "./features/reading/collections";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -108,7 +112,10 @@ vi.mock("./features/library/client", () => ({
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
+  listPageBookmarks: vi.fn(),
   clearReadingHistory: vi.fn(),
+  savePageBookmark: vi.fn(),
+  deletePageBookmark: vi.fn(),
   renameFileItem: vi.fn(),
   createFileFolder: vi.fn(),
   copyFileItemsToFolder: vi.fn(),
@@ -157,7 +164,10 @@ const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
+const listPageBookmarksMock = vi.mocked(listPageBookmarks);
 const clearHistoryMock = vi.mocked(clearReadingHistory);
+const savePageBookmarkMock = vi.mocked(savePageBookmark);
+const deletePageBookmarkMock = vi.mocked(deletePageBookmark);
 const diagnoseMock = vi.mocked(diagnoseLibrary);
 const renameFileItemMock = vi.mocked(renameFileItem);
 const createFileFolderMock = vi.mocked(createFileFolder);
@@ -422,7 +432,10 @@ describe("application shell", () => {
     searchMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
+    listPageBookmarksMock.mockReset();
     clearHistoryMock.mockReset();
+    savePageBookmarkMock.mockReset();
+    deletePageBookmarkMock.mockReset();
     diagnoseMock.mockReset();
     renameFileItemMock.mockReset();
     createFileFolderMock.mockReset();
@@ -471,6 +484,16 @@ describe("application shell", () => {
       metadataResponse(itemIdentity, { rating }),
     );
     historyMock.mockResolvedValue(historyResponse([]));
+    listPageBookmarksMock.mockResolvedValue({
+      status: "ok", requestId: "bookmarks" as never, generation: 1 as never, data: [],
+    });
+    savePageBookmarkMock.mockImplementation(async (bookmark) => ({
+      status: "ok", requestId: "save-bookmark" as never, generation: 1 as never,
+      data: [bookmark],
+    }));
+    deletePageBookmarkMock.mockResolvedValue({
+      status: "ok", requestId: "delete-bookmark" as never, generation: 1 as never, data: [],
+    });
     clearHistoryMock.mockResolvedValue({
       status: "ok",
       requestId: "clear-history" as never,
@@ -1486,6 +1509,56 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("REQ-LEY-P2-003 loads, saves, and deletes SQLite-backed bookmarks", async () => {
+    const only = testEntry("bookmarked.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(only.relativePath));
+    await registerTestLibrary([only]);
+    await openTestComic(only.relativePath);
+    await waitFor(() => expect(listPageBookmarksMock)
+      .toHaveBeenCalledWith(only.relativePath, expect.any(Number)));
+
+    fireEvent.click(screen.getByRole("button", { name: "しおりを保存" }));
+    await screen.findByText("しおりを保存しました: 1ページ");
+    expect(savePageBookmarkMock).toHaveBeenCalledWith({
+      itemKey: only.relativePath,
+      pageIndex: 0,
+      pageKey: "page-1.png",
+      createdAt: expect.any(Number),
+    }, expect.any(Number));
+
+    fireEvent.click(screen.getByRole("button", { name: "しおり一覧" }));
+    fireEvent.click(screen.getByRole("button", { name: "しおりを削除: page-1.png" }));
+    await screen.findByText("しおりを削除しました: page-1.png");
+    expect(deletePageBookmarkMock).toHaveBeenCalledWith(
+      only.relativePath,
+      "page-1.png",
+      expect.any(Number),
+    );
+  });
+
+  it("REQ-LEY-P2-003 removes legacy bookmark rows only after native migration succeeds", async () => {
+    localStorage.clear();
+    localStorage.setItem("comic-explorer.bookmarks.v1", JSON.stringify([{
+      itemKey: "legacy.cbz",
+      pageIndex: 0,
+      pageKey: "page-1.png",
+      createdAt: 1,
+    }]));
+    const legacy = testEntry("legacy.cbz");
+    openMock.mockResolvedValueOnce(viewerResponse(legacy.relativePath));
+    await registerTestLibrary([legacy]);
+    await openTestComic(legacy.relativePath);
+
+    await waitFor(() => expect(savePageBookmarkMock).toHaveBeenCalledWith({
+      itemKey: legacy.relativePath,
+      pageIndex: 0,
+      pageKey: "page-1.png",
+      createdAt: 1,
+    }, expect.any(Number)));
+    expect(listBookmarks(legacy.relativePath, "C:\\")).toEqual([]);
+    localStorage.clear();
   });
 
   it("keeps the Viewer open and reports a stop policy at the boundary", async () => {

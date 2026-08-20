@@ -31,11 +31,11 @@ codd:
 | tier | 対象 | Published | 未完了 |
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
-| P2 閲覧中核 | 16 | 2 | 14 |
+| P2 閲覧中核 | 16 | 3 | 13 |
 | P3 操作・検索 | 31 | 0 | 31 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **23** | **80** |
+| **合計** | **103** | **24** | **79** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -50,6 +50,8 @@ P1-CではLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件を
 P2-AではLEY-VIEWER-007をPublishedとした。既存のslideshow context起動を、通常viewerからも開始・停止できる単一timer commandへ完成させ、background・focus喪失中の停止、復帰後のfresh interval、1page無効化、unmount cleanupを接続した。詳細な間隔・順序・反復・random設定は依存順どおりLEY-VIEWER-008で実装する。release WebView2でのbackground/focus直接観測は未測定として残す。
 
 P2-BではLEY-VIEWER-009をPublishedとした。既存5 policyのsort順・archive/PDF/画像folder・次巻先頭/前巻末尾・確認・停止・loop・永続化を回帰し、return-libraryを次巻の有無より先に解決して最終巻でも確実に一覧へ戻す不足挙動を完成させた。catalog再取得失敗とstale generationは既存の安全停止を維持する。
+
+P2-CではLEY-VIEWER-010をPublishedとした。複数しおりをcanonical root namespace・作品・page keyでSQLite schema v5へ保存し、pageKey再解決、次しおり循環、欠落pageの明示と個別削除、同一page upsert、root分離、旧localStorage行の成功後移行を接続した。作品ごとのDB上限10000件と旧行自動移行上限1000件を設けた。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
