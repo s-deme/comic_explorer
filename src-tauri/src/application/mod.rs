@@ -339,6 +339,7 @@ pub struct CatalogSettings {
     pub slideshow_interval_ms: u32,
     pub slideshow_order: String,
     pub slideshow_repeat_current_item: bool,
+    pub viewer_catalog_selection_sync: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -413,6 +414,7 @@ pub struct SettingsProfileInput {
     pub slideshow_interval_ms: u32,
     pub slideshow_order: String,
     pub slideshow_repeat_current_item: bool,
+    pub viewer_catalog_selection_sync: bool,
     pub viewer_background: String,
     pub viewer_page_margin: u16,
     pub viewer_spread_gap: u16,
@@ -1117,6 +1119,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         slideshow_interval_ms,
         slideshow_order,
         slideshow_repeat_current_item: settings.slideshow_repeat_current_item,
+        viewer_catalog_selection_sync: settings.viewer_catalog_selection_sync,
         viewer_background,
         viewer_page_margin,
         viewer_spread_gap,
@@ -2688,6 +2691,7 @@ pub fn set_settings_profile(
         settings.slideshow_interval_ms = profile.slideshow_interval_ms.to_string();
         settings.slideshow_order = profile.slideshow_order;
         settings.slideshow_repeat_current_item = profile.slideshow_repeat_current_item;
+        settings.viewer_catalog_selection_sync = profile.viewer_catalog_selection_sync;
         settings.viewer_background = profile.viewer_background;
         settings.viewer_page_margin = profile.viewer_page_margin.to_string();
         settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
@@ -4689,6 +4693,7 @@ mod shutdown_tests {
             slideshow_interval_ms: 3_000,
             slideshow_order: "forward".into(),
             slideshow_repeat_current_item: false,
+            viewer_catalog_selection_sync: true,
             viewer_background: "checker".into(),
             viewer_page_margin: 0,
             viewer_spread_gap: 8,

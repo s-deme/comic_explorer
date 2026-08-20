@@ -456,6 +456,11 @@ export function SettingsDialog({
       category: "viewer",
       text: `スライドショー 間隔 ${draft.slideshowIntervalMs / 1000}秒 順序 ${SLIDESHOW_ORDER_LABELS[draft.slideshowOrder]} 反復 ${draft.slideshowRepeatCurrentItem ? "現在の作品を繰り返す" : "巻末動作に従う"}`,
     },
+    {
+      id: "viewer-catalog-selection-sync",
+      category: "viewer",
+      text: `一覧 選択 同期 Viewer 復帰 スクロール ${draft.viewerCatalogSelectionSync ? "有効" : "無効"}`,
+    },
     ...([
       ["tree-visible", "フォルダツリー", draft.treeVisible, "ライブラリの階層を左側へ表示します"],
       ["menu-visible", "メニューバー", draft.menuBarVisible, "すべてのアプリメニューを画面上部へ表示します"],
@@ -840,6 +845,17 @@ export function SettingsDialog({
                     <span>{draft.slideshowRepeatCurrentItem ? "反復する" : "反復しない"}</span>
                   </label>
                 </div>
+              </SettingRow>
+              <SettingRow id="viewer-catalog-selection-sync" title="Viewerと一覧の選択を同期" description="Viewerで表示中の画像または作品を、一覧へ戻ったときの選択位置に反映します。" hidden={rowHidden("viewer-catalog-selection-sync")}>
+                <label className="settings-switch">
+                  <input
+                    type="checkbox"
+                    aria-label="profile Viewerと一覧の選択を同期"
+                    checked={draft.viewerCatalogSelectionSync}
+                    onChange={(event) => update({ viewerCatalogSelectionSync: event.target.checked })}
+                  />
+                  <span>{draft.viewerCatalogSelectionSync ? "同期する" : "同期しない"}</span>
+                </label>
               </SettingRow>
               <SettingRow id="reading-direction" title="読み方向" description="見開きの配置と左右キーの進行方向を揃えます。" hidden={rowHidden("reading-direction")}>
                 <select aria-label="profile読み方向" value={draft.readingDirection} onChange={(event) => update({ readingDirection: event.target.value as SettingsProfile["readingDirection"] })}>

@@ -261,6 +261,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | source 256MiB、長辺16,384px、120,000,000 pixels、DIBV5 header込み256MiBの拒否境界とchecked overflowをtestした。decodeとclipboard書込みはblocking workerへ分離する。最大付近の実画像による処理時間・peak working setは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2 toolbarからの実操作、Explorer・Paint等の他appへの透明画像貼り付け、animated形式、archive・PDF全形式、clipboard競合中の再試行は未測定。 |
 
+## Leeyes P2-O 一覧選択同期
+
+対象はLEY-VIEWER-012の1件。Viewerのanchor page変化を、現行session・generation・読み込み済みvisible catalogが一致する場合だけ単一selectionへ反映する。画像folderはpage path、archive・PDF・comic folderと次巻・前巻はitem keyを使い、設定無効または不可視候補では既存selectionを保持する。設定はprofile v17とSQLiteへatomic保存する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend / Rust | PASS | App 92件、profile 91件、selection resolver 3件、client contract 1件、Rust settings 2件、FAIL 0。画像page、同期無効、次巻item、v16 migration、不正boolean、SQLite false再open、必須payloadを含む。 |
+| Windows tests / typecheck / build | PASS | 最終sourceを含むcanonical CoDD verifyでPython 59件とfrontend 30 files / 408件、FAIL 0。typecheck exit 0。frontend 70 modules build、bundle 520.23kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 180件とshutdown process 1件、FAIL 0。設定transaction、既存catalog・viewer境界の回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 初回canonicalはproduct-shortcutで新設定fieldのfrontend payload欠落を検出してFAIL。fieldとclient contract test追加後の再実行は258.865秒で全12 stageがexit 0。Rust 45.647秒、release executable/freshness、GUI権限付きshortcut product回帰11.670秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能 | PASS / 限定 | visible pathのSetはcatalog変更時だけ構築し、page移動ごとは現在pageとitem keyの最大2 indexed lookupであることをspy testで確認。追加I/O、polling、page数比例stateはない。release 10,000項目での復帰scroll時間・frame timeは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2で画像folderの連続page移動後に一覧へ戻る操作、10,000項目virtual catalogのscroll復帰、検索・mask中の不可視候補、次巻・前巻の選択表示は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

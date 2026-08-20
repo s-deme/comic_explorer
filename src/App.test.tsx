@@ -216,6 +216,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   slideshowIntervalMs: 3_000,
   slideshowOrder: "forward",
   slideshowRepeatCurrentItem: false,
+  viewerCatalogSelectionSync: true,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
@@ -1033,6 +1034,78 @@ describe("application shell", () => {
     expect(screen.queryByRole("menu", { name: "ファイル" })).not.toBeInTheDocument();
   });
 
+  it("REQ-LEY-P2-015 synchronizes an image-folder page to catalog selection on return", async () => {
+    const first: CatalogEntry = { relativePath: "01.png" as never, kind: "page" };
+    const second: CatalogEntry = { relativePath: "02.png" as never, kind: "page" };
+    openMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "open-image-folder" as never,
+      generation: 1 as never,
+      data: {
+        itemKey: "",
+        displayName: first.relativePath,
+        pages: [first, second].map((entry, index) => ({
+          id: `folder-page-${index}` as never,
+          relativePath: entry.relativePath,
+          mediaUri: `data:image/png;base64,page-${index}`,
+        })),
+        startIndex: 0,
+      },
+    });
+    await registerTestLibrary([first, second]);
+    await openTestComic(first.relativePath);
+    markViewerPrefetchReady();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+    expect(await screen.findByText("2 / 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+
+    const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const secondButton = within(grid).getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
+    await waitFor(() => expect(secondButton).toHaveAttribute("data-selected", "true"));
+    expect(screen.getByText("現在位置: 2/2")).toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P2-015 preserves the pre-view selection when synchronization is disabled", async () => {
+    const first: CatalogEntry = { relativePath: "01.png" as never, kind: "page" };
+    const second: CatalogEntry = { relativePath: "02.png" as never, kind: "page" };
+    settingsMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "settings-no-sync" as never,
+      generation: 1 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, viewerCatalogSelectionSync: false },
+    });
+    openMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "open-image-folder-no-sync" as never,
+      generation: 1 as never,
+      data: {
+        itemKey: "",
+        displayName: first.relativePath,
+        pages: [first, second].map((entry, index) => ({
+          id: `folder-no-sync-${index}` as never,
+          relativePath: entry.relativePath,
+          mediaUri: `data:image/png;base64,no-sync-${index}`,
+        })),
+        startIndex: 0,
+      },
+    });
+    await registerTestLibrary([first, second]);
+    await openTestComic(first.relativePath);
+    markViewerPrefetchReady();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+    expect(await screen.findByText("2 / 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+
+    const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const firstButton = within(grid).getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === first.relativePath);
+    await waitFor(() => expect(firstButton).toHaveAttribute("data-selected", "true"));
+    expect(screen.getByText("現在位置: 1/2")).toBeInTheDocument();
+  });
+
   it("FT-B17-002 exposes accessible toolbar commands and invokes each callback once", async () => {
     await registerTestLibrary([]);
 
@@ -1469,6 +1542,25 @@ describe("application shell", () => {
       .toHaveAttribute("role", "status");
     expect(screen.getByLabelText(`${only.relativePath} ビューワ`)).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("REQ-LEY-P2-015 synchronizes a next-volume Viewer session to its catalog item", async () => {
+    const first = testEntry("01-first.cbz");
+    const second = testEntry("02-second.cbz");
+    openMock
+      .mockResolvedValueOnce(viewerResponse(first.relativePath))
+      .mockResolvedValueOnce(viewerResponse(second.relativePath));
+    await registerTestLibrary([first, second]);
+    await openTestComic(first.relativePath);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "次ページ" })[0]);
+    expect(await screen.findByLabelText(`${second.relativePath} ビューワ`)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
+
+    const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    const secondButton = within(grid).getAllByRole("button")
+      .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
+    await waitFor(() => expect(secondButton).toHaveAttribute("data-selected", "true"));
   });
 
   it("returns to the library from the Viewer end callback for return_library", async () => {
@@ -2934,7 +3026,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 16,
+        profileVersion: 17,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -3061,7 +3153,7 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 16,
+        profileVersion: 17,
         trayStoreOnMinimize: true,
         trayCloseBehavior: "store",
         trayRestoreGesture: "doubleClick",
@@ -3087,10 +3179,28 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 16,
+        profileVersion: 17,
         slideshowIntervalMs: 7_500,
         slideshowOrder: "random",
         slideshowRepeatCurrentItem: true,
+      }),
+      expect.any(Number),
+    ));
+  });
+
+  it("REQ-LEY-P2-015 persists Viewer catalog selection synchronization atomically", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
+    fireEvent.click(within(dialog).getByLabelText("profile Viewerと一覧の選択を同期"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileVersion: 17,
+        viewerCatalogSelectionSync: false,
       }),
       expect.any(Number),
     ));

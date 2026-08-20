@@ -75,9 +75,11 @@ P2-MではLEY-VIEWER-008をPublishedとした。0.5〜60秒の間隔、順方向
 
 P2-NではLEY-VIEWER-011をPublishedとした。viewer toolbarから現在のanchor pageをRust native commandへ渡し、folder・archive・PDF・対応画像を既存の安全境界で読み、EXIF向き適用済み32bpp BGRAをtop-down `CF_DIBV5`としてWindows clipboardへ書く。透明PNG、DIBV5 header・resource上限、実clipboard format、page変更後の古いstatus抑止を自動検証した。Windows canonicalとrelease buildはPASSしたが、release製品から他appへの貼り付け、最大上限付近の実画像、処理時間・peak memoryは未測定として残す。
 
+P2-OではLEY-VIEWER-012をPublishedとした。既定有効の選択同期をprofile v17・SQLite・設定dialogへ追加し、画像folderの現在page、archive・PDF・comic folderと次巻・前巻のitem keyを、現行viewer generationとvisible catalogが一致するときだけ単一selectionへ反映する。catalog変更時に作るSetを共有し、page移動は最大2 lookupとした。初回canonicalではfrontendからRustへの新field欠落をproduct-shortcut gateが検出したため、payloadを修正して専用contract testを追加し、再実行した全12 stageはPASSした。release製品の大量catalog復帰scrollは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
-| Implemented | PASS | 72 |
+| Implemented | PASS | 73 |
 | Implemented | BLOCKED | 15 |
 | Partial | BLOCKED | 9 |
 | Candidate | NOT TESTED | 3 |

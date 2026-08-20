@@ -140,6 +140,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       slideshowIntervalMs: 3_000,
       slideshowOrder: "forward",
       slideshowRepeatCurrentItem: false,
+      viewerCatalogSelectionSync: true,
       viewerBackground: "checker" as const,
       viewerPageMargin: 0,
       viewerSpreadGap: 8,

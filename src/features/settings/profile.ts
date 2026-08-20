@@ -83,7 +83,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 16;
+export const SETTINGS_PROFILE_VERSION = 17;
 export const APP_VERSION = packageMetadata.version;
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
@@ -174,6 +174,7 @@ export interface SettingsProfile {
   slideshowIntervalMs: number;
   slideshowOrder: SlideshowOrder;
   slideshowRepeatCurrentItem: boolean;
+  viewerCatalogSelectionSync: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -238,6 +239,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     slideshowIntervalMs: DEFAULT_SLIDESHOW_INTERVAL_MS,
     slideshowOrder: DEFAULT_SLIDESHOW_ORDER,
     slideshowRepeatCurrentItem: false,
+    viewerCatalogSelectionSync: true,
     viewerBackground: DEFAULT_VIEWER_BACKGROUND,
     viewerPageMargin: DEFAULT_VIEWER_PAGE_MARGIN,
     viewerSpreadGap: DEFAULT_VIEWER_SPREAD_GAP,
@@ -442,6 +444,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const slideshowRepeatCurrentItem = legacySlideshowPreferences
     ? false
     : candidate.slideshowRepeatCurrentItem;
+  const legacyViewerCatalogSelectionSync = legacySlideshowPreferences || candidate.profileVersion === 16;
+  const viewerCatalogSelectionSync = legacyViewerCatalogSelectionSync
+    ? true
+    : candidate.viewerCatalogSelectionSync;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -458,6 +464,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 13
       && candidate.profileVersion !== 14
       && candidate.profileVersion !== 15
+      && candidate.profileVersion !== 16
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -493,6 +500,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isSlideshowIntervalMs(slideshowIntervalMs) ||
     slideshowOrder === null ||
     typeof slideshowRepeatCurrentItem !== "boolean" ||
+    typeof viewerCatalogSelectionSync !== "boolean" ||
     viewerBackground === null ||
     !isViewerSpacing(viewerPageMargin) ||
     !isViewerSpacing(viewerSpreadGap) ||
@@ -557,6 +565,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     slideshowIntervalMs,
     slideshowOrder,
     slideshowRepeatCurrentItem,
+    viewerCatalogSelectionSync,
     viewerBackground,
     viewerPageMargin,
     viewerSpreadGap,

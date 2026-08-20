@@ -92,6 +92,7 @@ pub struct Settings {
     pub slideshow_interval_ms: String,
     pub slideshow_order: String,
     pub slideshow_repeat_current_item: bool,
+    pub viewer_catalog_selection_sync: bool,
     pub viewer_background: String,
     pub viewer_page_margin: String,
     pub viewer_spread_gap: String,
@@ -179,6 +180,7 @@ impl Default for Settings {
             slideshow_interval_ms: "3000".into(),
             slideshow_order: "forward".into(),
             slideshow_repeat_current_item: false,
+            viewer_catalog_selection_sync: true,
             viewer_background: "checker".into(),
             viewer_page_margin: "0".into(),
             viewer_spread_gap: "8".into(),
@@ -310,6 +312,9 @@ impl StateStore {
                 "slideshowRepeatCurrentItem" => {
                     settings.slideshow_repeat_current_item = value == "true"
                 }
+                "viewerCatalogSelectionSync" => {
+                    settings.viewer_catalog_selection_sync = value == "true"
+                }
                 "viewerBackground" => settings.viewer_background = value,
                 "viewerPageMargin" => settings.viewer_page_margin = value,
                 "viewerSpreadGap" => settings.viewer_spread_gap = value,
@@ -438,6 +443,10 @@ impl StateStore {
             (
                 "slideshowRepeatCurrentItem",
                 settings.slideshow_repeat_current_item.to_string(),
+            ),
+            (
+                "viewerCatalogSelectionSync",
+                settings.viewer_catalog_selection_sync.to_string(),
             ),
             ("viewerBackground", settings.viewer_background.clone()),
             ("viewerPageMargin", settings.viewer_page_margin.clone()),
@@ -1506,6 +1515,7 @@ mod tests {
                 slideshow_interval_ms: "7500".into(),
                 slideshow_order: "random".into(),
                 slideshow_repeat_current_item: true,
+                viewer_catalog_selection_sync: false,
                 viewer_background: "black".into(),
                 viewer_page_margin: "24".into(),
                 viewer_spread_gap: "18".into(),
@@ -1611,6 +1621,7 @@ mod tests {
         assert_eq!(restored.slideshow_interval_ms, "7500");
         assert_eq!(restored.slideshow_order, "random");
         assert!(restored.slideshow_repeat_current_item);
+        assert!(!restored.viewer_catalog_selection_sync);
         assert_eq!(restored.viewer_background, "black");
         assert_eq!(restored.viewer_page_margin, "24");
         assert_eq!(restored.viewer_spread_gap, "18");

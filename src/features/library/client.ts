@@ -146,6 +146,7 @@ export interface CatalogSettings {
   slideshowIntervalMs: number;
   slideshowOrder: SettingsProfile["slideshowOrder"];
   slideshowRepeatCurrentItem: boolean;
+  viewerCatalogSelectionSync: boolean;
   viewerBackground: ViewerBackground;
   viewerPageMargin: number;
   viewerSpreadGap: number;
@@ -269,6 +270,7 @@ export async function saveSettingsProfile(
       slideshowIntervalMs: profile.slideshowIntervalMs,
       slideshowOrder: profile.slideshowOrder,
       slideshowRepeatCurrentItem: profile.slideshowRepeatCurrentItem,
+      viewerCatalogSelectionSync: profile.viewerCatalogSelectionSync,
       viewerBackground: profile.viewerBackground,
       viewerPageMargin: profile.viewerPageMargin,
       viewerSpreadGap: profile.viewerSpreadGap,

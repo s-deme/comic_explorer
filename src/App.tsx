@@ -109,6 +109,7 @@ import {
   isSlideshowOrder,
   type SlideshowOrder,
 } from "./features/viewer/slideshow";
+import { resolveViewerCatalogSelection } from "./features/viewer/catalog-selection";
 import {
   DEFAULT_PAN_FACTOR,
   DEFAULT_VIEWER_GRID_COLOR,
@@ -515,6 +516,7 @@ export function App({
   const [slideshowOrder, setSlideshowOrder] =
     useState<SlideshowOrder>(DEFAULT_SLIDESHOW_ORDER);
   const [slideshowRepeatCurrentItem, setSlideshowRepeatCurrentItem] = useState(false);
+  const [viewerCatalogSelectionSync, setViewerCatalogSelectionSync] = useState(true);
   const [viewerBackground, setViewerBackground] =
     useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
   const [viewerPageMargin, setViewerPageMargin] =
@@ -955,6 +957,7 @@ export function App({
             ? response.data.slideshowOrder
             : DEFAULT_SLIDESHOW_ORDER);
           setSlideshowRepeatCurrentItem(response.data.slideshowRepeatCurrentItem === true);
+          setViewerCatalogSelectionSync(response.data.viewerCatalogSelectionSync !== false);
           setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
           setViewerPageMargin(normalizeViewerSpacing(
             response.data.viewerPageMargin,
@@ -1101,11 +1104,14 @@ export function App({
     () => sortedEntries.filter((entry) => matchesMask(entry, fileMask)),
     [fileMask, sortedEntries],
   );
+  const visibleEntryPaths = useMemo(
+    () => new Set<string>(visibleEntries.map((entry) => entry.relativePath)),
+    [visibleEntries],
+  );
 
   useEffect(() => {
-    const visible = new Set<string>(visibleEntries.map((entry) => entry.relativePath));
-    const next = selectedPaths.filter((path) => visible.has(path));
-    const nextActive = selectedPath !== null && visible.has(selectedPath)
+    const next = selectedPaths.filter((path) => visibleEntryPaths.has(path));
+    const nextActive = selectedPath !== null && visibleEntryPaths.has(selectedPath)
       ? selectedPath
       : next.at(-1) ?? null;
     if (
@@ -1115,10 +1121,10 @@ export function App({
       setSelectedPaths(next);
     }
     if (nextActive !== selectedPath) setSelectedPath(nextActive);
-    if (selectionAnchor.current !== null && !visible.has(selectionAnchor.current)) {
+    if (selectionAnchor.current !== null && !visibleEntryPaths.has(selectionAnchor.current)) {
       selectionAnchor.current = nextActive;
     }
-  }, [selectedPath, selectedPaths, visibleEntries]);
+  }, [selectedPath, selectedPaths, visibleEntryPaths]);
 
   useEffect(() => {
     if (selectedPath !== null) rememberedCatalogSelections.current.set(navigation.current, selectedPath);
@@ -2561,6 +2567,7 @@ export function App({
       slideshowIntervalMs,
       slideshowOrder,
       slideshowRepeatCurrentItem,
+      viewerCatalogSelectionSync,
       viewerBackground,
       viewerPageMargin,
       viewerSpreadGap,
@@ -2667,6 +2674,7 @@ export function App({
       setSlideshowIntervalMs(normalized.slideshowIntervalMs);
       setSlideshowOrder(normalized.slideshowOrder);
       setSlideshowRepeatCurrentItem(normalized.slideshowRepeatCurrentItem);
+      setViewerCatalogSelectionSync(normalized.viewerCatalogSelectionSync);
       setViewerBackground(normalized.viewerBackground);
       setViewerPageMargin(normalized.viewerPageMargin);
       setViewerSpreadGap(normalized.viewerSpreadGap);
@@ -2839,6 +2847,7 @@ export function App({
     fullscreenEscapeBehavior, preventDisplaySleepFullscreen,
     trayStoreOnMinimize, trayCloseBehavior, trayRestoreGesture,
     slideshowIntervalMs, slideshowOrder, slideshowRepeatCurrentItem,
+    viewerCatalogSelectionSync,
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
@@ -3212,6 +3221,27 @@ export function App({
     thumbnailRequests.current.clear();
   }
 
+  function synchronizeViewerCatalogSelection(
+    session: ViewerSession,
+    index: number,
+    expectedViewerGeneration: number,
+  ) {
+    if (
+      !viewerCatalogSelectionSync
+      || expectedViewerGeneration !== viewerGeneration.current
+      || viewerSession?.itemKey !== session.itemKey
+      || loadedCatalogPath !== navigation.current
+    ) return;
+    const candidate = resolveViewerCatalogSelection(session, index, visibleEntryPaths);
+    if (candidate === null) return;
+    selectionAnchor.current = candidate;
+    rememberedCatalogSelections.current.set(navigation.current, candidate);
+    setSelectedPaths((current) => current.length === 1 && current[0] === candidate
+      ? current
+      : [candidate]);
+    setSelectedPath((current) => current === candidate ? current : candidate);
+  }
+
   async function openComicEntry(
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
@@ -3378,6 +3408,7 @@ export function App({
   }
 
   if (viewerSession !== null) {
+    const activeViewerGeneration = viewerGeneration.current;
     return (
       <div
         className={viewerDetached ? "viewer-shell viewer-shell--detached" : "viewer-shell"}
@@ -3448,7 +3479,11 @@ export function App({
           endOfVolumePolicy={endOfVolumePolicy}
           onEndOfVolumePolicyChange={changeEndOfVolumePolicy}
           bookmarks={bookmarks}
-          onPageChange={() => undefined}
+          onPageChange={(index) => synchronizeViewerCatalogSelection(
+            viewerSession,
+            index,
+            activeViewerGeneration,
+          )}
           mouseGestures={mouseGestures}
           detached={viewerDetached}
           onToggleDetached={() => setViewerDetached((current) => !current)}

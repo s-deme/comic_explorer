@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 16,
+    profileVersion: 17,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -44,6 +44,7 @@ function validProfile(): SettingsProfile {
     slideshowIntervalMs: 3_000,
     slideshowOrder: "forward",
     slideshowRepeatCurrentItem: false,
+    viewerCatalogSelectionSync: true,
     viewerBackground: "checker",
     viewerPageMargin: 0,
     viewerSpreadGap: 8,
@@ -117,7 +118,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 17, 99, "16", undefined])(
+  it.each([0, 18, 99, "17", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -383,6 +384,18 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(withField("slideshowIntervalMs", 60_001))).toBeNull();
     expect(normalizeSettingsProfile(withField("slideshowOrder", "shuffleForever"))).toBeNull();
     expect(normalizeSettingsProfile(withField("slideshowRepeatCurrentItem", "true"))).toBeNull();
+  });
+
+  it("REQ-LEY-P2-015 migrates v16 and validates Viewer catalog selection sync", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 16;
+    delete legacy.viewerCatalogSelectionSync;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerCatalogSelectionSync: false,
+    })).toEqual(expect.objectContaining({ viewerCatalogSelectionSync: false }));
+    expect(normalizeSettingsProfile(withField("viewerCatalogSelectionSync", "true"))).toBeNull();
   });
 
   it.each([

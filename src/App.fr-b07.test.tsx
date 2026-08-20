@@ -194,6 +194,7 @@ const defaultSettings: CatalogSettings = {
   slideshowIntervalMs: 3_000,
   slideshowOrder: "forward",
   slideshowRepeatCurrentItem: false,
+  viewerCatalogSelectionSync: true,
   viewerBackground: "checker",
   viewerPageMargin: 0,
   viewerSpreadGap: 8,
