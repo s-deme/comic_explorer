@@ -212,6 +212,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   viewerGridColor: "light",
   panFactor: 1,
   wheelDeadZone: 0,
+  scrollStepPercent: 90,
+  wheelScrollFactor: 1,
+  smoothScroll: true,
   treeVisible: true,
   menuBarVisible: true,
   toolbarVisible: true,
@@ -2695,6 +2698,13 @@ describe("application shell", () => {
       { target: { value: "175" } },
     );
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^操作/ }));
+    fireEvent.change(within(dialog).getByLabelText("profileページ内スクロール量（%）"), {
+      target: { value: "75" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile連続スクロールのホイール速度（%）"), {
+      target: { value: "140" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profileページ内スクロールアニメーション"));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
@@ -2721,6 +2731,9 @@ describe("application shell", () => {
         fitBasis: "page",
         fitIncludePageMargin: false,
         scale: 1.75,
+        scrollStepPercent: 75,
+        wheelScrollFactor: 1.4,
+        smoothScroll: false,
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
           doubleClick: "toggleFullscreen",
@@ -2852,7 +2865,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 9,
+        profileVersion: 10,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,

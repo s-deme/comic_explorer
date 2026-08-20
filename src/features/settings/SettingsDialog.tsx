@@ -29,9 +29,13 @@ import {
   MAX_PAN_FACTOR,
   MAX_VIEWER_GRID_SIZE,
   MAX_WHEEL_DEAD_ZONE,
+  MAX_SCROLL_STEP_PERCENT,
+  MAX_WHEEL_SCROLL_FACTOR,
   MIN_PAN_FACTOR,
   MIN_VIEWER_GRID_SIZE,
   MIN_WHEEL_DEAD_ZONE,
+  MIN_SCROLL_STEP_PERCENT,
+  MIN_WHEEL_SCROLL_FACTOR,
   MIN_VIEWER_SPACING,
   MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
   MIN_PORTRAIT_ASPECT_PERCENT,
@@ -432,6 +436,21 @@ export function SettingsDialog({
       id: "wheel-dead-zone",
       category: "commands",
       text: `ホイール 不感帯 閾値 ${draft.wheelDeadZone}`,
+    },
+    {
+      id: "scroll-step",
+      category: "commands",
+      text: `スクロール ページ内 移動量 ${draft.scrollStepPercent}%`,
+    },
+    {
+      id: "wheel-scroll-factor",
+      category: "commands",
+      text: `連続スクロール ホイール 速度 ${Math.round(draft.wheelScrollFactor * 100)}%`,
+    },
+    {
+      id: "smooth-scroll",
+      category: "commands",
+      text: `スクロール アニメーション 滑らか ${draft.smoothScroll ? "有効" : "無効"}`,
     },
     {
       id: "gesture-double-click",
@@ -1000,6 +1019,50 @@ export function SettingsDialog({
                     ),
                   })}
                 />
+              </SettingRow>
+              <SettingRow id="scroll-step" title="ページ内スクロール量" description="大きな画像で次・前コマンドが送る量を表示領域の10%〜100%で指定します。" hidden={rowHidden("scroll-step")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profileページ内スクロール量（%）"
+                    min={MIN_SCROLL_STEP_PERCENT}
+                    max={MAX_SCROLL_STEP_PERCENT}
+                    step="5"
+                    value={draft.scrollStepPercent}
+                    onChange={(event) => update({
+                      scrollStepPercent: Math.min(
+                        MAX_SCROLL_STEP_PERCENT,
+                        Math.max(MIN_SCROLL_STEP_PERCENT, Math.round(Number(event.target.value))),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="wheel-scroll-factor" title="連続スクロールのホイール速度" description="縦・横の連続レイアウトでwheel移動量を50%〜200%に調整します。" hidden={rowHidden("wheel-scroll-factor")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profile連続スクロールのホイール速度（%）"
+                    min={MIN_WHEEL_SCROLL_FACTOR * 100}
+                    max={MAX_WHEEL_SCROLL_FACTOR * 100}
+                    step="10"
+                    value={Math.round(draft.wheelScrollFactor * 100)}
+                    onChange={(event) => update({
+                      wheelScrollFactor: Math.min(
+                        MAX_WHEEL_SCROLL_FACTOR,
+                        Math.max(MIN_WHEEL_SCROLL_FACTOR, Number(event.target.value) / 100),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="smooth-scroll" title="ページ内スクロールアニメーション" description="次・前コマンドによるページ内移動を滑らかにします。OSの視覚効果軽減設定を常に優先します。" hidden={rowHidden("smooth-scroll")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profileページ内スクロールアニメーション" checked={draft.smoothScroll} onChange={(event) => update({ smoothScroll: event.target.checked })} />
+                  <span>{draft.smoothScroll ? "有効" : "無効"}</span>
+                </label>
               </SettingRow>
               {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
                 <SettingRow

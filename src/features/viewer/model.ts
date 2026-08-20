@@ -105,6 +105,13 @@ export const DEFAULT_PAN_FACTOR = 1;
 export const MIN_WHEEL_DEAD_ZONE = 0;
 export const MAX_WHEEL_DEAD_ZONE = 200;
 export const DEFAULT_WHEEL_DEAD_ZONE = 0;
+export const MIN_SCROLL_STEP_PERCENT = 10;
+export const MAX_SCROLL_STEP_PERCENT = 100;
+export const DEFAULT_SCROLL_STEP_PERCENT = 90;
+export const MIN_WHEEL_SCROLL_FACTOR = 0.5;
+export const MAX_WHEEL_SCROLL_FACTOR = 2;
+export const DEFAULT_WHEEL_SCROLL_FACTOR = 1;
+export const DEFAULT_SMOOTH_SCROLL = true;
 
 export function isPortraitAspectPercent(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value)
@@ -116,6 +123,31 @@ export function isAutoViewportAspectPercent(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value)
     && value >= MIN_AUTO_VIEWPORT_ASPECT_PERCENT
     && value <= MAX_AUTO_VIEWPORT_ASPECT_PERCENT;
+}
+
+export function isScrollStepPercent(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value)
+    && value >= MIN_SCROLL_STEP_PERCENT
+    && value <= MAX_SCROLL_STEP_PERCENT;
+}
+
+export function isWheelScrollFactor(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value)
+    && value >= MIN_WHEEL_SCROLL_FACTOR
+    && value <= MAX_WHEEL_SCROLL_FACTOR;
+}
+
+export function wheelDeltaPixels(
+  delta: number,
+  deltaMode: number,
+  viewportSize: number,
+  factor = DEFAULT_WHEEL_SCROLL_FACTOR,
+): number {
+  if (!Number.isFinite(delta)) return 0;
+  const safeViewport = Number.isFinite(viewportSize) && viewportSize > 0 ? viewportSize : 1;
+  const unit = deltaMode === 1 ? 16 : deltaMode === 2 ? safeViewport : 1;
+  const safeFactor = isWheelScrollFactor(factor) ? factor : DEFAULT_WHEEL_SCROLL_FACTOR;
+  return delta * unit * safeFactor;
 }
 
 export function isPagePairable(

@@ -24,6 +24,9 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  isScrollStepPercent,
+  isWheelScrollFactor,
+  wheelDeltaPixels,
   randomPageIndex,
   scaleForPixelDimension,
   scaleReducer,
@@ -263,6 +266,17 @@ describe("FR-B01 scale model", () => {
     expect(isPanFactor(2.01)).toBe(false);
     expect(isWheelDeadZone(200)).toBe(true);
     expect(isWheelDeadZone(200.5)).toBe(false);
+  });
+
+  it("REQ-LEY-P2-007 validates scroll settings and normalizes wheel delta units", () => {
+    expect(isScrollStepPercent(10)).toBe(true);
+    expect(isScrollStepPercent(101)).toBe(false);
+    expect(isWheelScrollFactor(0.5)).toBe(true);
+    expect(isWheelScrollFactor(2.01)).toBe(false);
+    expect(wheelDeltaPixels(12, 0, 400, 1.5)).toBe(18);
+    expect(wheelDeltaPixels(2, 1, 400, 1.5)).toBe(48);
+    expect(wheelDeltaPixels(1, 2, 400, 0.5)).toBe(200);
+    expect(wheelDeltaPixels(Number.NaN, 0, 400, 1)).toBe(0);
   });
 });
 

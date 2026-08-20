@@ -89,6 +89,9 @@ pub struct Settings {
     pub viewer_grid_color: String,
     pub pan_factor: String,
     pub wheel_dead_zone: String,
+    pub scroll_step_percent: String,
+    pub wheel_scroll_factor: String,
+    pub smooth_scroll: bool,
     pub tree_visible: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
@@ -159,6 +162,9 @@ impl Default for Settings {
             viewer_grid_color: "light".into(),
             pan_factor: "1".into(),
             wheel_dead_zone: "0".into(),
+            scroll_step_percent: "90".into(),
+            wheel_scroll_factor: "1".into(),
+            smooth_scroll: true,
             tree_visible: true,
             menu_bar_visible: true,
             toolbar_visible: true,
@@ -269,6 +275,9 @@ impl StateStore {
                 "viewerGridColor" => settings.viewer_grid_color = value,
                 "panFactor" => settings.pan_factor = value,
                 "wheelDeadZone" => settings.wheel_dead_zone = value,
+                "scrollStepPercent" => settings.scroll_step_percent = value,
+                "wheelScrollFactor" => settings.wheel_scroll_factor = value,
+                "smoothScroll" => settings.smooth_scroll = value == "true",
                 "treeVisible" => settings.tree_visible = value == "true",
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
@@ -369,6 +378,9 @@ impl StateStore {
             ("viewerGridColor", settings.viewer_grid_color.clone()),
             ("panFactor", settings.pan_factor.clone()),
             ("wheelDeadZone", settings.wheel_dead_zone.clone()),
+            ("scrollStepPercent", settings.scroll_step_percent.clone()),
+            ("wheelScrollFactor", settings.wheel_scroll_factor.clone()),
+            ("smoothScroll", settings.smooth_scroll.to_string()),
             ("treeVisible", settings.tree_visible.to_string()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
@@ -1416,6 +1428,9 @@ mod tests {
                 viewer_grid_color: "dark".into(),
                 pan_factor: "1.5".into(),
                 wheel_dead_zone: "24".into(),
+                scroll_step_percent: "75".into(),
+                wheel_scroll_factor: "1.4".into(),
+                smooth_scroll: false,
                 tree_visible: false,
                 menu_bar_visible: false,
                 toolbar_visible: true,
@@ -1504,6 +1519,9 @@ mod tests {
         assert_eq!(restored.viewer_grid_color, "dark");
         assert_eq!(restored.pan_factor, "1.5");
         assert_eq!(restored.wheel_dead_zone, "24");
+        assert_eq!(restored.scroll_step_percent, "75");
+        assert_eq!(restored.wheel_scroll_factor, "1.4");
+        assert!(!restored.smooth_scroll);
         assert!(!restored.tree_visible);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);

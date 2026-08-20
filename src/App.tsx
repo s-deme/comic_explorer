@@ -106,6 +106,9 @@ import {
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_WHEEL_SCROLL_FACTOR,
+  DEFAULT_SMOOTH_SCROLL,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_BACKGROUND,
   DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
@@ -122,6 +125,8 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  isScrollStepPercent,
+  isWheelScrollFactor,
   isAutoViewportAspectPercent,
   isPortraitAspectPercent,
   SPREAD_PAIRINGS,
@@ -486,6 +491,9 @@ export function App({
     useState<ViewerGridColor>(DEFAULT_VIEWER_GRID_COLOR);
   const [panFactor, setPanFactor] = useState(DEFAULT_PAN_FACTOR);
   const [wheelDeadZone, setWheelDeadZone] = useState(DEFAULT_WHEEL_DEAD_ZONE);
+  const [scrollStepPercent, setScrollStepPercent] = useState(DEFAULT_SCROLL_STEP_PERCENT);
+  const [wheelScrollFactor, setWheelScrollFactor] = useState(DEFAULT_WHEEL_SCROLL_FACTOR);
+  const [smoothScroll, setSmoothScroll] = useState(DEFAULT_SMOOTH_SCROLL);
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
@@ -904,6 +912,13 @@ export function App({
           setWheelDeadZone(isWheelDeadZone(response.data.wheelDeadZone)
             ? response.data.wheelDeadZone
             : DEFAULT_WHEEL_DEAD_ZONE);
+          setScrollStepPercent(isScrollStepPercent(response.data.scrollStepPercent)
+            ? response.data.scrollStepPercent
+            : DEFAULT_SCROLL_STEP_PERCENT);
+          setWheelScrollFactor(isWheelScrollFactor(response.data.wheelScrollFactor)
+            ? response.data.wheelScrollFactor
+            : DEFAULT_WHEEL_SCROLL_FACTOR);
+          setSmoothScroll(response.data.smoothScroll !== false);
           setTreeVisible(response.data.treeVisible);
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
@@ -2473,6 +2488,9 @@ export function App({
       viewerGridColor,
       panFactor,
       wheelDeadZone,
+      scrollStepPercent,
+      wheelScrollFactor,
+      smoothScroll,
       treeVisible,
       menuBarVisible,
       toolbarVisible,
@@ -2562,6 +2580,9 @@ export function App({
       setViewerGridColor(normalized.viewerGridColor);
       setPanFactor(normalized.panFactor);
       setWheelDeadZone(normalized.wheelDeadZone);
+      setScrollStepPercent(normalized.scrollStepPercent);
+      setWheelScrollFactor(normalized.wheelScrollFactor);
+      setSmoothScroll(normalized.smoothScroll);
       setTreeVisible(normalized.treeVisible);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
@@ -2717,7 +2738,8 @@ export function App({
     catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
     viewerScaleMode, viewerScale, loupeEnabled, viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
-    viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, treeVisible,
+    viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
+    wheelScrollFactor, smoothScroll, treeVisible,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
@@ -3279,6 +3301,9 @@ export function App({
           viewerGridColor={viewerGridColor}
           panFactor={panFactor}
           wheelDeadZone={wheelDeadZone}
+          scrollStepPercent={scrollStepPercent}
+          wheelScrollFactor={wheelScrollFactor}
+          smoothScroll={smoothScroll}
           shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
             setViewMode(mode);

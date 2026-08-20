@@ -854,6 +854,68 @@ describe("Viewer settings", () => {
     expect(spread).toHaveProperty("scrollTop", 0);
   });
 
+  it("REQ-LEY-P2-007 scrolls tall pages in the configured amount in both directions", () => {
+    const onPreviousItem = vi.fn();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="original"
+        scrollStepPercent={50}
+        smoothScroll={false}
+        onPreviousItem={onPreviousItem}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread");
+    expect(spread).not.toBeNull();
+    Object.defineProperties(spread!, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1100 },
+    });
+    spread!.scrollTop = 400;
+    spread!.scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+      const top = typeof options === "number" ? y : options?.top;
+      spread!.scrollTop = top ?? spread!.scrollTop;
+    }) as HTMLDivElement["scrollTo"];
+
+    fireEvent.click(screen.getByRole("button", { name: "前ページ" }));
+    expect(spread).toHaveProperty("scrollTop", 200);
+    expect(onPreviousItem).not.toHaveBeenCalled();
+    expect(spread!.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({
+      top: 200,
+      behavior: "auto",
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    expect(spread).toHaveProperty("scrollTop", 400);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P2-007 normalizes and scales wheel input only in continuous layouts", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialLayoutMode="vertical_scroll"
+        initialDirection="rightToLeft"
+        wheelScrollFactor={1.5}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread");
+    const stage = document.querySelector<HTMLElement>(".viewer-stage");
+    expect(spread).not.toBeNull();
+    expect(stage).not.toBeNull();
+    fireEvent.wheel(stage!, { deltaX: 1, deltaY: 2, deltaMode: 1 });
+    expect(spread).toHaveProperty("scrollLeft", 24);
+    expect(spread).toHaveProperty("scrollTop", 48);
+  });
+
   it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
     render(
       <Viewer

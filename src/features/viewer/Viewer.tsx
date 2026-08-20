@@ -19,6 +19,9 @@ import {
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_WHEEL_SCROLL_FACTOR,
+  DEFAULT_SMOOTH_SCROLL,
   DEFAULT_ZOOM_RETENTION,
   LOUPE_SIZE,
   LOUPE_ZOOM,
@@ -31,8 +34,11 @@ import {
   isPanFactor,
   isViewerGridSize,
   isWheelDeadZone,
+  isScrollStepPercent,
+  isWheelScrollFactor,
   isPagePairable,
   fitScaleForPages,
+  wheelDeltaPixels,
   scaleForPixelDimension,
   scaleReducer,
   viewerReducer,
@@ -110,6 +116,9 @@ interface ViewerProps {
   viewerGridColor?: ViewerGridColor;
   panFactor?: number;
   wheelDeadZone?: number;
+  scrollStepPercent?: number;
+  wheelScrollFactor?: number;
+  smoothScroll?: boolean;
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
@@ -172,6 +181,9 @@ export function Viewer({
   viewerGridColor: initialViewerGridColor = DEFAULT_VIEWER_GRID_COLOR,
   panFactor: initialPanFactor = DEFAULT_PAN_FACTOR,
   wheelDeadZone: initialWheelDeadZone = DEFAULT_WHEEL_DEAD_ZONE,
+  scrollStepPercent: initialScrollStepPercent = DEFAULT_SCROLL_STEP_PERCENT,
+  wheelScrollFactor: initialWheelScrollFactor = DEFAULT_WHEEL_SCROLL_FACTOR,
+  smoothScroll: initialSmoothScroll = DEFAULT_SMOOTH_SCROLL,
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
@@ -207,6 +219,15 @@ export function Viewer({
   const wheelDeadZone = isWheelDeadZone(initialWheelDeadZone)
     ? initialWheelDeadZone
     : DEFAULT_WHEEL_DEAD_ZONE;
+  const scrollStepPercent = isScrollStepPercent(initialScrollStepPercent)
+    ? initialScrollStepPercent
+    : DEFAULT_SCROLL_STEP_PERCENT;
+  const wheelScrollFactor = isWheelScrollFactor(initialWheelScrollFactor)
+    ? initialWheelScrollFactor
+    : DEFAULT_WHEEL_SCROLL_FACTOR;
+  const smoothScroll = typeof initialSmoothScroll === "boolean"
+    ? initialSmoothScroll
+    : DEFAULT_SMOOTH_SCROLL;
   const [state, dispatch] = useReducer(viewerReducer, {
     index: session.startIndex,
     mode: initialMode,
@@ -432,22 +453,22 @@ export function Viewer({
     await saveReadingPosition(session, state.index, generation);
   }
 
-  function advanceVerticalOverflow(): boolean {
+  function scrollVerticalOverflow(direction: -1 | 1): boolean {
     if (layoutMode !== "paged") return false;
     const spread = spreadRef.current;
     if (!spread) return false;
     const maxScrollTop = Math.max(0, spread.scrollHeight - spread.clientHeight);
-    if (maxScrollTop <= 1 || spread.scrollTop >= maxScrollTop - 1) return false;
-    const nextScrollTop = Math.min(
-      maxScrollTop,
-      spread.scrollTop + Math.max(1, Math.floor(spread.clientHeight * 0.9)),
-    );
+    if (maxScrollTop <= 1) return false;
+    if (direction > 0 && spread.scrollTop >= maxScrollTop - 1) return false;
+    if (direction < 0 && spread.scrollTop <= 1) return false;
+    const step = Math.max(1, Math.floor(spread.clientHeight * scrollStepPercent / 100));
+    const nextScrollTop = Math.min(maxScrollTop, Math.max(0, spread.scrollTop + direction * step));
     if (typeof spread.scrollTo === "function") {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
       spread.scrollTo({
         top: nextScrollTop,
         left: spread.scrollLeft,
-        behavior: reducedMotion ? "auto" : "smooth",
+        behavior: smoothScroll && !reducedMotion ? "smooth" : "auto",
       });
     } else {
       spread.scrollTop = nextScrollTop;
@@ -456,7 +477,7 @@ export function Viewer({
   }
 
   function next() {
-    if (advanceVerticalOverflow()) return;
+    if (scrollVerticalOverflow(1)) return;
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
       void flushReadingPosition().finally(() =>
         onNextItem?.(),
@@ -486,6 +507,7 @@ export function Viewer({
   }, [layoutMode, state.index]);
 
   function previous() {
+    if (scrollVerticalOverflow(-1)) return;
     if (state.index === 0) {
       void flushReadingPosition().finally(() => onPreviousItem?.());
       return;
@@ -1478,10 +1500,25 @@ export function Viewer({
                 const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
                   ? event.deltaX
                   : event.deltaY;
-                spread.scrollLeft += delta;
+                spread.scrollLeft += wheelDeltaPixels(
+                  delta,
+                  event.deltaMode,
+                  spread.clientWidth,
+                  wheelScrollFactor,
+                );
               } else {
-                spread.scrollLeft += event.deltaX;
-                spread.scrollTop += event.deltaY;
+                spread.scrollLeft += wheelDeltaPixels(
+                  event.deltaX,
+                  event.deltaMode,
+                  spread.clientWidth,
+                  wheelScrollFactor,
+                );
+                spread.scrollTop += wheelDeltaPixels(
+                  event.deltaY,
+                  event.deltaMode,
+                  spread.clientHeight,
+                  wheelScrollFactor,
+                );
               }
               event.preventDefault();
             }

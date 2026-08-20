@@ -132,6 +132,9 @@ export interface CatalogSettings {
   viewerGridColor: ViewerGridColor;
   panFactor: number;
   wheelDeadZone: number;
+  scrollStepPercent: number;
+  wheelScrollFactor: number;
+  smoothScroll: boolean;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -238,6 +241,9 @@ export async function saveSettingsProfile(
       viewerGridColor: profile.viewerGridColor,
       panFactor: profile.panFactor,
       wheelDeadZone: profile.wheelDeadZone,
+      scrollStepPercent: profile.scrollStepPercent,
+      wheelScrollFactor: profile.wheelScrollFactor,
+      smoothScroll: profile.smoothScroll,
       treeVisible: profile.treeVisible,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,

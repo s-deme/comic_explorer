@@ -20,6 +20,9 @@ import {
   DEFAULT_VIEWER_GRID_COLOR,
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_WHEEL_SCROLL_FACTOR,
+  DEFAULT_SMOOTH_SCROLL,
   DEFAULT_ZOOM_RETENTION,
   DEFAULT_VIEWER_PAGE_MARGIN,
   DEFAULT_VIEWER_SPREAD_GAP,
@@ -33,6 +36,8 @@ import {
   isAutoViewportAspectPercent,
   isPortraitAspectPercent,
   isWheelDeadZone,
+  isScrollStepPercent,
+  isWheelScrollFactor,
   MAX_SCALE,
   MIN_SCALE,
   VIEWER_BACKGROUNDS,
@@ -59,7 +64,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 9;
+export const SETTINGS_PROFILE_VERSION = 10;
 export const APP_VERSION = packageMetadata.version;
 
 export const NAVIGATION_SELECTION_POLICIES = ["none", "first", "last", "restore"] as const;
@@ -139,6 +144,9 @@ export interface SettingsProfile {
   viewerGridColor: ViewerGridColor;
   panFactor: number;
   wheelDeadZone: number;
+  scrollStepPercent: number;
+  wheelScrollFactor: number;
+  smoothScroll: boolean;
   treeVisible: boolean;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
@@ -186,6 +194,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     viewerGridColor: DEFAULT_VIEWER_GRID_COLOR,
     panFactor: DEFAULT_PAN_FACTOR,
     wheelDeadZone: DEFAULT_WHEEL_DEAD_ZONE,
+    scrollStepPercent: DEFAULT_SCROLL_STEP_PERCENT,
+    wheelScrollFactor: DEFAULT_WHEEL_SCROLL_FACTOR,
+    smoothScroll: DEFAULT_SMOOTH_SCROLL,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -324,6 +335,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const fitIncludePageMargin = legacyFitRules
     ? DEFAULT_FIT_RULES.includePageMargin
     : candidate.fitIncludePageMargin;
+  const legacyScrollPreferences = legacyFitRules || candidate.profileVersion === 9;
+  const scrollStepPercent = legacyScrollPreferences
+    ? DEFAULT_SCROLL_STEP_PERCENT
+    : candidate.scrollStepPercent;
+  const wheelScrollFactor = legacyScrollPreferences
+    ? DEFAULT_WHEEL_SCROLL_FACTOR
+    : candidate.wheelScrollFactor;
+  const smoothScroll = legacyScrollPreferences
+    ? DEFAULT_SMOOTH_SCROLL
+    : candidate.smoothScroll;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -333,6 +354,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 6
       && candidate.profileVersion !== 7
       && candidate.profileVersion !== 8
+      && candidate.profileVersion !== 9
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -365,6 +387,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     viewerGridColor === null ||
     !isPanFactor(panFactor) ||
     !isWheelDeadZone(wheelDeadZone) ||
+    !isScrollStepPercent(scrollStepPercent) ||
+    !isWheelScrollFactor(wheelScrollFactor) ||
+    typeof smoothScroll !== "boolean" ||
     typeof candidate.treeVisible !== "boolean" ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
@@ -412,6 +437,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     viewerGridColor,
     panFactor,
     wheelDeadZone,
+    scrollStepPercent,
+    wheelScrollFactor,
+    smoothScroll,
     treeVisible: candidate.treeVisible,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,

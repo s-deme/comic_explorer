@@ -12,7 +12,7 @@ import {
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 9,
+    profileVersion: 10,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -41,6 +41,9 @@ function validProfile(): SettingsProfile {
     viewerGridColor: "light",
     panFactor: 1,
     wheelDeadZone: 0,
+    scrollStepPercent: 90,
+    wheelScrollFactor: 1,
+    smoothScroll: true,
     treeVisible: true,
     menuBarVisible: true,
     toolbarVisible: true,
@@ -100,7 +103,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 10, 99, "9", undefined])(
+  it.each([0, 11, 99, "10", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -220,6 +223,35 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(withField("fitAllowUpscale", "true"))).toBeNull();
     expect(normalizeSettingsProfile(withField("fitBasis", "width"))).toBeNull();
     expect(normalizeSettingsProfile(withField("fitIncludePageMargin", 1))).toBeNull();
+  });
+
+  it("REQ-LEY-P2-007 migrates a v9 profile with safe scroll defaults", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 9;
+    delete legacy.scrollStepPercent;
+    delete legacy.wheelScrollFactor;
+    delete legacy.smoothScroll;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P2-007 accepts scroll detail settings and rejects malformed values", () => {
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      scrollStepPercent: 75,
+      wheelScrollFactor: 1.4,
+      smoothScroll: false,
+    })).toEqual(expect.objectContaining({
+      scrollStepPercent: 75,
+      wheelScrollFactor: 1.4,
+      smoothScroll: false,
+    }));
+    for (const [field, value] of [
+      ["scrollStepPercent", 9], ["scrollStepPercent", 101],
+      ["scrollStepPercent", 50.5], ["wheelScrollFactor", 0.49],
+      ["wheelScrollFactor", 2.01], ["smoothScroll", "true"],
+    ] as const) {
+      expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
+    }
   });
 
   it.each([
