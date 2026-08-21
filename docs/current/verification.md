@@ -497,6 +497,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | right-click判定は1 pointerの固定個数比較でtimer・filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput latency、CPU、working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-P固有の実right-click event順序、touchpad、多ボタンmouse、DPI、設定UI操作はrelease WebView2で直接観測していない。 |
 
+## Leeyes P3-Q ドラッグ矩形ズーム
+
+対象はLEY-INPUT-013の1件。Rustのresolve_viewer_rectangle_zoomがviewport・selection・scroll・現在倍率の検証、1〜800%倍率と中心scroll位置の計算を担当し、TypeScriptはWebView pointer capture・clamp・overlay・DOM適用だけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-016の1件、FAIL 0。倍率・中心scroll計算、800% clamp、12px未満、viewport外、32768px超過、負scroll、NaN拒否を含む。 |
+| Focused frontend | PASS | Viewerとclientの2 files / 77件、FAIL 0。toolbar toggle、pointer capture、stage clamp、overlay、Rust payload/plan適用、全3 layout保護、小矩形、pan・象限・right/middle/side・wheel・touch・pen・modifier競合、Escape・cancel・layout cleanup、stale/error応答を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 34 files / 470件とPython 61件、FAIL 0。typecheck exit 0。frontend 75 modules build、CSS 43.49kB、JS 574.80kB。Viteの500kB advisoryを機能PASSへ読み替えない。SBOM 746 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | lib 209件とshutdown process 1件、FAIL 0。rectangle zoom計算・IPC commandと既存catalog、viewer、file操作、search、watch、tree、cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後のIMP-004 canonicalは255.292秒で全12 stageがexit 0。Rust canonical 69.144秒、release executable freshness 1.474秒、GUI権限付きshortcut product回帰10.277秒、CoDD verify 129.171秒を含む。log rootはsrc-tauri/target/verification/imp-004-20260821T093525065Z。これ以前の1回は既存folder thumbnail待機だけがtimeoutしたが、単独product shortcutは9.3秒・原本差分0でPASSし、source変更なしの全12 stage再実行もPASSした。 |
+| 性能 | NOT APPLICABLE / 限定 | pointer moveは1矩形の固定個数stateだけを更新し、Rust計算は固定個数の比較・乗除算と1回のIPC。filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput/zoom latency、CPU、working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-Q固有の実pointer capture、selection overlay、DPI、高倍率画像はrelease WebView2で直接操作・観測していない。Leeyes 2.6.1の現行起動gestureは監査資料上Unverifiedのままである。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

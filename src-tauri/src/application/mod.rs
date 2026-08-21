@@ -533,6 +533,28 @@ pub struct CatalogThumbnailSizes {
     pub reference_tile: u16,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerRectangleZoomInput {
+    pub viewport_width: f64,
+    pub viewport_height: f64,
+    pub selection_left: f64,
+    pub selection_top: f64,
+    pub selection_width: f64,
+    pub selection_height: f64,
+    pub scroll_left: f64,
+    pub scroll_top: f64,
+    pub current_scale: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerRectangleZoomPlan {
+    pub scale: f64,
+    pub scroll_left: f64,
+    pub scroll_top: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsProfileInput {
@@ -5085,6 +5107,87 @@ pub fn resolve_catalog_activation(
     })
 }
 
+fn viewer_rectangle_zoom_plan(
+    input: ViewerRectangleZoomInput,
+) -> Result<ViewerRectangleZoomPlan, AppError> {
+    const MIN_SELECTION_PX: f64 = 12.0;
+    const MAX_VIEWPORT_PX: f64 = 32_768.0;
+    const MAX_SCROLL_PX: f64 = 1_000_000_000.0;
+    let values = [
+        input.viewport_width,
+        input.viewport_height,
+        input.selection_left,
+        input.selection_top,
+        input.selection_width,
+        input.selection_height,
+        input.scroll_left,
+        input.scroll_top,
+        input.current_scale,
+    ];
+    if values.iter().any(|value| !value.is_finite())
+        || !(0.0..=MAX_VIEWPORT_PX).contains(&input.viewport_width)
+        || input.viewport_width == 0.0
+        || !(0.0..=MAX_VIEWPORT_PX).contains(&input.viewport_height)
+        || input.viewport_height == 0.0
+        || input.selection_left < 0.0
+        || input.selection_top < 0.0
+        || input.selection_width < MIN_SELECTION_PX
+        || input.selection_height < MIN_SELECTION_PX
+        || input.selection_left + input.selection_width > input.viewport_width
+        || input.selection_top + input.selection_height > input.viewport_height
+        || !(0.0..=MAX_SCROLL_PX).contains(&input.scroll_left)
+        || !(0.0..=MAX_SCROLL_PX).contains(&input.scroll_top)
+        || !(MIN_VIEWER_SCALE..=MAX_VIEWER_SCALE).contains(&input.current_scale)
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Viewer rectangle zoom geometry is invalid.",
+        ));
+    }
+    let factor = (input.viewport_width / input.selection_width)
+        .min(input.viewport_height / input.selection_height);
+    let scale = ((input.current_scale * factor).clamp(MIN_VIEWER_SCALE, MAX_VIEWER_SCALE)
+        * 10_000.0)
+        .round()
+        / 10_000.0;
+    let content_center_x = (input.scroll_left + input.selection_left + input.selection_width / 2.0)
+        / input.current_scale;
+    let content_center_y = (input.scroll_top + input.selection_top + input.selection_height / 2.0)
+        / input.current_scale;
+    let scroll_left = (content_center_x * scale - input.viewport_width / 2.0).max(0.0);
+    let scroll_top = (content_center_y * scale - input.viewport_height / 2.0).max(0.0);
+    if !scale.is_finite() || !scroll_left.is_finite() || !scroll_top.is_finite() {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Viewer rectangle zoom result is out of range.",
+        ));
+    }
+    Ok(ViewerRectangleZoomPlan {
+        scale,
+        scroll_left,
+        scroll_top,
+    })
+}
+
+#[tauri::command]
+pub fn resolve_viewer_rectangle_zoom(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    input: ViewerRectangleZoomInput,
+) -> Result<Response<ViewerRectangleZoomPlan>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    match viewer_rectangle_zoom_plan(input) {
+        Ok(data) => Ok(Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        }),
+        Err(error) => Ok(error_response(&context, error)),
+    }
+}
+
 fn catalog_activation_action(
     kind: ItemKind,
     trigger: &str,
@@ -5996,6 +6099,69 @@ mod shutdown_tests {
             catalog_thumbnail_sizes(&settings),
             DEFAULT_CATALOG_THUMBNAIL_SIZES
         );
+    }
+
+    #[test]
+    fn req_ley_p3_016_rectangle_zoom_validates_and_centers_the_selection() {
+        let input = ViewerRectangleZoomInput {
+            viewport_width: 1_000.0,
+            viewport_height: 800.0,
+            selection_left: 250.0,
+            selection_top: 200.0,
+            selection_width: 500.0,
+            selection_height: 400.0,
+            scroll_left: 0.0,
+            scroll_top: 0.0,
+            current_scale: 1.0,
+        };
+        assert_eq!(
+            viewer_rectangle_zoom_plan(input).unwrap(),
+            ViewerRectangleZoomPlan {
+                scale: 2.0,
+                scroll_left: 500.0,
+                scroll_top: 400.0,
+            }
+        );
+        assert_eq!(
+            viewer_rectangle_zoom_plan(ViewerRectangleZoomInput {
+                selection_left: 0.0,
+                selection_top: 0.0,
+                selection_width: 12.0,
+                selection_height: 12.0,
+                current_scale: 8.0,
+                ..input
+            })
+            .unwrap()
+            .scale,
+            8.0
+        );
+        for invalid in [
+            ViewerRectangleZoomInput {
+                selection_width: 11.9,
+                ..input
+            },
+            ViewerRectangleZoomInput {
+                selection_left: 600.0,
+                ..input
+            },
+            ViewerRectangleZoomInput {
+                viewport_width: 32_769.0,
+                ..input
+            },
+            ViewerRectangleZoomInput {
+                scroll_left: -1.0,
+                ..input
+            },
+            ViewerRectangleZoomInput {
+                current_scale: f64::NAN,
+                ..input
+            },
+        ] {
+            assert_eq!(
+                viewer_rectangle_zoom_plan(invalid).unwrap_err().code,
+                ErrorCode::InvalidRequest
+            );
+        }
     }
 
     #[test]

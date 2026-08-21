@@ -154,6 +154,7 @@ vi.mock("./features/library/client", () => ({
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
+  resolveViewerRectangleZoom: vi.fn(),
   addFavorite: vi.fn(),
   listFavorites: vi.fn(),
   removeFavorite: vi.fn(),

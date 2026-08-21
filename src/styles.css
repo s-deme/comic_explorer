@@ -1733,7 +1733,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .viewer-stage[data-background="black"] { background-color: #000; }
 .viewer-stage[data-background="light"] { background-color: #e6e8eb; }
 .viewer-stage[data-panning="true"] { cursor: grabbing; }
+.viewer-stage[data-rectangle-zoom="true"] { cursor: crosshair; }
 .viewer-stage[data-cursor-hidden="true"][data-panning="false"] { cursor: none; }
+.viewer-stage[data-rectangle-zoom="true"][data-cursor-hidden="true"] { cursor: crosshair; }
+.viewer-rectangle-zoom-selection {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid #66b5ff;
+  background: rgb(34 125 214 / 20%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 55%);
+}
 .viewer-grid-overlay {
   position: absolute;
   z-index: 2;

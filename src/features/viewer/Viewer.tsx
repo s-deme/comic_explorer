@@ -3,6 +3,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import {
   copyViewerPageToClipboard,
   loadPage,
+  resolveViewerRectangleZoom,
   saveReadingPosition,
   type ViewerSession,
 } from "../library/client";
@@ -220,6 +221,14 @@ interface RightClickState {
   canceled: boolean;
 }
 
+interface RectangleZoomSelection {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
+
 export function Viewer({
   session,
   generation,
@@ -383,6 +392,7 @@ export function Viewer({
   const [pixelWidthInput, setPixelWidthInput] = useState("");
   const [pixelHeightInput, setPixelHeightInput] = useState("");
   const [pixelScaleError, setPixelScaleError] = useState<string | null>(null);
+  const [rectangleZoomError, setRectangleZoomError] = useState<string | null>(null);
   const activeShortcuts = useMemo(
     () => normalizeShortcutBindings(shortcuts),
     [shortcuts],
@@ -413,6 +423,11 @@ export function Viewer({
   const rightButtonHeldRef = useRef(false);
   const rightClickRef = useRef<RightClickState | null>(null);
   const [panning, setPanning] = useState(false);
+  const [rectangleZoomArmed, setRectangleZoomArmed] = useState(false);
+  const [rectangleZoomSelection, setRectangleZoomSelection] =
+    useState<RectangleZoomSelection | null>(null);
+  const rectangleZoomSelectionRef = useRef<RectangleZoomSelection | null>(null);
+  const rectangleZoomRequestRef = useRef(0);
   const [cursorHidden, setCursorHidden] = useState(false);
   const cursorInsideStageRef = useRef(false);
   const cursorHideTimerRef = useRef<number | null>(null);
@@ -466,6 +481,7 @@ export function Viewer({
     const resetRightButton = () => {
       rightButtonHeldRef.current = false;
       rightClickRef.current = null;
+      cancelRectangleZoom();
     };
     window.addEventListener("pointerup", releaseRightButton);
     window.addEventListener("blur", resetRightButton);
@@ -491,6 +507,7 @@ export function Viewer({
       || pointerDragRef.current !== null
       || rightButtonHeldRef.current
       || panning
+      || rectangleZoomArmed
       || scale.loupeEnabled
     ) return;
     cursorHideTimerRef.current = window.setTimeout(() => {
@@ -502,7 +519,7 @@ export function Viewer({
   useEffect(() => {
     scheduleCursorHide();
     return clearCursorHideTimer;
-  }, [cursorAutoHideMs, panning, scale.loupeEnabled]);
+  }, [cursorAutoHideMs, panning, rectangleZoomArmed, scale.loupeEnabled]);
   const transformForPage = (index: number): ViewerImageTransform =>
     pageTransformsRef.current.get(index) ?? IDENTITY_IMAGE_TRANSFORM;
   const effectiveLandscape = useMemo(() => {
@@ -935,6 +952,7 @@ export function Viewer({
   }
 
   function changeLayout(next: ViewerLayoutMode) {
+    if (next !== "paged") cancelRectangleZoom();
     setLayoutMode(next);
     onLayoutChange?.(next);
   }
@@ -975,6 +993,90 @@ export function Viewer({
     onScaleChange?.(next);
     if (!next.loupeEnabled) setLoupe(null);
   }
+
+  function cancelRectangleZoom() {
+    rectangleZoomRequestRef.current += 1;
+    rectangleZoomSelectionRef.current = null;
+    setRectangleZoomSelection(null);
+    setRectangleZoomArmed(false);
+  }
+
+  function toggleRectangleZoom() {
+    if (layoutMode !== "paged") return;
+    setRectangleZoomError(null);
+    if (rectangleZoomArmed) {
+      cancelRectangleZoom();
+      return;
+    }
+    clearQuadrantClickTimer();
+    pointerDragRef.current = null;
+    rightClickRef.current = null;
+    rightButtonHeldRef.current = false;
+    setPanning(false);
+    setRectangleZoomArmed(true);
+  }
+
+  async function applyRectangleZoom(selection: RectangleZoomSelection) {
+    const stage = stageRef.current;
+    const spread = spreadRef.current;
+    if (stage === null || spread === null) return;
+    const bounds = stage.getBoundingClientRect();
+    const selectionLeft = Math.min(selection.startX, selection.currentX);
+    const selectionTop = Math.min(selection.startY, selection.currentY);
+    const selectionWidth = Math.abs(selection.currentX - selection.startX);
+    const selectionHeight = Math.abs(selection.currentY - selection.startY);
+    if (selectionWidth < 12 || selectionHeight < 12) return;
+    const viewportWidth = spread.clientWidth > 0 ? spread.clientWidth : bounds.width;
+    const viewportHeight = spread.clientHeight > 0 ? spread.clientHeight : bounds.height;
+    const currentScale = currentDisplayedScale() ?? displayedScale;
+    const request = ++rectangleZoomRequestRef.current;
+    setRectangleZoomArmed(false);
+    setRectangleZoomError(null);
+    try {
+      const response = await resolveViewerRectangleZoom({
+        viewportWidth,
+        viewportHeight,
+        selectionLeft,
+        selectionTop,
+        selectionWidth,
+        selectionHeight,
+        scrollLeft: spread.scrollLeft,
+        scrollTop: spread.scrollTop,
+        currentScale,
+      }, generation);
+      if (request !== rectangleZoomRequestRef.current) return;
+      if (response.status === "error") {
+        setRectangleZoomError(`矩形ズームを適用できません。${presentError(response.error)}`);
+        return;
+      }
+      if (response.status !== "ok" || response.generation !== generation) return;
+      applyScale({ type: "scale", scale: response.data.scale });
+      window.requestAnimationFrame(() => {
+        if (request !== rectangleZoomRequestRef.current || spreadRef.current === null) return;
+        const target = spreadRef.current;
+        target.scrollLeft = Math.min(
+          response.data.scrollLeft,
+          Math.max(0, target.scrollWidth - target.clientWidth),
+        );
+        target.scrollTop = Math.min(
+          response.data.scrollTop,
+          Math.max(0, target.scrollHeight - target.clientHeight),
+        );
+      });
+    } catch {
+      if (request === rectangleZoomRequestRef.current) {
+        setRectangleZoomError(`矩形ズームを適用できません。${presentUnexpectedError()}`);
+      }
+    }
+  }
+
+  useEffect(() => {
+    cancelRectangleZoom();
+    return () => {
+      rectangleZoomRequestRef.current += 1;
+      rectangleZoomSelectionRef.current = null;
+    };
+  }, [generation, session.itemKey]);
 
   function applyPixelDimension(axis: "width" | "height", value: string) {
     const image = spreadRef.current?.querySelector<HTMLImageElement>(
@@ -1259,6 +1361,11 @@ export function Viewer({
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.isComposing) return;
+      if (rectangleZoomArmed && event.key === "Escape") {
+        event.preventDefault();
+        cancelRectangleZoom();
+        return;
+      }
       if (detached && event.key === "Escape") {
         event.preventDefault();
         handleCloseCommand();
@@ -1708,6 +1815,20 @@ export function Viewer({
         </button>
         <button
           className="viewer-icon-button"
+          aria-label="矩形ズーム"
+          title={layoutMode === "paged"
+            ? rectangleZoomArmed
+              ? "矩形ズームを解除"
+              : "stage上で拡大する範囲をドラッグ"
+            : "ページ送りレイアウトで利用できます"}
+          aria-pressed={rectangleZoomArmed}
+          disabled={layoutMode !== "paged"}
+          onClick={toggleRectangleZoom}
+        >
+          <span aria-hidden="true">▣＋</span>
+        </button>
+        <button
+          className="viewer-icon-button"
           aria-label="ルーペ"
           title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
           aria-pressed={scale.loupeEnabled}
@@ -1723,6 +1844,9 @@ export function Viewer({
         >
           <span aria-hidden="true">{state.mode === "single" ? "▯▯" : "▯"}</span>
         </button>
+        {rectangleZoomError && (
+          <span className="viewer-control-error" role="alert">{rectangleZoomError}</span>
+        )}
         <button
           className="viewer-icon-button"
           aria-label="読み方向"
@@ -1908,6 +2032,7 @@ export function Viewer({
         ref={stageRef}
         className="viewer-stage"
         data-panning={panning}
+        data-rectangle-zoom={rectangleZoomArmed}
         data-background={viewerBackground}
         data-cursor-hidden={cursorHidden}
         style={{
@@ -1920,6 +2045,19 @@ export function Viewer({
           scheduleCursorHide();
         }}
         onPointerMove={(event) => {
+          const rectangle = rectangleZoomSelectionRef.current;
+          if (rectangle?.pointerId === event.pointerId) {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const next = {
+              ...rectangle,
+              currentX: Math.min(Math.max(event.clientX - bounds.left, 0), bounds.width),
+              currentY: Math.min(Math.max(event.clientY - bounds.top, 0), bounds.height),
+            };
+            rectangleZoomSelectionRef.current = next;
+            setRectangleZoomSelection(next);
+            event.preventDefault();
+            return;
+          }
           scheduleCursorHide();
           updateLoupe(event);
           const rightClick = rightClickRef.current;
@@ -1955,6 +2093,32 @@ export function Viewer({
           clearQuadrantClickTimer();
           clearCursorHideTimer();
           setCursorHidden(false);
+          if (rectangleZoomArmed) {
+            if (
+              event.button === 0
+              && event.pointerType === "mouse"
+              && !event.ctrlKey
+              && !event.metaKey
+              && !event.shiftKey
+              && !event.altKey
+            ) {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const startX = Math.min(Math.max(event.clientX - bounds.left, 0), bounds.width);
+              const startY = Math.min(Math.max(event.clientY - bounds.top, 0), bounds.height);
+              const selection = {
+                pointerId: event.pointerId,
+                startX,
+                startY,
+                currentX: startX,
+                currentY: startY,
+              };
+              rectangleZoomSelectionRef.current = selection;
+              setRectangleZoomSelection(selection);
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            }
+            event.preventDefault();
+            return;
+          }
           if (event.button === 2) {
             rightButtonHeldRef.current = true;
             rightClickRef.current = {
@@ -2008,6 +2172,24 @@ export function Viewer({
           if (pannable) event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
         onPointerUp={(event) => {
+          const rectangle = rectangleZoomSelectionRef.current;
+          if (rectangle?.pointerId === event.pointerId) {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            const completed = {
+              ...rectangle,
+              currentX: Math.min(Math.max(event.clientX - bounds.left, 0), bounds.width),
+              currentY: Math.min(Math.max(event.clientY - bounds.top, 0), bounds.height),
+            };
+            rectangleZoomSelectionRef.current = null;
+            setRectangleZoomSelection(null);
+            event.preventDefault();
+            void applyRectangleZoom(completed);
+            return;
+          }
+          if (rectangleZoomArmed) {
+            event.preventDefault();
+            return;
+          }
           if (event.button === 2) {
             const rightClick = rightClickRef.current;
             rightClickRef.current = null;
@@ -2057,6 +2239,9 @@ export function Viewer({
           applyMouseGesture(action);
         }}
         onPointerCancel={() => {
+          if (rectangleZoomArmed || rectangleZoomSelectionRef.current !== null) {
+            cancelRectangleZoom();
+          }
           clearQuadrantClickTimer();
           rightButtonHeldRef.current = false;
           rightClickRef.current = null;
@@ -2065,11 +2250,19 @@ export function Viewer({
           scheduleCursorHide();
         }}
         onContextMenu={(event) => event.preventDefault()}
-        onDoubleClick={() => {
+        onDoubleClick={(event) => {
+          if (rectangleZoomArmed) {
+            event.preventDefault();
+            return;
+          }
           clearQuadrantClickTimer();
           void requestFullscreen(!fullscreen);
         }}
         onWheel={(event) => {
+          if (rectangleZoomArmed) {
+            event.preventDefault();
+            return;
+          }
           const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
           if (rightWheel && event.deltaY !== 0) {
             if (rightClickRef.current !== null) rightClickRef.current.canceled = true;
@@ -2152,6 +2345,18 @@ export function Viewer({
             ),
           )}
         </div>
+        {rectangleZoomSelection && (
+          <div
+            className="viewer-rectangle-zoom-selection"
+            aria-hidden="true"
+            style={{
+              left: Math.min(rectangleZoomSelection.startX, rectangleZoomSelection.currentX),
+              top: Math.min(rectangleZoomSelection.startY, rectangleZoomSelection.currentY),
+              width: Math.abs(rectangleZoomSelection.currentX - rectangleZoomSelection.startX),
+              height: Math.abs(rectangleZoomSelection.currentY - rectangleZoomSelection.startY),
+            }}
+          />
+        )}
         {viewerGridEnabled && (
           <div
             className="viewer-grid-overlay"

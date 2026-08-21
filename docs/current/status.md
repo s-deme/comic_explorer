@@ -109,6 +109,8 @@ P3-OではLEY-INPUT-008をPublishedとした。Viewer stageを4象限に分け�
 
 P3-PではLEY-INPUT-009をPublishedとした。Viewer stageのmodifierなしright clickへ安全な既知Viewer commandを割り当て、既定`none`で現行操作を保った。Rustが単1 action registryをstrict profile v26とSQLiteで検証・atomic保存し、TypeScriptはWebView pointer event、4px移動判定、right-wheel取消、既存handlerへのdispatchに限定した。right-wheel、touch・pen・modifier・pointer cancel・blurを保護し、catalogとfolder treeのcontext menuは変更していない。frontend 34 files / 466件、Python 61件、Rust 208+1件、typecheck、75 modules build、最終Windows canonical全12 stageはPASSした。初回canonicalの最終CoDD test commandだけの一時失敗は単独full test、CoDD verify、source変更なしの全stage再実行でPASSを確認した。実right-click順序、touchpad、多ボタンmouse、DPI、input latency、CPU・working setは未測定として残す。
 
+P3-QではLEY-INPUT-013をPublishedとした。paged Viewer toolbarから明示的に1回だけ矩形ズームをarmedにし、12px以上のmouse drag範囲を中央に保って1〜800%の範囲で拡大できる。Rust commandがviewport・selection・scroll・現在倍率を検証して倍率とscroll planを計算し、TypeScriptはpointer capture、stage clamp、一時overlay、DOM適用に限定した。pan・4象限・right click・middle/side・wheel・touch・pen・modifierを分離し、Escape・cancel・blur・layout/session変更で安全に解除する。frontend 34 files / 470件、Python 61件、Rust 209+1件、typecheck、75 modules build、SBOM 746 components・禁止license 0、再実行したWindows canonical全12 stageはPASSした。初回canonicalの既存folder thumbnail待機testだけの一時timeoutは単独product shortcutとsource変更なしの全stage再実行でPASSし、原本差分0を確認した。Leeyes 2.6.1の現行起動gesture、実pointer capture、DPI、高倍率画像、input・zoom latency、CPU・working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

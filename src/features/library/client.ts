@@ -401,6 +401,34 @@ export async function resolveCatalogActivation(
   });
 }
 
+export interface ViewerRectangleZoomInput {
+  viewportWidth: number;
+  viewportHeight: number;
+  selectionLeft: number;
+  selectionTop: number;
+  selectionWidth: number;
+  selectionHeight: number;
+  scrollLeft: number;
+  scrollTop: number;
+  currentScale: number;
+}
+
+export interface ViewerRectangleZoomPlan {
+  scale: number;
+  scrollLeft: number;
+  scrollTop: number;
+}
+
+export async function resolveViewerRectangleZoom(
+  input: ViewerRectangleZoomInput,
+  generation: number,
+): Promise<ApiResponse<ViewerRectangleZoomPlan>> {
+  return invoke("resolve_viewer_rectangle_zoom", {
+    context: context(generation),
+    input,
+  });
+}
+
 export type FavoriteStatus = "available" | "moved" | "missing";
 
 export interface FavoriteEntry {

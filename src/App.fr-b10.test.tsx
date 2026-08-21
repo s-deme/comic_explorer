@@ -79,6 +79,7 @@ vi.mock("./features/library/client", () => ({
   copyViewerPageToClipboard: vi.fn(),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
+  resolveViewerRectangleZoom: vi.fn(),
   pickLibraryRoot: vi.fn(),
   queryTags: vi.fn(),
   registerLibraryRoot: vi.fn(),

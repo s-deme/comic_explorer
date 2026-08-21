@@ -14,6 +14,7 @@ import {
   watchLibraryFolder,
   saveSettingsProfile,
   resolveCatalogActivation,
+  resolveViewerRectangleZoom,
   cancelRecursiveThumbnailGeneration,
   generateRecursiveThumbnails,
   listenRecursiveThumbnailProgress,
@@ -343,6 +344,28 @@ describe("library client settings contract", () => {
       2,
       "stop_library_folder_watch",
       expect.objectContaining({ context: expect.objectContaining({ generation: 42 }) }),
+    );
+  });
+
+  it("REQ-LEY-P3-016 sends only typed rectangle geometry to Rust", async () => {
+    await resolveViewerRectangleZoom({
+      viewportWidth: 1_000,
+      viewportHeight: 800,
+      selectionLeft: 250,
+      selectionTop: 200,
+      selectionWidth: 500,
+      selectionHeight: 400,
+      scrollLeft: 0,
+      scrollTop: 0,
+      currentScale: 1,
+    }, 51);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "resolve_viewer_rectangle_zoom",
+      expect.objectContaining({
+        context: expect.objectContaining({ generation: 51 }),
+        input: expect.objectContaining({ selectionWidth: 500, currentScale: 1 }),
+      }),
     );
   });
 });

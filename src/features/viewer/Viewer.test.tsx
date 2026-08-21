@@ -1,7 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { copyViewerPageToClipboard, loadPage, saveReadingPosition } from "../library/client";
+import {
+  copyViewerPageToClipboard,
+  loadPage,
+  resolveViewerRectangleZoom,
+  saveReadingPosition,
+} from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
 import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import { Viewer } from "./Viewer";
@@ -9,6 +14,7 @@ import { Viewer } from "./Viewer";
 vi.mock("../library/client", () => ({
   copyViewerPageToClipboard: vi.fn(),
   loadPage: vi.fn(),
+  resolveViewerRectangleZoom: vi.fn(),
   saveReadingPosition: vi.fn(),
 }));
 
@@ -60,6 +66,7 @@ describe("Viewer settings", () => {
     cleanup();
     vi.mocked(loadPage).mockReset();
     vi.mocked(saveReadingPosition).mockReset();
+    vi.mocked(resolveViewerRectangleZoom).mockReset();
     vi.mocked(copyViewerPageToClipboard).mockReset();
   });
 
@@ -70,6 +77,12 @@ describe("Viewer settings", () => {
       requestId: "position" as never,
       generation: 1 as never,
       data: undefined,
+    });
+    vi.mocked(resolveViewerRectangleZoom).mockResolvedValue({
+      status: "ok",
+      requestId: "rectangle-zoom" as never,
+      generation: 1 as never,
+      data: { scale: 2, scrollLeft: 100, scrollTop: 80 },
     });
     vi.mocked(copyViewerPageToClipboard).mockResolvedValue({
       status: "ok",
@@ -227,7 +240,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(24);
+    expect(buttons).toHaveLength(25);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -2245,5 +2258,173 @@ describe("Viewer settings", () => {
     fireEvent.pointerUp(stage, { pointerId: 7, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
+  });
+
+  it("REQ-LEY-P3-016 draws a clamped rectangle and applies the Rust zoom plan once", async () => {
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 10, top: 20, width: 1_000, height: 800,
+      right: 1_010, bottom: 820, x: 10, y: 20, toJSON: () => ({}),
+    });
+    const capture = vi.fn();
+    Object.defineProperty(stage, "setPointerCapture", { configurable: true, value: capture });
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 1_000 },
+      clientHeight: { configurable: true, value: 800 },
+      scrollWidth: { configurable: true, value: 2_000 },
+      scrollHeight: { configurable: true, value: 1_600 },
+    });
+
+    const toggle = screen.getByRole("button", { name: "矩形ズーム" });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    fireEvent.pointerDown(stage, {
+      pointerId: 81, pointerType: "mouse", button: 0, clientX: 260, clientY: 220,
+    });
+    fireEvent.pointerMove(stage, {
+      pointerId: 81, pointerType: "mouse", button: 0, clientX: 760, clientY: 620,
+    });
+    expect(capture).toHaveBeenCalledWith(81);
+    expect(document.querySelector(".viewer-rectangle-zoom-selection")).toHaveStyle({
+      left: "250px", top: "200px", width: "500px", height: "400px",
+    });
+    fireEvent.pointerUp(stage, {
+      pointerId: 81, pointerType: "mouse", button: 0, clientX: 1_050, clientY: 900,
+    });
+
+    await waitFor(() => expect(resolveViewerRectangleZoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        viewportWidth: 1_000,
+        viewportHeight: 800,
+        selectionLeft: 250,
+        selectionTop: 200,
+        selectionWidth: 750,
+        selectionHeight: 600,
+        currentScale: 1,
+      }),
+      1,
+    ));
+    await waitFor(() => expect(spread).toHaveAttribute("data-scale", "2"));
+    await waitFor(() => {
+      expect(spread.scrollLeft).toBe(100);
+      expect(spread.scrollTop).toBe(80);
+    });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(document.querySelector(".viewer-rectangle-zoom-selection")).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-016 protects conflicting input and cancels without applying", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        rightClickAction="nextPage"
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, width: 100, height: 100,
+      right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const toggle = screen.getByRole("button", { name: "矩形ズーム" });
+    fireEvent.click(toggle);
+    fireEvent.wheel(stage, { deltaY: 120 });
+    fireEvent.pointerDown(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    for (const [pointerId, pointerType, modifier] of [
+      [2, "touch", {}],
+      [3, "pen", {}],
+      [4, "mouse", { ctrlKey: true }],
+    ] as const) {
+      fireEvent.pointerDown(stage, { pointerId, pointerType, button: 0, clientX: 10, clientY: 10, ...modifier });
+      fireEvent.pointerUp(stage, { pointerId, pointerType, button: 0, clientX: 90, clientY: 90, ...modifier });
+    }
+    fireEvent.pointerDown(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 15, clientY: 15 });
+    expect(resolveViewerRectangleZoom).not.toHaveBeenCalled();
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.pointerDown(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 90, clientY: 90 });
+    fireEvent.pointerCancel(stage, { pointerId: 6, pointerType: "mouse", button: 0 });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
+      target: { value: "vertical_scroll" },
+    });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("REQ-LEY-P3-016 ignores stale plans and presents Rust validation errors", async () => {
+    vi.mocked(resolveViewerRectangleZoom)
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "stale-rectangle" as never,
+        generation: 0 as never,
+        data: { scale: 4, scrollLeft: 200, scrollTop: 200 },
+      })
+      .mockResolvedValueOnce({
+        status: "error",
+        requestId: "invalid-rectangle" as never,
+        generation: 1 as never,
+        error: {
+          code: "INVALID_REQUEST",
+          message: "invalid geometry",
+          retryable: false,
+        },
+      });
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, width: 100, height: 100,
+      right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    const toggle = screen.getByRole("button", { name: "矩形ズーム" });
+    const select = (pointerId: number) => {
+      fireEvent.click(toggle);
+      fireEvent.pointerDown(stage, {
+        pointerId, pointerType: "mouse", button: 0, clientX: 20, clientY: 20,
+      });
+      fireEvent.pointerUp(stage, {
+        pointerId, pointerType: "mouse", button: 0, clientX: 80, clientY: 80,
+      });
+    };
+
+    select(91);
+    await waitFor(() => expect(resolveViewerRectangleZoom).toHaveBeenCalledTimes(1));
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1");
+    select(92);
+    expect(await screen.findByRole("alert")).toHaveTextContent("対応していません");
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1");
   });
 });
