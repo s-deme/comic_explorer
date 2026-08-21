@@ -154,6 +154,20 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P4-004 sends the four-direction layout only through the Rust profile command", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.catalogPanePosition = "bottom";
+    profile.treeHeight = 360;
+    await saveSettingsProfile(profile, 191);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({ catalogPanePosition: "bottom", treeHeight: 360 }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-007 sends open rules and activation context to Rust", async () => {
     const profile = createDefaultSettingsProfile();
     profile.folderOpenRule = "read";

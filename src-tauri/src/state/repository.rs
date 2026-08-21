@@ -143,6 +143,8 @@ pub struct Settings {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub tree_height: u16,
+    pub catalog_pane_position: String,
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
@@ -316,6 +318,8 @@ impl Default for Settings {
             tree_auto_collapse: false,
             tree_confirm_children: true,
             tree_width: 240,
+            tree_height: 240,
+            catalog_pane_position: "right".into(),
             folder_open_rule: "navigate".into(),
             image_open_rule: "read".into(),
             archive_open_rule: "read".into(),
@@ -467,7 +471,24 @@ impl StateStore {
                 "treeAutoCollapse" => settings.tree_auto_collapse = value == "true",
                 "treeConfirmChildren" => settings.tree_confirm_children = value == "true",
                 "treeWidth" => {
-                    settings.tree_width = value.parse::<u16>().unwrap_or(240).clamp(180, 480)
+                    settings.tree_width = value
+                        .parse::<u16>()
+                        .ok()
+                        .filter(|width| (180..=480).contains(width))
+                        .unwrap_or(240)
+                }
+                "treeHeight" => {
+                    settings.tree_height = value
+                        .parse::<u16>()
+                        .ok()
+                        .filter(|height| (120..=480).contains(height))
+                        .unwrap_or(240)
+                }
+                "catalogPanePosition" => {
+                    settings.catalog_pane_position = match value.as_str() {
+                        "right" | "left" | "top" | "bottom" => value,
+                        _ => "right".into(),
+                    }
                 }
                 "folderOpenRule" => settings.folder_open_rule = value,
                 "imageOpenRule" => settings.image_open_rule = value,
@@ -672,6 +693,17 @@ impl StateStore {
                 settings.tree_confirm_children.to_string(),
             ),
             ("treeWidth", settings.tree_width.clamp(180, 480).to_string()),
+            (
+                "treeHeight",
+                settings.tree_height.clamp(120, 480).to_string(),
+            ),
+            (
+                "catalogPanePosition",
+                match settings.catalog_pane_position.as_str() {
+                    "right" | "left" | "top" | "bottom" => settings.catalog_pane_position.clone(),
+                    _ => "right".into(),
+                },
+            ),
             ("folderOpenRule", settings.folder_open_rule.clone()),
             ("imageOpenRule", settings.image_open_rule.clone()),
             ("archiveOpenRule", settings.archive_open_rule.clone()),
@@ -2864,6 +2896,41 @@ mod tests {
     }
 
     #[test]
+    fn req_ley_p4_004_layout_settings_round_trip_and_recover_invalid_storage() {
+        let paths = temporary_paths("layout-settings");
+        let (mut store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        let mut settings = Settings::default();
+        settings.catalog_pane_position = "top".into();
+        settings.tree_width = 420;
+        settings.tree_height = 360;
+        store.save_settings(&settings).unwrap();
+        let restored = store.load_settings().unwrap();
+        assert_eq!(restored.catalog_pane_position, "top");
+        assert_eq!(restored.tree_width, 420);
+        assert_eq!(restored.tree_height, 360);
+
+        store
+            .connection
+            .execute(
+                "UPDATE settings SET value = 'floating' WHERE key = 'catalogPanePosition'",
+                [],
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE settings SET value = '9999' WHERE key = 'treeHeight'",
+                [],
+            )
+            .unwrap();
+        let recovered = store.load_settings().unwrap();
+        assert_eq!(recovered.catalog_pane_position, "right");
+        assert_eq!(recovered.tree_height, 240);
+        let _ = fs::remove_dir_all(paths.root);
+    }
+
+    #[test]
     fn fr_b17_and_req_ley_p3_012_to_p3_015_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
@@ -2926,6 +2993,8 @@ mod tests {
                 tree_auto_collapse: true,
                 tree_confirm_children: false,
                 tree_width: 360,
+                tree_height: 300,
+                catalog_pane_position: "bottom".into(),
                 folder_open_rule: "read".into(),
                 image_open_rule: "none".into(),
                 archive_open_rule: "none".into(),
@@ -3064,6 +3133,8 @@ mod tests {
         assert!(restored.tree_auto_collapse);
         assert!(!restored.tree_confirm_children);
         assert_eq!(restored.tree_width, 360);
+        assert_eq!(restored.tree_height, 300);
+        assert_eq!(restored.catalog_pane_position, "bottom");
         assert_eq!(restored.folder_open_rule, "read");
         assert_eq!(restored.image_open_rule, "none");
         assert_eq!(restored.archive_open_rule, "none");

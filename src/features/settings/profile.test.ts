@@ -71,6 +71,8 @@ function validProfile(): SettingsProfile {
     treeAutoCollapse: false,
     treeConfirmChildren: true,
     treeWidth: 240,
+    treeHeight: 240,
+    catalogPanePosition: "right",
     menuBarVisible: true,
     toolbarVisible: true,
     addressBarVisible: true,
@@ -147,7 +149,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 27, 99, "21", undefined])(
+  it.each([0, 28, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -247,6 +249,26 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(withField("treeConfirmChildren", 1))).toBeNull();
     for (const width of [179, 481, 240.5, Number.NaN]) {
       expect(normalizeSettingsProfile(withField("treeWidth", width))).toBeNull();
+    }
+  });
+
+  it("REQ-LEY-P4-004 migrates v26 layout defaults and validates the four persisted positions", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 26;
+    delete legacy.treeHeight;
+    delete legacy.catalogPanePosition;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+
+    for (const catalogPanePosition of ["right", "left", "top", "bottom"] as const) {
+      expect(normalizeSettingsProfile({
+        ...validProfile(),
+        catalogPanePosition,
+        treeHeight: 360,
+      })).toEqual(expect.objectContaining({ catalogPanePosition, treeHeight: 360 }));
+    }
+    expect(normalizeSettingsProfile(withField("catalogPanePosition", "floating"))).toBeNull();
+    for (const height of [119, 481, 240.5, Number.NaN]) {
+      expect(normalizeSettingsProfile(withField("treeHeight", height))).toBeNull();
     }
   });
 

@@ -187,6 +187,8 @@ describe("FR-B09 connected library diagnostics", () => {
       treeAutoCollapse: false,
       treeConfirmChildren: true,
       treeWidth: 240,
+      treeHeight: 240,
+      catalogPanePosition: "right",
       menuBarVisible: true,
       toolbarVisible: true,
       shortcuts: {},

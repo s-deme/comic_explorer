@@ -99,12 +99,18 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 26;
+export const SETTINGS_PROFILE_VERSION = 27;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
 export const MAX_TREE_WIDTH = 480;
 export const DEFAULT_TREE_WIDTH = 240;
+export const MIN_TREE_HEIGHT = 120;
+export const MAX_TREE_HEIGHT = 480;
+export const DEFAULT_TREE_HEIGHT = 240;
+export const CATALOG_PANE_POSITIONS = ["right", "left", "top", "bottom"] as const;
+export type CatalogPanePosition = (typeof CATALOG_PANE_POSITIONS)[number];
+export const DEFAULT_CATALOG_PANE_POSITION: CatalogPanePosition = "right";
 
 export const FOLDER_OPEN_RULES = ["navigate", "read", "none"] as const;
 export type FolderOpenRule = (typeof FOLDER_OPEN_RULES)[number];
@@ -224,6 +230,8 @@ export interface SettingsProfile {
   treeAutoCollapse: boolean;
   treeConfirmChildren: boolean;
   treeWidth: number;
+  treeHeight: number;
+  catalogPanePosition: CatalogPanePosition;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
   addressBarVisible: boolean;
@@ -306,6 +314,8 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     treeAutoCollapse: false,
     treeConfirmChildren: true,
     treeWidth: DEFAULT_TREE_WIDTH,
+    treeHeight: DEFAULT_TREE_HEIGHT,
+    catalogPanePosition: DEFAULT_CATALOG_PANE_POSITION,
     menuBarVisible: true,
     toolbarVisible: true,
     addressBarVisible: true,
@@ -524,6 +534,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const treeAutoCollapse = legacyTreePreferences ? false : candidate.treeAutoCollapse;
   const treeConfirmChildren = legacyTreePreferences ? true : candidate.treeConfirmChildren;
   const treeWidth = legacyTreePreferences ? DEFAULT_TREE_WIDTH : candidate.treeWidth;
+  const legacyCatalogPaneLayout = candidate.profileVersion !== SETTINGS_PROFILE_VERSION;
+  const treeHeight = legacyCatalogPaneLayout ? DEFAULT_TREE_HEIGHT : candidate.treeHeight;
+  const catalogPanePosition = legacyCatalogPaneLayout
+    ? DEFAULT_CATALOG_PANE_POSITION
+    : enumValue(candidate.catalogPanePosition, CATALOG_PANE_POSITIONS);
   const legacyOpenRules = legacyTreePreferences || candidate.profileVersion === 19;
   const folderOpenRule = legacyOpenRules
     ? "navigate"
@@ -558,10 +573,12 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     ? { ...DEFAULT_CATALOG_MOUSE_BINDINGS }
     : strictCatalogMouseBindings(candidate.catalogMouseBindings);
   const viewerQuadrantBindings = candidate.profileVersion === 25
+    || candidate.profileVersion === 26
     || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerQuadrantBindings(candidate.viewerQuadrantBindings)
     : { ...DEFAULT_VIEWER_QUADRANT_BINDINGS };
-  const viewerRightClickAction = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+  const viewerRightClickAction = candidate.profileVersion === 26
+    || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerRightClickAction(candidate.viewerRightClickAction)
     : DEFAULT_VIEWER_RIGHT_CLICK_ACTION;
   if (
@@ -590,6 +607,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 23
       && candidate.profileVersion !== 24
       && candidate.profileVersion !== 25
+      && candidate.profileVersion !== 26
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -649,6 +667,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !Number.isInteger(treeWidth) ||
     treeWidth < MIN_TREE_WIDTH ||
     treeWidth > MAX_TREE_WIDTH ||
+    typeof treeHeight !== "number" ||
+    !Number.isInteger(treeHeight) ||
+    treeHeight < MIN_TREE_HEIGHT ||
+    treeHeight > MAX_TREE_HEIGHT ||
+    catalogPanePosition === null ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
     typeof addressBarVisible !== "boolean" ||
@@ -731,6 +754,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     treeAutoCollapse,
     treeConfirmChildren,
     treeWidth,
+    treeHeight,
+    catalogPanePosition,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,
     addressBarVisible,

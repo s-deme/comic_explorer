@@ -388,6 +388,8 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   treeAutoCollapse: false,
   treeConfirmChildren: true,
   treeWidth: 240,
+  treeHeight: 240,
+  catalogPanePosition: "right",
   menuBarVisible: true,
   toolbarVisible: true,
   addressBarVisible: true,
@@ -1363,6 +1365,42 @@ describe("application shell", () => {
     chooseAppMenuItem("ヘルプ", "一般ヘルプ…");
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("REQ-LEY-P4-004 applies a Rust-backed bottom catalog layout without resetting catalog state", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
+    const item = screen.getByRole("button", { name: /^book\.cbz/ });
+    fireEvent.click(item);
+
+    const workspace = document.querySelector<HTMLElement>(".workspace")!;
+    expect(workspace).toHaveAttribute("data-catalog-pane-position", "right");
+    expect(workspace.style.gridTemplateAreas).toContain("navigation separator catalog");
+
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.change(within(dialog).getByLabelText("profile一覧ペインの位置"), {
+      target: { value: "bottom" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profilenavigationペインの高さ"), {
+      target: { value: "300" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(workspace).toHaveAttribute("data-catalog-pane-position", "bottom"));
+    expect(workspace.style.gridTemplateAreas).toContain("navigation");
+    expect(workspace.style.gridTemplateRows).toBe("300px 6px minmax(0, 1fr)");
+    expect(screen.getByRole("gridcell", { name: /book\.cbz/ }))
+      .toHaveAttribute("aria-selected", "true");
+    const splitter = screen.getByRole("separator", { name: "フォルダツリーの高さ" });
+    expect(splitter).toHaveAttribute("aria-orientation", "horizontal");
+    expect(splitter).toHaveAttribute("aria-valuenow", "300");
+    fireEvent.keyDown(splitter, { key: "ArrowDown" });
+    expect(splitter).toHaveAttribute("aria-valuenow", "310");
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ catalogPanePosition: "bottom", treeHeight: 300 }),
+      expect.any(Number),
+    );
   });
 
   it("FT-B17-001 opens the required five top-level menus and runs File exactly once", async () => {

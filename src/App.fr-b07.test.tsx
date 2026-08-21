@@ -239,6 +239,8 @@ const defaultSettings: CatalogSettings = {
   treeAutoCollapse: false,
   treeConfirmChildren: true,
   treeWidth: 240,
+  treeHeight: 240,
+  catalogPanePosition: "right",
   menuBarVisible: true,
   toolbarVisible: true,
   addressBarVisible: true,

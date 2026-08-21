@@ -5,7 +5,7 @@ LEY-SHELL-003,シェル,イメージバー,Equivalent,NoAction,Existing,NA,,,,,,
 LEY-SHELL-004,シェル,シークバー,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-SHELL-005,シェル,ステータスバー,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-SHELL-006,シェル,アドレスバー,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
-LEY-SHELL-007,シェル,一覧位置変更,Missing,Selected,NotStarted,L,P4,12,永続化を伴う大型layout変更,,,,,,レイアウト永続化,,2026-08-21,
+LEY-SHELL-007,シェル,一覧位置変更,Missing,Selected,Published,L,P4,12,永続化を伴う大型layout変更,REQ-LEY-P4-004,requirements.md#REQ-LEY-P4-004,src-tauri/src/state/repository.rs;src-tauri/src/application/mod.rs;src/features/workspace/display.ts;src/features/settings/profile.ts;src/features/settings/SettingsDialog.tsx;src/features/library/client.ts;src/App.tsx;src/styles.css,src-tauri/src/state/repository.rs#tests;src-tauri/src/application/mod.rs#shutdown_tests;src/features/workspace/display.test.ts;src/features/settings/profile.test.ts;src/features/library/client.test.ts;src/App.test.tsx,verification.md#leeyes-p4-d-一覧ペイン位置,SQLite settings・strict profile v27,release WebView2の10k item FPS・reflow・DPI・最小window・CPU・working set未測定,2026-08-22,SELF
 LEY-SHELL-008,シェル,Viewer分離,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-SHELL-009,シェル,全画面表示,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-SHELL-010,シェル,全画面端UI,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,

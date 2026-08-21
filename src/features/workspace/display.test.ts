@@ -3,7 +3,7 @@ import {
   restoreWorkspaceDisplay,
   shellGridRows,
   trayStatusAvailable,
-  workspaceGridColumns,
+  workspaceGridLayout,
 } from "./display";
 
 describe("workspace display", () => {
@@ -26,8 +26,43 @@ describe("workspace display", () => {
   });
 
   it("FT-B18-001 removes the tree columns while preserving a full-width catalog", () => {
-    expect(workspaceGridColumns(false, 240)).toBe("minmax(0, 1fr)");
-    expect(workspaceGridColumns(true, 120)).toBe("180px 6px minmax(0, 1fr)");
+    expect(workspaceGridLayout(false, "left", 240, 240)).toEqual({
+      gridTemplateAreas: '"catalog"',
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gridTemplateRows: "minmax(0, 1fr)",
+      separatorOrientation: "vertical",
+    });
+  });
+
+  it("REQ-LEY-P4-004 maps all four catalog positions to bounded grid tracks", () => {
+    expect(workspaceGridLayout(true, "right", 120, 999)).toEqual({
+      gridTemplateAreas: '"navigation separator catalog"',
+      gridTemplateColumns: "180px 6px minmax(0, 1fr)",
+      gridTemplateRows: "minmax(0, 1fr)",
+      separatorOrientation: "vertical",
+    });
+    expect(workspaceGridLayout(true, "left", 999, 240).gridTemplateAreas)
+      .toBe('"catalog separator navigation"');
+    expect(workspaceGridLayout(true, "top", 240, 80)).toEqual({
+      gridTemplateAreas: '"catalog" "separator" "navigation"',
+      gridTemplateColumns: "minmax(0, 1fr)",
+      gridTemplateRows: "minmax(0, 1fr) 6px 120px",
+      separatorOrientation: "horizontal",
+    });
+    expect(workspaceGridLayout(true, "bottom", 240, 999).gridTemplateRows)
+      .toBe("480px 6px minmax(0, 1fr)");
+  });
+
+  it("REQ-LEY-P4-004 resolves 10,000 catalog layouts per position within one second", () => {
+    const started = performance.now();
+    for (const position of ["right", "left", "top", "bottom"] as const) {
+      for (let index = 0; index < 10_000; index += 1) {
+        workspaceGridLayout(true, position, 180 + (index % 301), 120 + (index % 361));
+      }
+    }
+    const elapsedMs = performance.now() - started;
+    console.info(`REQ-LEY-P4-004 4 x 10,000 layout helper calls: ${elapsedMs.toFixed(3)}ms`);
+    expect(elapsedMs).toBeLessThan(1_000);
   });
 
   it("restores all current-session display surfaces", () => {

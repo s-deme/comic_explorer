@@ -507,6 +507,8 @@ pub struct CatalogSettings {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub tree_height: u16,
+    pub catalog_pane_position: String,
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
@@ -621,6 +623,8 @@ pub struct SettingsProfileInput {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub tree_height: u16,
+    pub catalog_pane_position: String,
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
@@ -1479,6 +1483,11 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         tree_auto_collapse: settings.tree_auto_collapse,
         tree_confirm_children: settings.tree_confirm_children,
         tree_width: settings.tree_width.clamp(180, 480),
+        tree_height: settings.tree_height.clamp(120, 480),
+        catalog_pane_position: match settings.catalog_pane_position.as_str() {
+            "right" | "left" | "top" | "bottom" => settings.catalog_pane_position,
+            _ => "right".into(),
+        },
         folder_open_rule: match settings.folder_open_rule.as_str() {
             "navigate" | "read" | "none" => settings.folder_open_rule,
             _ => "navigate".into(),
@@ -2997,6 +3006,11 @@ fn validate_settings_profile(
             .contains(&profile.wheel_scroll_factor)
         || !matches!(profile.page_scan_mode.as_str(), "vertical" | "n" | "z")
         || !(180..=480).contains(&profile.tree_width)
+        || !(120..=480).contains(&profile.tree_height)
+        || !matches!(
+            profile.catalog_pane_position.as_str(),
+            "right" | "left" | "top" | "bottom"
+        )
         || !matches!(
             profile.folder_open_rule.as_str(),
             "navigate" | "read" | "none"
@@ -3103,6 +3117,8 @@ fn apply_settings_profile_to_settings(
     settings.tree_auto_collapse = profile.tree_auto_collapse;
     settings.tree_confirm_children = profile.tree_confirm_children;
     settings.tree_width = profile.tree_width;
+    settings.tree_height = profile.tree_height;
+    settings.catalog_pane_position = profile.catalog_pane_position;
     settings.folder_open_rule = profile.folder_open_rule;
     settings.image_open_rule = profile.image_open_rule;
     settings.archive_open_rule = profile.archive_open_rule;
@@ -3141,6 +3157,33 @@ fn normalize_settings_profile_input(
     profile.viewer_right_click_action = right_click;
     profile.mouse_gestures = gestures;
     Ok(profile)
+}
+
+fn decode_stored_settings_profile(profile_json: &str) -> Result<SettingsProfileInput, AppError> {
+    let mut value = serde_json::from_str::<serde_json::Value>(profile_json).map_err(|_| {
+        request_error(
+            ErrorCode::UnsupportedFormat,
+            "Stored settings profile is invalid.",
+        )
+    })?;
+    let object = value.as_object_mut().ok_or_else(|| {
+        request_error(
+            ErrorCode::UnsupportedFormat,
+            "Stored settings profile is invalid.",
+        )
+    })?;
+    object.entry("treeHeight").or_insert(serde_json::json!(240));
+    object
+        .entry("catalogPanePosition")
+        .or_insert(serde_json::json!("right"));
+    serde_json::from_value::<SettingsProfileInput>(value)
+        .map_err(|_| {
+            request_error(
+                ErrorCode::UnsupportedFormat,
+                "Stored settings profile is invalid.",
+            )
+        })
+        .and_then(normalize_settings_profile_input)
 }
 
 fn validate_named_settings_profile_name(name: &str) -> Result<String, AppError> {
@@ -3292,15 +3335,7 @@ pub fn list_named_settings_profiles(
     };
     let mut summaries = Vec::with_capacity(records.len());
     for record in records {
-        let profile = match serde_json::from_str::<SettingsProfileInput>(&record.profile_json)
-            .map_err(|_| {
-                request_error(
-                    ErrorCode::UnsupportedFormat,
-                    "Stored settings profile is invalid.",
-                )
-            })
-            .and_then(normalize_settings_profile_input)
-        {
+        let profile = match decode_stored_settings_profile(&record.profile_json) {
             Ok(profile) => profile,
             Err(error) => return Ok(error_response(&context, error)),
         };
@@ -3395,14 +3430,7 @@ fn stored_settings_profile(
     let record = store
         .named_settings_profile(name)?
         .ok_or_else(|| request_error(ErrorCode::NotFound, "Settings profile was not found."))?;
-    let profile = serde_json::from_str::<SettingsProfileInput>(&record.profile_json)
-        .map_err(|_| {
-            request_error(
-                ErrorCode::UnsupportedFormat,
-                "Stored settings profile is invalid.",
-            )
-        })
-        .and_then(normalize_settings_profile_input)?;
+    let profile = decode_stored_settings_profile(&record.profile_json)?;
     Ok((record, profile))
 }
 
@@ -6608,7 +6636,7 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn fr_b19_and_req_ley_p3_013_to_p3_015_and_p3_019_settings_profile_validates_all_atomic_bindings()
+    fn fr_b19_and_req_ley_p3_013_to_p3_015_and_p3_019_and_req_ley_p4_004_settings_profile_validates_all_atomic_bindings()
      {
         let mut profile = SettingsProfileInput {
             sort_field: "name".into(),
@@ -6668,6 +6696,8 @@ mod shutdown_tests {
             tree_auto_collapse: true,
             tree_confirm_children: true,
             tree_width: 320,
+            tree_height: 260,
+            catalog_pane_position: "top".into(),
             folder_open_rule: "navigate".into(),
             image_open_rule: "read".into(),
             archive_open_rule: "read".into(),
@@ -6847,6 +6877,20 @@ mod shutdown_tests {
         );
         profile.page_scan_mode = "z".into();
 
+        profile.tree_height = 119;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.tree_height = 300;
+        profile.catalog_pane_position = "floating".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.catalog_pane_position = "left".into();
+        validate_settings_profile(&profile).unwrap();
+
         profile.navigation_selection_policy = "middle".into();
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
@@ -6932,12 +6976,27 @@ mod shutdown_tests {
         let normalized = normalize_settings_profile_input(profile.clone()).unwrap();
         let profile_json = serde_json::to_string(&normalized).unwrap();
         assert!(!profile_json.contains("libraryRoot"));
+        let mut legacy_layout = serde_json::to_value(&normalized).unwrap();
+        legacy_layout.as_object_mut().unwrap().remove("treeHeight");
+        legacy_layout
+            .as_object_mut()
+            .unwrap()
+            .remove("catalogPanePosition");
+        let migrated = decode_stored_settings_profile(&legacy_layout.to_string()).unwrap();
+        assert_eq!(migrated.tree_height, 240);
+        assert_eq!(migrated.catalog_pane_position, "right");
         let mut unknown = serde_json::to_value(&normalized).unwrap();
         unknown
             .as_object_mut()
             .unwrap()
             .insert("secretToken".into(), serde_json::json!("discard-me"));
-        assert!(serde_json::from_value::<SettingsProfileInput>(unknown).is_err());
+        assert!(serde_json::from_value::<SettingsProfileInput>(unknown.clone()).is_err());
+        assert_eq!(
+            decode_stored_settings_profile(&unknown.to_string())
+                .unwrap_err()
+                .code,
+            ErrorCode::UnsupportedFormat
+        );
         let confirmation_key = settings_profile_confirmation_key("Reading", &profile_json);
         assert_eq!(confirmation_key.len(), 16);
         assert_ne!(

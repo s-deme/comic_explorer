@@ -34,6 +34,7 @@ import {
   SETTINGS_PROFILE_VERSION,
   type MouseGestureBindings,
   CatalogPalette,
+  CatalogPanePosition,
   FileOpenRule,
   FolderOpenRule,
   DetailGridLineMode,
@@ -435,6 +436,8 @@ export interface CatalogSettings {
   treeAutoCollapse: boolean;
   treeConfirmChildren: boolean;
   treeWidth: number;
+  treeHeight: number;
+  catalogPanePosition: CatalogPanePosition;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
   addressBarVisible: boolean;
@@ -576,6 +579,8 @@ export async function saveSettingsProfile(
       treeAutoCollapse: profile.treeAutoCollapse,
       treeConfirmChildren: profile.treeConfirmChildren,
       treeWidth: profile.treeWidth,
+      treeHeight: profile.treeHeight,
+      catalogPanePosition: profile.catalogPanePosition,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,
       addressBarVisible: profile.addressBarVisible,

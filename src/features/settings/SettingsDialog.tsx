@@ -99,7 +99,10 @@ import {
   FOLDER_OPEN_RULES,
   DETAIL_GRID_LINE_MODES,
   DETAIL_ROW_DENSITIES,
+  CATALOG_PANE_POSITIONS,
+  MAX_TREE_HEIGHT,
   MAX_TREE_WIDTH,
+  MIN_TREE_HEIGHT,
   MIN_TREE_WIDTH,
   TRAY_CLOSE_BEHAVIORS,
   TRAY_RESTORE_GESTURES,
@@ -150,6 +153,9 @@ const DETAIL_GRID_LINE_LABELS: Record<SettingsProfile["detailGridLines"], string
 };
 const DETAIL_ROW_DENSITY_LABELS: Record<SettingsProfile["detailRowDensity"], string> = {
   compact: "コンパクト", standard: "標準", comfortable: "ゆったり",
+};
+const CATALOG_PANE_POSITION_LABELS: Record<SettingsProfile["catalogPanePosition"], string> = {
+  right: "右", left: "左", top: "上", bottom: "下",
 };
 
 type SettingsCategory = "catalog" | "viewer" | "interface" | "commands" | "profile";
@@ -557,7 +563,7 @@ export function SettingsDialog({
     {
       id: "tree-details",
       category: "interface",
-      text: `フォルダツリー 自動折畳み 下位確認 横幅 ${draft.treeWidth}px ${draft.treeAutoCollapse ? "自動折畳み有効" : "展開保持"} ${draft.treeConfirmChildren ? "下位確認有効" : "下位未確認"}`,
+      text: `一覧位置 ペイン配置 ${CATALOG_PANE_POSITION_LABELS[draft.catalogPanePosition]} フォルダツリー 自動折畳み 下位確認 横幅 ${draft.treeWidth}px 高さ ${draft.treeHeight}px ${draft.treeAutoCollapse ? "自動折畳み有効" : "展開保持"} ${draft.treeConfirmChildren ? "下位確認有効" : "下位未確認"}`,
     },
     ...([
       ["tree-visible", "フォルダツリー", draft.treeVisible, "ライブラリの階層を左側へ表示します"],
@@ -1259,6 +1265,39 @@ export function SettingsDialog({
                   </label>
                 </SettingRow>
               ))}
+              <SettingRow id="catalog-pane-position" title="一覧ペインの位置" description="フォルダツリーまたは検索ペインに対する一覧の位置と、上下配置時のnavigation高さを指定します。" hidden={rowHidden("catalog-pane-position")}>
+                <div className="settings-inline-actions">
+                  <select
+                    aria-label="profile一覧ペインの位置"
+                    value={draft.catalogPanePosition}
+                    onChange={(event) => update({
+                      catalogPanePosition: event.target.value as SettingsProfile["catalogPanePosition"],
+                    })}
+                  >
+                    {CATALOG_PANE_POSITIONS.map((position) => (
+                      <option key={position} value={position}>{CATALOG_PANE_POSITION_LABELS[position]}</option>
+                    ))}
+                  </select>
+                  <label>
+                    上下配置のnavigation高さ
+                    <input
+                      type="number"
+                      aria-label="profilenavigationペインの高さ"
+                      min={MIN_TREE_HEIGHT}
+                      max={MAX_TREE_HEIGHT}
+                      step="10"
+                      value={draft.treeHeight}
+                      onChange={(event) => update({
+                        treeHeight: Math.max(
+                          MIN_TREE_HEIGHT,
+                          Math.min(MAX_TREE_HEIGHT, Math.round(Number(event.target.value))),
+                        ),
+                      })}
+                    />
+                    px
+                  </label>
+                </div>
+              </SettingRow>
               <SettingRow id="tree-details" title="フォルダツリーの詳細" description="現在位置以外のbranchを閉じる動作、leaf判定、保存する横幅を指定します。書庫ツリーはP4で別途扱います。" hidden={rowHidden("tree-details")}>
                 <div className="settings-inline-actions">
                   <label>

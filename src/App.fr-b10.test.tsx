@@ -202,6 +202,8 @@ describe("FR-B10 connected tag management", () => {
         treeAutoCollapse: false,
         treeConfirmChildren: true,
         treeWidth: 240,
+        treeHeight: 240,
+        catalogPanePosition: "right",
         menuBarVisible: true,
         toolbarVisible: true,
         shortcuts: {},

@@ -621,6 +621,18 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Frontend focused | PASS | App 2件とclient 1件、FAIL 0。menu label/enable、typed status/execute IPC、Ctrl+Z、editing・tree・Viewer保護、成功notice・再照会を含む。 |
 | Typecheck | PASS | Windows-native typecheck exit 0。 |
 | Windows tests / canonical / build / CoDD | PASS | frontend 39 files / 497件、Python 61件、Rust 243件とshutdown process 1件、typecheck、80 modules build、SBOM 783 components・unknown/prohibited license 0。最終source後のsandbox外formal canonicalは全12 stage PASS、278.255秒。logは`src-tauri/target/verification/imp-004-20260821T160025974Z`。その直前のcanonicalでは最終CoDD verify内test commandだけが一過性FAILしたが、standalone Windows tests（frontend 497件・Python 61件）とCoDD verifyを再実行してPASSし、続く全stage再実行もPASSした。managed sandbox内の初回canonicalは同一releaseのWebView2 processが起動前に消えproduct-shortcutだけFAILしたが、sandbox外product-shortcut単独と全stage再実行でPASSし、source difference 0を確認した。 |
+
+## Leeyes P4-D 一覧ペイン位置
+
+対象はLEY-SHELL-007の1件。Rustが4方向enum、横幅・高さ境界、SQLite、strict profile v27、旧profile・named profile移行の正本を担当し、TypeScriptは設定dialog、typed IPC、固定CSS Grid areaとseparator操作だけを担当する。
+
+| gate | 結果 | 証拠・未測定 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P4-004の2件、FAIL 0。DB round-trip・不正値回復、profile値・旧named profile補完・未知field拒否を含む。 |
+| Focused frontend | PASS | workspace helper 7件、profile 102件、client 23件、App 110件の関連suiteをPASS。4方向area、上限、profile v26移行、Rust payload、下配置・横separator・選択保持を含む。 |
+| 性能・上限 | PASS / 限定 | jsdomで4方向それぞれ10,000回、合計40,000回のlayout helper呼出しは6.391ms。release WebView2の10,000 item FPS・reflow、DPI別pointer、最小window、CPU、peak working setは未測定。 |
+| Windows tests / build | PASS | frontend 39 files / 502件、Python 61件、typecheck、80 modules build。minified JS 623.13kBの既存chunk advisoryあり。 |
+| Windows canonical / CoDD | PASS | Rust 244件とshutdown process 1件、SBOM 783 components・unknown/prohibited license 0、release build・freshness・product shortcut・cleanup、CoDD scan/check/verifyを含む最終sourceのformal canonical全12 stage PASS、388.385秒。logは`src-tauri/target/verification/imp-004-20260821T164707662Z`。初回canonicalは追加test内のmove後参照をcompile時に検出してrust-canonicalでFAILし、cloneへ修正後にfocused Rustを再実行した。その後の全stage PASS後にenum重複をtype-only共有へ整理したため、最終sourceでも全stageを再実行してPASSした。 |
 | 製品直接観測 | NOT RUN | release WebView2の実menu/shortcut、network/removable drive、外部process競合、巨大directory、CPU・working setを直接観測していない。 |
 
 ## FR-B23 Leeyes viewer操作・外観

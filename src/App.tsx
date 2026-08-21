@@ -272,7 +272,7 @@ import {
   restoreWorkspaceDisplay,
   shellGridRows,
   trayStatusAvailable,
-  workspaceGridColumns,
+  workspaceGridLayout,
 } from "./features/workspace/display";
 import {
   applyAlwaysOnTop,
@@ -286,7 +286,12 @@ import {
   DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
   DEFAULT_CATALOG_PALETTE,
   DEFAULT_TREE_WIDTH,
+  DEFAULT_TREE_HEIGHT,
+  DEFAULT_CATALOG_PANE_POSITION,
+  CATALOG_PANE_POSITIONS,
+  MAX_TREE_HEIGHT,
   MAX_TREE_WIDTH,
+  MIN_TREE_HEIGHT,
   MIN_TREE_WIDTH,
   DEFAULT_NAVIGATION_SELECTION_POLICY,
   DEFAULT_STARTUP_LOCATION,
@@ -296,6 +301,7 @@ import {
   normalizeSettingsProfile,
   type MouseGestureAction,
   type CatalogPalette,
+  type CatalogPanePosition,
   type MouseGestureBindings,
   type MouseGestureName,
   type NavigationSelectionPolicy,
@@ -824,6 +830,9 @@ export function App({
   const [activeToolbarMenu, setActiveToolbarMenu] = useState<ToolbarMenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
   const [treeWidth, setTreeWidth] = useState(DEFAULT_TREE_WIDTH);
+  const [treeHeight, setTreeHeight] = useState(DEFAULT_TREE_HEIGHT);
+  const [catalogPanePosition, setCatalogPanePosition] =
+    useState<CatalogPanePosition>(DEFAULT_CATALOG_PANE_POSITION);
   const [treeVisible, setTreeVisible] = useState(true);
   const [treeAutoCollapse, setTreeAutoCollapse] = useState(false);
   const [treeConfirmChildren, setTreeConfirmChildren] = useState(true);
@@ -1391,6 +1400,13 @@ export function App({
             MIN_TREE_WIDTH,
             Math.min(MAX_TREE_WIDTH, response.data.treeWidth ?? DEFAULT_TREE_WIDTH),
           ));
+          setTreeHeight(Math.max(
+            MIN_TREE_HEIGHT,
+            Math.min(MAX_TREE_HEIGHT, response.data.treeHeight ?? DEFAULT_TREE_HEIGHT),
+          ));
+          setCatalogPanePosition(CATALOG_PANE_POSITIONS.includes(response.data.catalogPanePosition)
+            ? response.data.catalogPanePosition
+            : DEFAULT_CATALOG_PANE_POSITION);
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
           setAddressBarVisible(response.data.addressBarVisible !== false);
@@ -3543,6 +3559,8 @@ export function App({
       treeAutoCollapse,
       treeConfirmChildren,
       treeWidth,
+      treeHeight,
+      catalogPanePosition,
       menuBarVisible,
       toolbarVisible,
       addressBarVisible,
@@ -3692,6 +3710,8 @@ export function App({
       setTreeAutoCollapse(normalized.treeAutoCollapse);
       setTreeConfirmChildren(normalized.treeConfirmChildren);
       setTreeWidth(normalized.treeWidth);
+      setTreeHeight(normalized.treeHeight);
+      setCatalogPanePosition(normalized.catalogPanePosition);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
       setAddressBarVisible(normalized.addressBarVisible);
@@ -4051,6 +4071,12 @@ export function App({
   );
   const up = parentPath(navigation.current);
   const sidePaneVisible = treeVisible || searchPaneOpen;
+  const workspaceLayout = workspaceGridLayout(
+    sidePaneVisible,
+    catalogPanePosition,
+    treeWidth,
+    treeHeight,
+  );
   const selectedThumbnailDataUrl = selectedPath === null
     ? undefined
     : selected?.kind === "archive" || selected?.kind === "comicFolder" || selected?.kind === "pdf"
@@ -5824,8 +5850,11 @@ export function App({
       <div
         className="workspace"
         style={{
-          gridTemplateColumns: workspaceGridColumns(sidePaneVisible, treeWidth),
+          gridTemplateAreas: workspaceLayout.gridTemplateAreas,
+          gridTemplateColumns: workspaceLayout.gridTemplateColumns,
+          gridTemplateRows: workspaceLayout.gridTemplateRows,
         }}
+        data-catalog-pane-position={catalogPanePosition}
       >
         <FolderTree
           key={`tree:${libraryRoot ?? "pc"}:${treeConfirmChildren}`}
@@ -6429,32 +6458,57 @@ export function App({
             <div
               className="tree-splitter"
               role="separator"
-              aria-label={searchPaneOpen ? "検索ペインの幅" : "フォルダツリーの幅"}
-              aria-orientation="vertical"
-              aria-valuemin={180}
-              aria-valuenow={treeWidth}
+              aria-label={workspaceLayout.separatorOrientation === "vertical"
+                ? (searchPaneOpen ? "検索ペインの幅" : "フォルダツリーの幅")
+                : (searchPaneOpen ? "検索ペインの高さ" : "フォルダツリーの高さ")}
+              aria-orientation={workspaceLayout.separatorOrientation}
+              aria-valuemin={workspaceLayout.separatorOrientation === "vertical"
+                ? MIN_TREE_WIDTH : MIN_TREE_HEIGHT}
+              aria-valuemax={workspaceLayout.separatorOrientation === "vertical"
+                ? MAX_TREE_WIDTH : MAX_TREE_HEIGHT}
+              aria-valuenow={workspaceLayout.separatorOrientation === "vertical"
+                ? treeWidth : treeHeight}
               tabIndex={0}
               onKeyDown={(event) => {
-                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                if (workspaceLayout.separatorOrientation === "vertical"
+                  && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
                   event.preventDefault();
+                  const increaseKey = catalogPanePosition === "left" ? "ArrowLeft" : "ArrowRight";
                   setTreeWidth((width) =>
                     Math.max(
                       MIN_TREE_WIDTH,
                       Math.min(
                         MAX_TREE_WIDTH,
-                        width + (event.key === "ArrowLeft" ? -10 : 10),
+                        width + (event.key === increaseKey ? 10 : -10),
                       ),
                     ),
                   );
+                } else if (workspaceLayout.separatorOrientation === "horizontal"
+                  && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+                  event.preventDefault();
+                  const increaseKey = catalogPanePosition === "top" ? "ArrowUp" : "ArrowDown";
+                  setTreeHeight((height) => Math.max(
+                    MIN_TREE_HEIGHT,
+                    Math.min(MAX_TREE_HEIGHT, height + (event.key === increaseKey ? 10 : -10)),
+                  ));
                 }
               }}
               onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
               onPointerMove={(event) => {
                 if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  setTreeWidth(Math.max(
-                    MIN_TREE_WIDTH,
-                    Math.min(MAX_TREE_WIDTH, event.clientX),
-                  ));
+                  const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+                  if (bounds === undefined) return;
+                  if (workspaceLayout.separatorOrientation === "vertical") {
+                    const extent = catalogPanePosition === "left"
+                      ? bounds.right - event.clientX
+                      : event.clientX - bounds.left;
+                    setTreeWidth(Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, extent)));
+                  } else {
+                    const extent = catalogPanePosition === "top"
+                      ? bounds.bottom - event.clientY
+                      : event.clientY - bounds.top;
+                    setTreeHeight(Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT, extent)));
+                  }
                 }
               }}
             />
