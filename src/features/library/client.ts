@@ -422,6 +422,39 @@ export async function deleteOfflineMedia(mediaId: number, generation: number): P
   return invoke("delete_offline_media", { context: context(generation), mediaId, confirmed: true });
 }
 
+export interface TonePoint { input: number; output: number; }
+export type ViewerFilter =
+  | { kind: "grayscale" }
+  | { kind: "levels"; black: number; white: number; gamma: number }
+  | { kind: "gamma"; value: number }
+  | { kind: "contrast"; value: number }
+  | { kind: "brightness"; value: number }
+  | { kind: "histogramEqualize" }
+  | { kind: "posterize"; levels: number }
+  | { kind: "invert" }
+  | { kind: "toneCurve"; points: TonePoint[] }
+  | { kind: "sharpen"; amount: number }
+  | { kind: "unsharpMask"; radius: number; amount: number; threshold: number }
+  | { kind: "blur"; radius: number }
+  | { kind: "crop"; top: number; right: number; bottom: number; left: number }
+  | { kind: "margin"; top: number; right: number; bottom: number; left: number; color: string };
+export interface ViewerFilterStep { enabled: boolean; filter: ViewerFilter; }
+export interface ViewerFilterSet { id: number; name: string; chain: ViewerFilterStep[]; active: boolean; updatedAtMs: number; }
+export interface ViewerFilterCatalog { sets: ViewerFilterSet[]; maximumSets: number; maximumSteps: number; }
+
+export async function listViewerFilterSets(generation: number): Promise<ApiResponse<ViewerFilterCatalog>> {
+  return invoke("list_viewer_filter_sets", { context: context(generation) });
+}
+export async function saveViewerFilterSet(name: string, chain: ViewerFilterStep[], overwrite: boolean, generation: number): Promise<ApiResponse<ViewerFilterCatalog>> {
+  return invoke("save_viewer_filter_set", { context: context(generation), request: { name, chain, overwrite } });
+}
+export async function activateViewerFilterSet(filterSetId: number | null, generation: number): Promise<ApiResponse<ViewerFilterCatalog>> {
+  return invoke("activate_viewer_filter_set", { context: context(generation), filterSetId });
+}
+export async function deleteViewerFilterSet(filterSetId: number, generation: number): Promise<ApiResponse<ViewerFilterCatalog>> {
+  return invoke("delete_viewer_filter_set", { context: context(generation), filterSetId, confirmed: true });
+}
+
 export async function openOfflineMediaEntry(
   mediaId: number,
   relativePath: string,

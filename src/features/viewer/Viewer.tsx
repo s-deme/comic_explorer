@@ -129,6 +129,7 @@ import {
   type ImageTransformAction,
   type ViewerImageTransform,
 } from "./image-transform";
+import { FilterDialog } from "./FilterDialog";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
 
@@ -382,6 +383,7 @@ export function Viewer({
   const [clipboardCopying, setClipboardCopying] = useState(false);
   const [imageTransformNotice, setImageTransformNotice] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [slideshowRunning, setSlideshowRunning] = useState(
     (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
   );
@@ -439,6 +441,18 @@ export function Viewer({
   const clipboardRequestRef = useRef(0);
   const pageTransformsRef = useRef(new Map<number, ViewerImageTransform>());
   const [imageTransformRevision, setImageTransformRevision] = useState(0);
+
+  function reloadFilteredPages() {
+    pageRequests.current.clear();
+    retainedIndicesRef.current.clear();
+    setMediaUris({});
+    setReadyPages(new Set());
+    setImageErrors(new Set());
+    setLandscape(new Set());
+    setPageSizes(new Map());
+    setPendingNextIndex(null);
+    setImageTransformNotice("フィルター変更を適用し、現在ページをRustから再読込します。");
+  }
 
   useLayoutEffect(() => {
     const update = () => {
@@ -1944,6 +1958,15 @@ export function Viewer({
           <span aria-hidden="true">0°</span>
         </button>
         <button
+          className="viewer-icon-button"
+          type="button"
+          aria-label="画像フィルター"
+          title="非破壊画像フィルターを設定"
+          onClick={() => setFilterDialogOpen(true)}
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
+        <button
           ref={fullscreenButtonRef}
           className="viewer-icon-button"
           aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
@@ -1979,6 +2002,13 @@ export function Viewer({
           </span>
         )}
       </header>
+      {filterDialogOpen && (
+        <FilterDialog
+          generation={generation}
+          onApplied={reloadFilteredPages}
+          onClose={() => setFilterDialogOpen(false)}
+        />
+      )}
       {bookmarkListOpen && (
         <div className="dialog-backdrop">
           <section

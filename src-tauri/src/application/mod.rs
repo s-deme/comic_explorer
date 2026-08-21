@@ -11,6 +11,7 @@ mod recursive_thumbnails;
 mod scheduler;
 mod search_query;
 pub mod shelves;
+pub mod viewer_filters;
 
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
@@ -6031,14 +6032,20 @@ pub async fn load_page(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    let prefetch_memory_mib = state
-        .store
-        .lock()
-        .map_err(|_| "state poisoned")?
-        .as_ref()
-        .and_then(|store| store.load_settings().ok())
-        .map(|settings| prefetch_memory_mib(&settings))
-        .unwrap_or(DEFAULT_PREFETCH_MEMORY_MIB);
+    let (prefetch_memory_mib, filter_chain) = {
+        let guard = state.store.lock().map_err(|_| "state poisoned")?;
+        let prefetch = guard
+            .as_ref()
+            .and_then(|store| store.load_settings().ok())
+            .map(|settings| prefetch_memory_mib(&settings))
+            .unwrap_or(DEFAULT_PREFETCH_MEMORY_MIB);
+        let chain = match guard.as_ref().map(viewer_filters::active_filter_chain) {
+            Some(Ok(value)) => value,
+            Some(Err(error)) => return Ok(error_response(&context, error)),
+            None => Vec::new(),
+        };
+        (prefetch, chain)
+    };
     let item = RelativePath::parse(item_relative_path).map_err(str::to_string)?;
     let page = RelativePath::parse(page_relative_path).map_err(str::to_string)?;
     let root = state
@@ -6062,8 +6069,11 @@ pub async fn load_page(
     if state
         .page_workers
         .submit(priority.into(), cancellation.clone(), move || {
-            let result = read_page_bytes(&grant, &worker_page)
-                .map(|(delivered_mime_type, bytes)| (grant, delivered_mime_type, bytes));
+            let result =
+                read_page_bytes(&grant, &worker_page).and_then(|(delivered_mime_type, bytes)| {
+                    viewer_filters::filter_page_bytes(bytes, delivered_mime_type, &filter_chain)
+                        .map(|(mime_type, bytes)| (grant, mime_type, bytes))
+                });
             if !cancellation.is_cancelled() {
                 let _ = sender.send(result);
             }

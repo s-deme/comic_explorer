@@ -6,6 +6,10 @@ import {
   loadPage,
   resolveViewerRectangleZoom,
   saveReadingPosition,
+  activateViewerFilterSet,
+  deleteViewerFilterSet,
+  listViewerFilterSets,
+  saveViewerFilterSet,
 } from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
 import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
@@ -16,6 +20,10 @@ vi.mock("../library/client", () => ({
   loadPage: vi.fn(),
   resolveViewerRectangleZoom: vi.fn(),
   saveReadingPosition: vi.fn(),
+  activateViewerFilterSet: vi.fn(),
+  deleteViewerFilterSet: vi.fn(),
+  listViewerFilterSets: vi.fn(),
+  saveViewerFilterSet: vi.fn(),
 }));
 
 const session = {
@@ -68,6 +76,10 @@ describe("Viewer settings", () => {
     vi.mocked(saveReadingPosition).mockReset();
     vi.mocked(resolveViewerRectangleZoom).mockReset();
     vi.mocked(copyViewerPageToClipboard).mockReset();
+    vi.mocked(activateViewerFilterSet).mockReset();
+    vi.mocked(deleteViewerFilterSet).mockReset();
+    vi.mocked(listViewerFilterSets).mockReset();
+    vi.mocked(saveViewerFilterSet).mockReset();
   });
 
   beforeEach(() => {
@@ -95,6 +107,15 @@ describe("Viewer settings", () => {
         payloadBytes: 3_200_124,
       },
     });
+    const filterCatalog = {
+      sets: [{ id: 4, name: "Scan", chain: [{ enabled: true, filter: { kind: "grayscale" as const } }], active: true, updatedAtMs: 1 }],
+      maximumSets: 32,
+      maximumSteps: 16,
+    };
+    vi.mocked(listViewerFilterSets).mockResolvedValue({ status: "ok", requestId: "filters" as never, generation: 1 as never, data: filterCatalog });
+    vi.mocked(activateViewerFilterSet).mockResolvedValue({ status: "ok", requestId: "filters" as never, generation: 1 as never, data: filterCatalog });
+    vi.mocked(saveViewerFilterSet).mockResolvedValue({ status: "ok", requestId: "filters" as never, generation: 1 as never, data: filterCatalog });
+    vi.mocked(deleteViewerFilterSet).mockResolvedValue({ status: "ok", requestId: "filters" as never, generation: 1 as never, data: filterCatalog });
   });
 
   it("starts from restored mode and direction and reports changes", () => {
@@ -240,7 +261,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(25);
+    expect(buttons).toHaveLength(26);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -253,6 +274,17 @@ describe("Viewer settings", () => {
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
     expect(close).toHaveTextContent("↩");
     expect(close).not.toHaveTextContent("一覧へ戻る");
+  });
+
+  it("REQ-LEY-P5-002 keeps the current anchor and reloads media after Rust filter activation", async () => {
+    render(<Viewer session={session} generation={1} initialMode="single" initialDirection="rightToLeft" onSettingsChange={() => undefined} onClose={() => undefined} />);
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "画像フィルター" }));
+    fireEvent.click(await screen.findByRole("button", { name: /● Scan/ }));
+    fireEvent.click(screen.getByRole("button", { name: "有効にする" }));
+    await waitFor(() => expect(activateViewerFilterSet).toHaveBeenCalledWith(4, 1));
+    await waitFor(() => expect(loadPage).toHaveBeenCalledWith(session, 0, 1, "visible"));
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
   });
 
   it("moves to a random non-current page and disables the action for a single page", () => {

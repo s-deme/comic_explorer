@@ -56,6 +56,10 @@ import {
   openOfflineMediaEntry,
   registerOfflineMedia,
   setOfflineMediaIcon,
+  activateViewerFilterSet,
+  deleteViewerFilterSet,
+  listViewerFilterSets,
+  saveViewerFilterSet,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -148,6 +152,23 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenNthCalledWith(6, "set_offline_media_icon", expect.objectContaining({ icon: "star" }));
     expect(invokeMock).toHaveBeenNthCalledWith(7, "open_offline_media_entry", expect.objectContaining({ relativePath: "Books/one.cbz" }));
     expect(invokeMock).toHaveBeenNthCalledWith(8, "delete_offline_media", expect.objectContaining({ confirmed: true }));
+  });
+
+  it("REQ-LEY-P5-002 keeps named ordered filter chains and activation in Rust IPC", async () => {
+    const chain = [
+      { enabled: true, filter: { kind: "grayscale" as const } },
+      { enabled: true, filter: { kind: "gamma" as const, value: 1.2 } },
+    ];
+    await listViewerFilterSets(100);
+    await saveViewerFilterSet("Scan", chain, true, 101);
+    await activateViewerFilterSet(4, 102);
+    await activateViewerFilterSet(null, 103);
+    await deleteViewerFilterSet(4, 104);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "list_viewer_filter_sets", expect.any(Object));
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "save_viewer_filter_set", expect.objectContaining({ request: { name: "Scan", chain, overwrite: true } }));
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "activate_viewer_filter_set", expect.objectContaining({ filterSetId: 4 }));
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "activate_viewer_filter_set", expect.objectContaining({ filterSetId: null }));
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "delete_viewer_filter_set", expect.objectContaining({ filterSetId: 4, confirmed: true }));
   });
 
   it("REQ-LEY-P2-015 sends the required Viewer catalog sync field to Rust", async () => {

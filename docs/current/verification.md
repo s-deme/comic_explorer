@@ -649,6 +649,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 製品直接観測 | NOT RUN | release GUI harnessは既存shortcutを観測したが、光学disc・removable driveの抜差し、drive letter変更、媒体台帳dialogのDPI/keyboard、実表紙、長時間cancelは今回直接観測していない。 |
 | Delivery | PASS | 実装commit `a88a752` を`origin/agent/pdf-support`へpushし、tracker 7件のdelivery_refへ固定した。 |
 
+## Leeyes P5-B 非破壊画像フィルター
+
+対象はLEY-FILTER-001〜016の16件。Rustが14種のpixel処理、chain検証、named/active set、SQLite schema v12、WIC decodeとbounded PNG生成を担当し、TypeScriptはtyped IPCとReact/WebViewのfilter editorだけを担当する。原本、thumbnail cache、書庫、PDFは変更しない。
+
+| gate | 結果 | 証拠・未測定 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P5-002の6件、FAIL 0。14処理の代表pixel、順序差、alpha、crop/margin寸法、parameter拒否、WIC→PNG、SQLite CRUD・単一activeを含む。 |
+| Focused frontend | PASS | Viewer、FilterDialog、clientの3 files / 92件、FAIL 0。全14 step、最大16 step、順序・有効状態、保存・active切替・削除、anchor保持とmedia再取得を含む。 |
+| Windows tests / typecheck | PASS | frontend 41 files / 511件、Python 61件、typecheck exit 0。既存shell、viewer、media、本棚の回帰を含む。 |
+| 性能・上限 | PASS / 限定 | 3840×2160 RGBAへgrayscale・gamma・contrast・radius 2 blurの4 stepをRust releaseで適用し1,188ms（debug 21,168ms）。最大辺16,384px、120,000,000 pixel、source/output 256MiB、512,000,000 pixel-step、set 32件、chain 16 stepをRustで制限する。release WebView2の連続page latency、CPU、peak working setは未測定。最初のrelease測定はcanonicalと重なって`libunrar.a`生成物がlockされFAILしたため、競合解消後の単独runを正式値とした。 |
+| Windows canonical / build / CoDD | PASS | Rust 255件とshutdown process 1件、typecheck、82 modules release build、SBOM 783 components・unknown/prohibited license 0、freshness、product shortcut、cleanup、CoDD scan/check/verifyを含むsandbox外formal canonical全12 stage PASS、562.252秒。logは`src-tauri/target/verification/imp-004-20260821T180515131Z`。 |
+| 製品直接観測 | NOT RUN | release WebView2の実画像品質、色管理、animated GIFの複数frame、見開きcrop、keyboard/DPI、長時間利用のCPU・working setを直接観測していない。active filter時のanimated GIFはWIC先頭frameを静止PNGとして返す既知の制限がある。 |
+| Delivery | PENDING | 検証済みsourceをcommit・push後、tracker 16件のdelivery_refを実装commitへ固定する。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -6,6 +6,7 @@ mod reading_position;
 mod repository;
 mod shelf;
 mod thumbnail;
+mod viewer_filter;
 
 pub use cache::{CACHE_HARD_CAP_BYTES, ThumbnailCache, ThumbnailPins};
 pub use fingerprint::SourceFingerprint;
@@ -23,3 +24,4 @@ pub use repository::{
 };
 pub use shelf::{NewShelfNodeRecord, ShelfNodeRecord, ShelfRecord, ShelfSnapshotRecord};
 pub use thumbnail::{NegativeThumbnail, ThumbnailPipeline, ThumbnailResult};
+pub use viewer_filter::ViewerFilterSetRecord;

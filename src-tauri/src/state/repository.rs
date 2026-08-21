@@ -10,7 +10,7 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
@@ -2382,6 +2382,34 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![11, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 12 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS viewer_filter_sets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK(length(name) BETWEEN 1 AND 64),
+                    chain_json TEXT NOT NULL CHECK(length(chain_json) BETWEEN 2 AND 32768),
+                    active INTEGER NOT NULL DEFAULT 0 CHECK(active IN (0, 1)),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE UNIQUE INDEX IF NOT EXISTS viewer_filter_sets_one_active
+                   ON viewer_filter_sets(active) WHERE active=1;
+                 CREATE INDEX IF NOT EXISTS viewer_filter_sets_updated
+                   ON viewer_filter_sets(updated_at_ms DESC, id DESC);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![12, unix_millis()],
             )
             .map_err(database_error)?;
         transaction

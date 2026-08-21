@@ -1705,6 +1705,22 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .media-entry-content > aside { padding: 10px; border-left: 1px solid #d8e0ea; }
 .media-entry-content img { display: block; max-width: 100%; max-height: 360px; margin: auto; object-fit: contain; }
 
+.filter-dialog { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 8px; padding: 14px; border: 1px solid #9aa8ba; border-radius: 10px; background: #f7f9fc; box-shadow: 0 14px 40px rgb(20 35 55 / 28%); color: #152033; }
+.filter-layout { min-height: 0; display: grid; grid-template-columns: minmax(210px, .55fr) minmax(500px, 1.6fr); gap: 10px; }
+.filter-layout > nav, .filter-chain { min-height: 0; overflow: auto; padding: 9px; border: 1px solid #d8e0ea; background: #fff; }
+.filter-layout nav ul { padding: 0; list-style: none; }
+.filter-layout nav li button { width: 100%; padding: 7px; border: 0; text-align: left; background: transparent; }
+.filter-layout nav li[aria-current="true"] button { background: #dcecff; }
+.filter-layout nav small { display: block; color: #657287; }
+.filter-set-actions, .filter-add, .filter-parameters { display: flex; flex-wrap: wrap; align-items: end; gap: 7px; }
+.filter-set-actions label, .filter-chain li label { display: grid; gap: 3px; }
+.filter-add { margin-block: 10px; }
+.filter-chain ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.filter-chain ol > li { padding: 8px; border: 1px solid #d8e0ea; border-radius: 6px; }
+.filter-chain ol > li > header { display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
+.filter-chain ol > li > header label { min-width: 0; flex: 1; display: flex; align-items: center; }
+.filter-edges label { grid-template-columns: auto minmax(60px, 85px) auto; align-items: center; }
+
 .archive-explorer-dialog {
   width: min(1040px, calc(100vw - 32px));
   height: min(720px, calc(100vh - 32px));
@@ -1735,6 +1751,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .bookshelf-transfer { grid-column: auto; }
   .archive-explorer-layout { grid-template-columns: 1fr; grid-template-rows: minmax(180px, .8fr) minmax(240px, 1.2fr); }
   .media-catalog-layout { grid-template-columns: 1fr; grid-template-rows: minmax(160px, .6fr) minmax(280px, 1.4fr); }
+  .filter-layout { grid-template-columns: 1fr; grid-template-rows: minmax(130px, .4fr) minmax(320px, 1.6fr); }
   .dialog-backdrop > .settings-dialog {
     width: calc(100vw - 16px);
     height: calc(100vh - 16px);
