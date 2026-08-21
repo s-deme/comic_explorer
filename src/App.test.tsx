@@ -42,6 +42,11 @@ import {
   saveReadingPosition,
   savePageBookmark,
   saveSettingsProfile,
+  listNamedSettingsProfiles,
+  saveNamedSettingsProfile,
+  previewNamedSettingsProfileSwitch,
+  executeNamedSettingsProfileSwitch,
+  deleteNamedSettingsProfile,
   saveViewerSettings,
   getTrayStatus,
   storeMainWindowInTray,
@@ -172,6 +177,11 @@ vi.mock("./features/library/client", () => ({
   saveItemMemo: vi.fn(),
   saveReadingPosition: vi.fn(),
   saveSettingsProfile: vi.fn(),
+  listNamedSettingsProfiles: vi.fn(),
+  saveNamedSettingsProfile: vi.fn(),
+  previewNamedSettingsProfileSwitch: vi.fn(),
+  executeNamedSettingsProfileSwitch: vi.fn(),
+  deleteNamedSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
   getTrayStatus: vi.fn(),
   storeMainWindowInTray: vi.fn(),
@@ -246,6 +256,11 @@ const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
 const saveMemoMock = vi.mocked(saveItemMemo);
 const saveReadingMock = vi.mocked(saveReadingPosition);
 const saveSettingsProfileMock = vi.mocked(saveSettingsProfile);
+const listNamedSettingsProfilesMock = vi.mocked(listNamedSettingsProfiles);
+const saveNamedSettingsProfileMock = vi.mocked(saveNamedSettingsProfile);
+const previewNamedSettingsProfileSwitchMock = vi.mocked(previewNamedSettingsProfileSwitch);
+const executeNamedSettingsProfileSwitchMock = vi.mocked(executeNamedSettingsProfileSwitch);
+const deleteNamedSettingsProfileMock = vi.mocked(deleteNamedSettingsProfile);
 const saveViewerMock = vi.mocked(saveViewerSettings);
 const getTrayStatusMock = vi.mocked(getTrayStatus);
 const storeMainWindowInTrayMock = vi.mocked(storeMainWindowInTray);
@@ -587,6 +602,11 @@ describe("application shell", () => {
     saveMemoMock.mockReset();
     saveReadingMock.mockReset();
     saveSettingsProfileMock.mockReset();
+    listNamedSettingsProfilesMock.mockReset();
+    saveNamedSettingsProfileMock.mockReset();
+    previewNamedSettingsProfileSwitchMock.mockReset();
+    executeNamedSettingsProfileSwitchMock.mockReset();
+    deleteNamedSettingsProfileMock.mockReset();
     saveViewerMock.mockReset();
     getTrayStatusMock.mockReset();
     storeMainWindowInTrayMock.mockReset();
@@ -777,6 +797,24 @@ describe("application shell", () => {
         ...profile,
       },
     }));
+    listNamedSettingsProfilesMock.mockResolvedValue({
+      status: "ok",
+      requestId: "named-profiles" as never,
+      generation: 1 as never,
+      data: [],
+    });
+    saveNamedSettingsProfileMock.mockImplementation(async (name) => ({
+      status: "ok",
+      requestId: "save-named-profile" as never,
+      generation: 1 as never,
+      data: { name, updatedAtMs: 1, active: false },
+    }));
+    deleteNamedSettingsProfileMock.mockResolvedValue({
+      status: "ok",
+      requestId: "delete-named-profile" as never,
+      generation: 1 as never,
+      data: true,
+    });
     saveSortMock.mockResolvedValue({
       status: "ok",
       requestId: "save-sort" as never,
@@ -3460,6 +3498,70 @@ describe("application shell", () => {
     await act(async () => resolveOpen(viewerResponse("old.cbz")));
     expect(screen.queryByLabelText("old.cbz ビューワ")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^new\.cbz/ })).toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-019 saves with overwrite confirmation and switches an atomic Rust profile", async () => {
+    const switchedProfile = {
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      ...DEFAULT_CATALOG_SETTINGS,
+      sortField: "size" as const,
+    };
+    listNamedSettingsProfilesMock.mockResolvedValue({
+      status: "ok",
+      requestId: "named-profiles" as never,
+      generation: 1 as never,
+      data: [{ name: "Work", updatedAtMs: 1, active: false }],
+    });
+    previewNamedSettingsProfileSwitchMock.mockResolvedValue({
+      status: "ok",
+      requestId: "profile-preview" as never,
+      generation: 2 as never,
+      data: {
+        name: "Work",
+        changedFieldCount: 1,
+        profile: switchedProfile,
+        confirmationKey: "opaque-profile-key",
+      },
+    });
+    executeNamedSettingsProfileSwitchMock.mockResolvedValue({
+      status: "ok",
+      requestId: "profile-switch" as never,
+      generation: 3 as never,
+      data: { ...DEFAULT_CATALOG_SETTINGS, sortField: "size" },
+    });
+    await registerTestLibrary([testEntry("book.cbz")]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^プロファイル/ }));
+    await within(dialog).findByText("Work");
+
+    fireEvent.change(within(dialog).getByLabelText("保存するprofile名"), {
+      target: { value: " Work " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "現在の下書きを保存" }));
+    expect(within(dialog).getByRole("group", { name: "profile上書き確認" }))
+      .toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "上書きを確認" }));
+    await waitFor(() => expect(saveNamedSettingsProfileMock).toHaveBeenCalledWith(
+      "Work",
+      expect.objectContaining({ profileVersion: SETTINGS_PROFILE_VERSION }),
+      true,
+      expect.any(Number),
+    ));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "切り替える" }));
+    const confirmation = await within(dialog).findByRole("group", { name: "profile切替確認" });
+    expect(within(confirmation).getByText(/1項目が変わります/)).toBeInTheDocument();
+    fireEvent.click(within(confirmation).getByRole("button", { name: "切替を確認" }));
+    await waitFor(() => expect(executeNamedSettingsProfileSwitchMock).toHaveBeenCalledWith(
+      "Work",
+      "opaque-profile-key",
+      true,
+      expect.any(Number),
+    ));
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+    expect(await screen.findByText("設定profile「Work」へ切り替えました。"))
+      .toBeInTheDocument();
   });
 
   it("FT-B19-001 keeps integrated settings as a draft until one atomic Apply", async () => {

@@ -29,6 +29,11 @@ import {
   saveRenamePreferences,
   previewBatchRename,
   executeBatchRename,
+  listNamedSettingsProfiles,
+  saveNamedSettingsProfile,
+  previewNamedSettingsProfileSwitch,
+  executeNamedSettingsProfileSwitch,
+  deleteNamedSettingsProfile,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -418,5 +423,44 @@ describe("library client settings contract", () => {
         input: expect.objectContaining({ selectionWidth: 500, currentScale: 1 }),
       }),
     );
+  });
+
+  it("REQ-LEY-P3-019 keeps named profile persistence and confirmation in structured IPC", async () => {
+    const profile = createDefaultSettingsProfile();
+    const { profileVersion: _profileVersion, ...nativeProfile } = profile;
+    invokeMock.mockResolvedValueOnce({ status: "ok", data: [] });
+    await listNamedSettingsProfiles(60);
+    await saveNamedSettingsProfile("Reading", profile, true, 61);
+    invokeMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "preview",
+      generation: 62,
+      data: {
+        name: "Reading",
+        changedFieldCount: 3,
+        profile: nativeProfile,
+        confirmationKey: "opaque",
+      },
+    });
+    const preview = await previewNamedSettingsProfileSwitch("Reading", 62);
+    await executeNamedSettingsProfileSwitch("Reading", "opaque", true, 63);
+    await deleteNamedSettingsProfile("Reading", true, 64);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "list_named_settings_profiles", {
+      context: expect.objectContaining({ generation: 60 }),
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "save_named_settings_profile", expect.objectContaining({
+      name: "Reading",
+      overwrite: true,
+      profile: expect.not.objectContaining({ profileVersion: expect.anything() }),
+    }));
+    expect(preview.status).toBe("ok");
+    if (preview.status === "ok") expect(preview.data.profile.profileVersion).toBe(profile.profileVersion);
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "execute_named_settings_profile_switch", expect.objectContaining({
+      name: "Reading", confirmationKey: "opaque", confirmed: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "delete_named_settings_profile", expect.objectContaining({
+      name: "Reading", confirmed: true,
+    }));
   });
 });

@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 21 | 10 |
+| P3 操作・検索 | 31 | 22 | 9 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **58** | **45** |
+| **合計** | **103** | **59** | **44** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -114,6 +114,8 @@ P3-QではLEY-INPUT-013をPublishedとした。paged Viewer toolbarから明示�
 P3-RではLEY-FILE-005/006/007をPublishedとした。Windows native pickerで明示選択した`.exe`だけを最大16件登録し、Rustがcanonical executable、固定引数、対象mode、library containment、最大64対象、preview keyを再検証して`Command::new`へ引数を個別に渡す。起動前の確認を必須とし、成功履歴はapp名・mode・件数・時刻だけをSQLite schema v7へ最大20件保存してpathと引数を残さない。TypeScriptは登録draft、選択収集、確認dialog、Tauri orchestrationだけを担当し、既存Windows「アプリケーションから開く…」も維持した。release製品でのnative picker、第三者app/UAC、長いUnicode path、removable executable、起動時間は未測定として残す。
 
 P3-SではLEY-FILE-022をPublishedとした。単一renameは拡張子を除く初期選択を既定とし、設定で拡張子まで選択できる。複数選択は2〜256件の基本名・separator・開始番号・桁数・拡張子保持をSQLiteへ保存し、RustがWindows名規則、library包含、reparse、欠落、大小文字を無視した重複と既存target衝突を検証して相対path previewとopaque keyを返す。明示確認後も同じ計画をmutex内で再計算し、途中失敗では完了済みrenameを逆順rollbackする。TypeScriptは選択、入力、preview確認、Tauri orchestrationだけを担当する。256実fileの計画は62.821ms。release WebView2の実disk rename、network/removable drive、途中I/O障害、長いUnicode名、CPU・working setは未測定として残す。
+
+P3-TではLEY-SETTING-004をPublishedとした。任意の外部設定fileを標準保存先へせず、用途別strict settings snapshotをapp-local SQLite schema v8へ最大16件保存する。Rustが名前・件数・case一意性、全field、保存・明示上書き、active判定、変更field数、opaque key、切替直前再検証、settings全体とactive名のatomic保存を担当する。active中の削除・上書きを拒否し、通常設定変更ではsnapshotを暗黙更新せずactive表示を解除する。TypeScriptは入力、一覧、確認、native topmost adapter、成功値のReact反映、Tauri orchestrationだけを担当する。16 full profilesのdeserialize・strict validationは4.613ms。release WebView2での切替表示、DB障害復旧、長いUnicode名、CPU・working setは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

@@ -10,11 +10,12 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
 const MAX_EXTERNAL_APP_HISTORY: i64 = 20;
+const MAX_SETTINGS_PROFILES: i64 = 16;
 
 fn default_shortcut_bindings() -> BTreeMap<String, Vec<String>> {
     [
@@ -226,6 +227,14 @@ pub struct RenamePreferencesRecord {
     pub sequence_digits: u8,
     pub separator: String,
     pub preserve_extension: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedSettingsProfileRecord {
+    pub name: String,
+    pub profile_json: String,
+    pub updated_at_ms: u64,
+    pub active: bool,
 }
 
 impl Default for RenamePreferencesRecord {
@@ -511,6 +520,14 @@ impl StateStore {
     }
 
     pub fn save_settings(&mut self, settings: &Settings) -> Result<(), AppError> {
+        self.save_settings_with_active_profile(settings, None)
+    }
+
+    fn save_settings_with_active_profile(
+        &mut self,
+        settings: &Settings,
+        active_profile: Option<&str>,
+    ) -> Result<(), AppError> {
         let transaction = self.connection.transaction().map_err(database_error)?;
         let shortcut_bindings =
             serde_json::to_string(&settings.shortcut_bindings).map_err(|error| AppError {
@@ -711,7 +728,184 @@ impl StateStore {
                 .execute("DELETE FROM settings WHERE key='libraryRoot'", [])
                 .map_err(database_error)?;
         }
+        if let Some(name) = active_profile {
+            transaction
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES('activeSettingsProfile', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    [name],
+                )
+                .map_err(database_error)?;
+        } else {
+            transaction
+                .execute("DELETE FROM settings WHERE key='activeSettingsProfile'", [])
+                .map_err(database_error)?;
+        }
         transaction.commit().map_err(database_error)
+    }
+
+    pub fn list_named_settings_profiles(
+        &self,
+    ) -> Result<Vec<NamedSettingsProfileRecord>, AppError> {
+        let active = self.active_settings_profile()?;
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT name, profile_json, updated_at_ms
+                 FROM named_settings_profiles
+                 ORDER BY name COLLATE NOCASE ASC
+                 LIMIT ?1",
+            )
+            .map_err(database_error)?;
+        let rows = statement
+            .query_map([MAX_SETTINGS_PROFILES], |row| {
+                let name = row.get::<_, String>(0)?;
+                Ok(NamedSettingsProfileRecord {
+                    active: active.as_deref() == Some(name.as_str()),
+                    name,
+                    profile_json: row.get(1)?,
+                    updated_at_ms: row.get::<_, i64>(2)?.max(0) as u64,
+                })
+            })
+            .map_err(database_error)?;
+        rows.map(|row| row.map_err(database_error)).collect()
+    }
+
+    pub fn named_settings_profile(
+        &self,
+        name: &str,
+    ) -> Result<Option<NamedSettingsProfileRecord>, AppError> {
+        let active = self.active_settings_profile()?;
+        self.connection
+            .query_row(
+                "SELECT name, profile_json, updated_at_ms
+                 FROM named_settings_profiles WHERE name=?1 COLLATE NOCASE",
+                [name],
+                |row| {
+                    let stored_name = row.get::<_, String>(0)?;
+                    Ok(NamedSettingsProfileRecord {
+                        active: active.as_deref() == Some(stored_name.as_str()),
+                        name: stored_name,
+                        profile_json: row.get(1)?,
+                        updated_at_ms: row.get::<_, i64>(2)?.max(0) as u64,
+                    })
+                },
+            )
+            .optional()
+            .map_err(database_error)
+    }
+
+    pub fn save_named_settings_profile(
+        &mut self,
+        record: &NamedSettingsProfileRecord,
+        overwrite: bool,
+    ) -> Result<(), AppError> {
+        let active_profile = self.active_settings_profile()?;
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        let exists = transaction
+            .query_row(
+                "SELECT 1 FROM named_settings_profiles WHERE name=?1 COLLATE NOCASE",
+                [&record.name],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?
+            .is_some();
+        if exists && active_profile.is_some_and(|active| active.eq_ignore_ascii_case(&record.name))
+        {
+            return Err(AppError {
+                code: ErrorCode::Conflict,
+                message: "The active settings profile cannot be overwritten.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        if exists && !overwrite {
+            return Err(AppError {
+                code: ErrorCode::Conflict,
+                message: "A settings profile with that name already exists.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        if !exists {
+            let count = transaction
+                .query_row("SELECT COUNT(*) FROM named_settings_profiles", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(database_error)?;
+            if count >= MAX_SETTINGS_PROFILES {
+                return Err(AppError {
+                    code: ErrorCode::InvalidRequest,
+                    message: "Settings profile limit reached.".into(),
+                    target: None,
+                    retryable: false,
+                });
+            }
+        }
+        transaction
+            .execute(
+                "INSERT INTO named_settings_profiles(name, profile_json, updated_at_ms)
+                 VALUES(?1, ?2, ?3)
+                 ON CONFLICT(name) DO UPDATE SET
+                   profile_json=excluded.profile_json,
+                   updated_at_ms=excluded.updated_at_ms",
+                params![
+                    record.name,
+                    record.profile_json,
+                    i64::try_from(record.updated_at_ms).unwrap_or(i64::MAX),
+                ],
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)
+    }
+
+    pub fn delete_named_settings_profile(&self, name: &str) -> Result<bool, AppError> {
+        if self
+            .active_settings_profile()?
+            .is_some_and(|active| active.eq_ignore_ascii_case(name))
+        {
+            return Err(AppError {
+                code: ErrorCode::Conflict,
+                message: "The active settings profile cannot be deleted.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        self.connection
+            .execute(
+                "DELETE FROM named_settings_profiles WHERE name=?1 COLLATE NOCASE",
+                [name],
+            )
+            .map(|affected| affected > 0)
+            .map_err(database_error)
+    }
+
+    pub fn activate_named_settings_profile(
+        &mut self,
+        name: &str,
+        settings: &Settings,
+    ) -> Result<(), AppError> {
+        if self.named_settings_profile(name)?.is_none() {
+            return Err(AppError {
+                code: ErrorCode::NotFound,
+                message: "Settings profile was not found.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        self.save_settings_with_active_profile(settings, Some(name))
+    }
+
+    fn active_settings_profile(&self) -> Result<Option<String>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT value FROM settings WHERE key='activeSettingsProfile'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(database_error)
     }
 
     pub fn reading_position(&self, item_key: &str) -> Result<Option<ReadingPosition>, AppError> {
@@ -1899,6 +2093,31 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
+    if version < 8 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS named_settings_profiles (
+                    name TEXT PRIMARY KEY COLLATE NOCASE NOT NULL
+                      CHECK(length(name) BETWEEN 1 AND 64),
+                    profile_json TEXT NOT NULL CHECK(length(profile_json) BETWEEN 2 AND 131072),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE INDEX IF NOT EXISTS named_settings_profiles_updated
+                   ON named_settings_profiles(updated_at_ms DESC, name COLLATE NOCASE ASC);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![8, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
     connection
         .execute_batch("PRAGMA quick_check;")
         .map_err(database_error)?;
@@ -2096,6 +2315,127 @@ mod tests {
             std::process::id(),
             unix_millis()
         )))
+    }
+
+    #[test]
+    fn req_ley_p3_019_named_settings_profiles_are_bounded_atomic_and_persistent() {
+        let paths = temporary_paths("named-settings-profiles");
+        {
+            let (mut store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            for index in 0..MAX_SETTINGS_PROFILES {
+                store
+                    .save_named_settings_profile(
+                        &NamedSettingsProfileRecord {
+                            name: format!("Profile {index}"),
+                            profile_json: format!(r#"{{"index":{index}}}"#),
+                            updated_at_ms: index as u64,
+                            active: false,
+                        },
+                        false,
+                    )
+                    .unwrap();
+            }
+            assert_eq!(store.list_named_settings_profiles().unwrap().len(), 16);
+            assert_eq!(
+                store
+                    .save_named_settings_profile(
+                        &NamedSettingsProfileRecord {
+                            name: "overflow".into(),
+                            profile_json: "{}".into(),
+                            updated_at_ms: 17,
+                            active: false,
+                        },
+                        false,
+                    )
+                    .unwrap_err()
+                    .code,
+                ErrorCode::InvalidRequest
+            );
+            assert_eq!(
+                store
+                    .save_named_settings_profile(
+                        &NamedSettingsProfileRecord {
+                            name: "profile 0".into(),
+                            profile_json: r#"{"updated":true}"#.into(),
+                            updated_at_ms: 20,
+                            active: false,
+                        },
+                        false,
+                    )
+                    .unwrap_err()
+                    .code,
+                ErrorCode::Conflict
+            );
+            store
+                .save_named_settings_profile(
+                    &NamedSettingsProfileRecord {
+                        name: "profile 0".into(),
+                        profile_json: r#"{"updated":true}"#.into(),
+                        updated_at_ms: 20,
+                        active: false,
+                    },
+                    true,
+                )
+                .unwrap();
+            let mut settings = Settings::default();
+            settings.sort_field = "size".into();
+            store
+                .activate_named_settings_profile("Profile 0", &settings)
+                .unwrap();
+            let active = store
+                .list_named_settings_profiles()
+                .unwrap()
+                .into_iter()
+                .find(|profile| profile.active)
+                .unwrap();
+            assert_eq!(active.name, "Profile 0");
+            assert_eq!(store.load_settings().unwrap().sort_field, "size");
+            assert_eq!(
+                store
+                    .save_named_settings_profile(
+                        &NamedSettingsProfileRecord {
+                            name: "profile 0".into(),
+                            profile_json: "{}".into(),
+                            updated_at_ms: 21,
+                            active: false,
+                        },
+                        true,
+                    )
+                    .unwrap_err()
+                    .code,
+                ErrorCode::Conflict
+            );
+            assert_eq!(
+                store
+                    .delete_named_settings_profile("profile 0")
+                    .unwrap_err()
+                    .code,
+                ErrorCode::Conflict
+            );
+            settings.sort_field = "modified".into();
+            store.save_settings(&settings).unwrap();
+            assert!(
+                !store
+                    .list_named_settings_profiles()
+                    .unwrap()
+                    .iter()
+                    .any(|profile| profile.active)
+            );
+            assert!(store.delete_named_settings_profile("PROFILE 0").unwrap());
+        }
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store
+                .connection()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        assert_eq!(store.list_named_settings_profiles().unwrap().len(), 15);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
     }
 
     #[test]

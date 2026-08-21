@@ -1426,6 +1426,11 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .settings-local-badge { color: #526277; font-size: .82rem; }
 .settings-local-badge { padding: 5px 9px; border-radius: 999px; background: #e5eef8; color: #225382; font-weight: 650; }
 .settings-inline-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.settings-profile-manager { display: grid; gap: 8px; min-width: min(460px, 100%); }
+.settings-profile-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.settings-profile-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.settings-profile-list li > span:first-child { flex: 1 1 160px; overflow-wrap: anywhere; }
+.settings-profile-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px; border: 1px solid #c3cedb; border-radius: 4px; }
 .settings-empty { display: grid; place-items: center; gap: 5px; min-height: 210px; color: #64748b; text-align: center; }
 .settings-empty strong { color: #27364a; font-size: 1rem; }
 .settings-actions {

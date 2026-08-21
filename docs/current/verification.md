@@ -539,6 +539,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | PASS / 限定 | 256個の1-byte JPEG実fileを作成し、全source metadata確認、target生成、衝突確認、preview key生成までをdebug testで62.821msと実測し、5秒上限を満たした。実rename throughput、network/removable drive、CPU、peak working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-S固有の実disk一括rename、途中I/O障害、長いUnicode名、衝突dialog、rollback結果はrelease WebView2で直接操作・観測していない。 |
 
+## Leeyes P3-T 使用設定profile切替
+
+対象はLEY-SETTING-004の1件。Leeyesの任意設定fileを直接標準保存先へする方式は採らず、Rustがapp-local SQLiteのnamed strict snapshot、active state、全field validation、preview key、atomic switchを担当する。TypeScriptは名前入力、一覧、確認、native topmost adapter、成功したprofileのReact state反映、Tauri orchestrationだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-019を含む2件、FAIL 0。schema v8 migration、最大16件、case-insensitive conflict、明示上書き、active削除・上書き拒否、通常保存時のactive解除、再open、名前・全field・unknown field拒否、端末path除外、opaque key、変更field数を含む。 |
+| Focused frontend | PASS | App、FR-B10、FR-B11、clientの4 files / 129件、FAIL 0。profile一覧、上書き二段階確認、切替preview、明示確認、構造化IPC、既存settings draft・shortcut/tag回帰を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 36 files / 478件とPython 61件、FAIL 0。typecheck exit 0。frontend 77 modules build、CSS 44.99kB、JS 591.09kB。Viteの500kB advisoryを機能PASSへ読み替えない。SBOM 746 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | lib 215件とshutdown process 1件、FAIL 0。`cargo fmt --check`、`cargo check --locked`、schema v8、named profile repository/validation/switchと既存settings・filesystem・viewer・search・cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後のIMP-004 canonicalは477.253秒で全12 stageがexit 0。Rust canonical 193.354秒、release executable 90.695秒、製品shortcut回帰15.365秒、CoDD verify 131.937秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T112148516Z`。 |
+| 性能 | PASS / 限定 | 16件の全field profileをJSON deserializeしRust strict validationする処理をdebug testで4.613msと実測し、5秒上限を満たした。SQLite I/O、React再描画、CPU、peak working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-T固有のprofile保存・上書き・切替表示、長いUnicode名、DB障害復旧はrelease WebView2で直接操作・観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -30,8 +30,9 @@ import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
 import type { CatalogMouseBindings } from "../input/catalog-mouse";
 import type { ViewerQuadrantBindings } from "../input/viewer-quadrants";
-import type {
-  MouseGestureBindings,
+import {
+  SETTINGS_PROFILE_VERSION,
+  type MouseGestureBindings,
   CatalogPalette,
   FileOpenRule,
   FolderOpenRule,
@@ -347,6 +348,98 @@ export async function saveSettingsProfile(
       viewerRightClickAction: profile.viewerRightClickAction,
       mouseGestures: profile.mouseGestures,
     },
+  });
+}
+
+export interface NamedSettingsProfileSummary {
+  name: string;
+  updatedAtMs: number;
+  active: boolean;
+}
+
+export interface SettingsProfileSwitchPreview {
+  name: string;
+  changedFieldCount: number;
+  profile: SettingsProfile;
+  confirmationKey: string;
+}
+
+type NativeSettingsProfile = Omit<SettingsProfile, "profileVersion">;
+
+function nativeSettingsProfile(profile: SettingsProfile): NativeSettingsProfile {
+  const { profileVersion: _profileVersion, ...native } = profile;
+  return native;
+}
+
+export async function listNamedSettingsProfiles(
+  generation: number,
+): Promise<ApiResponse<NamedSettingsProfileSummary[]>> {
+  return invoke("list_named_settings_profiles", { context: context(generation) });
+}
+
+export async function saveNamedSettingsProfile(
+  name: string,
+  profile: SettingsProfile,
+  overwrite: boolean,
+  generation: number,
+): Promise<ApiResponse<NamedSettingsProfileSummary>> {
+  return invoke("save_named_settings_profile", {
+    context: context(generation),
+    name,
+    profile: nativeSettingsProfile(profile),
+    overwrite,
+  });
+}
+
+export async function previewNamedSettingsProfileSwitch(
+  name: string,
+  generation: number,
+): Promise<ApiResponse<SettingsProfileSwitchPreview>> {
+  const response = await invoke<ApiResponse<{
+    name: string;
+    changedFieldCount: number;
+    profile: NativeSettingsProfile;
+    confirmationKey: string;
+  }>>("preview_named_settings_profile_switch", {
+    context: context(generation),
+    name,
+  });
+  if (response.status !== "ok") return response;
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      profile: {
+        profileVersion: SETTINGS_PROFILE_VERSION,
+        ...response.data.profile,
+      },
+    },
+  };
+}
+
+export async function executeNamedSettingsProfileSwitch(
+  name: string,
+  confirmationKey: string,
+  confirmed: boolean,
+  generation: number,
+): Promise<ApiResponse<CatalogSettings>> {
+  return invoke("execute_named_settings_profile_switch", {
+    context: context(generation),
+    name,
+    confirmationKey,
+    confirmed,
+  });
+}
+
+export async function deleteNamedSettingsProfile(
+  name: string,
+  confirmed: boolean,
+  generation: number,
+): Promise<ApiResponse<boolean>> {
+  return invoke("delete_named_settings_profile", {
+    context: context(generation),
+    name,
+    confirmed,
   });
 }
 

@@ -270,6 +270,13 @@ export interface SettingsDialogProps {
   onResetAllShortcuts: () => void;
   onMouseGestureChange: (name: MouseGestureName, action: MouseGestureAction) => void;
   onResetAllSettings: () => void;
+  namedProfiles: Array<{ name: string; updatedAtMs: number; active: boolean }>;
+  profileSwitchPreview: { name: string; changedFieldCount: number } | null;
+  onSaveNamedProfile: (name: string, overwrite: boolean) => void;
+  onPreviewNamedProfileSwitch: (name: string) => void;
+  onConfirmNamedProfileSwitch: () => void;
+  onCancelNamedProfileSwitch: () => void;
+  onDeleteNamedProfile: (name: string) => void;
 }
 
 function normalizedSearchText(value: string): string {
@@ -315,9 +322,19 @@ export function SettingsDialog({
   onResetAllShortcuts,
   onMouseGestureChange,
   onResetAllSettings,
+  namedProfiles,
+  profileSwitchPreview,
+  onSaveNamedProfile,
+  onPreviewNamedProfileSwitch,
+  onConfirmNamedProfileSwitch,
+  onCancelNamedProfileSwitch,
+  onDeleteNamedProfile,
 }: SettingsDialogProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("catalog");
   const [query, setQuery] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [pendingOverwrite, setPendingOverwrite] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const normalizedQuery = normalizedSearchText(query);
 
   const searchEntries = useMemo<SearchEntry[]>(() => [
@@ -620,6 +637,11 @@ export function SettingsDialog({
       text: "ダブルクリック doubleClick 全画面 表示 解除 固定",
     },
     {
+      id: "profile-selector",
+      category: "profile",
+      text: `用途別 profile 切替 保存 snapshot ${namedProfiles.map((profile) => profile.name).join(" ")}`,
+    },
+    {
       id: "profile-transfer",
       category: "profile",
       text: "設定 profile プロファイル 書き出し 読み込み 移行 バックアップ json",
@@ -639,7 +661,7 @@ export function SettingsDialog({
       category: "profile",
       text: "安全 ライブラリ 場所 端末 固有 情報 含まない ローカル",
     },
-  ], [draft]);
+  ], [draft, namedProfiles]);
 
   const matchedIds = useMemo(() => new Set(
     searchEntries
@@ -1605,6 +1627,73 @@ export function SettingsDialog({
                   <input type="checkbox" aria-label="profile前回の画像を再表示" checked={draft.restoreLastViewer} onChange={(event) => update({ restoreLastViewer: event.target.checked })} />
                   <span>{draft.restoreLastViewer ? "有効" : "無効"}</span>
                 </label>
+              </SettingRow>
+              <SettingRow id="profile-selector" title="使用するプロファイル" description="用途別の設定snapshotをアプリ内へ保存し、確認後に即時切り替えます。" hidden={rowHidden("profile-selector")}>
+                <div className="settings-profile-manager">
+                  <div className="settings-inline-actions">
+                    <input
+                      aria-label="保存するprofile名"
+                      value={profileName}
+                      maxLength={64}
+                      disabled={saving}
+                      onChange={(event) => {
+                        setProfileName(event.target.value);
+                        setPendingOverwrite(null);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={saving || profileName.trim().length === 0}
+                      onClick={() => {
+                        const name = profileName.trim();
+                        if (namedProfiles.some((profile) => profile.name.toLocaleLowerCase("ja") === name.toLocaleLowerCase("ja"))) {
+                          setPendingOverwrite(name);
+                        } else {
+                          onSaveNamedProfile(name, false);
+                        }
+                      }}
+                    >現在の下書きを保存</button>
+                  </div>
+                  {pendingOverwrite !== null && (
+                    <div role="group" aria-label="profile上書き確認" className="settings-profile-confirm">
+                      <span>「{pendingOverwrite}」を現在の下書きで上書きします。</span>
+                      <button type="button" disabled={saving} onClick={() => {
+                        onSaveNamedProfile(pendingOverwrite, true);
+                        setPendingOverwrite(null);
+                      }}>上書きを確認</button>
+                      <button type="button" onClick={() => setPendingOverwrite(null)}>やめる</button>
+                    </div>
+                  )}
+                  <ul className="settings-profile-list" aria-label="保存済みprofile">
+                    {namedProfiles.map((profile) => (
+                      <li key={profile.name}>
+                        <span>{profile.name}{profile.active ? "（使用中）" : ""}</span>
+                        <button type="button" disabled={saving || profile.active} onClick={() => {
+                          setPendingDelete(null);
+                          onPreviewNamedProfileSwitch(profile.name);
+                        }}>切り替える</button>
+                        <button type="button" disabled={saving || profile.active} onClick={() => setPendingDelete(profile.name)}>削除</button>
+                        {pendingDelete === profile.name && (
+                          <span className="settings-profile-confirm" role="group" aria-label={`${profile.name}削除確認`}>
+                            <button type="button" disabled={saving} onClick={() => {
+                              onDeleteNamedProfile(profile.name);
+                              setPendingDelete(null);
+                            }}>削除を確認</button>
+                            <button type="button" onClick={() => setPendingDelete(null)}>やめる</button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {profileSwitchPreview !== null && (
+                    <div role="group" aria-label="profile切替確認" className="settings-profile-confirm">
+                      <span>「{profileSwitchPreview.name}」へ切り替えると{profileSwitchPreview.changedFieldCount}項目が変わります。未適用の下書きは置き換わります。</span>
+                      <button type="button" disabled={saving} onClick={onConfirmNamedProfileSwitch}>切替を確認</button>
+                      <button type="button" disabled={saving} onClick={onCancelNamedProfileSwitch}>やめる</button>
+                    </div>
+                  )}
+                  {namedProfiles.length === 0 && <span>保存済みprofileはありません。</span>}
+                </div>
               </SettingRow>
               <SettingRow id="profile-transfer" title="設定を移行する" description="現在の設定をJSONへ書き出すか、別の端末で書き出した設定を下書きへ読み込みます。" hidden={rowHidden("profile-transfer")}>
                 <div className="settings-inline-actions">

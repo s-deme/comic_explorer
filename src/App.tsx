@@ -36,6 +36,11 @@ import {
   saveItemMemo,
   savePageBookmark,
   saveSettingsProfile,
+  listNamedSettingsProfiles,
+  saveNamedSettingsProfile,
+  previewNamedSettingsProfileSwitch,
+  executeNamedSettingsProfileSwitch,
+  deleteNamedSettingsProfile,
   resolveCatalogActivation,
   saveViewerSettings,
   assignTag,
@@ -85,6 +90,8 @@ import {
   type FileOperationResult,
   type NativeFileDropPreview,
   type RenamePreferences,
+  type NamedSettingsProfileSummary,
+  type SettingsProfileSwitchPreview,
   type CatalogMaskOptions,
   type SavedCatalogMask,
   type SearchResultEntry,
@@ -788,6 +795,9 @@ export function App({
   const [settingsDraft, setSettingsDraft] = useState<SettingsProfile | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [namedSettingsProfiles, setNamedSettingsProfiles] = useState<NamedSettingsProfileSummary[]>([]);
+  const [settingsProfileSwitchPreview, setSettingsProfileSwitchPreview] =
+    useState<SettingsProfileSwitchPreview | null>(null);
   const [mouseGestures, setMouseGestures] = useState<MouseGestureBindings>(() => ({
     ...DEFAULT_MOUSE_GESTURES,
   }));
@@ -3420,13 +3430,31 @@ export function App({
     };
   }
 
-  function openSettingsDialog() {
-    setProfileNotice(null);
-    setSettingsDraft(currentSettingsProfile());
-    setSettingsOpen(true);
+  async function refreshNamedSettingsProfiles(requestGeneration: number) {
+    try {
+      const response = await listNamedSettingsProfiles(requestGeneration);
+      if (requestGeneration !== settingsGeneration.current) return;
+      if (response.status === "ok") setNamedSettingsProfiles(response.data);
+      else if (response.status === "error") setProfileNotice(presentError(response.error));
+    } catch {
+      if (requestGeneration === settingsGeneration.current) {
+        setProfileNotice("保存済みprofileを読み込めませんでした。");
+      }
+    }
   }
 
-  async function applySettingsProfile(profile: SettingsProfile) {
+  function openSettingsDialog() {
+    setProfileNotice(null);
+    setSettingsProfileSwitchPreview(null);
+    setSettingsDraft(currentSettingsProfile());
+    setSettingsOpen(true);
+    void refreshNamedSettingsProfiles(settingsGeneration.current);
+  }
+
+  async function applySettingsProfile(
+    profile: SettingsProfile,
+    namedSwitch?: SettingsProfileSwitchPreview,
+  ) {
     if (settingsSaving) return;
     const normalized = normalizeSettingsProfile(profile);
     if (normalized === null) {
@@ -3445,7 +3473,14 @@ export function App({
         setProfileNotice("常に手前を切り替えられませんでした。設定は保存していません。");
         return;
       }
-      const response = await saveSettingsProfile(normalized, requestGeneration);
+      const response = namedSwitch === undefined
+        ? await saveSettingsProfile(normalized, requestGeneration)
+        : await executeNamedSettingsProfileSwitch(
+          namedSwitch.name,
+          namedSwitch.confirmationKey,
+          true,
+          requestGeneration,
+        );
       if (requestGeneration !== settingsGeneration.current) return;
       if (response.status !== "ok") {
         if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
@@ -3559,7 +3594,11 @@ export function App({
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
       setSettingsDraft(null);
-      setSelectionNotice("設定profileを適用しました。");
+      setSettingsProfileSwitchPreview(null);
+      setSelectionNotice(namedSwitch === undefined
+        ? "設定profileを適用しました。"
+        : `設定profile「${namedSwitch.name}」へ切り替えました。`);
+      void refreshNamedSettingsProfiles(requestGeneration);
       if (hiddenVisibilityChanged && libraryRoot !== null) {
         void load(navigation.current, selectedPaths);
       } else if (autoRefreshChanged && libraryRoot !== null) {
@@ -3573,6 +3612,92 @@ export function App({
       if (requestGeneration === settingsGeneration.current) {
         if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
         setProfileNotice("設定を保存できませんでした。変更は適用していません。");
+      }
+    } finally {
+      if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function saveCurrentNamedSettingsProfile(name: string, overwrite: boolean) {
+    if (settingsSaving || settingsDraft === null) return;
+    const normalized = normalizeSettingsProfile(settingsDraft);
+    if (normalized === null) {
+      setProfileNotice("設定profileの形式が不正です。");
+      return;
+    }
+    setSettingsSaving(true);
+    setProfileNotice(overwrite ? "設定profileを上書きしています。" : "設定profileを保存しています。");
+    const requestGeneration = ++settingsGeneration.current;
+    try {
+      const response = await saveNamedSettingsProfile(
+        name,
+        normalized,
+        overwrite,
+        requestGeneration,
+      );
+      if (requestGeneration !== settingsGeneration.current) return;
+      if (response.status === "ok") {
+        setProfileNotice(`設定profile「${response.data.name}」を保存しました。`);
+        await refreshNamedSettingsProfiles(requestGeneration);
+      } else if (response.status === "error") {
+        setProfileNotice(presentError(response.error));
+      } else {
+        setProfileNotice("設定profileの保存をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === settingsGeneration.current) {
+        setProfileNotice("設定profileを保存できませんでした。");
+      }
+    } finally {
+      if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function previewNamedSettingsProfile(name: string) {
+    if (settingsSaving) return;
+    setSettingsSaving(true);
+    setProfileNotice("設定profileの変更内容を確認しています。");
+    const requestGeneration = ++settingsGeneration.current;
+    try {
+      const response = await previewNamedSettingsProfileSwitch(name, requestGeneration);
+      if (requestGeneration !== settingsGeneration.current) return;
+      if (response.status === "ok") {
+        setSettingsProfileSwitchPreview(response.data);
+        setProfileNotice("内容を確認して切替を確定してください。");
+      } else if (response.status === "error") {
+        setProfileNotice(presentError(response.error));
+      } else {
+        setProfileNotice("設定profileの確認をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === settingsGeneration.current) {
+        setProfileNotice("設定profileを確認できませんでした。");
+      }
+    } finally {
+      if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function deleteCurrentNamedSettingsProfile(name: string) {
+    if (settingsSaving) return;
+    setSettingsSaving(true);
+    setProfileNotice("設定profileを削除しています。");
+    const requestGeneration = ++settingsGeneration.current;
+    try {
+      const response = await deleteNamedSettingsProfile(name, true, requestGeneration);
+      if (requestGeneration !== settingsGeneration.current) return;
+      if (response.status === "ok" && response.data) {
+        setSettingsProfileSwitchPreview((current) => current?.name === name ? null : current);
+        setProfileNotice(`設定profile「${name}」を削除しました。`);
+        await refreshNamedSettingsProfiles(requestGeneration);
+      } else if (response.status === "error") {
+        setProfileNotice(presentError(response.error));
+      } else {
+        setProfileNotice("設定profileは削除されませんでした。");
+      }
+    } catch {
+      if (requestGeneration === settingsGeneration.current) {
+        setProfileNotice("設定profileを削除できませんでした。");
       }
     } finally {
       if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
@@ -6513,6 +6638,7 @@ export function App({
           onCancel={() => {
             setSettingsOpen(false);
             setSettingsDraft(null);
+            setSettingsProfileSwitchPreview(null);
             setProfileNotice(null);
           }}
           onExport={exportSettingsProfile}
@@ -6523,6 +6649,22 @@ export function App({
           onResetAllShortcuts={resetAllDraftShortcuts}
           onMouseGestureChange={updateDraftMouseGesture}
           onResetAllSettings={resetAllDraftSettings}
+          namedProfiles={namedSettingsProfiles}
+          profileSwitchPreview={settingsProfileSwitchPreview}
+          onSaveNamedProfile={(name, overwrite) => {
+            void saveCurrentNamedSettingsProfile(name, overwrite);
+          }}
+          onPreviewNamedProfileSwitch={(name) => void previewNamedSettingsProfile(name)}
+          onConfirmNamedProfileSwitch={() => {
+            if (settingsProfileSwitchPreview !== null) {
+              void applySettingsProfile(
+                settingsProfileSwitchPreview.profile,
+                settingsProfileSwitchPreview,
+              );
+            }
+          }}
+          onCancelNamedProfileSwitch={() => setSettingsProfileSwitchPreview(null)}
+          onDeleteNamedProfile={(name) => void deleteCurrentNamedSettingsProfile(name)}
         />
       )}
       {thumbnailManagerOpen && (

@@ -11,6 +11,6 @@ pub use paths::AppPaths;
 pub use reading_position::{ReadingPosition, resolve_reading_position};
 pub use repository::{
     BookmarkRecord, CatalogMaskRecord, ExternalAppHistoryRecord, ExternalAppRecord, FavoriteRecord,
-    RecoveryNotice, RenamePreferencesRecord, Settings, StateStore,
+    NamedSettingsProfileRecord, RecoveryNotice, RenamePreferencesRecord, Settings, StateStore,
 };
 pub use thumbnail::{NegativeThumbnail, ThumbnailPipeline, ThumbnailResult};

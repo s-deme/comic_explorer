@@ -11,6 +11,7 @@ pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
 use std::collections::{BTreeMap, HashSet};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,8 +37,8 @@ use crate::domain::{
 };
 use crate::media::{MediaGrant, MediaTokenRegistry, PageSource, media_uri, read_grant_bytes};
 use crate::state::{
-    AppPaths, BookmarkRecord, CatalogMaskRecord, FavoriteRecord, StateStore, ThumbnailPins,
-    ThumbnailPipeline,
+    AppPaths, BookmarkRecord, CatalogMaskRecord, FavoriteRecord, NamedSettingsProfileRecord,
+    Settings, StateStore, ThumbnailPins, ThumbnailPipeline,
 };
 use library_root::validate_library_root;
 use recursive_thumbnails::collect_recursive_thumbnail_candidates;
@@ -556,7 +557,7 @@ pub struct ViewerRectangleZoomPlan {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SettingsProfileInput {
     pub sort_field: String,
     pub sort_descending: bool,
@@ -636,6 +637,23 @@ pub struct SettingsProfileInput {
     pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub viewer_right_click_action: String,
     pub mouse_gestures: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedSettingsProfileSummary {
+    pub name: String,
+    pub updated_at_ms: u64,
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsProfileSwitchPreview {
+    pub name: String,
+    pub changed_field_count: u16,
+    pub profile: SettingsProfileInput,
+    pub confirmation_key: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -2836,18 +2854,17 @@ pub fn set_viewer_settings(
     })
 }
 
+type NormalizedProfileBindings = (
+    BTreeMap<String, Vec<String>>,
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+    String,
+    BTreeMap<String, String>,
+);
+
 fn validate_settings_profile(
     profile: &SettingsProfileInput,
-) -> Result<
-    (
-        BTreeMap<String, Vec<String>>,
-        BTreeMap<String, String>,
-        BTreeMap<String, String>,
-        String,
-        BTreeMap<String, String>,
-    ),
-    AppError,
-> {
+) -> Result<NormalizedProfileBindings, AppError> {
     let shortcuts = normalize_shortcuts(&profile.shortcuts).ok_or_else(|| {
         request_error(
             ErrorCode::InvalidRequest,
@@ -3013,6 +3030,150 @@ fn validate_settings_profile(
     ))
 }
 
+fn apply_settings_profile_to_settings(
+    settings: &mut Settings,
+    profile: SettingsProfileInput,
+    bindings: NormalizedProfileBindings,
+) {
+    let (shortcuts, catalog_mouse, quadrants, right_click, gestures) = bindings;
+    settings.sort_field = profile.sort_field;
+    settings.sort_descending = profile.sort_descending;
+    settings.end_of_volume_policy = profile.end_of_volume_policy;
+    settings.catalog_view_mode = profile.catalog_view_mode;
+    settings.small_thumbnail_size = profile.catalog_thumbnail_sizes.small_thumbnail.to_string();
+    settings.cover_list_thumbnail_size = profile.catalog_thumbnail_sizes.cover_list.to_string();
+    settings.card_grid_thumbnail_size = profile.catalog_thumbnail_sizes.card_grid.to_string();
+    settings.reference_tile_thumbnail_size =
+        profile.catalog_thumbnail_sizes.reference_tile.to_string();
+    settings.view_mode = profile.view_mode;
+    settings.spread_portrait_max_aspect_percent =
+        profile.spread_portrait_max_aspect_percent.to_string();
+    settings.auto_spread_min_viewport_aspect_percent =
+        profile.auto_spread_min_viewport_aspect_percent.to_string();
+    settings.spread_first_page_single = profile.spread_first_page_single;
+    settings.spread_pairing = profile.spread_pairing;
+    settings.fit_allow_upscale = profile.fit_allow_upscale;
+    settings.fit_basis = profile.fit_basis;
+    settings.fit_include_page_margin = profile.fit_include_page_margin;
+    settings.layout_mode = profile.layout_mode;
+    settings.reading_direction = profile.reading_direction;
+    settings.scale_mode = profile.scale_mode;
+    settings.scale = profile.scale.to_string();
+    settings.loupe_enabled = profile.loupe_enabled;
+    settings.loupe_size = profile.loupe_size.to_string();
+    settings.loupe_zoom = profile.loupe_zoom.to_string();
+    settings.prefetch_ahead = profile.prefetch_ahead.to_string();
+    settings.prefetch_behind = profile.prefetch_behind.to_string();
+    settings.prefetch_memory_mib = profile.prefetch_memory_mib.to_string();
+    settings.fullscreen_escape_behavior = profile.fullscreen_escape_behavior;
+    settings.prevent_display_sleep_fullscreen = profile.prevent_display_sleep_fullscreen;
+    settings.tray_store_on_minimize = profile.tray_store_on_minimize;
+    settings.tray_close_behavior = profile.tray_close_behavior;
+    settings.tray_restore_gesture = profile.tray_restore_gesture;
+    settings.slideshow_interval_ms = profile.slideshow_interval_ms.to_string();
+    settings.slideshow_order = profile.slideshow_order;
+    settings.slideshow_repeat_current_item = profile.slideshow_repeat_current_item;
+    settings.viewer_catalog_selection_sync = profile.viewer_catalog_selection_sync;
+    settings.viewer_background = profile.viewer_background;
+    settings.viewer_page_margin = profile.viewer_page_margin.to_string();
+    settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
+    settings.cursor_auto_hide_ms = profile.cursor_auto_hide_ms.to_string();
+    settings.zoom_retention = profile.zoom_retention;
+    settings.viewer_grid_enabled = profile.viewer_grid_enabled;
+    settings.viewer_grid_size = profile.viewer_grid_size.to_string();
+    settings.viewer_grid_color = profile.viewer_grid_color;
+    settings.pan_factor = profile.pan_factor.to_string();
+    settings.wheel_dead_zone = profile.wheel_dead_zone.to_string();
+    settings.scroll_step_percent = profile.scroll_step_percent.to_string();
+    settings.key_scroll_acceleration_percent = profile.key_scroll_acceleration_percent.to_string();
+    settings.key_scroll_continuous = profile.key_scroll_continuous;
+    settings.wheel_scroll_factor = profile.wheel_scroll_factor.to_string();
+    settings.smooth_scroll = profile.smooth_scroll;
+    settings.page_scan_mode = profile.page_scan_mode;
+    settings.tree_visible = profile.tree_visible;
+    settings.tree_auto_collapse = profile.tree_auto_collapse;
+    settings.tree_confirm_children = profile.tree_confirm_children;
+    settings.tree_width = profile.tree_width;
+    settings.folder_open_rule = profile.folder_open_rule;
+    settings.image_open_rule = profile.image_open_rule;
+    settings.archive_open_rule = profile.archive_open_rule;
+    settings.detail_grid_lines = profile.detail_grid_lines;
+    settings.detail_row_density = profile.detail_row_density;
+    settings.detail_show_kind = profile.detail_show_kind;
+    settings.detail_show_size = profile.detail_show_size;
+    settings.detail_show_modified = profile.detail_show_modified;
+    settings.menu_bar_visible = profile.menu_bar_visible;
+    settings.toolbar_visible = profile.toolbar_visible;
+    settings.address_bar_visible = profile.address_bar_visible;
+    settings.status_bar_visible = profile.status_bar_visible;
+    settings.always_on_top = profile.always_on_top;
+    settings.navigation_selection_policy = profile.navigation_selection_policy;
+    settings.thumbnail_generation_scope = profile.thumbnail_generation_scope;
+    settings.startup_location = profile.startup_location;
+    settings.show_hidden_files = profile.show_hidden_files;
+    settings.catalog_palette = profile.catalog_palette;
+    settings.restore_last_viewer = profile.restore_last_viewer;
+    settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
+    settings.shortcut_bindings = shortcuts;
+    settings.catalog_mouse_bindings = catalog_mouse;
+    settings.viewer_quadrant_bindings = quadrants;
+    settings.viewer_right_click_action = right_click;
+    settings.mouse_gesture_bindings = gestures;
+}
+
+fn normalize_settings_profile_input(
+    mut profile: SettingsProfileInput,
+) -> Result<SettingsProfileInput, AppError> {
+    let (shortcuts, catalog_mouse, quadrants, right_click, gestures) =
+        validate_settings_profile(&profile)?;
+    profile.shortcuts = shortcuts;
+    profile.catalog_mouse_bindings = catalog_mouse;
+    profile.viewer_quadrant_bindings = quadrants;
+    profile.viewer_right_click_action = right_click;
+    profile.mouse_gestures = gestures;
+    Ok(profile)
+}
+
+fn validate_named_settings_profile_name(name: &str) -> Result<String, AppError> {
+    let normalized = name.trim();
+    let length = normalized.encode_utf16().count();
+    if !(1..=64).contains(&length)
+        || normalized
+            .chars()
+            .any(|character| character.is_control() || matches!(character, '/' | '\\'))
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Settings profile name is invalid.",
+        ));
+    }
+    Ok(normalized.into())
+}
+
+fn settings_profile_confirmation_key(name: &str, profile_json: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    "settings-profile-v1".hash(&mut hasher);
+    name.to_lowercase().hash(&mut hasher);
+    profile_json.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+fn settings_profile_changed_fields(profile: &SettingsProfileInput, settings: Settings) -> u16 {
+    let target = serde_json::to_value(profile).ok();
+    let current = serde_json::to_value(catalog_settings(settings)).ok();
+    match (target, current) {
+        (Some(serde_json::Value::Object(target)), Some(serde_json::Value::Object(current))) => {
+            target
+                .iter()
+                .filter(|(key, value)| current.get(*key) != Some(*value))
+                .count()
+                .try_into()
+                .unwrap_or(u16::MAX)
+        }
+        _ => u16::MAX,
+    }
+}
+
 #[tauri::command]
 pub fn set_settings_profile(
     state: tauri::State<'_, AppState>,
@@ -3059,90 +3220,17 @@ pub fn set_settings_profile(
             Ok(settings) => settings,
             Err(error) => return Ok(error_response(&context, error)),
         };
-        settings.sort_field = profile.sort_field;
-        settings.sort_descending = profile.sort_descending;
-        settings.end_of_volume_policy = profile.end_of_volume_policy;
-        settings.catalog_view_mode = profile.catalog_view_mode;
-        settings.small_thumbnail_size = profile.catalog_thumbnail_sizes.small_thumbnail.to_string();
-        settings.cover_list_thumbnail_size = profile.catalog_thumbnail_sizes.cover_list.to_string();
-        settings.card_grid_thumbnail_size = profile.catalog_thumbnail_sizes.card_grid.to_string();
-        settings.reference_tile_thumbnail_size =
-            profile.catalog_thumbnail_sizes.reference_tile.to_string();
-        settings.view_mode = profile.view_mode;
-        settings.spread_portrait_max_aspect_percent =
-            profile.spread_portrait_max_aspect_percent.to_string();
-        settings.auto_spread_min_viewport_aspect_percent =
-            profile.auto_spread_min_viewport_aspect_percent.to_string();
-        settings.spread_first_page_single = profile.spread_first_page_single;
-        settings.spread_pairing = profile.spread_pairing;
-        settings.fit_allow_upscale = profile.fit_allow_upscale;
-        settings.fit_basis = profile.fit_basis;
-        settings.fit_include_page_margin = profile.fit_include_page_margin;
-        settings.layout_mode = profile.layout_mode;
-        settings.reading_direction = profile.reading_direction;
-        settings.scale_mode = profile.scale_mode;
-        settings.scale = profile.scale.to_string();
-        settings.loupe_enabled = profile.loupe_enabled;
-        settings.loupe_size = profile.loupe_size.to_string();
-        settings.loupe_zoom = profile.loupe_zoom.to_string();
-        settings.prefetch_ahead = profile.prefetch_ahead.to_string();
-        settings.prefetch_behind = profile.prefetch_behind.to_string();
-        settings.prefetch_memory_mib = profile.prefetch_memory_mib.to_string();
-        settings.fullscreen_escape_behavior = profile.fullscreen_escape_behavior;
-        settings.prevent_display_sleep_fullscreen = profile.prevent_display_sleep_fullscreen;
-        settings.tray_store_on_minimize = profile.tray_store_on_minimize;
-        settings.tray_close_behavior = profile.tray_close_behavior;
-        settings.tray_restore_gesture = profile.tray_restore_gesture;
-        settings.slideshow_interval_ms = profile.slideshow_interval_ms.to_string();
-        settings.slideshow_order = profile.slideshow_order;
-        settings.slideshow_repeat_current_item = profile.slideshow_repeat_current_item;
-        settings.viewer_catalog_selection_sync = profile.viewer_catalog_selection_sync;
-        settings.viewer_background = profile.viewer_background;
-        settings.viewer_page_margin = profile.viewer_page_margin.to_string();
-        settings.viewer_spread_gap = profile.viewer_spread_gap.to_string();
-        settings.cursor_auto_hide_ms = profile.cursor_auto_hide_ms.to_string();
-        settings.zoom_retention = profile.zoom_retention;
-        settings.viewer_grid_enabled = profile.viewer_grid_enabled;
-        settings.viewer_grid_size = profile.viewer_grid_size.to_string();
-        settings.viewer_grid_color = profile.viewer_grid_color;
-        settings.pan_factor = profile.pan_factor.to_string();
-        settings.wheel_dead_zone = profile.wheel_dead_zone.to_string();
-        settings.scroll_step_percent = profile.scroll_step_percent.to_string();
-        settings.key_scroll_acceleration_percent =
-            profile.key_scroll_acceleration_percent.to_string();
-        settings.key_scroll_continuous = profile.key_scroll_continuous;
-        settings.wheel_scroll_factor = profile.wheel_scroll_factor.to_string();
-        settings.smooth_scroll = profile.smooth_scroll;
-        settings.page_scan_mode = profile.page_scan_mode;
-        settings.tree_visible = profile.tree_visible;
-        settings.tree_auto_collapse = profile.tree_auto_collapse;
-        settings.tree_confirm_children = profile.tree_confirm_children;
-        settings.tree_width = profile.tree_width;
-        settings.folder_open_rule = profile.folder_open_rule;
-        settings.image_open_rule = profile.image_open_rule;
-        settings.archive_open_rule = profile.archive_open_rule;
-        settings.detail_grid_lines = profile.detail_grid_lines;
-        settings.detail_row_density = profile.detail_row_density;
-        settings.detail_show_kind = profile.detail_show_kind;
-        settings.detail_show_size = profile.detail_show_size;
-        settings.detail_show_modified = profile.detail_show_modified;
-        settings.menu_bar_visible = profile.menu_bar_visible;
-        settings.toolbar_visible = profile.toolbar_visible;
-        settings.address_bar_visible = profile.address_bar_visible;
-        settings.status_bar_visible = profile.status_bar_visible;
-        settings.always_on_top = profile.always_on_top;
-        settings.navigation_selection_policy = profile.navigation_selection_policy;
-        settings.thumbnail_generation_scope = profile.thumbnail_generation_scope;
-        settings.startup_location = profile.startup_location;
-        settings.show_hidden_files = profile.show_hidden_files;
-        settings.catalog_palette = profile.catalog_palette;
-        settings.restore_last_viewer = profile.restore_last_viewer;
-        settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
-        settings.shortcut_bindings = shortcuts;
-        settings.catalog_mouse_bindings = catalog_mouse_bindings;
-        settings.viewer_quadrant_bindings = viewer_quadrant_bindings;
-        settings.viewer_right_click_action = viewer_right_click_action;
-        settings.mouse_gesture_bindings = mouse_gestures;
+        apply_settings_profile_to_settings(
+            &mut settings,
+            profile,
+            (
+                shortcuts,
+                catalog_mouse_bindings,
+                viewer_quadrant_bindings,
+                viewer_right_click_action,
+                mouse_gestures,
+            ),
+        );
         if let Err(error) = store.save_settings(&settings) {
             return Ok(error_response(&context, error));
         }
@@ -3158,6 +3246,346 @@ pub fn set_settings_profile(
         generation: context.generation,
         data: catalog_settings(settings),
     })
+}
+
+#[tauri::command]
+pub fn list_named_settings_profiles(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<NamedSettingsProfileSummary>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = match state.store.lock() {
+        Ok(stores) => stores,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is unavailable.",
+                ),
+            ));
+        }
+    };
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local settings storage is not initialized.",
+            ),
+        ));
+    };
+    let records = match store.list_named_settings_profiles() {
+        Ok(records) => records,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let mut summaries = Vec::with_capacity(records.len());
+    for record in records {
+        let profile = match serde_json::from_str::<SettingsProfileInput>(&record.profile_json)
+            .map_err(|_| {
+                request_error(
+                    ErrorCode::UnsupportedFormat,
+                    "Stored settings profile is invalid.",
+                )
+            })
+            .and_then(normalize_settings_profile_input)
+        {
+            Ok(profile) => profile,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
+        let _ = profile;
+        summaries.push(NamedSettingsProfileSummary {
+            name: record.name,
+            updated_at_ms: record.updated_at_ms,
+            active: record.active,
+        });
+    }
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: summaries,
+    })
+}
+
+#[tauri::command]
+pub fn save_named_settings_profile(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    name: String,
+    profile: SettingsProfileInput,
+    overwrite: bool,
+) -> Result<Response<NamedSettingsProfileSummary>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let name = match validate_named_settings_profile_name(&name) {
+        Ok(name) => name,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let profile = match normalize_settings_profile_input(profile) {
+        Ok(profile) => profile,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let profile_json = match serde_json::to_string(&profile) {
+        Ok(profile_json) if profile_json.len() <= 131_072 => profile_json,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Settings profile is too large."),
+            ));
+        }
+    };
+    let updated_at_ms = unix_millis().max(0) as u64;
+    let mut stores = match state.store.lock() {
+        Ok(stores) => stores,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is unavailable.",
+                ),
+            ));
+        }
+    };
+    let Some(store) = stores.as_mut() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local settings storage is not initialized.",
+            ),
+        ));
+    };
+    let record = NamedSettingsProfileRecord {
+        name: name.clone(),
+        profile_json,
+        updated_at_ms,
+        active: false,
+    };
+    if let Err(error) = store.save_named_settings_profile(&record, overwrite) {
+        return Ok(error_response(&context, error));
+    }
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: NamedSettingsProfileSummary {
+            name,
+            updated_at_ms,
+            active: false,
+        },
+    })
+}
+
+fn stored_settings_profile(
+    store: &StateStore,
+    name: &str,
+) -> Result<(NamedSettingsProfileRecord, SettingsProfileInput), AppError> {
+    let record = store
+        .named_settings_profile(name)?
+        .ok_or_else(|| request_error(ErrorCode::NotFound, "Settings profile was not found."))?;
+    let profile = serde_json::from_str::<SettingsProfileInput>(&record.profile_json)
+        .map_err(|_| {
+            request_error(
+                ErrorCode::UnsupportedFormat,
+                "Stored settings profile is invalid.",
+            )
+        })
+        .and_then(normalize_settings_profile_input)?;
+    Ok((record, profile))
+}
+
+#[tauri::command]
+pub fn preview_named_settings_profile_switch(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    name: String,
+) -> Result<Response<SettingsProfileSwitchPreview>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let name = match validate_named_settings_profile_name(&name) {
+        Ok(name) => name,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = match state.store.lock() {
+        Ok(stores) => stores,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is unavailable.",
+                ),
+            ));
+        }
+    };
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local settings storage is not initialized.",
+            ),
+        ));
+    };
+    let (record, profile) = match stored_settings_profile(store, &name) {
+        Ok(value) => value,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let current = match store.load_settings() {
+        Ok(settings) => settings,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: SettingsProfileSwitchPreview {
+            name: record.name.clone(),
+            changed_field_count: settings_profile_changed_fields(&profile, current),
+            confirmation_key: settings_profile_confirmation_key(&record.name, &record.profile_json),
+            profile,
+        },
+    })
+}
+
+#[tauri::command]
+pub fn execute_named_settings_profile_switch(
+    state: tauri::State<'_, AppState>,
+    tray_state: tauri::State<'_, crate::tray::TrayState>,
+    context: RequestContext,
+    name: String,
+    confirmation_key: String,
+    confirmed: bool,
+) -> Result<Response<CatalogSettings>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !confirmed {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Settings profile switch requires confirmation.",
+            ),
+        ));
+    }
+    let name = match validate_named_settings_profile_name(&name) {
+        Ok(name) => name,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let mut stores = match state.store.lock() {
+        Ok(stores) => stores,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is unavailable.",
+                ),
+            ));
+        }
+    };
+    let Some(store) = stores.as_mut() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local settings storage is not initialized.",
+            ),
+        ));
+    };
+    let (record, profile) = match stored_settings_profile(store, &name) {
+        Ok(value) => value,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if confirmation_key != settings_profile_confirmation_key(&record.name, &record.profile_json) {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Conflict,
+                "Settings profile changed after preview.",
+            ),
+        ));
+    }
+    let bindings = match validate_settings_profile(&profile) {
+        Ok(bindings) => bindings,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let mut settings = match store.load_settings() {
+        Ok(settings) => settings,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    apply_settings_profile_to_settings(&mut settings, profile, bindings);
+    if let Err(error) = store.activate_named_settings_profile(&record.name, &settings) {
+        return Ok(error_response(&context, error));
+    }
+    tray_state.apply_preferences(
+        settings.tray_store_on_minimize,
+        &settings.tray_close_behavior,
+        &settings.tray_restore_gesture,
+    );
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: catalog_settings(settings),
+    })
+}
+
+#[tauri::command]
+pub fn delete_named_settings_profile(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    name: String,
+    confirmed: bool,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !confirmed {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Settings profile deletion requires confirmation.",
+            ),
+        ));
+    }
+    let name = match validate_named_settings_profile_name(&name) {
+        Ok(name) => name,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let stores = match state.store.lock() {
+        Ok(stores) => stores,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Local settings storage is unavailable.",
+                ),
+            ));
+        }
+    };
+    let Some(store) = stores.as_ref() else {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Internal,
+                "Local settings storage is not initialized.",
+            ),
+        ));
+    };
+    match store.delete_named_settings_profile(&name) {
+        Ok(deleted) => Ok(Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data: deleted,
+        }),
+        Err(error) => Ok(error_response(&context, error)),
+    }
 }
 
 #[tauri::command]
@@ -6165,7 +6593,8 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn fr_b19_and_req_ley_p3_013_to_p3_015_settings_profile_validates_all_atomic_bindings() {
+    fn fr_b19_and_req_ley_p3_013_to_p3_015_and_p3_019_settings_profile_validates_all_atomic_bindings()
+     {
         let mut profile = SettingsProfileInput {
             sort_field: "name".into(),
             sort_descending: false,
@@ -6484,6 +6913,56 @@ mod shutdown_tests {
             validate_settings_profile(&profile).unwrap_err().code,
             ErrorCode::InvalidRequest
         );
+        profile.viewer_right_click_action = "none".into();
+        let normalized = normalize_settings_profile_input(profile.clone()).unwrap();
+        let profile_json = serde_json::to_string(&normalized).unwrap();
+        assert!(!profile_json.contains("libraryRoot"));
+        let mut unknown = serde_json::to_value(&normalized).unwrap();
+        unknown
+            .as_object_mut()
+            .unwrap()
+            .insert("secretToken".into(), serde_json::json!("discard-me"));
+        assert!(serde_json::from_value::<SettingsProfileInput>(unknown).is_err());
+        let confirmation_key = settings_profile_confirmation_key("Reading", &profile_json);
+        assert_eq!(confirmation_key.len(), 16);
+        assert_ne!(
+            confirmation_key,
+            settings_profile_confirmation_key("Reading", &(profile_json.clone() + " "))
+        );
+        assert_eq!(
+            validate_named_settings_profile_name("  読書用  ").unwrap(),
+            "読書用"
+        );
+        for invalid in ["", "   ", "bad/name", "bad\\name", "bad\nname"] {
+            assert_eq!(
+                validate_named_settings_profile_name(invalid)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::InvalidRequest
+            );
+        }
+        assert_eq!(
+            validate_named_settings_profile_name(&"長".repeat(65))
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+        let bindings = validate_settings_profile(&normalized).unwrap();
+        let mut settings = Settings::default();
+        assert!(settings_profile_changed_fields(&normalized, settings.clone()) > 0);
+        apply_settings_profile_to_settings(&mut settings, normalized.clone(), bindings);
+        assert_eq!(settings_profile_changed_fields(&normalized, settings), 0);
+        let started = std::time::Instant::now();
+        for _ in 0..16 {
+            let restored = serde_json::from_str::<SettingsProfileInput>(&profile_json).unwrap();
+            normalize_settings_profile_input(restored).unwrap();
+        }
+        let elapsed = started.elapsed();
+        eprintln!(
+            "REQ-LEY-P3-019 validated 16 full profiles in {:.3} ms",
+            elapsed.as_secs_f64() * 1000.0
+        );
+        assert!(elapsed < std::time::Duration::from_secs(5));
     }
 
     #[test]
