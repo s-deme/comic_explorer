@@ -162,6 +162,7 @@ pub struct Settings {
     pub shortcut_bindings: BTreeMap<String, Vec<String>>,
     pub catalog_mouse_bindings: BTreeMap<String, String>,
     pub viewer_quadrant_bindings: BTreeMap<String, String>,
+    pub viewer_right_click_action: String,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
 
@@ -279,6 +280,7 @@ impl Default for Settings {
             shortcut_bindings: default_shortcut_bindings(),
             catalog_mouse_bindings: default_catalog_mouse_bindings(),
             viewer_quadrant_bindings: default_viewer_quadrant_bindings(),
+            viewer_right_click_action: "none".into(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
     }
@@ -454,6 +456,7 @@ impl StateStore {
                         settings.viewer_quadrant_bindings = bindings;
                     }
                 }
+                "viewerRightClickAction" => settings.viewer_right_click_action = value,
                 "mouseGestureBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.mouse_gesture_bindings = bindings;
@@ -643,6 +646,10 @@ impl StateStore {
             ("shortcutBindings", shortcut_bindings),
             ("catalogMouseBindings", catalog_mouse_bindings),
             ("viewerQuadrantBindings", viewer_quadrant_bindings),
+            (
+                "viewerRightClickAction",
+                settings.viewer_right_click_action.clone(),
+            ),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
         if let Some(root) = &settings.library_root {
@@ -1814,7 +1821,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b17_and_req_ley_p3_012_to_p3_014_settings_survive_reopen() {
+    fn fr_b17_and_req_ley_p3_012_to_p3_015_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1925,6 +1932,7 @@ mod tests {
                 ]
                 .into_iter()
                 .collect(),
+                viewer_right_click_action: "zoomOut".into(),
                 mouse_gesture_bindings: [
                     ("swipeLeft".into(), "previousPage".into()),
                     ("swipeRight".into(), "nextPage".into()),
@@ -2047,6 +2055,7 @@ mod tests {
             restored.viewer_quadrant_bindings["bottomRight"],
             "toggleLoupe"
         );
+        assert_eq!(restored.viewer_right_click_action, "zoomOut");
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],
             "closeViewer"

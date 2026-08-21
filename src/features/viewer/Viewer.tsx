@@ -92,9 +92,12 @@ import {
 } from "../input/shortcuts";
 import {
   DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
   strictViewerQuadrantBindings,
+  strictViewerRightClickAction,
   viewerQuadrantAt,
   type ViewerQuadrantBindings,
+  type ViewerRightClickAction,
 } from "../input/viewer-quadrants";
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import {
@@ -180,6 +183,7 @@ interface ViewerProps {
   onPageChange?: (index: number) => void;
   mouseGestures?: MouseGestureBindings;
   quadrantBindings?: ViewerQuadrantBindings;
+  rightClickAction?: ViewerRightClickAction;
   detached?: boolean;
   onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
@@ -206,6 +210,14 @@ interface PointerDragState {
   pannable: boolean;
   quadrantClickEligible: boolean;
   moved: boolean;
+}
+
+interface RightClickState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  eligible: boolean;
+  canceled: boolean;
 }
 
 export function Viewer({
@@ -261,6 +273,7 @@ export function Viewer({
   onPageChange,
   mouseGestures,
   quadrantBindings,
+  rightClickAction,
   detached = false,
   onToggleDetached,
   onSaveBookmark,
@@ -383,6 +396,11 @@ export function Viewer({
       ?? { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
     [quadrantBindings],
   );
+  const activeRightClickAction = useMemo(
+    () => strictViewerRightClickAction(rightClickAction)
+      ?? DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
+    [rightClickAction],
+  );
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
@@ -393,6 +411,7 @@ export function Viewer({
   const quadrantClickTimerRef = useRef<number | null>(null);
   const pageScanInitializedRef = useRef(false);
   const rightButtonHeldRef = useRef(false);
+  const rightClickRef = useRef<RightClickState | null>(null);
   const [panning, setPanning] = useState(false);
   const [cursorHidden, setCursorHidden] = useState(false);
   const cursorInsideStageRef = useRef(false);
@@ -439,10 +458,14 @@ export function Viewer({
 
   useEffect(() => {
     const releaseRightButton = (event: PointerEvent) => {
-      if (event.button === 2) rightButtonHeldRef.current = false;
+      if (event.button === 2) {
+        rightButtonHeldRef.current = false;
+        rightClickRef.current = null;
+      }
     };
     const resetRightButton = () => {
       rightButtonHeldRef.current = false;
+      rightClickRef.current = null;
     };
     window.addEventListener("pointerup", releaseRightButton);
     window.addEventListener("blur", resetRightButton);
@@ -1899,6 +1922,12 @@ export function Viewer({
         onPointerMove={(event) => {
           scheduleCursorHide();
           updateLoupe(event);
+          const rightClick = rightClickRef.current;
+          if (
+            rightClick?.pointerId === event.pointerId
+            && (Math.abs(event.clientX - rightClick.startX) >= 4
+              || Math.abs(event.clientY - rightClick.startY) >= 4)
+          ) rightClick.canceled = true;
           const drag = pointerDragRef.current;
           if (!drag || drag.pointerId !== event.pointerId || !drag.pannable) return;
           const spread = spreadRef.current;
@@ -1928,6 +1957,17 @@ export function Viewer({
           setCursorHidden(false);
           if (event.button === 2) {
             rightButtonHeldRef.current = true;
+            rightClickRef.current = {
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              eligible: event.pointerType === "mouse"
+                && !event.ctrlKey
+                && !event.metaKey
+                && !event.shiftKey
+                && !event.altKey,
+              canceled: false,
+            };
             event.currentTarget.setPointerCapture?.(event.pointerId);
             event.preventDefault();
             return;
@@ -1969,9 +2009,21 @@ export function Viewer({
         }}
         onPointerUp={(event) => {
           if (event.button === 2) {
+            const rightClick = rightClickRef.current;
+            rightClickRef.current = null;
             rightButtonHeldRef.current = false;
             scheduleCursorHide();
             event.preventDefault();
+            if (
+              rightClick?.pointerId === event.pointerId
+              && rightClick.eligible
+              && !rightClick.canceled
+              && event.pointerType === "mouse"
+              && !event.ctrlKey
+              && !event.metaKey
+              && !event.shiftKey
+              && !event.altKey
+            ) applyMouseGesture(activeRightClickAction);
             return;
           }
           if (event.button !== 0) {
@@ -2007,6 +2059,7 @@ export function Viewer({
         onPointerCancel={() => {
           clearQuadrantClickTimer();
           rightButtonHeldRef.current = false;
+          rightClickRef.current = null;
           pointerDragRef.current = null;
           setPanning(false);
           scheduleCursorHide();
@@ -2019,6 +2072,7 @@ export function Viewer({
         onWheel={(event) => {
           const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
           if (rightWheel && event.deltaY !== 0) {
+            if (rightClickRef.current !== null) rightClickRef.current.canceled = true;
             event.preventDefault();
             applyMouseGesture(
               event.deltaY > 0

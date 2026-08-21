@@ -359,6 +359,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
     forwardButton: "navigateForward",
   },
   viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
+  viewerRightClickAction: "none",
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 
@@ -1261,7 +1262,7 @@ describe("application shell", () => {
     expect(await screen.findByLabelText("book.cbz ビューワ")).toBeInTheDocument();
   });
 
-  it("REQ-LEY-P3-014 applies the Rust-restored quadrant registry to Viewer clicks", async () => {
+  it("REQ-LEY-P3-014 and P3-015 apply Rust-restored Viewer click bindings", async () => {
     settingsMock.mockResolvedValue({
       status: "ok",
       requestId: "settings-quadrants" as never,
@@ -1274,6 +1275,7 @@ describe("application shell", () => {
           bottomLeft: "previousPage",
           bottomRight: "nextPage",
         },
+        viewerRightClickAction: "zoomIn",
       },
     });
     openMock.mockResolvedValue(viewerResponse("book.cbz"));
@@ -1295,6 +1297,14 @@ describe("application shell", () => {
     });
     await waitFor(() => expect(document.querySelector(".page-spread"))
       .toHaveAttribute("data-scale", "1.1"));
+    fireEvent.pointerDown(stage, {
+      pointerId: 2, pointerType: "mouse", button: 2, clientX: 50, clientY: 50,
+    });
+    fireEvent.pointerUp(stage, {
+      pointerId: 2, pointerType: "mouse", button: 2, clientX: 50, clientY: 50,
+    });
+    await waitFor(() => expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-scale", "1.2"));
   });
 
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
@@ -3486,6 +3496,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profileViewer左上クリック割当"), {
       target: { value: "zoomIn" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profileViewer右クリック割当"), {
+      target: { value: "zoomIn" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     expect(screen.getByLabelText("一覧表示形式"))
@@ -3587,6 +3600,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profileViewer左上クリック割当"), {
       target: { value: "zoomIn" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profileViewer右クリック割当"), {
+      target: { value: "zoomIn" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
@@ -3642,6 +3658,7 @@ describe("application shell", () => {
           bottomLeft: "previousPage",
           bottomRight: "nextPage",
         }),
+        viewerRightClickAction: "zoomIn",
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
           doubleClick: "toggleFullscreen",

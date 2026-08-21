@@ -175,6 +175,7 @@ describe("library client settings contract", () => {
             bottomLeft: "previousPage",
             bottomRight: "nextPage",
           },
+          viewerRightClickAction: "none",
         }),
       }),
     );

@@ -483,6 +483,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | 象限判定は4領域への固定個数の比較、待機timerは最大1件で、filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput latency、CPU、working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-O固有の実double-click interval、touchpad、pen、DPI、設定UI操作はrelease WebView2で直接観測していない。 |
 
+## Leeyes P3-P 右クリック割当
+
+対象はLEY-INPUT-009の1件。Rustが`none`を含む安全な既知Viewer actionをstrict profile v26・SQLiteで検証・保存し、TypeScriptはWebView right-button event、4px移動境界、right-wheel取消、既存Viewer commandへのdispatchだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-015の2件、FAIL 0。既定`none`、既知・未知action、custom割当のSQLite再open、profile atomic validationを含む。 |
+| Focused frontend | PASS | Viewer、profile、client、Appの4 files / 276件、FAIL 0。single dispatch、全3 layout、4px以上の往復移動、touch・pen・modifier・cancel・blur保護、right-wheel優先、context menu抑止、v25→v26移行、Rust復元値のApp接続を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 34 files / 466件とPython 61件、FAIL 0。typecheck exit 0。frontend 75 modules build、CSS 43.17kB、JS 571.29kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 208件とshutdown process 1件、FAIL 0。right-click action registry・SQLite/profile再openと既存catalog、viewer、file操作、search、watch、tree、cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは253.511秒で全12 stageがexit 0。Rust canonical 67.471秒、release executable freshness 1.411秒、GUI権限付きshortcut product回帰10.013秒、CoDD verify 130.690秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T090609098Z`。これ以前の1回は最終CoDD verify内のtest commandだけがexit 1となったが、直後の単独full Windows test 466+61件、単独CoDD verify、source変更なしの全12 stage再実行がすべてPASSした。 |
+| 性能 | NOT APPLICABLE / 限定 | right-click判定は1 pointerの固定個数比較でtimer・filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput latency、CPU、working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-P固有の実right-click event順序、touchpad、多ボタンmouse、DPI、設定UI操作はrelease WebView2で直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -15,6 +15,9 @@ export type ViewerQuadrant = (typeof VIEWER_QUADRANT_NAMES)[number];
 export const VIEWER_QUADRANT_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
 export type ViewerQuadrantAction = (typeof VIEWER_QUADRANT_ACTIONS)[number];
 export type ViewerQuadrantBindings = Record<ViewerQuadrant, ViewerQuadrantAction>;
+export type ViewerRightClickAction = ViewerQuadrantAction;
+
+export const DEFAULT_VIEWER_RIGHT_CLICK_ACTION: ViewerRightClickAction = "none";
 
 export const DEFAULT_VIEWER_QUADRANT_BINDINGS: ViewerQuadrantBindings = {
   topLeft: "previousPage",
@@ -32,6 +35,12 @@ export const VIEWER_QUADRANT_LABELS: Record<ViewerQuadrant, string> = {
 
 export function viewerQuadrantActionLabel(action: ViewerQuadrantAction): string {
   return action === "none" ? "何もしない" : SHORTCUT_LABELS[action as ViewerShortcutCommand];
+}
+
+export function strictViewerRightClickAction(value: unknown): ViewerRightClickAction | null {
+  return VIEWER_QUADRANT_ACTIONS.includes(value as ViewerRightClickAction)
+    ? value as ViewerRightClickAction
+    : null;
 }
 
 export function strictViewerQuadrantBindings(value: unknown): ViewerQuadrantBindings | null {

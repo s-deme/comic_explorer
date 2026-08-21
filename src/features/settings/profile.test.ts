@@ -100,6 +100,7 @@ function validProfile(): SettingsProfile {
       forwardButton: "navigateForward",
     },
     viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
+    viewerRightClickAction: "none",
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
 }
@@ -146,7 +147,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 26, 99, "21", undefined])(
+  it.each([0, 27, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -388,6 +389,25 @@ describe("settings profile", () => {
         ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
         topLeft: "delete",
       },
+    })).toBeNull();
+  });
+
+  it("REQ-LEY-P3-015 migrates v25 right-click default and rejects unknown actions", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 25;
+    delete legacy.viewerRightClickAction;
+    expect(normalizeSettingsProfile(legacy)).toMatchObject({
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      viewerQuadrantBindings: DEFAULT_VIEWER_QUADRANT_BINDINGS,
+      viewerRightClickAction: "none",
+    });
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerRightClickAction: "zoomIn",
+    })).toMatchObject({ viewerRightClickAction: "zoomIn" });
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerRightClickAction: "delete",
     })).toBeNull();
   });
 

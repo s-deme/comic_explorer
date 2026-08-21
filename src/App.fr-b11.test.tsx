@@ -198,6 +198,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
         forwardButton: "navigateForward",
       },
       viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
+      viewerRightClickAction: "none",
       mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
     } satisfies CatalogSettings,
   };

@@ -203,6 +203,7 @@ export interface CatalogSettings {
   shortcuts: ShortcutBindings;
   catalogMouseBindings: CatalogMouseBindings;
   viewerQuadrantBindings: ViewerQuadrantBindings;
+  viewerRightClickAction: SettingsProfile["viewerRightClickAction"];
   mouseGestures: MouseGestureBindings;
 }
 
@@ -343,6 +344,7 @@ export async function saveSettingsProfile(
       shortcuts: profile.shortcuts,
       catalogMouseBindings: profile.catalogMouseBindings,
       viewerQuadrantBindings: profile.viewerQuadrantBindings,
+      viewerRightClickAction: profile.viewerRightClickAction,
       mouseGestures: profile.mouseGestures,
     },
   });

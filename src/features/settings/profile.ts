@@ -11,8 +11,11 @@ import {
 } from "../input/catalog-mouse";
 import {
   DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
   strictViewerQuadrantBindings,
+  strictViewerRightClickAction,
   type ViewerQuadrantBindings,
+  type ViewerRightClickAction,
 } from "../input/viewer-quadrants";
 import {
   CATALOG_VIEW_MODES,
@@ -96,7 +99,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 25;
+export const SETTINGS_PROFILE_VERSION = 26;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -244,6 +247,7 @@ export interface SettingsProfile {
   shortcuts: ShortcutBindings;
   catalogMouseBindings: CatalogMouseBindings;
   viewerQuadrantBindings: ViewerQuadrantBindings;
+  viewerRightClickAction: ViewerRightClickAction;
   mouseGestures: MouseGestureBindings;
 }
 
@@ -325,6 +329,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     shortcuts: { ...DEFAULT_SHORTCUTS },
     catalogMouseBindings: { ...DEFAULT_CATALOG_MOUSE_BINDINGS },
     viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
+    viewerRightClickAction: DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
 }
@@ -552,9 +557,13 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     || candidate.profileVersion === 23
     ? { ...DEFAULT_CATALOG_MOUSE_BINDINGS }
     : strictCatalogMouseBindings(candidate.catalogMouseBindings);
-  const viewerQuadrantBindings = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+  const viewerQuadrantBindings = candidate.profileVersion === 25
+    || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerQuadrantBindings(candidate.viewerQuadrantBindings)
     : { ...DEFAULT_VIEWER_QUADRANT_BINDINGS };
+  const viewerRightClickAction = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+    ? strictViewerRightClickAction(candidate.viewerRightClickAction)
+    : DEFAULT_VIEWER_RIGHT_CLICK_ACTION;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -580,6 +589,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 22
       && candidate.profileVersion !== 23
       && candidate.profileVersion !== 24
+      && candidate.profileVersion !== 25
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -662,6 +672,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     shortcuts === null ||
     catalogMouseBindings === null ||
     viewerQuadrantBindings === null ||
+    viewerRightClickAction === null ||
     mouseGestures === null
   ) {
     return null;
@@ -743,6 +754,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     shortcuts,
     catalogMouseBindings,
     viewerQuadrantBindings,
+    viewerRightClickAction,
     mouseGestures,
   };
 }

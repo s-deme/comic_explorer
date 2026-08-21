@@ -574,6 +574,11 @@ export function SettingsDialog({
       category: "commands" as const,
       text: `Viewer 4象限 クリック ${VIEWER_QUADRANT_LABELS[name]} ${viewerQuadrantActionLabel(draft.viewerQuadrantBindings[name])} stage 片手 読書`,
     })),
+    {
+      id: "viewer-right-click",
+      category: "commands",
+      text: `Viewer 右クリック 割当 ${viewerQuadrantActionLabel(draft.viewerRightClickAction)} right wheel context menu`,
+    },
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
       category: "commands" as const,
@@ -1434,6 +1439,24 @@ export function SettingsDialog({
                   </select>
                 </SettingRow>
               ))}
+              <SettingRow
+                id="viewer-right-click"
+                title="Viewer右クリック"
+                description="stageの右クリックに割り当てます。右ボタン+ホイールとcatalogのcontext menuは変更しません。"
+                hidden={rowHidden("viewer-right-click")}
+              >
+                <select
+                  aria-label="profileViewer右クリック割当"
+                  value={draft.viewerRightClickAction}
+                  onChange={(event) => update({
+                    viewerRightClickAction: event.target.value as ViewerQuadrantAction,
+                  })}
+                >
+                  {VIEWER_QUADRANT_ACTIONS.map((action) => (
+                    <option key={action} value={action}>{viewerQuadrantActionLabel(action)}</option>
+                  ))}
+                </select>
+              </SettingRow>
               <h3 className="settings-subheading">Viewerマウスジェスチャー</h3>
               <SettingRow id="pan-factor" title="ドラッグ移動係数" description="画像をpointerでpanするときの移動量だけを50%〜200%で調整します。" hidden={rowHidden("pan-factor")}>
                 <div className="settings-number-control">

@@ -2166,4 +2166,84 @@ describe("Viewer settings", () => {
     act(() => vi.advanceTimersByTime(250));
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("REQ-LEY-P3-015 dispatches the Rust-validated right-click action in every layout", () => {
+    render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        rightClickAction="zoomIn"
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    const rightClick = (pointerId: number) => {
+      fireEvent.pointerDown(stage, {
+        pointerId, pointerType: "mouse", button: 2, clientX: 20, clientY: 20,
+      });
+      fireEvent.pointerUp(stage, {
+        pointerId, pointerType: "mouse", button: 2, clientX: 20, clientY: 20,
+      });
+    };
+
+    rightClick(1);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
+    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
+      target: { value: "vertical_scroll" },
+    });
+    rightClick(2);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.2");
+    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
+      target: { value: "horizontal_scroll" },
+    });
+    rightClick(3);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.3");
+
+    const contextMenu = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    stage.dispatchEvent(contextMenu);
+    expect(contextMenu.defaultPrevented).toBe(true);
+  });
+
+  it("REQ-LEY-P3-015 protects movement, non-mouse input, modifiers, cancel, blur, and right-wheel", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        rightClickAction="nextPage"
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+
+    fireEvent.pointerDown(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 14, clientY: 10 });
+    fireEvent.pointerMove(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(stage, { pointerId: 1, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+
+    for (const [pointerId, pointerType, modifier] of [
+      [2, "touch", {}],
+      [3, "pen", {}],
+      [4, "mouse", { shiftKey: true }],
+    ] as const) {
+      fireEvent.pointerDown(stage, { pointerId, pointerType, button: 2, clientX: 10, clientY: 10, ...modifier });
+      fireEvent.pointerUp(stage, { pointerId, pointerType, button: 2, clientX: 10, clientY: 10, ...modifier });
+    }
+    fireEvent.pointerDown(stage, { pointerId: 5, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.pointerCancel(stage, { pointerId: 5, pointerType: "mouse", button: 2 });
+    fireEvent.pointerDown(stage, { pointerId: 6, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.blur(window);
+    fireEvent.pointerUp(stage, { pointerId: 6, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+
+    fireEvent.pointerDown(stage, { pointerId: 7, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    fireEvent.wheel(stage, { deltaY: -120, buttons: 2 });
+    fireEvent.pointerUp(stage, { pointerId: 7, pointerType: "mouse", button: 2, clientX: 10, clientY: 10 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
+  });
 });

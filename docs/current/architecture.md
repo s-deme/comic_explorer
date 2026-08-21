@@ -214,6 +214,8 @@ catalog mouse割当はRustの完全shape registryを設定の正本とし、prim
 
 Viewer 4象限割当もRustの完全shape registryを設定の正本とし、top-left、top-right、bottom-left、bottom-rightと既知Viewer actionだけをSQLite/profile保存前に検証する。TypeScriptはstageのbounding rectとclient座標による固定個数の象限判定、mouse primary・modifier・4px移動境界、250ms timer、既存Viewer commandへのdispatchだけを担う。stage中央の境界はright/bottomへ含め、物理領域の割当は読書方向から独立させる。touch、pen、pan、swipe、middle/side button、wheel、固定double click全画面切替を優先し、拡大画像でも4px未満のmouse clickだけを象限actionとして扱う。任意code、外部app、filesystem、global hookはこの経路へ接続しない。
 
+Viewer右click割当は同じRustの既知Viewer action registryを正本とし、strict profile v26とSQLiteの保存前に`none`を含む単1 actionを検証する。TypeScriptはWebView stageのmouse right-button down/up、modifier、4pxの移動境界、right-wheel成立時の取消、Rust検証済みactionの既存handlerへのdispatchだけを担う。右button+wheel、touch、pen、pointer cancel、window blur、toolbar/dialog/controlを優先し、catalog・folder treeのfile-operation context menuは固定境界のまま変更しない。filesystem、外部app、任意code、global hookへは接続しない。
+
 詳細一覧の書式はRustのstrict settings profileを正本とし、`none`・`horizontal`・`both`の罫線、`compact`・`standard`・`comfortable`の密度、種別・サイズ・更新日時の表示booleanだけを保存する。frontendは同じ検証済み値をCSS data attributeと共有grid-template variableへ写像し、headerとrowの列構成を一致させる。狭幅では更新日時、次に種別・サイズを視覚的に縮退してもbuttonのaccessible nameにはmetadataを残す。高さはvirtualizerのestimateと実測を再計測し、一覧全件DOM化や項目単位の書式stateを作らず、他の一覧形式と原本・metadata・cacheを変更しない。
 
 catalog maskも同じRust `search_query` parser・非regex matcherを使う。frontendは現在snapshotからbasenameだけを最大100,000件のbatchとして`evaluate_catalog_mask`へ渡し、返された位置対応booleanだけで既存のsorted catalogを絞り込むため、maskごとのfilesystem再走査、native I/O、TypeScript側の構文複製を行わない。draftはEnterまたは適用buttonまで表示へ反映せず、invalid・cancel・stale generationは最後のvalidな適用済みmaskと選択を保持する。既存semicolon区切りはquoted/escaped境界を尊重して最外ORへ変換し、式全体で1024文字・128 token、各basename 1024文字を制限する。
