@@ -117,6 +117,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / foreign-types-shared | 0.3.1 | MIT OR Apache-2.0 |
 | cargo / foreign-types | 0.5.0 | MIT OR Apache-2.0 |
 | cargo / form_urlencoded | 1.2.2 | MIT OR Apache-2.0 |
+| cargo / fsevent-sys | 4.1.0 | MIT |
 | cargo / futures-channel | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-core | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-executor | 0.3.33 | MIT OR Apache-2.0 |
@@ -181,6 +182,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | cargo / indexmap | 2.14.0 | Apache-2.0 OR MIT |
 | cargo / infer | 0.19.0 | MIT |
+| cargo / inotify-sys | 0.1.8 | ISC |
+| cargo / inotify | 0.11.5 | ISC |
 | cargo / ipnet | 2.12.0 | MIT OR Apache-2.0 |
 | cargo / itoa | 1.0.18 | MIT OR Apache-2.0 |
 | cargo / javascriptcore-rs-sys | 1.1.1 | MIT |
@@ -193,6 +196,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / json-patch | 3.0.1 | MIT OR Apache-2.0 |
 | cargo / jsonptr | 0.6.3 | MIT OR Apache-2.0 |
 | cargo / keyboard-types | 0.7.0 | MIT OR Apache-2.0 |
+| cargo / kqueue-sys | 1.1.2 | MIT |
+| cargo / kqueue | 1.2.1 | MIT |
 | cargo / kurbo | 0.11.3 | Apache-2.0 OR MIT |
 | cargo / libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |
 | cargo / libappindicator | 0.9.0 | Apache-2.0 OR MIT |
@@ -217,6 +222,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | cargo / ndk | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / new_debug_unreachable | 1.0.6 | MIT |
+| cargo / notify-types | 2.1.0 | MIT OR Apache-2.0 |
+| cargo / notify | 8.2.0 | CC0-1.0 |
 | cargo / nt-time | 0.8.1 | Apache-2.0 OR MIT |
 | cargo / num-conv | 0.1.0 | MIT OR Apache-2.0 |
 | cargo / num-traits | 0.2.19 | MIT OR Apache-2.0 |
@@ -455,9 +462,11 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / windows-sys | 0.45.0 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.52.0 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.59.0 | MIT OR Apache-2.0 |
+| cargo / windows-sys | 0.60.2 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.61.2 | MIT OR Apache-2.0 |
 | cargo / windows-targets | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows-targets | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows-targets | 0.53.5 | MIT OR Apache-2.0 |
 | cargo / windows-threading | 0.1.0 | MIT OR Apache-2.0 |
 | cargo / windows-threading | 0.2.1 | MIT OR Apache-2.0 |
 | cargo / windows-version | 0.1.7 | MIT OR Apache-2.0 |
@@ -465,19 +474,27 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / windows | 0.62.2 | MIT OR Apache-2.0 |
 | cargo / windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_aarch64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_aarch64_msvc | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_aarch64_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_aarch64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_i686_gnu | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_i686_gnu | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_i686_gnu | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_i686_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_i686_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_i686_msvc | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_i686_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_i686_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_gnu | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_gnu | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_x86_64_gnu | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_x86_64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 |
 | cargo / windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
+| cargo / windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | cargo / winnow | 0.5.40 | MIT |
 | cargo / winnow | 0.7.15 | MIT |
 | cargo / winnow | 1.0.4 | MIT |

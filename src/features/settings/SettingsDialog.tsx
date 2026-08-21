@@ -331,6 +331,11 @@ export function SettingsDialog({
       text: `隠し 項目 ファイル folder 表示 ${draft.showHiddenFiles ? "有効" : "無効"}`,
     },
     {
+      id: "auto-refresh-current-folder",
+      category: "catalog",
+      text: `現在 フォルダー 自動 更新 監視 ${draft.autoRefreshCurrentFolder ? "有効" : "無効"}`,
+    },
+    {
       id: "catalog-palette",
       category: "catalog",
       text: `一覧 配色 背景 文字 選択 contrast ${CATALOG_PALETTE_LABELS[draft.catalogPalette]}`,
@@ -729,6 +734,12 @@ export function SettingsDialog({
                 <label className="settings-switch">
                   <input type="checkbox" aria-label="profile隠し項目を表示" checked={draft.showHiddenFiles} onChange={(event) => update({ showHiddenFiles: event.target.checked })} />
                   <span>{draft.showHiddenFiles ? "表示" : "非表示"}</span>
+                </label>
+              </SettingRow>
+              <SettingRow id="auto-refresh-current-folder" title="現在フォルダーを自動更新" description="表示中のフォルダーに外部変更があったとき、選択を保ちながら一覧を再読み込みします。" hidden={rowHidden("auto-refresh-current-folder")}>
+                <label className="settings-switch">
+                  <input type="checkbox" aria-label="profile現在フォルダーを自動更新" checked={draft.autoRefreshCurrentFolder} onChange={(event) => update({ autoRefreshCurrentFolder: event.target.checked })} />
+                  <span>{draft.autoRefreshCurrentFolder ? "有効" : "無効"}</span>
                 </label>
               </SettingRow>
               <SettingRow id="catalog-palette" title="一覧配色" description="判読性を確認した背景・文字・選択色の組を選びます。" hidden={rowHidden("catalog-palette")}>

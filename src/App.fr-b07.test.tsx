@@ -46,6 +46,9 @@ vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
   pickLibraryRoot: vi.fn(),
   listFolder: vi.fn(),
+  listenCatalogFolderChanges: vi.fn(async () => () => undefined),
+  watchLibraryFolder: vi.fn(async () => ({ status: "cancelled" })),
+  stopLibraryFolderWatch: vi.fn(async () => ({ status: "cancelled" })),
   listTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({
     status: "ok", requestId: "drives", generation: 1,
@@ -221,6 +224,7 @@ const defaultSettings: CatalogSettings = {
   showHiddenFiles: false,
   catalogPalette: "system",
   restoreLastViewer: false,
+  autoRefreshCurrentFolder: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };

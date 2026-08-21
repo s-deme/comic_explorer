@@ -83,7 +83,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 17;
+export const SETTINGS_PROFILE_VERSION = 18;
 export const APP_VERSION = packageMetadata.version;
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
@@ -201,6 +201,7 @@ export interface SettingsProfile {
   showHiddenFiles: boolean;
   catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
+  autoRefreshCurrentFolder: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -266,6 +267,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     showHiddenFiles: false,
     catalogPalette: DEFAULT_CATALOG_PALETTE,
     restoreLastViewer: false,
+    autoRefreshCurrentFolder: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -448,6 +450,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const viewerCatalogSelectionSync = legacyViewerCatalogSelectionSync
     ? true
     : candidate.viewerCatalogSelectionSync;
+  const legacyAutoRefreshCurrentFolder = legacyViewerCatalogSelectionSync
+    || candidate.profileVersion === 17;
+  const autoRefreshCurrentFolder = legacyAutoRefreshCurrentFolder
+    ? true
+    : candidate.autoRefreshCurrentFolder;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -465,6 +472,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 14
       && candidate.profileVersion !== 15
       && candidate.profileVersion !== 16
+      && candidate.profileVersion !== 17
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -527,6 +535,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof showHiddenFiles !== "boolean" ||
     catalogPalette === null ||
     typeof restoreLastViewer !== "boolean" ||
+    typeof autoRefreshCurrentFolder !== "boolean" ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -592,6 +601,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     showHiddenFiles,
     catalogPalette,
     restoreLastViewer,
+    autoRefreshCurrentFolder,
     shortcuts,
     mouseGestures,
   };

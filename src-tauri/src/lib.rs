@@ -70,6 +70,8 @@ pub fn run() {
             application::pick_library_file,
             application::set_library_root,
             application::list_folder,
+            application::watch_library_folder,
+            application::stop_library_folder_watch,
             application::file_operations::rename_file_item,
             application::file_operations::create_file_folder,
             application::file_operations::copy_file_items_to_folder,

@@ -21,6 +21,7 @@ import {
   loadPage,
   listTreeChildren,
   listFolder,
+  listenCatalogFolderChanges,
   listReadingHistory,
   listPageBookmarks,
   clearReadingHistory,
@@ -29,6 +30,8 @@ import {
   pickLibraryRoot,
   pickSearchSource,
   registerLibraryRoot,
+  watchLibraryFolder,
+  stopLibraryFolderWatch,
   removeFavorite,
   restoreLibraryRoot,
   saveCatalogSort,
@@ -72,8 +75,22 @@ import {
 } from "./features/library/client";
 import type { CatalogEntry, ImageFormat } from "./types/domain";
 import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
-import { APP_VERSION, DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
+import {
+  APP_VERSION,
+  DEFAULT_MOUSE_GESTURES,
+  SETTINGS_PROFILE_VERSION,
+} from "./features/settings/profile";
 import { listBookmarks } from "./features/reading/collections";
+
+const folderWatchHarness = vi.hoisted(() => ({
+  handler: undefined as undefined | ((change: {
+    generation: number;
+    libraryRoot: string;
+    relativePath: string;
+    status: "changed" | "error";
+    message?: string | null;
+  }) => void),
+}));
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -81,6 +98,9 @@ vi.mock("./features/library/client", () => ({
   pickLibraryRoot: vi.fn(),
   pickSearchSource: vi.fn(),
   listFolder: vi.fn(),
+  listenCatalogFolderChanges: vi.fn(),
+  watchLibraryFolder: vi.fn(),
+  stopLibraryFolderWatch: vi.fn(),
   listTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({
     status: "ok", requestId: "drives", generation: 1,
@@ -151,6 +171,9 @@ const pickerMock = vi.mocked(pickLibraryRoot);
 const searchSourcePickerMock = vi.mocked(pickSearchSource);
 const filePickerMock = vi.mocked(pickLibraryFile);
 const listMock = vi.mocked(listFolder);
+const listenCatalogFolderChangesMock = vi.mocked(listenCatalogFolderChanges);
+const watchLibraryFolderMock = vi.mocked(watchLibraryFolder);
+const stopLibraryFolderWatchMock = vi.mocked(stopLibraryFolderWatch);
 const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
@@ -258,6 +281,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   showHiddenFiles: false,
   catalogPalette: "system",
   restoreLastViewer: false,
+  autoRefreshCurrentFolder: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -449,6 +473,10 @@ describe("application shell", () => {
     searchSourcePickerMock.mockReset();
     filePickerMock.mockReset();
     listMock.mockReset();
+    listenCatalogFolderChangesMock.mockReset();
+    watchLibraryFolderMock.mockReset();
+    stopLibraryFolderWatchMock.mockReset();
+    folderWatchHarness.handler = undefined;
     treeMock.mockReset();
     restoreMock.mockReset();
     openMock.mockReset();
@@ -499,6 +527,22 @@ describe("application shell", () => {
     knownFoldersMock.mockResolvedValue({
       status: "ok", requestId: "known-folders" as never, generation: 1 as never, data: [],
     });
+    listenCatalogFolderChangesMock.mockImplementation(async (handler) => {
+      folderWatchHarness.handler = handler;
+      return vi.fn();
+    });
+    watchLibraryFolderMock.mockImplementation(async (_path, generation) => ({
+      status: "ok",
+      requestId: "watch-folder" as never,
+      generation: generation as never,
+      data: true,
+    }));
+    stopLibraryFolderWatchMock.mockImplementation(async (generation) => ({
+      status: "ok",
+      requestId: "stop-watch-folder" as never,
+      generation: generation as never,
+      data: true,
+    }));
     catalogMaskMock.mockImplementation(async (_mask, candidates, _options, generation) => ({
       status: "ok",
       requestId: "catalog-mask" as never,
@@ -2946,6 +2990,64 @@ describe("application shell", () => {
     expect(screen.queryByRole("button", { name: /^01\.cbz/ })).not.toBeInTheDocument();
   });
 
+  it("REQ-LEY-P3-005 refreshes only current Rust watch events and preserves surviving selection", async () => {
+    const first = testEntry("01.cbz");
+    const second = testEntry("02.cbz");
+    const added = testEntry("03.cbz");
+    await registerTestLibrary([first, second]);
+    await waitFor(() => expect(watchLibraryFolderMock).toHaveBeenCalledWith("", expect.any(Number)));
+    await waitFor(() => expect(folderWatchHarness.handler).toBeDefined());
+    const watchGeneration = watchLibraryFolderMock.mock.calls.at(-1)![1];
+    fireEvent.click(screen.getByRole("button", { name: /^02\.cbz/ }));
+    listMock.mockClear();
+
+    act(() => folderWatchHarness.handler!({
+      generation: watchGeneration - 1,
+      libraryRoot: "C:\\",
+      relativePath: "",
+      status: "changed",
+    }));
+    act(() => folderWatchHarness.handler!({
+      generation: watchGeneration,
+      libraryRoot: "C:\\",
+      relativePath: "Other",
+      status: "changed",
+    }));
+    expect(listMock).not.toHaveBeenCalled();
+
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "automatic-refresh" as never,
+      generation: (watchGeneration + 1) as never,
+      data: [second, added],
+    });
+    act(() => folderWatchHarness.handler!({
+      generation: watchGeneration,
+      libraryRoot: "C:\\",
+      relativePath: "",
+      status: "changed",
+    }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^03\.cbz/ })).toBeInTheDocument());
+    expect(screen.getByRole("gridcell", { name: /02\.cbz/ })).toHaveAttribute("aria-selected", "true");
+
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByLabelText("profile現在フォルダーを自動更新"));
+    const listenerCount = listenCatalogFolderChangesMock.mock.calls.length;
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+    await waitFor(() => expect(stopLibraryFolderWatchMock).toHaveBeenCalled());
+    await waitFor(() => expect(listenCatalogFolderChangesMock.mock.calls.length).toBeGreaterThan(listenerCount));
+    listMock.mockClear();
+    const latestGeneration = watchLibraryFolderMock.mock.calls.at(-1)![1];
+    act(() => folderWatchHarness.handler!({
+      generation: latestGeneration,
+      libraryRoot: "C:\\",
+      relativePath: "",
+      status: "changed",
+    }));
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
   it("FT-B13-002 extends a keyboard range from the original anchor", async () => {
     await registerTestLibrary([
       testEntry("01.cbz"),
@@ -3301,7 +3403,7 @@ describe("application shell", () => {
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 17,
+        profileVersion: SETTINGS_PROFILE_VERSION,
         viewerBackground: "black",
         viewerPageMargin: 24,
         viewerSpreadGap: 18,
@@ -3428,7 +3530,7 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 17,
+        profileVersion: SETTINGS_PROFILE_VERSION,
         trayStoreOnMinimize: true,
         trayCloseBehavior: "store",
         trayRestoreGesture: "doubleClick",
@@ -3454,7 +3556,7 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 17,
+        profileVersion: SETTINGS_PROFILE_VERSION,
         slideshowIntervalMs: 7_500,
         slideshowOrder: "random",
         slideshowRepeatCurrentItem: true,
@@ -3474,7 +3576,7 @@ describe("application shell", () => {
 
     await waitFor(() => expect(saveSettingsProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        profileVersion: 17,
+        profileVersion: SETTINGS_PROFILE_VERSION,
         viewerCatalogSelectionSync: false,
       }),
       expect.any(Number),

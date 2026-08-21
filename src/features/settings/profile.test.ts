@@ -7,12 +7,13 @@ import {
   DEFAULT_MOUSE_GESTURES,
   normalizeSettingsProfile,
   remapMouseGesture,
+  SETTINGS_PROFILE_VERSION,
   type SettingsProfile,
 } from "./profile";
 
 function validProfile(): SettingsProfile {
   return {
-    profileVersion: 17,
+    profileVersion: SETTINGS_PROFILE_VERSION,
     sortField: "name",
     sortDescending: false,
     endOfVolumePolicy: "auto_next",
@@ -71,6 +72,7 @@ function validProfile(): SettingsProfile {
     showHiddenFiles: false,
     catalogPalette: "system",
     restoreLastViewer: false,
+    autoRefreshCurrentFolder: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -118,7 +120,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 18, 99, "17", undefined])(
+  it.each([0, 19, 99, "18", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -186,6 +188,13 @@ describe("settings profile", () => {
     delete legacy.showHiddenFiles;
     delete legacy.catalogPalette;
     delete legacy.restoreLastViewer;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P3-005 migrates a v17 profile with automatic refresh enabled", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 17;
+    delete legacy.autoRefreshCurrentFolder;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 

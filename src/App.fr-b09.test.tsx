@@ -43,6 +43,9 @@ vi.mock("./features/library/client", () => ({
   getThumbnail: vi.fn(),
   listFavorites: vi.fn(),
   listFolder: vi.fn(),
+  listenCatalogFolderChanges: vi.fn(async () => () => undefined),
+  watchLibraryFolder: vi.fn(async () => ({ status: "cancelled" })),
+  stopLibraryFolderWatch: vi.fn(async () => ({ status: "cancelled" })),
   listReadingHistory: vi.fn(),
   listTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({

@@ -9,6 +9,7 @@ import {
 } from "./features/navigation/navigation";
 import {
   listFolder,
+  listenCatalogFolderChanges,
   getCatalogSettings,
   getItemMetadata,
   getItemTags,
@@ -23,6 +24,8 @@ import {
   pickSearchSource,
   pickLibraryFile,
   registerLibraryRoot,
+  watchLibraryFolder,
+  stopLibraryFolderWatch,
   restoreLibraryRoot,
   saveCatalogSort,
   saveCatalogViewMode,
@@ -724,6 +727,8 @@ export function App({
   const [catalogPalette, setCatalogPalette] = useState<CatalogPalette>(DEFAULT_CATALOG_PALETTE);
   const [restoreLastViewer, setRestoreLastViewer] = useState(false);
   const restoreLastViewerRef = useRef(false);
+  const [autoRefreshCurrentFolder, setAutoRefreshCurrentFolder] = useState(true);
+  const autoRefreshCurrentFolderRef = useRef(true);
   const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
@@ -1174,6 +1179,11 @@ export function App({
           );
           restoreLastViewerRef.current = response.data.restoreLastViewer === true;
           setRestoreLastViewer(restoreLastViewerRef.current);
+          autoRefreshCurrentFolderRef.current = response.data.autoRefreshCurrentFolder !== false;
+          setAutoRefreshCurrentFolder(autoRefreshCurrentFolderRef.current);
+          if (!autoRefreshCurrentFolderRef.current) {
+            void stopLibraryFolderWatch(generation.current);
+          }
           const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
           void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
             if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
@@ -1357,6 +1367,7 @@ export function App({
         selectionAnchor.current = nextActive;
         setSelectedPath(nextActive);
         setLoadState({ status: "ready" });
+        void configureFolderWatch(relativePath, requestGeneration);
       } else if (response.status === "error") {
         setLoadState({
           status: "error",
@@ -1374,6 +1385,58 @@ export function App({
       }
     }
   }
+
+  async function configureFolderWatch(relativePath: string, requestGeneration: number) {
+    if (!autoRefreshCurrentFolderRef.current) {
+      await stopLibraryFolderWatch(requestGeneration).catch(() => undefined);
+      return;
+    }
+    try {
+      const response = await watchLibraryFolder(relativePath, requestGeneration);
+      if (requestGeneration !== generation.current) return;
+      if (response.status === "error") setSelectionNotice(presentError(response.error));
+    } catch {
+      if (requestGeneration === generation.current) {
+        setSelectionNotice("現在フォルダーを自動監視できません。F5で再読み込みできます。");
+      }
+    }
+  }
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenCatalogFolderChanges((change) => {
+      if (
+        disposed
+        || !autoRefreshCurrentFolder
+        || libraryRoot === null
+        || change.generation !== generation.current
+        || normalizeWindowsDisplayPath(change.libraryRoot).toLocaleLowerCase("en-US")
+          !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+        || change.relativePath !== navigation.current
+      ) return;
+      if (change.status === "error") {
+        setSelectionNotice(change.message
+          ?? "現在フォルダーの自動更新を継続できません。F5で再読み込みできます。");
+        return;
+      }
+      const selection = selectedPaths.length > 0
+        ? selectedPaths
+        : selectedPath === null ? [] : [selectedPath];
+      void load(change.relativePath, selection);
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    }).catch(() => {
+      if (!disposed && autoRefreshCurrentFolder) {
+        setSelectionNotice("自動更新通知を受信できません。F5で再読み込みできます。");
+      }
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [autoRefreshCurrentFolder, libraryRoot, navigation.current, selectedPath, selectedPaths]);
 
   async function selectDrive(
     absolutePath: string,
@@ -2982,6 +3045,7 @@ export function App({
       showHiddenFiles,
       catalogPalette,
       restoreLastViewer,
+      autoRefreshCurrentFolder,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -3094,6 +3158,9 @@ export function App({
       setCatalogPalette(normalized.catalogPalette);
       restoreLastViewerRef.current = normalized.restoreLastViewer;
       setRestoreLastViewer(normalized.restoreLastViewer);
+      const autoRefreshChanged = normalized.autoRefreshCurrentFolder !== autoRefreshCurrentFolder;
+      autoRefreshCurrentFolderRef.current = normalized.autoRefreshCurrentFolder;
+      setAutoRefreshCurrentFolder(normalized.autoRefreshCurrentFolder);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -3101,6 +3168,12 @@ export function App({
       setSelectionNotice("設定profileを適用しました。");
       if (hiddenVisibilityChanged && libraryRoot !== null) {
         void load(navigation.current, selectedPaths);
+      } else if (autoRefreshChanged && libraryRoot !== null) {
+        if (normalized.autoRefreshCurrentFolder) {
+          void configureFolderWatch(navigation.current, generation.current);
+        } else {
+          void stopLibraryFolderWatch(generation.current);
+        }
       }
     } catch {
       if (requestGeneration === settingsGeneration.current) {
@@ -3243,6 +3316,7 @@ export function App({
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
+    autoRefreshCurrentFolder,
     shortcuts, mouseGestures,
   ]);
 

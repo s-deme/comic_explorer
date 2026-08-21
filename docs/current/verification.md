@@ -344,6 +344,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 最大8 sourceと合計50,000結果をRust境界で自動検証。複数source走査の基準PC時間、slow/removable drive、50,000実fileのwall-clockとworking setは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2のfolder picker、cancel、network/removable folder、access変化、結果source表示と移動は未測定。 |
 
+## Leeyes P3-F 現在folder自動更新
+
+対象はLEY-FILER-010の1件。Rust OS watcherを表示中folderへ1件だけ設定し、bounded coalescing後の一致eventを既存catalog再走査へ接続する。設定はstrict profile v18とapp-local SQLiteへ保存する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust / filesystem | PASS | 2件、FAIL 0。実temp folderの100 file burst、rename、delete、watcher drop後の通知停止、250ms coalescing、canonical nested folder、parent traversal拒否、missing/file拒否を含む。 |
+| Focused frontend / profile / typecheck | PASS | App 96件、client 5件、profile 92件、計193件、FAIL 0。current/stale/別path event、残存selection、設定無効化、typed event/command、v17→v18移行を含む。`tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | frontend 31 files / 422件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 536.39kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 193件とshutdown process 1件、FAIL 0。watcher lifecycle、設定永続、既存search・catalog・viewer・file操作・SQLite境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは391.090秒で全12 stageがexit 0。Rust canonical 157.382秒、release executable 86.151秒、GUI権限付きshortcut product回帰15.177秒、SBOM/third-party notice、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | 実100-event burstを250ms windowで1通知へcoalesceし、watcherを常に最大1件とするtestはPASS。10,000-event burst、network/removable drive、基準PCの反映時間・CPU・working setは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2で外部Explorerからの作成・rename・削除、設定切替、watch error表示、F5 fallbackは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

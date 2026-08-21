@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   API_VERSION,
   type ApiResponse,
@@ -179,6 +180,7 @@ export interface CatalogSettings {
   showHiddenFiles: boolean;
   catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
+  autoRefreshCurrentFolder: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -303,6 +305,7 @@ export async function saveSettingsProfile(
       showHiddenFiles: profile.showHiddenFiles,
       catalogPalette: profile.catalogPalette,
       restoreLastViewer: profile.restoreLastViewer,
+      autoRefreshCurrentFolder: profile.autoRefreshCurrentFolder,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },
@@ -439,6 +442,36 @@ export async function listFolder(
     context: context(generation),
     relativePath,
   });
+}
+
+export interface CatalogFolderChange {
+  generation: number;
+  libraryRoot: string;
+  relativePath: string;
+  status: "changed" | "error";
+  message?: string | null;
+}
+
+export async function listenCatalogFolderChanges(
+  handler: (change: CatalogFolderChange) => void,
+): Promise<UnlistenFn> {
+  return listen<CatalogFolderChange>("catalog-folder-changed", (event) => handler(event.payload));
+}
+
+export async function watchLibraryFolder(
+  relativePath: string,
+  generation: number,
+): Promise<ApiResponse<boolean>> {
+  return invoke("watch_library_folder", {
+    context: context(generation),
+    relativePath,
+  });
+}
+
+export async function stopLibraryFolderWatch(
+  generation: number,
+): Promise<ApiResponse<boolean>> {
+  return invoke("stop_library_folder_watch", { context: context(generation) });
 }
 
 export type FileOperationKind =

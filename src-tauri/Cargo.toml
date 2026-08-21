@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 delharc = { version = "=0.6.2", default-features = false, features = ["std", "lh1", "lz"] }
 image = { version = "=0.25.9", default-features = false, features = ["bmp", "gif", "ico", "png", "tiff"] }
 image-webp = "=0.2.4"
+notify = "=8.2.0"
 resvg = { version = "=0.45.1", default-features = false, features = ["system-fonts", "text"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

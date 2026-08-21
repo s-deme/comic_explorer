@@ -1,6 +1,7 @@
 mod coordinator;
 mod display_awake;
 pub mod file_operations;
+mod folder_watch;
 mod library_root;
 mod scheduler;
 mod search_query;
@@ -16,6 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 
 use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
@@ -45,6 +47,7 @@ use search_query::{
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     search_sources: Mutex<BTreeMap<String, PathBuf>>,
+    folder_watch: Mutex<Option<folder_watch::FolderWatch>>,
     navigation: Mutex<NavigationCoordinator>,
     diagnostics: Mutex<NavigationCoordinator>,
     viewer: Arc<Mutex<NavigationCoordinator>>,
@@ -171,6 +174,18 @@ pub struct SearchResultEntry {
     source_root: String,
 }
 
+const CATALOG_FOLDER_CHANGED_EVENT: &str = "catalog-folder-changed";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogFolderChangeEvent {
+    generation: Generation,
+    library_root: String,
+    relative_path: String,
+    status: String,
+    message: Option<String>,
+}
+
 impl Default for AppState {
     fn default() -> Self {
         let (store, library_root, thumbnails, recovered) = AppPaths::discover()
@@ -200,6 +215,7 @@ impl Default for AppState {
         Self {
             library_root: Mutex::new(library_root),
             search_sources: Mutex::new(search_sources),
+            folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -236,6 +252,9 @@ impl AppState {
         }
         if let Ok(mut display_awake) = self.display_awake.lock() {
             let _ = display_awake.set_enabled(false);
+        }
+        if let Ok(mut folder_watch) = self.folder_watch.lock() {
+            folder_watch.take();
         }
         self.thumbnail_workers.shutdown();
         self.page_workers.shutdown();
@@ -446,6 +465,7 @@ pub struct CatalogSettings {
     pub show_hidden_files: bool,
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
+    pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -521,6 +541,7 @@ pub struct SettingsProfileInput {
     pub show_hidden_files: bool,
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
+    pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
@@ -1238,6 +1259,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             _ => "system".into(),
         },
         restore_last_viewer: settings.restore_last_viewer,
+        auto_refresh_current_folder: settings.auto_refresh_current_folder,
         shortcuts,
         mouse_gestures,
     }
@@ -2798,6 +2820,7 @@ pub fn set_settings_profile(
         settings.show_hidden_files = profile.show_hidden_files;
         settings.catalog_palette = profile.catalog_palette;
         settings.restore_last_viewer = profile.restore_last_viewer;
+        settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
         settings.shortcut_bindings = shortcuts;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
@@ -3085,6 +3108,109 @@ pub async fn list_folder(
         .map_err(|_| "state poisoned")?
         .is_current(context.generation);
     Ok(port_response(context, result, is_current))
+}
+
+#[tauri::command]
+pub fn watch_library_folder(
+    state: tauri::State<'_, AppState>,
+    app: tauri::AppHandle,
+    context: RequestContext,
+    relative_path: String,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let relative = match RelativePath::parse(relative_path.clone()) {
+        Ok(path) => path,
+        Err(message) => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, message),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let directory = match resolve_watch_directory(&root, &relative) {
+        Ok(directory) => directory,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let event_root = library_root::display_path(&root);
+    let event_relative = relative.as_str().to_owned();
+    let event_generation = context.generation;
+    let watcher = match folder_watch::FolderWatch::start(&directory, move |signal| {
+        let (status, message) = match signal {
+            folder_watch::WatchSignal::Changed => ("changed", None),
+            folder_watch::WatchSignal::Error(_) => (
+                "error",
+                Some("現在フォルダーの自動更新を継続できません。F5で再読み込みできます。".into()),
+            ),
+        };
+        let _ = app.emit(
+            CATALOG_FOLDER_CHANGED_EVENT,
+            CatalogFolderChangeEvent {
+                generation: event_generation,
+                library_root: event_root.clone(),
+                relative_path: event_relative.clone(),
+                status: status.into(),
+                message,
+            },
+        );
+    }) {
+        Ok(watcher) => watcher,
+        Err(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::Internal,
+                    "Current folder automatic refresh is unavailable.",
+                ),
+            ));
+        }
+    };
+    state
+        .folder_watch
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .replace(watcher);
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: true,
+    })
+}
+
+#[tauri::command]
+pub fn stop_library_folder_watch(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stopped = state
+        .folder_watch
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .take()
+        .is_some();
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: stopped,
+    })
 }
 
 #[tauri::command]
@@ -3854,6 +3980,27 @@ fn enumerate_folder_port(
 
 fn reset_thumbnail_pins_for_navigation(pins: &ThumbnailPins) -> Result<(), AppError> {
     pins.clear()
+}
+
+fn resolve_watch_directory(root: &Path, relative: &RelativePath) -> Result<PathBuf, AppError> {
+    let directory = root
+        .join(relative.as_str())
+        .canonicalize()
+        .map_err(|source| {
+            let code = match source.kind() {
+                std::io::ErrorKind::NotFound => ErrorCode::NotFound,
+                std::io::ErrorKind::PermissionDenied => ErrorCode::AccessDenied,
+                _ => ErrorCode::InvalidPath,
+            };
+            request_error(code, "Current folder cannot be watched.")
+        })?;
+    if !directory.starts_with(root) || !directory.is_dir() {
+        return Err(request_error(
+            ErrorCode::InvalidPath,
+            "Watch folder is outside the library root or is not a directory.",
+        ));
+    }
+    Ok(directory)
 }
 
 const MAX_SEARCH_SOURCES: usize = 8;
@@ -5219,6 +5366,7 @@ mod shutdown_tests {
             show_hidden_files: false,
             catalog_palette: "system".into(),
             restore_last_viewer: false,
+            auto_refresh_current_folder: true,
             shortcuts: default_shortcuts(),
             mouse_gestures: default_mouse_gestures(),
         };
@@ -5534,6 +5682,7 @@ mod shutdown_tests {
         let state = AppState {
             library_root: Mutex::new(None),
             search_sources: Mutex::new(BTreeMap::new()),
+            folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -5581,6 +5730,7 @@ mod shutdown_tests {
         let state = AppState {
             library_root: Mutex::new(None),
             search_sources: Mutex::new(BTreeMap::new()),
+            folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -6033,6 +6183,37 @@ mod shutdown_tests {
             .code,
             ErrorCode::ResourceLimit
         );
+    }
+
+    #[test]
+    fn req_ley_p3_005_watch_directory_stays_inside_the_canonical_library_root() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-watch-containment-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(root.join("Nested")).unwrap();
+        std::fs::write(root.join("file.cbz"), b"not a directory").unwrap();
+        let canonical_root = root.canonicalize().unwrap();
+        let nested = RelativePath::parse("Nested").unwrap();
+        assert_eq!(
+            resolve_watch_directory(&canonical_root, &nested).unwrap(),
+            root.join("Nested").canonicalize().unwrap()
+        );
+        assert!(RelativePath::parse("../outside").is_err());
+        assert_eq!(
+            resolve_watch_directory(&canonical_root, &RelativePath::parse("missing").unwrap(),)
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+        assert_eq!(
+            resolve_watch_directory(&canonical_root, &RelativePath::parse("file.cbz").unwrap(),)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

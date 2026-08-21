@@ -120,6 +120,7 @@ pub struct Settings {
     pub show_hidden_files: bool,
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
+    pub auto_refresh_current_folder: bool,
     pub shortcut_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
@@ -221,6 +222,7 @@ impl Default for Settings {
             show_hidden_files: false,
             catalog_palette: "system".into(),
             restore_last_viewer: false,
+            auto_refresh_current_folder: true,
             shortcut_bindings: default_shortcut_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
@@ -355,6 +357,9 @@ impl StateStore {
                 "showHiddenFiles" => settings.show_hidden_files = value == "true",
                 "catalogPalette" => settings.catalog_palette = value,
                 "restoreLastViewer" => settings.restore_last_viewer = value == "true",
+                "autoRefreshCurrentFolder" => {
+                    settings.auto_refresh_current_folder = value == "true"
+                }
                 "shortcutBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.shortcut_bindings = bindings;
@@ -502,6 +507,10 @@ impl StateStore {
             (
                 "restoreLastViewer",
                 settings.restore_last_viewer.to_string(),
+            ),
+            (
+                "autoRefreshCurrentFolder",
+                settings.auto_refresh_current_folder.to_string(),
             ),
             ("shortcutBindings", shortcut_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
@@ -1696,6 +1705,7 @@ mod tests {
                 show_hidden_files: true,
                 catalog_palette: "midnight".into(),
                 restore_last_viewer: true,
+                auto_refresh_current_folder: false,
                 shortcut_bindings: [
                     ("nextPage".into(), "N".into()),
                     ("previousPage".into(), "P".into()),
@@ -1802,6 +1812,7 @@ mod tests {
         assert!(restored.show_hidden_files);
         assert_eq!(restored.catalog_palette, "midnight");
         assert!(restored.restore_last_viewer);
+        assert!(!restored.auto_refresh_current_folder);
         assert_eq!(restored.shortcut_bindings["nextPage"], "N");
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],

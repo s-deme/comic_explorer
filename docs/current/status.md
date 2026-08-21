@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 5 | 26 |
+| P3 操作・検索 | 31 | 6 | 25 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **42** | **61** |
+| **合計** | **103** | **43** | **60** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -86,6 +86,8 @@ P3-BではLEY-CATALOG-006をPublishedとした。既存のTypeScript regex mask�
 P3-CではLEY-CATALOG-007をPublishedとした。folder/file、最小/最大size、local calendar開始/終了日を同じRust batch評価へ追加し、欠落metadata・範囲逆転・両種別無効を拒否する。条件一式はapp-local SQLite schema v6へ最大32件、同名atomic置換、更新順list、確認後削除として保存し、選択時はdraftだけを復元する。synthetic 10,000複合評価は104.382ms、frontend 417件、Python 59件、Rust 189+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2のtimezone/DST別日付、100,000件IPC/working set、SQLite同時利用は未測定として残す。
 
 P3-D/EではLEY-SEARCH-001/002をPublishedとした。Windows folder pickerで明示した最大8 sourceをRustのsession allowlistへ登録し、未承認pathを拒否して同じRust search portで順次横断する。重なるsourceのcanonical itemは先行sourceへ統合し、全体50,000件上限、missing/cancel、source別結果表示と結果sourceへの再登録・親folder移動を接続した。frontend 419件、Python 59件、Rust 191+1件、typecheck、build、Windows canonical全12 stageはPASSした。release folder pickerの直接操作、50,000実file、slow/removable driveの時間・working setは未測定として残す。
+
+P3-FではLEY-FILER-010をPublishedとした。既定有効・profile v18/SQLite永続の設定で、Rust `notify` OS watcherを表示中canonical folderへ非再帰で最大1件だけ設定し、250ms windowでevent stormをcoalesceする。generation/root/pathが一致するeventだけを既存一覧再走査へ渡し、残存selectionを復元する。frontend 422件、Python 59件、Rust 193+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2、network/removable drive、10,000-event burstの反映時間・CPU・working setは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
