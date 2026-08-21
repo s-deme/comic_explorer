@@ -99,6 +99,8 @@ P3-JではLEY-CATALOG-016をPublishedとした。サムネイル管理から現�
 
 P3-KではLEY-FILE-020をPublishedとした。library内dragは同一driveの明示folder targetへ既定move、Ctrlでcopyとし、Explorerからのnative dropはRustが最大256件の絶対pathをpreview・実行直前に再検証して、確認後もcopyだけを行う。Alt+dragの外向き操作はRustがWindows Shell `IDataObject`を構築し、copy effectだけで`SHDoDragDrop`を開始する。TypeScriptは座標・修飾key・確認UIの調整だけを担当する。frontend 32 files / 442件、Python 61件、Rust 207+1件、typecheck、build、Windows canonical全12 stageはPASSした。最初のcanonicalで既存FT-B14-001の1秒待機flakeを検出し、10秒の明示待機へ安定化して単独10/10 PASS後に全体を再実行した。実Explorerとのdrag in/out、100/150/200% DPI、network/removable drive、大量・大容量copyの時間・CPU・working setは未測定として残す。
 
+P3-LではLEY-INPUT-001をPublishedとした。各catalog/viewer commandへ順序付きで1〜4個のkeyboard bindingを追加・編集・削除でき、command単位と全体のreset、全bindingのdispatch、offline help表示を接続した。Rust registryが既知command、canonical key、件数、command内重複、command間競合、予約keyを検証し、配列をSQLiteへatomic保存する。既存SQLiteとstrict profile v1〜v21の単一文字列はprofile v22の1要素配列へ移行する。frontend 32 files / 444件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。実keyboard layout、IME、AltGr、OS別system予約key差とalternate bindingのrelease UI直接操作は未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

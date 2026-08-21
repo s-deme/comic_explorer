@@ -8,9 +8,9 @@ describe("offline help", () => {
   afterEach(cleanup);
 
   it("REQ-LEY-P1-015 searches bundled topics and keeps current shortcuts", () => {
-    render(<OfflineHelp shortcuts={{ ...DEFAULT_SHORTCUTS, nextPage: "N" }} onClose={vi.fn()} />);
+    render(<OfflineHelp shortcuts={{ ...DEFAULT_SHORTCUTS, nextPage: ["N", "PageDown"] }} onClose={vi.fn()} />);
     expect(screen.getByRole("region", { name: "プライバシーと安全" })).toHaveTextContent("外部通信を行わず");
-    expect(screen.getByText("N")).toBeInTheDocument();
+    expect(screen.getByText("N / PageDown")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "ヘルプを検索" }), { target: { value: "ごみ箱" } });
     expect(screen.getByRole("region", { name: "ファイル操作" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "ビューワ" })).not.toBeInTheDocument();

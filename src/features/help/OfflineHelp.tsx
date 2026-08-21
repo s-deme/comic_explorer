@@ -69,7 +69,7 @@ export function OfflineHelp({ shortcuts, onClose }: {
         <section aria-label="現在のショートカット">
           <h3>現在のショートカット</h3>
           <dl>{SHORTCUT_COMMANDS.map((command) => (
-            <div key={command}><dt>{SHORTCUT_LABELS[command]}</dt><dd>{shortcuts[command]}</dd></div>
+            <div key={command}><dt>{SHORTCUT_LABELS[command]}</dt><dd>{shortcuts[command].join(" / ")}</dd></div>
           ))}</dl>
         </section>
         <button type="button" data-product-id="shortcut-dialog-close" onClick={onClose}>閉じる</button>

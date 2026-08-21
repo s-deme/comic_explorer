@@ -243,7 +243,12 @@ export interface SettingsDialogProps {
   onCancel: () => void;
   onExport: () => void;
   onImport: (event: ChangeEvent<HTMLInputElement>) => void;
-  onShortcutKeyDown: (command: ShortcutCommand, event: KeyboardEvent<HTMLInputElement>) => void;
+  onShortcutKeyDown: (
+    command: ShortcutCommand,
+    index: number,
+    event: KeyboardEvent<HTMLElement>,
+  ) => void;
+  onRemoveShortcut: (command: ShortcutCommand, index: number) => void;
   onResetShortcut: (command: ShortcutCommand) => void;
   onResetAllShortcuts: () => void;
   onMouseGestureChange: (name: MouseGestureName, action: MouseGestureAction) => void;
@@ -288,6 +293,7 @@ export function SettingsDialog({
   onExport,
   onImport,
   onShortcutKeyDown,
+  onRemoveShortcut,
   onResetShortcut,
   onResetAllShortcuts,
   onMouseGestureChange,
@@ -539,7 +545,7 @@ export function SettingsDialog({
     ...SHORTCUT_COMMANDS.map((command) => ({
       id: `shortcut-${command}`,
       category: "commands" as const,
-      text: `${SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]} ${SHORTCUT_LABELS[command]} ショートカット キー コマンド ${draft.shortcuts[command]} ${DEFAULT_SHORTCUTS[command]} ${SHORTCUT_FALLBACKS[command]} ${SHORTCUT_DESCRIPTIONS[command]} ${CONFIGURABLE_MOUSE_GESTURE_NAMES.filter((name) => draft.mouseGestures[name] === command).map((name) => GESTURE_LABELS[name]).join(" ")}`,
+      text: `${SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]} ${SHORTCUT_LABELS[command]} ショートカット キー コマンド ${draft.shortcuts[command].join(" ")} ${DEFAULT_SHORTCUTS[command].join(" ")} ${SHORTCUT_FALLBACKS[command]} ${SHORTCUT_DESCRIPTIONS[command]} ${CONFIGURABLE_MOUSE_GESTURE_NAMES.filter((name) => draft.mouseGestures[name] === command).map((name) => GESTURE_LABELS[name]).join(" ")}`,
     })),
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
@@ -1308,13 +1314,36 @@ export function SettingsDialog({
                 >
                   <span className="settings-command-group">{SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]}</span>
                   <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
-                  <input
-                    id={`shortcut-${command}`}
-                    aria-label={`${SHORTCUT_LABELS[command]}ショートカット`}
-                    value={draft.shortcuts[command]}
-                    readOnly
-                    onKeyDown={(event) => onShortcutKeyDown(command, event)}
-                  />
+                  <div className="settings-shortcut-bindings">
+                    {draft.shortcuts[command].map((binding, index) => (
+                      <span className="settings-shortcut-binding" key={`${command}-${index}`}>
+                        <input
+                          id={index === 0 ? `shortcut-${command}` : undefined}
+                          aria-label={`${SHORTCUT_LABELS[command]}ショートカット${index === 0 ? "" : ` ${index + 1}`}`}
+                          value={binding}
+                          readOnly
+                          onKeyDown={(event) => onShortcutKeyDown(command, index, event)}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`${SHORTCUT_LABELS[command]}ショートカット ${index + 1} を削除`}
+                          disabled={draft.shortcuts[command].length === 1}
+                          onClick={() => onRemoveShortcut(command, index)}
+                        >削除</button>
+                      </span>
+                    ))}
+                    {draft.shortcuts[command].length < 4 && (
+                      <button
+                        type="button"
+                        aria-label={`${SHORTCUT_LABELS[command]}へキーを追加`}
+                        onKeyDown={(event) => onShortcutKeyDown(
+                          command,
+                          draft.shortcuts[command].length,
+                          event,
+                        )}
+                      >キーを追加（選択してキー入力）</button>
+                    )}
+                  </div>
                   <span className="settings-command-mouse">
                     {CONFIGURABLE_MOUSE_GESTURE_NAMES
                       .filter((name) => draft.mouseGestures[name] === command)
@@ -1323,7 +1352,7 @@ export function SettingsDialog({
                   </span>
                   <span className="settings-command-description">
                     {SHORTCUT_DESCRIPTIONS[command]}
-                    <small>既定: {DEFAULT_SHORTCUTS[command]} / 代替: {SHORTCUT_FALLBACKS[command]}</small>
+                    <small>既定: {DEFAULT_SHORTCUTS[command].join(" / ")} / 代替: {SHORTCUT_FALLBACKS[command]}</small>
                   </span>
                   <button type="button" aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`} onClick={() => onResetShortcut(command)}>戻す</button>
                 </div>

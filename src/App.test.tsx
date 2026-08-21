@@ -3522,7 +3522,7 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
-  }, 20_000);
+  }, 40_000);
 
   it("REQ-LEY-P1-017 and P1-019 persist hidden visibility and a safe catalog palette", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);

@@ -363,7 +363,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     await waitFor(() =>
       expect(saveSettingsMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          shortcuts: expect.objectContaining({ nextPage: "N" }),
+          shortcuts: expect.objectContaining({ nextPage: ["N"] }),
         }),
         expect.any(Number),
       ),
@@ -402,6 +402,44 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     await waitFor(() => expect(resetDialog).not.toBeInTheDocument());
   });
 
+  it("REQ-LEY-P3-011 adds, dispatches, removes, and saves an alternate key", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
+    openSettingsMenuItem();
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const add = within(dialog).getByRole("button", { name: "検索ペインを切り替えるへキーを追加" });
+    fireEvent.keyDown(add, { key: "k", ctrlKey: true });
+    expect(within(dialog).getByRole("textbox", {
+      name: "検索ペインを切り替えるショートカット 2",
+    })).toHaveValue("Ctrl+K");
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(saveSettingsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        shortcuts: expect.objectContaining({ toggleSearch: ["Ctrl+F", "Ctrl+K"] }),
+      }),
+      expect.any(Number),
+    );
+
+    const catalogItem = screen.getByRole("button", { name: /^book\.cbz/ });
+    catalogItem.focus();
+    fireEvent.keyDown(catalogItem, { key: "k", ctrlKey: true });
+    await waitFor(() => expect(
+      screen.getByRole("complementary", { name: "検索ペイン" }),
+    ).toBeInTheDocument());
+
+    openSettingsMenuItem();
+    const removeDialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(removeDialog).getByRole("button", {
+      name: "検索ペインを切り替えるショートカット 2 を削除",
+    }));
+    expect(within(removeDialog).queryByRole("textbox", {
+      name: "検索ペインを切り替えるショートカット 2",
+    })).not.toBeInTheDocument();
+    expect(within(removeDialog).getByRole("button", {
+      name: "検索ペインを切り替えるショートカット 1 を削除",
+    })).toBeDisabled();
+  });
+
   it("FT-B11-006 connects a remapped catalog command to the application shell", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     openSettingsMenuItem();
@@ -428,7 +466,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
 
   it("FT-B11-004 keeps keyboard fallback, suppresses focused input, and stops at the Viewer/navigation boundary", async () => {
     const entry = testEntry("book.cbz");
-    settingsMock.mockResolvedValue(settingsResponse({ nextPage: "N" }));
+    settingsMock.mockResolvedValue(settingsResponse({ nextPage: ["N", "PageDown"] }));
     openMock.mockResolvedValue({
       status: "ok",
       requestId: "open" as never,
@@ -460,7 +498,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
 
   it("FT-B11-005 persists across restart and keeps help read-only with safe default recovery", async () => {
     settingsMock.mockResolvedValue(
-      settingsResponse({ nextPage: "N", previousPage: "N" }),
+      settingsResponse({ nextPage: ["N"], previousPage: ["N"] }),
     );
     await registerTestLibrary([]);
     openSettingsMenuItem();
@@ -475,7 +513,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     ).toHaveValue("PageUp");
 
     cleanup();
-    settingsMock.mockResolvedValue(settingsResponse({ nextPage: "N" }));
+    settingsMock.mockResolvedValue(settingsResponse({ nextPage: ["N"] }));
     await registerTestLibrary([]);
     openSettingsMenuItem();
     expect(

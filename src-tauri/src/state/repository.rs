@@ -14,7 +14,7 @@ const SCHEMA_VERSION: i64 = 6;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 
-fn default_shortcut_bindings() -> BTreeMap<String, String> {
+fn default_shortcut_bindings() -> BTreeMap<String, Vec<String>> {
     [
         ("openSelected", "Enter"),
         ("navigateBack", "Alt+ArrowLeft"),
@@ -34,7 +34,7 @@ fn default_shortcut_bindings() -> BTreeMap<String, String> {
         ("toggleFullscreen", "F11"),
     ]
     .into_iter()
-    .map(|(command, shortcut)| (command.to_owned(), shortcut.to_owned()))
+    .map(|(command, shortcut)| (command.to_owned(), vec![shortcut.to_owned()]))
     .collect()
 }
 
@@ -132,7 +132,7 @@ pub struct Settings {
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
-    pub shortcut_bindings: BTreeMap<String, String>,
+    pub shortcut_bindings: BTreeMap<String, Vec<String>>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
 
@@ -396,8 +396,17 @@ impl StateStore {
                     settings.auto_refresh_current_folder = value == "true"
                 }
                 "shortcutBindings" => {
-                    if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
+                    if let Ok(bindings) =
+                        serde_json::from_str::<BTreeMap<String, Vec<String>>>(&value)
+                    {
                         settings.shortcut_bindings = bindings;
+                    } else if let Ok(legacy) =
+                        serde_json::from_str::<BTreeMap<String, String>>(&value)
+                    {
+                        settings.shortcut_bindings = legacy
+                            .into_iter()
+                            .map(|(command, shortcut)| (command, vec![shortcut]))
+                            .collect();
                     }
                 }
                 "mouseGestureBindings" => {
@@ -1689,6 +1698,53 @@ mod tests {
     }
 
     #[test]
+    fn req_ley_p3_011_migrates_single_shortcut_values_and_persists_arrays() {
+        let paths = temporary_paths("shortcut-array-migration");
+        let legacy = default_shortcut_bindings()
+            .into_iter()
+            .map(|(command, bindings)| (command, bindings[0].clone()))
+            .collect::<BTreeMap<_, _>>();
+        {
+            let (mut store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            store
+                .connection
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES('shortcutBindings', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    [serde_json::to_string(&legacy).unwrap()],
+                )
+                .unwrap();
+            let mut settings = store.load_settings().unwrap();
+            assert_eq!(settings.shortcut_bindings["nextPage"], ["PageDown"]);
+            settings
+                .shortcut_bindings
+                .get_mut("nextPage")
+                .unwrap()
+                .push("N".into());
+            store.save_settings(&settings).unwrap();
+        }
+        {
+            let (store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            let restored = store.load_settings().unwrap();
+            assert_eq!(restored.shortcut_bindings["nextPage"], ["PageDown", "N"]);
+            let encoded: String = store
+                .connection
+                .query_row(
+                    "SELECT value FROM settings WHERE key = 'shortcutBindings'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            let persisted =
+                serde_json::from_str::<BTreeMap<String, Vec<String>>>(&encoded).unwrap();
+            assert_eq!(persisted["nextPage"], ["PageDown", "N"]);
+        }
+        let _ = fs::remove_dir_all(paths.root);
+    }
+
+    #[test]
     fn fr_b17_catalog_card_modes_and_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
@@ -1770,14 +1826,14 @@ mod tests {
                 restore_last_viewer: true,
                 auto_refresh_current_folder: false,
                 shortcut_bindings: [
-                    ("nextPage".into(), "N".into()),
-                    ("previousPage".into(), "P".into()),
-                    ("closeViewer".into(), "Escape".into()),
-                    ("singlePage".into(), "1".into()),
-                    ("spreadPage".into(), "2".into()),
-                    ("toggleDirection".into(), "R".into()),
-                    ("zoomIn".into(), "+".into()),
-                    ("zoomOut".into(), "-".into()),
+                    ("nextPage".into(), vec!["N".into(), "PageDown".into()]),
+                    ("previousPage".into(), vec!["P".into()]),
+                    ("closeViewer".into(), vec!["Escape".into()]),
+                    ("singlePage".into(), vec!["1".into()]),
+                    ("spreadPage".into(), vec!["2".into()]),
+                    ("toggleDirection".into(), vec!["R".into()]),
+                    ("zoomIn".into(), vec!["+".into()]),
+                    ("zoomOut".into(), vec!["-".into()]),
                 ]
                 .into_iter()
                 .collect(),
@@ -1887,7 +1943,7 @@ mod tests {
         assert_eq!(restored.catalog_palette, "midnight");
         assert!(restored.restore_last_viewer);
         assert!(!restored.auto_refresh_current_folder);
-        assert_eq!(restored.shortcut_bindings["nextPage"], "N");
+        assert_eq!(restored.shortcut_bindings["nextPage"], ["N", "PageDown"]);
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],
             "closeViewer"

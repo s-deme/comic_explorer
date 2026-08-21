@@ -43,27 +43,35 @@ const MIGRATION_SHORTCUT_FALLBACKS = [
 export type ShortcutCommand = (typeof SHORTCUT_COMMANDS)[number];
 export type CatalogShortcutCommand = (typeof CATALOG_SHORTCUT_COMMANDS)[number];
 export type ViewerShortcutCommand = (typeof VIEWER_SHORTCUT_COMMANDS)[number];
-export type ShortcutBindings = Record<ShortcutCommand, string>;
+export type ShortcutBindings = Record<ShortcutCommand, string[]>;
 export type ShortcutGroup = "catalog" | "viewer";
 
 export const DEFAULT_SHORTCUTS: ShortcutBindings = {
-  openSelected: "Enter",
-  navigateBack: "Alt+ArrowLeft",
-  navigateForward: "Alt+ArrowRight",
-  navigateUp: "Alt+ArrowUp",
-  refreshCatalog: "F5",
-  toggleSearch: "Ctrl+F",
-  nextPage: "PageDown",
-  previousPage: "PageUp",
-  closeViewer: "Escape",
-  singlePage: "1",
-  spreadPage: "2",
-  toggleDirection: "R",
-  zoomIn: "+",
-  zoomOut: "-",
-  toggleLoupe: "L",
-  toggleFullscreen: "F11",
+  openSelected: ["Enter"],
+  navigateBack: ["Alt+ArrowLeft"],
+  navigateForward: ["Alt+ArrowRight"],
+  navigateUp: ["Alt+ArrowUp"],
+  refreshCatalog: ["F5"],
+  toggleSearch: ["Ctrl+F"],
+  nextPage: ["PageDown"],
+  previousPage: ["PageUp"],
+  closeViewer: ["Escape"],
+  singlePage: ["1"],
+  spreadPage: ["2"],
+  toggleDirection: ["R"],
+  zoomIn: ["+"],
+  zoomOut: ["-"],
+  toggleLoupe: ["L"],
+  toggleFullscreen: ["F11"],
 };
+
+export const MAX_SHORTCUTS_PER_COMMAND = 4;
+
+function cloneShortcutBindings(bindings: ShortcutBindings): ShortcutBindings {
+  return Object.fromEntries(
+    SHORTCUT_COMMANDS.map((command) => [command, [...bindings[command]]]),
+  ) as ShortcutBindings;
+}
 
 export const SHORTCUT_LABELS: Record<ShortcutCommand, string> = {
   openSelected: "選択項目を開く",
@@ -283,7 +291,10 @@ function isCatalogCommandTarget(target: EventTarget | null): boolean {
   return button === null || button.classList.contains("catalog-item");
 }
 
-export function validateShortcutBindings(value: unknown): ShortcutBindings | null {
+export function validateShortcutBindings(
+  value: unknown,
+  allowLegacySingles = false,
+): ShortcutBindings | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -301,25 +312,37 @@ export function validateShortcutBindings(value: unknown): ShortcutBindings | nul
   const sourceCommands = legacyShape ? LEGACY_SHORTCUT_COMMANDS : SHORTCUT_COMMANDS;
   for (const command of sourceCommands) {
     const raw = candidate[command];
-    const shortcut = normalizeShortcut(raw);
+    const rawBindings = Array.isArray(raw)
+      ? raw
+      : allowLegacySingles && typeof raw === "string" ? [raw] : null;
     if (
-      shortcut === null
-      || RESERVED_SHORTCUTS[shortcut] !== undefined
-      || seen.has(shortcut)
+      rawBindings === null
+      || rawBindings.length < 1
+      || rawBindings.length > MAX_SHORTCUTS_PER_COMMAND
     ) return null;
-    normalized[command] = shortcut;
-    seen.add(shortcut);
+    const bindings: string[] = [];
+    for (const rawBinding of rawBindings) {
+      const shortcut = normalizeShortcut(rawBinding);
+      if (
+        shortcut === null
+        || RESERVED_SHORTCUTS[shortcut] !== undefined
+        || seen.has(shortcut)
+      ) return null;
+      bindings.push(shortcut);
+      seen.add(shortcut);
+    }
+    normalized[command] = bindings;
   }
   if (legacyShape) {
     let fallbackIndex = 0;
     for (const command of MIGRATED_SHORTCUT_COMMANDS) {
-      let shortcut = DEFAULT_SHORTCUTS[command];
+      let shortcut = DEFAULT_SHORTCUTS[command][0];
       while (seen.has(shortcut)) {
         shortcut = MIGRATION_SHORTCUT_FALLBACKS[fallbackIndex] ?? "";
         fallbackIndex += 1;
         if (shortcut === "") return null;
       }
-      normalized[command] = shortcut;
+      normalized[command] = [shortcut];
       seen.add(shortcut);
     }
   }
@@ -327,11 +350,11 @@ export function validateShortcutBindings(value: unknown): ShortcutBindings | nul
 }
 
 export function normalizeShortcutBindings(value: unknown): ShortcutBindings {
-  return validateShortcutBindings(value) ?? { ...DEFAULT_SHORTCUTS };
+  return validateShortcutBindings(value, true) ?? cloneShortcutBindings(DEFAULT_SHORTCUTS);
 }
 
 export function resetShortcutBindings(): ShortcutBindings {
-  return { ...DEFAULT_SHORTCUTS };
+  return cloneShortcutBindings(DEFAULT_SHORTCUTS);
 }
 
 export type RemapShortcutResult =
@@ -347,6 +370,7 @@ export function remapShortcut(
   bindings: ShortcutBindings,
   command: ShortcutCommand,
   value: unknown,
+  index = 0,
 ): RemapShortcutResult {
   const shortcut = normalizeShortcut(value);
   if (shortcut === null) return { ok: false, reason: "invalid" };
@@ -355,14 +379,37 @@ export function remapShortcut(
     return { ok: false, reason: "reserved", reservedLabel };
   }
   const conflict = SHORTCUT_COMMANDS.find(
-    (candidate) => candidate !== command && bindings[candidate] === shortcut,
+    (candidate) => bindings[candidate].some(
+      (binding, bindingIndex) => binding === shortcut
+        && (candidate !== command || bindingIndex !== index),
+    ),
   );
   if (conflict !== undefined) {
     return { ok: false, reason: "conflict", conflict };
   }
+  const current = bindings[command];
+  if (index < 0 || index > current.length || index >= MAX_SHORTCUTS_PER_COMMAND) {
+    return { ok: false, reason: "invalid" };
+  }
+  const next = [...current];
+  if (index === current.length) next.push(shortcut);
+  else next[index] = shortcut;
   return {
     ok: true,
-    bindings: { ...bindings, [command]: shortcut },
+    bindings: { ...bindings, [command]: next },
+  };
+}
+
+export function removeShortcut(
+  bindings: ShortcutBindings,
+  command: ShortcutCommand,
+  index: number,
+): ShortcutBindings | null {
+  const current = bindings[command];
+  if (current.length <= 1 || index < 0 || index >= current.length) return null;
+  return {
+    ...bindings,
+    [command]: current.filter((_, bindingIndex) => bindingIndex !== index),
   };
 }
 
@@ -373,7 +420,7 @@ export function customShortcutCommand(
   if (isTextInputTarget(event.target)) return undefined;
   const pressed = eventShortcut(event);
   if (pressed === null) return undefined;
-  return SHORTCUT_COMMANDS.find((command) => bindings[command] === pressed);
+  return SHORTCUT_COMMANDS.find((command) => bindings[command].includes(pressed));
 }
 
 export function customCatalogShortcutCommand(
@@ -384,7 +431,7 @@ export function customCatalogShortcutCommand(
   const pressed = eventShortcut(event);
   if (pressed === null) return undefined;
   return CATALOG_SHORTCUT_COMMANDS.find(
-    (command) => bindings[command] === pressed,
+    (command) => bindings[command].includes(pressed),
   );
 }
 

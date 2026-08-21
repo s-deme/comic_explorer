@@ -83,7 +83,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 21;
+export const SETTINGS_PROFILE_VERSION = 22;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -358,7 +358,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
   const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);
-  const shortcuts = strictShortcutBindings(candidate.shortcuts);
+  const shortcuts = strictShortcutBindings(
+    candidate.shortcuts,
+    candidate.profileVersion !== SETTINGS_PROFILE_VERSION,
+  );
   const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
   const legacyViewerAppearance =
     candidate.profileVersion === 1
@@ -536,6 +539,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 18
       && candidate.profileVersion !== 19
       && candidate.profileVersion !== 20
+      && candidate.profileVersion !== 21
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -734,8 +738,11 @@ function enumValue<T extends string>(
     : null;
 }
 
-function strictShortcutBindings(value: unknown): ShortcutBindings | null {
-  return validateShortcutBindings(value);
+function strictShortcutBindings(
+  value: unknown,
+  allowLegacySingles = false,
+): ShortcutBindings | null {
+  return validateShortcutBindings(value, allowLegacySingles);
 }
 
 function strictMouseGestureBindings(value: unknown): MouseGestureBindings | null {

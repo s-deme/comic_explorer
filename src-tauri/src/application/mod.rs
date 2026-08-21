@@ -515,7 +515,7 @@ pub struct CatalogSettings {
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
-    pub shortcuts: BTreeMap<String, String>,
+    pub shortcuts: BTreeMap<String, Vec<String>>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -602,7 +602,7 @@ pub struct SettingsProfileInput {
     pub catalog_palette: String,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
-    pub shortcuts: BTreeMap<String, String>,
+    pub shortcuts: BTreeMap<String, Vec<String>>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -757,7 +757,7 @@ const MOUSE_GESTURE_ACTIONS: [&str; 11] = [
     "toggleFullscreen",
 ];
 
-fn default_shortcuts() -> BTreeMap<String, String> {
+fn default_shortcuts() -> BTreeMap<String, Vec<String>> {
     [
         ("openSelected", "Enter"),
         ("navigateBack", "Alt+ArrowLeft"),
@@ -777,7 +777,7 @@ fn default_shortcuts() -> BTreeMap<String, String> {
         ("toggleFullscreen", "F11"),
     ]
     .into_iter()
-    .map(|(command, shortcut)| (command.to_owned(), shortcut.to_owned()))
+    .map(|(command, shortcut)| (command.to_owned(), vec![shortcut.to_owned()]))
     .collect()
 }
 
@@ -833,7 +833,9 @@ fn valid_shortcut_key(value: &str) -> bool {
                 .is_some_and(|value| (1..=12).contains(&value)))
 }
 
-fn normalize_shortcuts(shortcuts: &BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
+fn normalize_shortcuts(
+    shortcuts: &BTreeMap<String, Vec<String>>,
+) -> Option<BTreeMap<String, Vec<String>>> {
     let full_shape = shortcuts.len() == SHORTCUT_COMMANDS.len()
         && shortcuts
             .keys()
@@ -843,43 +845,48 @@ fn normalize_shortcuts(shortcuts: &BTreeMap<String, String>) -> Option<BTreeMap<
             .keys()
             .all(|command| LEGACY_SHORTCUT_COMMANDS.contains(&command.as_str()));
     if (!full_shape && !legacy_shape)
-        || shortcuts.values().any(|shortcut| {
-            !valid_shortcut_key(shortcut)
-                || matches!(
-                    shortcut.as_str(),
-                    "Alt+F"
-                        | "Alt+E"
-                        | "Alt+V"
-                        | "Alt+O"
-                        | "Alt+H"
-                        | "Alt+F4"
-                        | "Ctrl+X"
-                        | "Ctrl+C"
-                        | "Ctrl+V"
-                        | "Delete"
-                )
+        || shortcuts.values().any(|bindings| {
+            bindings.is_empty()
+                || bindings.len() > 4
+                || bindings.iter().any(|shortcut| {
+                    !valid_shortcut_key(shortcut)
+                        || matches!(
+                            shortcut.as_str(),
+                            "Alt+F"
+                                | "Alt+E"
+                                | "Alt+V"
+                                | "Alt+O"
+                                | "Alt+H"
+                                | "Alt+F4"
+                                | "Ctrl+X"
+                                | "Ctrl+C"
+                                | "Ctrl+V"
+                                | "Delete"
+                        )
+                })
         })
     {
         return None;
     }
     let mut normalized = shortcuts.clone();
     let mut seen = std::collections::BTreeSet::new();
-    if normalized
-        .values()
-        .any(|shortcut| !seen.insert(shortcut.clone()))
-    {
-        return None;
+    for bindings in normalized.values() {
+        for shortcut in bindings {
+            if !seen.insert(shortcut.clone()) {
+                return None;
+            }
+        }
     }
     if legacy_shape {
         let defaults = default_shortcuts();
         let mut fallback_index = 0;
         for command in MIGRATED_SHORTCUT_COMMANDS {
-            let mut shortcut = defaults[command].as_str();
+            let mut shortcut = defaults[command][0].as_str();
             while seen.contains(shortcut) {
                 shortcut = MIGRATION_SHORTCUT_FALLBACKS.get(fallback_index)?;
                 fallback_index += 1;
             }
-            normalized.insert(command.to_owned(), shortcut.to_owned());
+            normalized.insert(command.to_owned(), vec![shortcut.to_owned()]);
             seen.insert(shortcut.to_owned());
         }
     }
@@ -928,7 +935,7 @@ fn normalize_mouse_gestures(
     Some(normalized)
 }
 
-fn shortcuts_for_settings(settings: &crate::state::Settings) -> BTreeMap<String, String> {
+fn shortcuts_for_settings(settings: &crate::state::Settings) -> BTreeMap<String, Vec<String>> {
     normalize_shortcuts(&settings.shortcut_bindings).unwrap_or_else(default_shortcuts)
 }
 
@@ -2529,8 +2536,8 @@ pub fn set_catalog_view_mode(
 pub fn set_shortcut_bindings(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
-    shortcuts: BTreeMap<String, String>,
-) -> Result<Response<BTreeMap<String, String>>, String> {
+    shortcuts: BTreeMap<String, Vec<String>>,
+) -> Result<Response<BTreeMap<String, Vec<String>>>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
@@ -2682,7 +2689,7 @@ pub fn set_viewer_settings(
 
 fn validate_settings_profile(
     profile: &SettingsProfileInput,
-) -> Result<(BTreeMap<String, String>, BTreeMap<String, String>), AppError> {
+) -> Result<(BTreeMap<String, Vec<String>>, BTreeMap<String, String>), AppError> {
     let shortcuts = normalize_shortcuts(&profile.shortcuts).ok_or_else(|| {
         request_error(
             ErrorCode::InvalidRequest,
@@ -5569,6 +5576,37 @@ mod shutdown_tests {
         assert!(valid_shortcut_key("+"));
         assert!(valid_shortcut_key("Ctrl++"));
         assert!(!valid_shortcut_key("Ctrl+++"));
+
+        let mut multiple = default_shortcuts();
+        multiple.get_mut("nextPage").unwrap().extend([
+            "N".into(),
+            "Ctrl+N".into(),
+            "Shift+N".into(),
+        ]);
+        assert_eq!(normalize_shortcuts(&multiple), Some(multiple.clone()));
+
+        let mut too_many = multiple.clone();
+        too_many.get_mut("nextPage").unwrap().push("Alt+N".into());
+        assert!(normalize_shortcuts(&too_many).is_none());
+
+        let mut same_command_duplicate = multiple.clone();
+        same_command_duplicate.get_mut("nextPage").unwrap()[1] = "PageDown".into();
+        assert!(normalize_shortcuts(&same_command_duplicate).is_none());
+
+        let mut cross_command_conflict = multiple.clone();
+        cross_command_conflict
+            .get_mut("previousPage")
+            .unwrap()
+            .push("N".into());
+        assert!(normalize_shortcuts(&cross_command_conflict).is_none());
+
+        let mut reserved = default_shortcuts();
+        reserved.insert("nextPage".into(), vec!["Ctrl+C".into()]);
+        assert!(normalize_shortcuts(&reserved).is_none());
+
+        let mut empty = default_shortcuts();
+        empty.insert("nextPage".into(), Vec::new());
+        assert!(normalize_shortcuts(&empty).is_none());
     }
 
     #[test]
@@ -6048,8 +6086,8 @@ mod shutdown_tests {
             .into_iter()
             .filter(|(command, _)| LEGACY_SHORTCUT_COMMANDS.contains(&command.as_str()))
             .collect::<BTreeMap<_, _>>();
-        legacy_shortcuts.insert("nextPage".into(), "F11".into());
-        legacy_shortcuts.insert("previousPage".into(), "Ctrl+F".into());
+        legacy_shortcuts.insert("nextPage".into(), vec!["F11".into()]);
+        legacy_shortcuts.insert("previousPage".into(), vec!["Ctrl+F".into()]);
         let legacy_gestures = default_mouse_gestures()
             .into_iter()
             .filter(|(gesture, _)| LEGACY_MOUSE_GESTURE_NAMES.contains(&gesture.as_str()))
@@ -6057,11 +6095,11 @@ mod shutdown_tests {
 
         let shortcuts = normalize_shortcuts(&legacy_shortcuts).unwrap();
         assert_eq!(shortcuts.len(), SHORTCUT_COMMANDS.len());
-        assert_eq!(shortcuts["nextPage"], "F11");
-        assert_eq!(shortcuts["previousPage"], "Ctrl+F");
-        assert_eq!(shortcuts["toggleLoupe"], "L");
-        assert_ne!(shortcuts["toggleSearch"], "Ctrl+F");
-        assert_ne!(shortcuts["toggleFullscreen"], "F11");
+        assert_eq!(shortcuts["nextPage"], ["F11"]);
+        assert_eq!(shortcuts["previousPage"], ["Ctrl+F"]);
+        assert_eq!(shortcuts["toggleLoupe"], ["L"]);
+        assert_ne!(shortcuts["toggleSearch"], ["Ctrl+F"]);
+        assert_ne!(shortcuts["toggleFullscreen"], ["F11"]);
 
         let gestures = normalize_mouse_gestures(&legacy_gestures).unwrap();
         assert_eq!(gestures.len(), MOUSE_GESTURE_NAMES.len());

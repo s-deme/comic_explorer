@@ -187,6 +187,7 @@ import {
   eventShortcut,
   fallbackCatalogShortcutCommand,
   normalizeShortcutBindings,
+  removeShortcut,
   remapShortcut,
   resetShortcutBindings,
   type ShortcutBindings,
@@ -3502,7 +3503,8 @@ export function App({
 
   function captureDraftShortcut(
     command: ShortcutCommand,
-    event: React.KeyboardEvent<HTMLInputElement>,
+    index: number,
+    event: React.KeyboardEvent<HTMLElement>,
   ) {
     event.preventDefault();
     event.stopPropagation();
@@ -3512,7 +3514,7 @@ export function App({
       return;
     }
     if (settingsDraft === null) return;
-    const result = remapShortcut(settingsDraft.shortcuts, command, pressed);
+    const result = remapShortcut(settingsDraft.shortcuts, command, pressed, index);
     if (!result.ok) {
       setProfileNotice(
         result.reason === "conflict"
@@ -3532,7 +3534,7 @@ export function App({
     const result = remapShortcut(
       settingsDraft.shortcuts,
       command,
-      DEFAULT_SHORTCUTS[command],
+      DEFAULT_SHORTCUTS[command][0],
     );
     if (!result.ok) {
       setProfileNotice(
@@ -3541,7 +3543,24 @@ export function App({
       return;
     }
     setProfileNotice(null);
-    setSettingsDraft({ ...settingsDraft, shortcuts: result.bindings });
+    setSettingsDraft({
+      ...settingsDraft,
+      shortcuts: {
+        ...result.bindings,
+        [command]: [...DEFAULT_SHORTCUTS[command]],
+      },
+    });
+  }
+
+  function removeDraftShortcut(command: ShortcutCommand, index: number) {
+    if (settingsDraft === null) return;
+    const shortcuts = removeShortcut(settingsDraft.shortcuts, command, index);
+    if (shortcuts === null) {
+      setProfileNotice("各コマンドには1つ以上のキーが必要です。");
+      return;
+    }
+    setProfileNotice(null);
+    setSettingsDraft({ ...settingsDraft, shortcuts });
   }
 
   function resetAllDraftShortcuts() {
@@ -6320,6 +6339,7 @@ export function App({
           onExport={exportSettingsProfile}
           onImport={importSettingsProfile}
           onShortcutKeyDown={captureDraftShortcut}
+          onRemoveShortcut={removeDraftShortcut}
           onResetShortcut={resetDraftShortcut}
           onResetAllShortcuts={resetAllDraftShortcuts}
           onMouseGestureChange={updateDraftMouseGesture}

@@ -427,6 +427,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 256 source上限と257件拒否は自動検証した。実Explorer、network/removable drive、大量・大容量copyの時間、CPU、peak working setは未測定でありPASSとしない。 |
 | 製品直接観測 | NOT RUN | Explorerとの実drag in/out、100/150/200% DPI、Shell cursor/effect表示、長時間copy中の製品UIは直接観測していない。 |
 
+## Leeyes P3-L 複数キー割当
+
+対象はLEY-INPUT-001の1件。各既知commandへ1〜4個の順序付きbindingを割り当て、Rust registryが形、key、件数、重複、競合、予約操作を保存前に検証してSQLiteへ配列でatomic保存する。TypeScriptは検証済み配列の即時dispatch、追加・編集・削除UI、reset、help表示だけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | 3件、FAIL 0。1〜4件、command内重複、command間競合、予約、空、5件上限、legacy command補完、旧SQLite単一文字列から配列への移行、複数binding保存・再openを含む。 |
+| Focused frontend | PASS | shortcuts、profile、help、App FR-B11の4 files / 110件、FAIL 0。alternate追加・dispatch・編集・削除・保存、primary互換、競合・予約拒否、reset、v21→v22移行、v22単一文字列拒否、helpの全binding表示を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 32 files / 444件とPython 61件、FAIL 0。typecheck exit 0。frontend 73 modules build、CSS 43.17kB、JS 559.71kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 208件とshutdown process 1件、FAIL 0。shortcut registry・SQLite移行と既存catalog・viewer・file操作・search・watch・tree・cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは325.978秒で全12 stageがexit 0。Rust canonical 67.745秒、release executable 85.210秒、GUI権限付きshortcut product回帰11.232秒、CoDD verify 116.396秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T062502633Z`。 |
+| 性能 | NOT APPLICABLE / 限定 | registryは16 command×最大4 bindingに固定され、filesystem・画像・書庫処理を追加しないため専用throughput測定対象外。設定dialogの既存統合testは複数control追加後21.469秒で完了し、timeoutを40秒へ調整した。release UIの入力latency、CPU、working setは未測定。 |
+| 製品直接観測 | PASS / 限定 | GUI権限付きproduct shortcut回帰はprimary bindingのremap、競合、viewer command、reset、restart復元と原本差分0を11.232秒で確認した。alternate追加・削除、keyboard layout、IME、AltGr、DPIはrelease WebView2で直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

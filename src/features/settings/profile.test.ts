@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SHORTCUTS, LEGACY_SHORTCUT_COMMANDS } from "../input/shortcuts";
+import {
+  DEFAULT_SHORTCUTS,
+  LEGACY_SHORTCUT_COMMANDS,
+  SHORTCUT_COMMANDS,
+} from "../input/shortcuts";
 import packageMetadata from "../../../package.json";
 import {
   APP_VERSION,
@@ -105,7 +109,7 @@ describe("settings profile", () => {
     const second = createDefaultSettingsProfile();
     expect(first).toEqual(validProfile());
     first.catalogThumbnailSizes.smallThumbnail = 200;
-    first.shortcuts.nextPage = "N";
+    first.shortcuts.nextPage = ["N"];
     first.mouseGestures.swipeLeft = "none";
     expect(second).toEqual(validProfile());
   });
@@ -131,7 +135,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 22, 99, "21", undefined])(
+  it.each([0, 23, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -606,15 +610,15 @@ describe("settings profile", () => {
 
   it("normalizes valid shortcuts but rejects missing, invalid, and conflicting bindings", () => {
     const alias = validProfile();
-    alias.shortcuts.nextPage = "ctrl+pgdn";
-    expect(normalizeSettingsProfile(alias)?.shortcuts.nextPage).toBe("Ctrl+PageDown");
+    alias.shortcuts.nextPage = ["ctrl+pgdn", "N"];
+    expect(normalizeSettingsProfile(alias)?.shortcuts.nextPage).toEqual(["Ctrl+PageDown", "N"]);
 
     const missing = validProfile();
     delete (missing.shortcuts as Partial<typeof missing.shortcuts>).zoomOut;
     expect(normalizeSettingsProfile(missing)).toBeNull();
 
     const invalid = validProfile();
-    invalid.shortcuts.zoomOut = "Ctrl+";
+    invalid.shortcuts.zoomOut = ["Ctrl+"];
     expect(normalizeSettingsProfile(invalid)).toBeNull();
 
     const conflict = validProfile();
@@ -642,10 +646,11 @@ describe("settings profile", () => {
 
   it("migrates the exact legacy shortcut and swipe maps without accepting arbitrary partial maps", () => {
     const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 21;
     legacy.shortcuts = Object.fromEntries(
       LEGACY_SHORTCUT_COMMANDS.map((command) => [
         command,
-        command === "nextPage" ? "N" : DEFAULT_SHORTCUTS[command],
+        command === "nextPage" ? "N" : DEFAULT_SHORTCUTS[command][0],
       ]),
     );
     legacy.mouseGestures = {
@@ -654,10 +659,16 @@ describe("settings profile", () => {
       doubleClick: "none",
     };
     const migrated = normalizeSettingsProfile(legacy);
-    expect(migrated?.shortcuts.nextPage).toBe("N");
-    expect(migrated?.shortcuts.toggleSearch).toBe("Ctrl+F");
+    expect(migrated?.shortcuts.nextPage).toEqual(["N"]);
+    expect(migrated?.shortcuts.toggleSearch).toEqual(["Ctrl+F"]);
     expect(migrated?.mouseGestures.wheelDown).toBe("nextPage");
     expect(migrated?.mouseGestures.doubleClick).toBe("toggleFullscreen");
+
+    const v22WithSingles = validProfile() as unknown as Record<string, unknown>;
+    v22WithSingles.shortcuts = Object.fromEntries(
+      SHORTCUT_COMMANDS.map((command) => [command, DEFAULT_SHORTCUTS[command][0]]),
+    );
+    expect(normalizeSettingsProfile(v22WithSingles)).toBeNull();
 
     const partial = validProfile();
     delete (partial.mouseGestures as Partial<typeof partial.mouseGestures>).middleClick;
