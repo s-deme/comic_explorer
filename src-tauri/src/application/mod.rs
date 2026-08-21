@@ -6,6 +6,7 @@ mod display_awake;
 pub mod file_operations;
 mod folder_watch;
 mod library_root;
+pub mod offline_media;
 mod recursive_thumbnails;
 mod scheduler;
 mod search_query;
@@ -59,6 +60,7 @@ pub struct AppState {
     navigation: Mutex<NavigationCoordinator>,
     diagnostics: Mutex<NavigationCoordinator>,
     recursive_thumbnails: Mutex<NavigationCoordinator>,
+    offline_media: Mutex<NavigationCoordinator>,
     viewer: Arc<Mutex<NavigationCoordinator>>,
     store: Arc<Mutex<Option<StateStore>>>,
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
@@ -261,6 +263,7 @@ impl Default for AppState {
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
+            offline_media: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(store)),
             thumbnails: Arc::new(Mutex::new(thumbnails)),
@@ -291,6 +294,9 @@ impl AppState {
         }
         if let Ok(mut recursive_thumbnails) = self.recursive_thumbnails.lock() {
             recursive_thumbnails.shutdown();
+        }
+        if let Ok(mut offline_media) = self.offline_media.lock() {
+            offline_media.shutdown();
         }
         if let Ok(mut viewer) = self.viewer.lock() {
             viewer.shutdown();
@@ -7180,6 +7186,7 @@ mod shutdown_tests {
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
+            offline_media: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
@@ -7286,6 +7293,7 @@ mod shutdown_tests {
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
+            offline_media: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),

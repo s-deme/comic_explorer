@@ -325,6 +325,7 @@ import {
   type PageBookmark,
 } from "./features/reading/collections";
 import { ShelfDialog } from "./features/shelves/ShelfDialog";
+import { MediaCatalogDialog } from "./features/media/MediaCatalogDialog";
 import {
   rangeSelection,
   selectEntriesByKind,
@@ -730,6 +731,7 @@ export function App({
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   const [bookshelfOpen, setBookshelfOpen] = useState(false);
+  const [mediaCatalogOpen, setMediaCatalogOpen] = useState(false);
   const [archiveExplorerPath, setArchiveExplorerPath] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
@@ -1036,6 +1038,7 @@ export function App({
   async function applyLaunchPlan(plan: CliLaunchPlan) {
     cliLaunchRequested.current = true;
     setBookshelfOpen(false);
+    setMediaCatalogOpen(false);
     const response = await registerLibraryRoot(plan.libraryRoot, ++generation.current);
     if (response.status !== "ok") {
       setSelectionNotice(
@@ -5403,6 +5406,17 @@ export function App({
               <button
                 type="button"
                 role="menuitem"
+                data-product-id="offline-media-menu-item"
+                tabIndex={-1}
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
+                onClick={() => runMenuAction(() => setMediaCatalogOpen(true))}
+              >
+                オフライン媒体台帳…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 aria-disabled={selectedPath === null}
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
@@ -7232,6 +7246,16 @@ export function App({
             await applyLaunchPlan(plan);
           }}
           onClose={() => setBookshelfOpen(false)}
+        />
+      )}
+      {mediaCatalogOpen && (
+        <MediaCatalogDialog
+          defaultName={libraryRoot?.split(/[\\/]/).filter(Boolean).at(-1) ?? "オフライン媒体"}
+          onOpenPlan={async (plan) => {
+            setMediaCatalogOpen(false);
+            await applyLaunchPlan(plan);
+          }}
+          onClose={() => setMediaCatalogOpen(false)}
         />
       )}
       {archiveExplorerPath !== null && (

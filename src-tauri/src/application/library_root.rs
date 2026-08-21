@@ -5,6 +5,16 @@ use std::path::{Path, PathBuf};
 use crate::domain::{AppError, ErrorCode};
 use crate::domain::{FileKind, classify_file_name};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VolumeIdentity {
+    pub root: PathBuf,
+    pub identity: String,
+    pub serial: u32,
+    pub filesystem: String,
+    pub label: String,
+    pub drive_type: u32,
+}
+
 pub fn display_path(path: &Path) -> String {
     let raw = path.to_string_lossy();
     if let Some(path) = raw.strip_prefix(r"\\?\UNC\") {
@@ -55,6 +65,92 @@ pub fn drive_display_name(root: &Path) -> String {
     });
     let drive = display_path(root).trim_end_matches('\\').to_owned();
     format!("{kind} ({drive})")
+}
+
+#[cfg(target_os = "windows")]
+pub fn volume_identity_for_path(path: &Path) -> Result<VolumeIdentity, AppError> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetVolumeInformationW};
+    use windows::core::PCWSTR;
+
+    let canonical = path
+        .canonicalize()
+        .map_err(|error| path_error(path, error))?;
+    let root = canonical
+        .ancestors()
+        .last()
+        .ok_or_else(|| AppError {
+            code: ErrorCode::InvalidPath,
+            message: "媒体のvolume rootを解決できません。".into(),
+            target: None,
+            retryable: false,
+        })?
+        .to_path_buf();
+    let wide: Vec<u16> = root.as_os_str().encode_wide().chain(Some(0)).collect();
+    let root_path = PCWSTR::from_raw(wide.as_ptr());
+    let drive_type = unsafe { GetDriveTypeW(root_path) };
+    if !matches!(drive_type, 2 | 3 | 5 | 6) {
+        return Err(AppError {
+            code: ErrorCode::InvalidPath,
+            message: "オフライン媒体台帳はlocal、removable、DVD、RAM driveだけを登録できます。"
+                .into(),
+            target: None,
+            retryable: false,
+        });
+    }
+    let mut label = [0u16; 261];
+    let mut filesystem = [0u16; 33];
+    let mut serial = 0u32;
+    unsafe {
+        GetVolumeInformationW(
+            root_path,
+            Some(&mut label),
+            Some(&mut serial),
+            None,
+            None,
+            Some(&mut filesystem),
+        )
+    }
+    .map_err(|error| AppError {
+        code: ErrorCode::InvalidPath,
+        message: format!("媒体識別情報を取得できませんでした: {error}"),
+        target: None,
+        retryable: true,
+    })?;
+    let decode = |buffer: &[u16]| {
+        let length = buffer
+            .iter()
+            .position(|value| *value == 0)
+            .unwrap_or(buffer.len());
+        String::from_utf16_lossy(&buffer[..length])
+    };
+    let filesystem = decode(&filesystem).to_ascii_uppercase();
+    if filesystem.is_empty() {
+        return Err(AppError {
+            code: ErrorCode::InvalidPath,
+            message: "媒体のfilesystem名を取得できませんでした。".into(),
+            target: None,
+            retryable: true,
+        });
+    }
+    Ok(VolumeIdentity {
+        root,
+        identity: format!("{filesystem}:{serial:08X}"),
+        serial,
+        filesystem,
+        label: decode(&label),
+        drive_type,
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn volume_identity_for_path(_path: &Path) -> Result<VolumeIdentity, AppError> {
+    Err(AppError {
+        code: ErrorCode::UnsupportedFormat,
+        message: "Offline media volume identity requires Windows.".into(),
+        target: None,
+        retryable: false,
+    })
 }
 
 fn drive_roots_from_mask(mask: u32) -> Vec<PathBuf> {

@@ -129,6 +129,8 @@ P4-CではLEY-FILE-016をPublishedとした。Rust file-operation mutex配下へ
 
 P4-DではLEY-SHELL-007をPublishedとし、P4の12件を完了した。Rust settings・SQLite・strict profile v27を一覧位置（右・左・上・下）とnavigation幅/高さの検証・永続化・旧profile移行の正本とし、TypeScriptは固定CSS Grid area、設定UI、orientation別separator操作だけを担当する。配置切替後もcatalog選択を保持するApp回帰を含めfrontend 39 files / 502件、Python 61件、Rust 244+1件、typecheck、80 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageをPASSした。4方向それぞれ10,000回のlayout helper呼出し（合計40,000回）は6.391ms。release WebView2の10,000 item FPS・reflow、DPI別pointer、最小window、CPU・working setは未測定として残す。
 
+P5-AではLEY-MEDIA-001/002/003/004/005/008/009の7件をVerifiedとした。RustがWindows volume identity、reparse非追跡のbounded scan、WIC JPEG表紙、cancel generation、SQLite schema v11の単一transaction、offline snapshot、接続volume再照合、open containment、組込みiconを所有し、TypeScriptはtyped IPCと台帳dialogだけを担当する。frontend 40 files / 506件、Python 61件、Rust 249+1件、typecheck、81 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageをPASSした。50,000 entry DB transactionと再読込は2,556ms。光学disc・removable driveの抜差し、drive letter変更、実媒体50,000 file scan、巨大画像256枚、CPU・working set、台帳dialogのrelease DPI/keyboardは未測定として残す。commit/push後にPublishedへ更新する。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

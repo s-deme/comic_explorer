@@ -348,6 +348,88 @@ export async function executeShelvesImport(
   });
 }
 
+export type OfflineMediaIcon = "disc" | "removable" | "archive" | "star";
+
+export interface OfflineMediaStatus {
+  id: number;
+  identity: string;
+  name: string;
+  sourceSubpath: string;
+  volumeLabel: string;
+  icon: OfflineMediaIcon;
+  filesystem: string;
+  volumeSerial: number;
+  scannedAtMs: number;
+  entryCount: number;
+  thumbnailCount: number;
+  available: boolean;
+  connectedRoot: string | null;
+}
+
+export interface OfflineMediaEntry {
+  relativePath: string;
+  parentPath: string;
+  name: string;
+  kind: "folder" | "image" | "archive" | "pdf" | "other";
+  sizeBytes: number;
+  modifiedMs: number;
+  sortOrder: number;
+}
+
+export interface OfflineMediaCatalog { media: OfflineMediaStatus[]; }
+export interface OfflineMediaDetail { media: OfflineMediaStatus; entries: OfflineMediaEntry[]; }
+export interface OfflineMediaThumbnailPayload { jpeg: number[]; width: number; height: number; }
+
+export async function listOfflineMedia(generation: number): Promise<ApiResponse<OfflineMediaCatalog>> {
+  return invoke("list_offline_media", { context: context(generation) });
+}
+
+export async function registerOfflineMedia(
+  name: string,
+  icon: OfflineMediaIcon,
+  generation: number,
+): Promise<ApiResponse<OfflineMediaCatalog>> {
+  return invoke("register_offline_media", {
+    context: context(generation), request: { name, icon },
+  });
+}
+
+export async function cancelOfflineMediaRegistration(generation: number): Promise<ApiResponse<boolean>> {
+  return invoke("cancel_offline_media_registration", { context: context(generation) });
+}
+
+export async function getOfflineMedia(mediaId: number, generation: number): Promise<ApiResponse<OfflineMediaDetail>> {
+  return invoke("get_offline_media", { context: context(generation), mediaId });
+}
+
+export async function getOfflineMediaThumbnail(
+  mediaId: number,
+  relativePath: string,
+  generation: number,
+): Promise<ApiResponse<OfflineMediaThumbnailPayload | null>> {
+  return invoke("get_offline_media_thumbnail", { context: context(generation), mediaId, relativePath });
+}
+
+export async function setOfflineMediaIcon(
+  mediaId: number,
+  icon: OfflineMediaIcon,
+  generation: number,
+): Promise<ApiResponse<OfflineMediaCatalog>> {
+  return invoke("set_offline_media_icon", { context: context(generation), mediaId, icon });
+}
+
+export async function deleteOfflineMedia(mediaId: number, generation: number): Promise<ApiResponse<OfflineMediaCatalog>> {
+  return invoke("delete_offline_media", { context: context(generation), mediaId, confirmed: true });
+}
+
+export async function openOfflineMediaEntry(
+  mediaId: number,
+  relativePath: string,
+  generation: number,
+): Promise<ApiResponse<CliLaunchPlan>> {
+  return invoke("open_offline_media_entry", { context: context(generation), mediaId, relativePath });
+}
+
 export async function setFullscreenDisplayAwake(
   enabled: boolean,
   generation: number,

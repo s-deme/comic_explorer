@@ -48,6 +48,14 @@ import {
   listArchiveVirtualTree,
   getFileUndoStatus,
   undoLastFileOperation,
+  cancelOfflineMediaRegistration,
+  deleteOfflineMedia,
+  getOfflineMedia,
+  getOfflineMediaThumbnail,
+  listOfflineMedia,
+  openOfflineMediaEntry,
+  registerOfflineMedia,
+  setOfflineMediaIcon,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -120,6 +128,26 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenNthCalledWith(2, "undo_last_file_operation", {
       context: expect.objectContaining({ generation: 87 }),
     });
+  });
+
+  it("REQ-LEY-P5-001 keeps media identity, scan, transaction, thumbnails, and open validation in Rust IPC", async () => {
+    await listOfflineMedia(90);
+    await registerOfflineMedia("資料DVD", "disc", 91);
+    await cancelOfflineMediaRegistration(91);
+    await getOfflineMedia(7, 92);
+    await getOfflineMediaThumbnail(7, "Books/cover.jpg", 93);
+    await setOfflineMediaIcon(7, "star", 94);
+    await openOfflineMediaEntry(7, "Books/one.cbz", 95);
+    await deleteOfflineMedia(7, 96);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "list_offline_media", expect.any(Object));
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "register_offline_media", expect.objectContaining({ request: { name: "資料DVD", icon: "disc" } }));
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "cancel_offline_media_registration", expect.objectContaining({ context: expect.objectContaining({ generation: 91 }) }));
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "get_offline_media", expect.objectContaining({ mediaId: 7 }));
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "get_offline_media_thumbnail", expect.objectContaining({ relativePath: "Books/cover.jpg" }));
+    expect(invokeMock).toHaveBeenNthCalledWith(6, "set_offline_media_icon", expect.objectContaining({ icon: "star" }));
+    expect(invokeMock).toHaveBeenNthCalledWith(7, "open_offline_media_entry", expect.objectContaining({ relativePath: "Books/one.cbz" }));
+    expect(invokeMock).toHaveBeenNthCalledWith(8, "delete_offline_media", expect.objectContaining({ confirmed: true }));
   });
 
   it("REQ-LEY-P2-015 sends the required Viewer catalog sync field to Rust", async () => {

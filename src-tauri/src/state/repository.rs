@@ -10,7 +10,7 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
@@ -2328,6 +2328,60 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![10, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 11 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS offline_media (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    identity TEXT NOT NULL UNIQUE CHECK(length(identity) BETWEEN 1 AND 128),
+                    name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 128),
+                    source_subpath TEXT NOT NULL CHECK(length(source_subpath) <= 32767),
+                    volume_label TEXT NOT NULL CHECK(length(volume_label) <= 128),
+                    icon TEXT NOT NULL CHECK(icon IN ('disc', 'removable', 'archive', 'star')),
+                    filesystem TEXT NOT NULL CHECK(length(filesystem) BETWEEN 1 AND 32),
+                    volume_serial INTEGER NOT NULL CHECK(volume_serial >= 0),
+                    scanned_at_ms INTEGER NOT NULL CHECK(scanned_at_ms >= 0),
+                    entry_count INTEGER NOT NULL CHECK(entry_count BETWEEN 0 AND 50000),
+                    thumbnail_count INTEGER NOT NULL CHECK(thumbnail_count BETWEEN 0 AND 256)
+                 );
+                 CREATE TABLE IF NOT EXISTS offline_media_entries (
+                    media_id INTEGER NOT NULL REFERENCES offline_media(id) ON DELETE CASCADE,
+                    relative_path TEXT NOT NULL CHECK(length(relative_path) BETWEEN 1 AND 32767),
+                    parent_path TEXT NOT NULL CHECK(length(parent_path) <= 32767),
+                    name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 255),
+                    kind TEXT NOT NULL CHECK(kind IN ('folder', 'image', 'archive', 'pdf', 'other')),
+                    size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0),
+                    modified_ms INTEGER NOT NULL CHECK(modified_ms >= 0),
+                    has_thumbnail INTEGER NOT NULL CHECK(has_thumbnail IN (0, 1)),
+                    sort_order INTEGER NOT NULL CHECK(sort_order >= 0),
+                    PRIMARY KEY(media_id, relative_path)
+                 );
+                 CREATE INDEX IF NOT EXISTS offline_media_entries_parent
+                   ON offline_media_entries(media_id, parent_path, sort_order, relative_path);
+                 CREATE TABLE IF NOT EXISTS offline_media_thumbnails (
+                    media_id INTEGER NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    jpeg BLOB NOT NULL CHECK(length(jpeg) BETWEEN 1 AND 1048576),
+                    width INTEGER NOT NULL CHECK(width BETWEEN 1 AND 16384),
+                    height INTEGER NOT NULL CHECK(height BETWEEN 1 AND 16384),
+                    PRIMARY KEY(media_id, relative_path),
+                    FOREIGN KEY(media_id, relative_path)
+                      REFERENCES offline_media_entries(media_id, relative_path) ON DELETE CASCADE
+                 );",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![11, unix_millis()],
             )
             .map_err(database_error)?;
         transaction

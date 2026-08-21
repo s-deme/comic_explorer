@@ -635,6 +635,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Windows canonical / CoDD | PASS | Rust 244件とshutdown process 1件、SBOM 783 components・unknown/prohibited license 0、release build・freshness・product shortcut・cleanup、CoDD scan/check/verifyを含む最終sourceのformal canonical全12 stage PASS、388.385秒。logは`src-tauri/target/verification/imp-004-20260821T164707662Z`。初回canonicalは追加test内のmove後参照をcompile時に検出してrust-canonicalでFAILし、cloneへ修正後にfocused Rustを再実行した。その後の全stage PASS後にenum重複をtype-only共有へ整理したため、最終sourceでも全stageを再実行してPASSした。 |
 | 製品直接観測 | NOT RUN | release WebView2の実menu/shortcut、network/removable drive、外部process競合、巨大directory、CPU・working setを直接観測していない。 |
 
+## Leeyes P5-A オフライン媒体台帳
+
+対象はLEY-MEDIA-001/002/003/004/005/008/009の7件。LEY-MEDIA-006/007の暗黙更新・差分比較は対象外のまま変更していない。Rustがvolume identity、bounded scan、thumbnail生成、atomic SQLite schema v11、availability・open再検証を担当し、TypeScriptはtyped IPCとdialog表示だけを担当する。
+
+| gate | 結果 | 証拠・未測定 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P5-001の5件、FAIL 0。名前・icon・相対path、cancel、SQLite round-trip・duplicate拒否、失敗時rollback、thumbnail 1MiB上限、50,000 entry transactionを含む。 |
+| Focused frontend | PASS | client 24件とMediaCatalogDialog 3件、FAIL 0。Rust IPC payload、offline tree、不在時open無効、登録・active generation cancelを含む。 |
+| Windows tests | PASS | frontend 40 files / 506件、Python 61件、FAIL 0。既存shell・viewer・本棚の回帰を含む。 |
+| 性能・上限 | PASS / 限定 | debug Rustの50,000 entry単一SQLite transactionと全件再読込はfocused run内で2,556ms（直前run 2,624ms）。最大50,000 entry、深さ64、媒体64、表紙256件・1件1MiB・合計64MiBをcode/schemaで制限する。release実媒体の50,000 file scan、256枚の巨大画像decode、CPU、peak working setは未測定。 |
+| Windows canonical / build / CoDD | PASS | Rust 249件とshutdown process 1件、typecheck、81 modules release build、SBOM 783 components・unknown/prohibited license 0、freshness、product shortcut、cleanup、CoDD scan/check/verifyを含むsandbox外formal canonical全12 stage PASS、280.365秒。logは`src-tauri/target/verification/imp-004-20260821T172804804Z`。sandbox内の直前runはrelease processが起動前に消えproduct-shortcutだけFAILしたが、同一sourceのsandbox外全stage再実行でPASSした。さらに最初のrunは最終error整形後のrustfmt未適用を検出してrust-canonicalでFAILし、formatとfocused Rustを再実行後に最終runを行った。 |
+| 製品直接観測 | NOT RUN | release GUI harnessは既存shortcutを観測したが、光学disc・removable driveの抜差し、drive letter変更、媒体台帳dialogのDPI/keyboard、実表紙、長時間cancelは今回直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。
