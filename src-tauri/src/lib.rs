@@ -157,6 +157,7 @@ pub fn run() {
             application::get_thumbnail,
             application::generate_recursive_thumbnails,
             application::list_tree_children,
+            application::archive_browser::list_archive_virtual_tree,
             application::resolve_catalog_activation,
             application::resolve_viewer_rectangle_zoom,
             application::cancel_navigation,

@@ -1546,6 +1546,34 @@ export async function cancelRecursiveThumbnailGeneration(
 export interface TreeEntry {
   relativePath: RelativePath;
   hasChildren?: boolean | null;
+  entryKind?: "folder" | "archive";
+}
+
+export type ArchiveVirtualEntryKind = "folder" | "image" | "archive";
+
+export interface ArchiveVirtualEntry {
+  id: string;
+  parentId: string | null;
+  name: string;
+  kind: ArchiveVirtualEntryKind;
+  hasChildren: boolean;
+  pageKey: RelativePath | null;
+  sortOrder: number;
+}
+
+export interface ArchiveVirtualTreeSnapshot {
+  archiveRelativePath: RelativePath;
+  entries: ArchiveVirtualEntry[];
+}
+
+export async function listArchiveVirtualTree(
+  archiveRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<ArchiveVirtualTreeSnapshot>> {
+  return invoke("list_archive_virtual_tree", {
+    context: context(generation),
+    archiveRelativePath,
+  });
 }
 
 export async function listTreeChildren(

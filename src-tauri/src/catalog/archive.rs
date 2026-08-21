@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,6 +12,8 @@ use sevenz_rust::{
 use unrar::error::{Code as UnrarCode, UnrarError, When as UnrarWhen};
 use unrar::{Archive, VolumeInfo};
 use zip::{CompressionMethod, ZipArchive};
+
+use serde::Serialize;
 
 use crate::api::{
     MAX_ARCHIVE_ENTRIES, MAX_ARCHIVE_ENTRY_BYTES, MAX_ARCHIVE_TOTAL_BYTES,
@@ -48,7 +51,28 @@ struct NestedArchiveBudget {
     bytes: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ArchiveVirtualEntryKind {
+    Folder,
+    Image,
+    Archive,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveVirtualEntry {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub name: String,
+    pub kind: ArchiveVirtualEntryKind,
+    pub has_children: bool,
+    pub page_key: Option<RelativePath>,
+    pub sort_order: usize,
+}
+
 const NESTED_PAGE_KEY_PREFIX: &str = "@comic-explorer-nested-v1/";
+const MAX_ARCHIVE_VIRTUAL_NODES: usize = 50_000;
 static TEMP_ARCHIVE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub fn archive_adapter_kind(path: &Path) -> ArchiveAdapterKind {
@@ -78,6 +102,196 @@ pub fn enumerate_archive_pages(path: &Path) -> Result<Vec<RelativePath>, AppErro
         .iter()
         .map(|chain| encode_archive_page_key(chain))
         .collect()
+}
+
+pub fn enumerate_archive_virtual_tree(path: &Path) -> Result<Vec<ArchiveVirtualEntry>, AppError> {
+    let mut builder = ArchiveVirtualTreeBuilder::default();
+    let mut budget = NestedArchiveBudget::default();
+    enumerate_archive_virtual_tree_inner(path, &[], None, 0, &mut budget, &mut builder)?;
+    builder.finish()
+}
+
+#[derive(Default)]
+struct ArchiveVirtualTreeBuilder {
+    entries: Vec<ArchiveVirtualEntry>,
+    folders: HashMap<String, String>,
+    next_id: usize,
+}
+
+impl ArchiveVirtualTreeBuilder {
+    fn push(
+        &mut self,
+        parent_id: Option<String>,
+        name: String,
+        kind: ArchiveVirtualEntryKind,
+        page_key: Option<RelativePath>,
+    ) -> Result<String, AppError> {
+        if self.entries.len() >= MAX_ARCHIVE_VIRTUAL_NODES {
+            return Err(limit_error("Archive virtual-node limit exceeded."));
+        }
+        let id = format!("archive-node-v1-{}", self.next_id);
+        self.next_id = self.next_id.saturating_add(1);
+        self.entries.push(ArchiveVirtualEntry {
+            id: id.clone(),
+            parent_id,
+            name,
+            kind,
+            has_children: false,
+            page_key,
+            sort_order: 0,
+        });
+        Ok(id)
+    }
+
+    fn folder_parent(
+        &mut self,
+        archive_chain: &[String],
+        context_parent: Option<&str>,
+        entry: &RelativePath,
+    ) -> Result<Option<String>, AppError> {
+        let parts = entry.as_str().split('/').collect::<Vec<_>>();
+        let mut parent_id = context_parent.map(str::to_string);
+        let context_key = archive_chain
+            .iter()
+            .map(|part| hex_encode(part.as_bytes()))
+            .collect::<Vec<_>>()
+            .join("/");
+        let mut folder_path = String::new();
+        for part in parts.iter().take(parts.len().saturating_sub(1)) {
+            if !folder_path.is_empty() {
+                folder_path.push('/');
+            }
+            folder_path.push_str(part);
+            let key = format!("{context_key}\0{folder_path}");
+            if let Some(existing) = self.folders.get(&key) {
+                parent_id = Some(existing.clone());
+                continue;
+            }
+            let id = self.push(
+                parent_id.clone(),
+                (*part).to_string(),
+                ArchiveVirtualEntryKind::Folder,
+                None,
+            )?;
+            self.folders.insert(key, id.clone());
+            parent_id = Some(id);
+        }
+        Ok(parent_id)
+    }
+
+    fn finish(mut self) -> Result<Vec<ArchiveVirtualEntry>, AppError> {
+        let mut children = HashMap::<Option<String>, Vec<usize>>::new();
+        for (index, entry) in self.entries.iter().enumerate() {
+            children
+                .entry(entry.parent_id.clone())
+                .or_default()
+                .push(index);
+        }
+        let parents_with_children = children
+            .keys()
+            .filter_map(Clone::clone)
+            .collect::<std::collections::HashSet<_>>();
+        for entry in &mut self.entries {
+            entry.has_children = parents_with_children.contains(&entry.id);
+        }
+        for indices in children.values_mut() {
+            indices.sort_by(|left, right| {
+                let left_entry = &self.entries[*left];
+                let right_entry = &self.entries[*right];
+                natural_cmp(&left_entry.name, &right_entry.name).then_with(|| {
+                    virtual_kind_order(left_entry.kind).cmp(&virtual_kind_order(right_entry.kind))
+                })
+            });
+            for (sort_order, index) in indices.iter().enumerate() {
+                self.entries[*index].sort_order = sort_order;
+            }
+        }
+        Ok(self.entries)
+    }
+}
+
+fn virtual_kind_order(kind: ArchiveVirtualEntryKind) -> u8 {
+    match kind {
+        ArchiveVirtualEntryKind::Folder => 0,
+        ArchiveVirtualEntryKind::Archive => 1,
+        ArchiveVirtualEntryKind::Image => 2,
+    }
+}
+
+fn enumerate_archive_virtual_tree_inner(
+    path: &Path,
+    archive_chain: &[String],
+    context_parent: Option<&str>,
+    depth: usize,
+    budget: &mut NestedArchiveBudget,
+    builder: &mut ArchiveVirtualTreeBuilder,
+) -> Result<(), AppError> {
+    let listing = list_archive(path)?;
+    let mut entries = listing
+        .pages
+        .into_iter()
+        .map(|entry| (entry, ArchiveVirtualEntryKind::Image))
+        .chain(
+            listing
+                .archives
+                .into_iter()
+                .map(|entry| (entry, ArchiveVirtualEntryKind::Archive)),
+        )
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| {
+        natural_cmp(left.0.as_str(), right.0.as_str())
+            .then_with(|| virtual_kind_order(left.1).cmp(&virtual_kind_order(right.1)))
+    });
+
+    for (entry, kind) in entries {
+        let parent_id = builder.folder_parent(archive_chain, context_parent, &entry)?;
+        let name = entry
+            .as_str()
+            .rsplit('/')
+            .next()
+            .unwrap_or(entry.as_str())
+            .to_string();
+        if kind == ArchiveVirtualEntryKind::Image {
+            let mut page_chain = archive_chain.to_vec();
+            page_chain.push(entry.as_str().to_string());
+            let page_key = encode_archive_page_key(&page_chain)?;
+            builder.push(parent_id, name, kind, Some(page_key))?;
+            continue;
+        }
+
+        let archive_id = builder.push(parent_id, name, kind, None)?;
+        if depth >= MAX_NESTED_ARCHIVE_DEPTH {
+            return Err(limit_error("Nested archive depth limit exceeded."));
+        }
+        budget.archives = budget.archives.saturating_add(1);
+        if budget.archives > MAX_NESTED_ARCHIVES {
+            return Err(limit_error("Nested archive count limit exceeded."));
+        }
+        let remaining = MAX_NESTED_ARCHIVE_BYTES.saturating_sub(budget.bytes);
+        if remaining == 0 {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let nested = read_direct_archive_entry(path, entry.as_str(), remaining)?;
+        budget.bytes = budget
+            .bytes
+            .checked_add(nested.bytes.len() as u64)
+            .ok_or_else(|| limit_error("Nested archive byte limit exceeded."))?;
+        if budget.bytes > MAX_NESTED_ARCHIVE_BYTES {
+            return Err(limit_error("Nested archive byte limit exceeded."));
+        }
+        let temporary = TemporaryArchive::create(entry.as_str(), &nested.bytes)?;
+        let mut nested_chain = archive_chain.to_vec();
+        nested_chain.push(entry.as_str().to_string());
+        enumerate_archive_virtual_tree_inner(
+            &temporary.path,
+            &nested_chain,
+            Some(&archive_id),
+            depth + 1,
+            budget,
+            builder,
+        )?;
+    }
+    Ok(())
 }
 
 fn list_archive(path: &Path) -> Result<ArchiveListing, AppError> {
@@ -1107,6 +1321,18 @@ mod tests {
         writer.finish().unwrap().into_inner()
     }
 
+    fn virtual_children<'a>(
+        entries: &'a [ArchiveVirtualEntry],
+        parent_id: Option<&str>,
+    ) -> Vec<&'a ArchiveVirtualEntry> {
+        let mut result = entries
+            .iter()
+            .filter(|entry| entry.parent_id.as_deref() == parent_id)
+            .collect::<Vec<_>>();
+        result.sort_by_key(|entry| entry.sort_order);
+        result
+    }
+
     #[test]
     fn lists_stored_and_deflated_images_without_extracting() {
         let path = temporary_archive("archive-pages");
@@ -1356,6 +1582,144 @@ mod tests {
         assert!(entry.fingerprint_detail.starts_with("nested:"));
         assert!(!path.parent().unwrap().join("2-volume.cbz").exists());
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_002_builds_read_only_folder_and_nested_archive_virtual_nodes() {
+        let path = temporary_archive("virtual-tree");
+        let nested = zip_bytes(&[("inside/1.png", b"nested-page")]);
+        let original = zip_bytes(&[
+            ("chapter/10.png", b"ten"),
+            ("chapter/2.png", b"two"),
+            ("packs/inner.cbz", &nested),
+            (".hidden/secret.png", b"hidden"),
+            ("notes.txt", b"ignored"),
+        ]);
+        fs::write(&path, &original).unwrap();
+
+        let entries = enumerate_archive_virtual_tree(&path).unwrap();
+        let root = virtual_children(&entries, None);
+        assert_eq!(
+            root.iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            ["chapter", "packs"]
+        );
+
+        let chapter = root.iter().find(|entry| entry.name == "chapter").unwrap();
+        let chapter_pages = virtual_children(&entries, Some(&chapter.id));
+        assert_eq!(
+            chapter_pages
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            ["2.png", "10.png"]
+        );
+        assert!(
+            chapter_pages
+                .iter()
+                .all(|entry| entry.kind == ArchiveVirtualEntryKind::Image)
+        );
+
+        let packs = root.iter().find(|entry| entry.name == "packs").unwrap();
+        let nested_archive = virtual_children(&entries, Some(&packs.id))[0];
+        assert_eq!(nested_archive.kind, ArchiveVirtualEntryKind::Archive);
+        let inside = virtual_children(&entries, Some(&nested_archive.id))[0];
+        assert_eq!(inside.kind, ArchiveVirtualEntryKind::Folder);
+        let nested_page = virtual_children(&entries, Some(&inside.id))[0];
+        let page_key = nested_page.page_key.as_ref().unwrap();
+        assert!(page_key.as_str().starts_with(NESTED_PAGE_KEY_PREFIX));
+        assert_eq!(
+            read_archive_entry(&path, page_key.as_str(), 64)
+                .unwrap()
+                .bytes,
+            b"nested-page"
+        );
+        assert_eq!(fs::read(&path).unwrap(), original);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_002_uses_the_existing_zip_rar_seven_zip_and_lzh_adapters() {
+        let mut zip_path = temporary_archive("virtual-adapter-zip");
+        zip_path.set_extension("epub");
+        fs::write(&zip_path, zip_bytes(&[("chapter/1.png", b"zip")])).unwrap();
+
+        let mut seven_zip_path = temporary_archive("virtual-adapter-seven");
+        seven_zip_path.set_extension("cb7");
+        write_seven_zip(&seven_zip_path, &[("chapter/1.png", b"seven")]);
+
+        let mut lzh_path = temporary_archive("virtual-adapter-lzh");
+        lzh_path.set_extension("lzh");
+        write_stored_lzh(&lzh_path, &[("chapter/1.png", b"lzh")]);
+
+        let rar_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-RAR-001/standard.rar");
+        for path in [&zip_path, &seven_zip_path, &lzh_path, &rar_path] {
+            let entries = enumerate_archive_virtual_tree(path).unwrap();
+            assert!(!entries.is_empty(), "{}", path.display());
+            assert!(
+                entries
+                    .iter()
+                    .any(|entry| entry.kind == ArchiveVirtualEntryKind::Image)
+            );
+        }
+
+        fs::remove_file(zip_path).unwrap();
+        fs::remove_file(seven_zip_path).unwrap();
+        fs::remove_file(lzh_path).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_002_twenty_thousand_entries_and_fifty_thousand_nodes_are_bounded() {
+        let path = temporary_archive("virtual-tree-large");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        const MEASURED_ENTRIES: usize = 20_000;
+        for index in 0..MEASURED_ENTRIES {
+            writer
+                .start_file(
+                    format!("{index:05}.png"),
+                    SimpleFileOptions::default().compression_method(CompressionMethod::Stored),
+                )
+                .unwrap();
+        }
+        writer.finish().unwrap();
+        let started = std::time::Instant::now();
+        let entries = enumerate_archive_virtual_tree(&path).unwrap();
+        let elapsed = started.elapsed();
+        eprintln!("REQ-LEY-P4-002 20,000-entry archive tree: {elapsed:?}");
+        assert_eq!(entries.len(), MEASURED_ENTRIES);
+        assert!(elapsed < std::time::Duration::from_secs(10));
+        fs::remove_file(path).unwrap();
+
+        let mut builder = ArchiveVirtualTreeBuilder::default();
+        let started = std::time::Instant::now();
+        for index in 0..MAX_ARCHIVE_VIRTUAL_NODES {
+            builder
+                .push(
+                    None,
+                    format!("{index:05}.png"),
+                    ArchiveVirtualEntryKind::Image,
+                    None,
+                )
+                .unwrap();
+        }
+        assert!(
+            builder
+                .push(
+                    None,
+                    "overflow.png".into(),
+                    ArchiveVirtualEntryKind::Image,
+                    None
+                )
+                .is_err()
+        );
+        let entries = builder.finish().unwrap();
+        let elapsed = started.elapsed();
+        eprintln!("REQ-LEY-P4-002 50,000 synthetic virtual nodes: {elapsed:?}");
+        assert_eq!(entries.len(), MAX_ARCHIVE_VIRTUAL_NODES);
+        assert!(elapsed < std::time::Duration::from_secs(5));
     }
 
     #[test]

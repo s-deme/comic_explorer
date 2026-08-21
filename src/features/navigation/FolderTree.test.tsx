@@ -435,6 +435,37 @@ describe("FolderTree", () => {
     expect(onNativeFileDragStart).toHaveBeenCalledWith(["Selected"]);
   });
 
+  it("REQ-LEY-P4-002 exposes supported archives as read-only tree entries", async () => {
+    listMock.mockResolvedValue({
+      status: "ok",
+      requestId: "archive-tree" as never,
+      generation: 1 as never,
+      data: [{
+        relativePath: "book.cbz" as never,
+        hasChildren: true,
+        entryKind: "archive",
+      }],
+    });
+    const onOpenArchive = vi.fn();
+    render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath=""
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+        onOpenArchive={onOpenArchive}
+      />,
+    );
+
+    const archive = await screen.findByRole("treeitem", { name: "book.cbz" });
+    expect(archive).toHaveAttribute("aria-haspopup", "dialog");
+    expect(archive).toHaveAttribute("draggable", "false");
+    fireEvent.click(archive);
+    expect(onOpenArchive).toHaveBeenCalledWith("book.cbz");
+    fireEvent.click(screen.getByRole("button", { name: "book.cbzを展開する" }));
+    expect(onOpenArchive).toHaveBeenCalledTimes(2);
+  });
+
   it("allows paste but not cut or copy on drive nodes", async () => {
     const onFileAction = vi.fn();
     render(

@@ -69,7 +69,9 @@ separatorとcaseを比較用に正規化してからdriveとpath segment境界�
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
 address表示ではExplorerと同じ通常pathへ変換する。
 
-treeのleaf/branch判定はRustのroot-contained `list_tree_children`で行い、下位確認を有効にした場合だけ各direct child folderを非再帰・先頭一致で調べてnullable `hasChildren`を返す。frontendはleafのexpanderを無効化し、自動折畳み設定ではPC、active drive、current ancestor chainだけを展開集合へ残す。tree幅は180〜480pxへpointer/keyboard共通でclampし、これら3値をprofile v19とSQLiteへ保存する。書庫nodeおよび書庫内仮想pathはP4のLEY-FILER-002/003で扱い、このfilesystem tree境界へ先行混在させない。
+treeのleaf/branch判定はRustのroot-contained `list_tree_children`で行い、下位確認を有効にした場合だけ各direct child folderを非再帰・先頭一致で調べてnullable `hasChildren`を返す。frontendはleafのexpanderを無効化し、自動折畳み設定ではPC、active drive、current ancestor chainだけを展開集合へ残す。tree幅は180〜480pxへpointer/keyboard共通でclampし、これら3値をprofile v19とSQLiteへ保存する。対応書庫は同じfilesystem treeでread-onlyの書庫nodeとして区別し、展開時はRustの`application::archive_browser`だけがroot containment、regular non-reparse file、対応kindを再検証して仮想snapshotを返す。
+
+書庫仮想snapshotは既存のZIP/RAR/7z/LZH adapterと多重圧縮readerを共有し、safe entry pathからfolderを推論して画像・入れ子書庫とともにopaque node/parent IDへ写像する。画像の既存opaque page keyだけをViewerへ戻し、TypeScriptはentry path、nested chain、書庫形式を解釈しない。tree/listは50,000 nodeでもDOM全件化せずvirtualizeし、session限定の選択だけを持つ。深さ3、最大64 nested archive、累積temp 512 MiB、entry 256 MiB、書庫100,000 entry・展開量1 GiBの既存上限を迂回しない。dot entry、空folder、unsupported/PDF entryは表示せず、仮想nodeへfile操作、外部app、drop、書込み、全体展開を接続しない。一時書庫はreader境界のRAII cleanupで破棄する。
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder移動は先に古いgenerationをcancelして
 metadata一覧を返し、placeholderを表示した後でthumbnail要求を非同期に投入する。navigation時のpin解除は

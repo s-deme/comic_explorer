@@ -38,6 +38,7 @@ import {
   takeCliLaunchRequest,
   listenCliLaunchPending,
   listShelves,
+  listArchiveVirtualTree,
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
@@ -173,6 +174,7 @@ vi.mock("./features/library/client", () => ({
   takeCliLaunchRequest: vi.fn(),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
+  listArchiveVirtualTree: vi.fn(async () => ({ status: "ok", data: { archiveRelativePath: "book.cbz", entries: [] } })),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),
@@ -261,6 +263,7 @@ const restoreMock = vi.mocked(restoreLibraryRoot);
 const takeCliLaunchRequestMock = vi.mocked(takeCliLaunchRequest);
 const listenCliLaunchPendingMock = vi.mocked(listenCliLaunchPending);
 const listShelvesMock = vi.mocked(listShelves);
+const listArchiveVirtualTreeMock = vi.mocked(listArchiveVirtualTree);
 const openMock = vi.mocked(openComic);
 const resolveCatalogActivationMock = vi.mocked(resolveCatalogActivation);
 const settingsMock = vi.mocked(getCatalogSettings);
@@ -613,6 +616,13 @@ describe("application shell", () => {
       requestId: "shelves" as never,
       generation: 1 as never,
       data: { shelves: [], nodes: [], startupShelfId: null },
+    });
+    listArchiveVirtualTreeMock.mockReset();
+    listArchiveVirtualTreeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "archive-tree" as never,
+      generation: 1 as never,
+      data: { archiveRelativePath: "book.cbz" as never, entries: [] },
     });
     cliLaunchHarness.handler = undefined;
     takeCliLaunchRequestMock.mockResolvedValue({
@@ -982,6 +992,55 @@ describe("application shell", () => {
     expect(await screen.findByRole("button", { name: /毎日読む$/ })).toHaveAttribute("aria-pressed", "true");
     expect(registerMock).not.toHaveBeenCalled();
     expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it("REQ-LEY-P4-002 opens a Rust-issued archive page key from the read-only tree browser", async () => {
+    treeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "tree-archive" as never,
+      generation: 1 as never,
+      data: [{ relativePath: "book.cbz" as never, hasChildren: true, entryKind: "archive" }],
+    });
+    listArchiveVirtualTreeMock.mockResolvedValue({
+      status: "ok",
+      requestId: "archive-tree" as never,
+      generation: 1 as never,
+      data: {
+        archiveRelativePath: "book.cbz" as never,
+        entries: [{
+          id: "page-2",
+          parentId: null,
+          name: "2.png",
+          kind: "image",
+          hasChildren: false,
+          pageKey: "page-2.png" as never,
+          sortOrder: 0,
+        }],
+      },
+    });
+    openMock.mockResolvedValue({
+      status: "ok",
+      requestId: "open-archive-page" as never,
+      generation: 1 as never,
+      data: {
+        itemKey: "book.cbz",
+        displayName: "book.cbz",
+        pages: [
+          { id: "page-1" as never, relativePath: "page-1.png" as never, mediaUri: "data:image/png;base64,one" },
+          { id: "page-2" as never, relativePath: "page-2.png" as never, mediaUri: "data:image/png;base64,two" },
+        ],
+        startIndex: 0,
+      },
+    });
+    await registerTestLibrary([testEntry("book.cbz")]);
+
+    fireEvent.click(await screen.findByRole("treeitem", { name: "book.cbz" }));
+    const dialog = await screen.findByRole("dialog", { name: "書庫エクスプローラー" });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "2.pngを開く" }));
+
+    expect(await screen.findByText("2 / 2")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "書庫エクスプローラー" })).not.toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledWith("book.cbz", expect.any(Number));
   });
 
   it("REQ-LEY-P3-021 applies a Rust-validated startup file plan without archive auto-fullscreen", async () => {

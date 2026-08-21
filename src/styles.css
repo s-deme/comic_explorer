@@ -1664,11 +1664,35 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .bookshelf-transfer { grid-column: 1 / -1; }
 .bookshelf-transfer textarea { box-sizing: border-box; width: 100%; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
 
+.archive-explorer-dialog {
+  width: min(1040px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 32px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #9aa8ba;
+  border-radius: 10px;
+  background: #f7f9fc;
+  box-shadow: 0 14px 40px rgb(20 35 55 / 28%);
+}
+.archive-explorer-dialog .quick-access-heading p { max-width: 70vw; margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-explorer-layout { min-height: 0; display: grid; grid-template-columns: minmax(220px, .75fr) minmax(360px, 1.5fr); gap: 10px; }
+.archive-tree-pane, .archive-list-pane { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); border: 1px solid #d8e0ea; background: #fff; }
+.archive-tree-pane > h3, .archive-list-pane > header { min-height: 38px; margin: 0; padding: 7px 9px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #d8e0ea; }
+.archive-list-pane > header h3 { min-width: 0; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-virtual-scroll { min-height: 0; overflow: auto; }
+.archive-tree-row, .archive-list-row { position: absolute; inset-inline: 0; height: 28px; display: flex; align-items: center; }
+.archive-tree-row > [role="treeitem"] { min-width: 0; flex: 1; overflow: hidden; text-align: start; text-overflow: ellipsis; white-space: nowrap; }
+.archive-list-row { height: 34px; gap: 8px; padding-inline: 6px; }
+.archive-list-row > :first-child { min-width: 0; flex: 1; overflow: hidden; text-align: start; text-overflow: ellipsis; white-space: nowrap; }
+
 @media (max-width: 760px) {
   .dialog-backdrop { padding: 8px; }
   .bookshelf-dialog { inset: 8px; width: auto; }
   .bookshelf-layout { grid-template-columns: 1fr; }
   .bookshelf-transfer { grid-column: auto; }
+  .archive-explorer-layout { grid-template-columns: 1fr; grid-template-rows: minmax(180px, .8fr) minmax(240px, 1.2fr); }
   .dialog-backdrop > .settings-dialog {
     width: calc(100vw - 16px);
     height: calc(100vh - 16px);

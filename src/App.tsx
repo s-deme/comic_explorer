@@ -121,6 +121,7 @@ import {
 import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
 import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
 import { CsvExportDialog } from "./features/catalog/CsvExportDialog";
+import { ArchiveExplorerDialog } from "./features/archive/ArchiveExplorerDialog";
 import {
   previousComicEntry,
   sortCatalogEntries,
@@ -714,6 +715,7 @@ export function App({
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   const [bookshelfOpen, setBookshelfOpen] = useState(false);
+  const [archiveExplorerPath, setArchiveExplorerPath] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
@@ -974,6 +976,7 @@ export function App({
     setRecursiveThumbnailReport(null);
     viewerGeneration.current += 1;
     setViewerSession(null);
+    setArchiveExplorerPath(null);
     setLibraryRoot(root);
     setSearchSourceRoots([root]);
     setSearchSourceNotice(null);
@@ -2600,6 +2603,7 @@ export function App({
     selectionPath: string | null = null,
   ) {
     addressInputDirty.current = false;
+    setArchiveExplorerPath(null);
     if (!searchOptions.retainResults) setSearchState({ status: "idle" });
     if (history === "push") dispatch({ type: "navigate", path });
     else if (typeof history === "string") dispatch({ type: history });
@@ -4317,6 +4321,7 @@ export function App({
     launchMode: ViewerLaunchMode = "normal",
     startAt: "restored" | "first" | "last" = "restored",
     preferArchiveFullscreen = true,
+    requestedPageKey: string | null = null,
   ): Promise<boolean> {
     const resolvedLaunchMode = preferArchiveFullscreen && launchMode === "normal" && entry.kind === "archive"
       ? "fullscreen"
@@ -4331,11 +4336,21 @@ export function App({
       const response = await openComic(entry.relativePath, requestGeneration);
       if (requestGeneration !== viewerGeneration.current) return false;
       if (response.status === "ok") {
+        const requestedPageIndex = requestedPageKey === null
+          ? null
+          : response.data.pages.findIndex((page) => page.relativePath === requestedPageKey);
+        if (requestedPageKey !== null && requestedPageIndex === -1) {
+          setLoadState({ status: "ready" });
+          setSelectionNotice("書庫の内容が変更されたため、選択ページを開けませんでした。再読み込みしてください。");
+          return false;
+        }
         rememberRecent(entry);
         void refreshBookmarks(response.data.itemKey, requestGeneration);
         setViewerSession({
           ...response.data,
-          startIndex: startAt === "first"
+          startIndex: requestedPageIndex !== null
+            ? requestedPageIndex
+            : startAt === "first"
             ? 0
             : startAt === "last"
               ? Math.max(0, response.data.pages.length - 1)
@@ -5749,6 +5764,7 @@ export function App({
           onFileDragStart={setDraggedFilePaths}
           onNativeFileDragStart={(paths) => void startDraggedItemsNative(paths)}
           onFileDragEnd={() => setDraggedFilePaths([])}
+          onOpenArchive={setArchiveExplorerPath}
         />
         {sidePaneVisible && (
           <>
@@ -7077,6 +7093,20 @@ export function App({
             await applyLaunchPlan(plan);
           }}
           onClose={() => setBookshelfOpen(false)}
+        />
+      )}
+      {archiveExplorerPath !== null && (
+        <ArchiveExplorerDialog
+          archiveRelativePath={archiveExplorerPath}
+          onOpenPage={async (pageKey) => {
+            const opened = await openComicEntry({
+              relativePath: archiveExplorerPath as CatalogEntry["relativePath"],
+              kind: "archive",
+              archiveKind: archiveKindFromPath(archiveExplorerPath),
+            }, "normal", "restored", false, pageKey);
+            if (opened) setArchiveExplorerPath(null);
+          }}
+          onClose={() => setArchiveExplorerPath(null)}
         />
       )}
       {historyOpen && (

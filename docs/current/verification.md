@@ -597,6 +597,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Windows canonical / build / CoDD | PASS | 最終source変更後の`verify-feature-windows.ps1 -Feature IMP-004 -RustMode Canonical`は全12 stage PASS、510.420秒。Rust 233件とshutdown process 1件、79 modules build、SBOM 783 components・unknown/prohibited license 0、product shortcut、CoDD scan/check/verifyを含む。logは`src-tauri/target/verification/imp-004-20260821T140441865Z`。 |
 | 製品直接観測 | NOT RUN | release WebView2の大規模tree FPS/working set、native drag、保存dialog、network/removable/offline分類、cold start、実content openを直接操作・観測していない。 |
 
+## Leeyes P4-B 書庫仮想ツリー・階層閲覧・入れ子書庫
+
+対象はLEY-FILER-002/003/004の3件。Rustがroot-contained regular archiveの再検証、既存ZIP/RAR/7z/LZH adapter、safe entry path、nested archive上限、opaque node/page key、natural order、temp cleanupを担当する。TypeScriptはfilesystem treeの書庫入口、virtualized tree/list、選択pageの既存Viewer適用だけを担当する。
+
+| 検証 | 結果 | 証拠 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P4-002の4件、FAIL 0。contained regular archive、folder推論、natural order、dot/unsupported非表示、nested archive、opaque page read、原本差分0、ZIP/RAR/7z/LZH adapterを含む。 |
+| 性能・上限 | PASS / 限定 | debug Rustで20,000 direct ZIP entryを625.062ms、50,000 synthetic virtual nodeを116.589msで構築した。50,001 node、既存depth/count/byte/entry上限はfail closed。実大規模RAR/7z/LZH、IPC、React FPS、CPU、peak working set/tempは未測定。 |
+| Frontend focused | PASS | FolderTree、ArchiveExplorerDialog、App、clientの4 files / 5件、FAIL 0。書庫入口、tree/list同期、nested container、opaque page選択、error回復、file-operation非表示、IPCを含む。 |
+| Typecheck | PASS | Windows-native typecheck exit 0。 |
+| Windows tests / canonical / build / CoDD | PASS | frontend 39 files / 494件、Python 61件、Rust 237件とshutdown process 1件、typecheck、80 modules build、SBOM 783 components・unknown/prohibited license 0。最終source変更後のformal canonicalは全12 stage PASS、536.254秒。logは`src-tauri/target/verification/imp-004-20260821T144314621Z`。 |
+| 製品直接観測 | NOT RUN | release WebView2の50,000 node FPS/working set、実大規模RAR/7z/LZH、slow/removable drive、temp peak、Viewer遷移時間を直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

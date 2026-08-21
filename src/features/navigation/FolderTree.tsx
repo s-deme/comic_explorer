@@ -20,7 +20,7 @@ interface TreeNode {
   path: string;
   name: string;
   depth: number;
-  kind: "pc" | "drive" | "folder";
+  kind: "pc" | "drive" | "folder" | "archive";
   driveRoot?: string;
   driveIdentity?: string;
   hasChildren?: boolean | null;
@@ -43,6 +43,7 @@ interface FolderTreeProps {
   onFileDragStart?: (paths: string[]) => void;
   onNativeFileDragStart?: (paths: string[]) => void;
   onFileDragEnd?: () => void;
+  onOpenArchive?: (relativePath: string) => void;
 }
 
 interface TreeMenuState {
@@ -97,6 +98,7 @@ export function FolderTree({
   onFileDragStart = () => undefined,
   onNativeFileDragStart = () => undefined,
   onFileDragEnd = () => undefined,
+  onOpenArchive = () => undefined,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
@@ -203,12 +205,14 @@ export function FolderTree({
           path,
           name: leafName(path),
           depth,
-          kind: "folder",
+          kind: child.entryKind === "archive" ? "archive" : "folder",
           driveRoot,
           driveIdentity,
           hasChildren: child.hasChildren,
         });
-        if (expanded.has(key)) appendFolders(driveIdentity, driveRoot, path, depth + 1);
+        if (child.entryKind !== "archive" && expanded.has(key)) {
+          appendFolders(driveIdentity, driveRoot, path, depth + 1);
+        }
       }
     };
 
@@ -328,7 +332,7 @@ export function FolderTree({
             const pathKey = drivePathKey(nodeDrive, node.path);
             const childCount = node.kind === "pc"
               ? drives.length
-              : node.kind === "folder"
+              : node.kind === "folder" || node.kind === "archive"
                 ? node.hasChildren === false ? 0 : children.get(pathKey)?.length
                 : undefined;
             const isSelected = node.kind === "pc"
@@ -351,6 +355,10 @@ export function FolderTree({
                   aria-expanded={isExpanded}
                   disabled={childCount === 0}
                   onClick={() => {
+                    if (node.kind === "archive") {
+                      onOpenArchive(node.path);
+                      return;
+                    }
                     setExpanded((previous) => {
                       const next = new Set(previous);
                       if (next.has(node.key)) next.delete(node.key);
@@ -379,6 +387,7 @@ export function FolderTree({
                   aria-keyshortcuts={node.kind === "folder"
                     ? "Shift+F10 Control+X Control+C Control+V Delete"
                     : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
+                  aria-haspopup={node.kind === "archive" ? "dialog" : undefined}
                   className="tree-node"
                   title={node.name}
                   data-native-drop-path={nodeDrive === activeDrive && fileTarget(node) !== null
@@ -465,6 +474,8 @@ export function FolderTree({
                   onClick={() => {
                     if (node.kind === "drive" && node.driveRoot !== undefined) {
                       void onSelectDrive(node.driveRoot);
+                    } else if (node.kind === "archive") {
+                      onOpenArchive(node.path);
                     } else if (node.kind === "folder") {
                       if (nodeDrive === activeDrive) onNavigate(node.path);
                       else if (node.driveRoot !== undefined) {
@@ -474,7 +485,7 @@ export function FolderTree({
                   }}
                 >
                   <span className={`tree-icon tree-icon--${node.kind}`} aria-hidden="true">
-                    {node.kind === "pc" ? "▣" : node.kind === "drive" ? "▰" : "■"}
+                    {node.kind === "pc" ? "▣" : node.kind === "drive" ? "▰" : node.kind === "archive" ? "▤" : "■"}
                   </span>
                   {node.name}
                 </button>

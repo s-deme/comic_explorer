@@ -45,6 +45,7 @@ import {
   executeShelvesImport,
   previewShelvesImport,
   migrateLegacyShelf,
+  listArchiveVirtualTree,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -98,6 +99,14 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenNthCalledWith(5, "migrate_legacy_shelf", expect.objectContaining({
       relativePaths: ["legacy.cbz"],
     }));
+  });
+
+  it("REQ-LEY-P4-002 sends only the root-relative archive path to the Rust virtual-tree boundary", async () => {
+    await listArchiveVirtualTree("Series/book.cbz", 85);
+    expect(invokeMock).toHaveBeenCalledWith("list_archive_virtual_tree", {
+      context: expect.objectContaining({ generation: 85 }),
+      archiveRelativePath: "Series/book.cbz",
+    });
   });
 
   it("REQ-LEY-P2-015 sends the required Viewer catalog sync field to Rust", async () => {

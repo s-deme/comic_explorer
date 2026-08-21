@@ -1,3 +1,4 @@
+pub mod archive_browser;
 pub mod cli_launch;
 mod coordinator;
 pub mod csv_export;
@@ -188,6 +189,7 @@ pub struct SearchResultEntry {
 pub struct TreeEntry {
     pub relative_path: RelativePath,
     pub has_children: Option<bool>,
+    pub entry_kind: String,
 }
 
 const CATALOG_FOLDER_CHANGED_EVENT: &str = "catalog-folder-changed";
@@ -5668,11 +5670,16 @@ fn enumerate_tree_children(
             .filter(|entry| {
                 matches!(
                     entry.kind,
-                    crate::domain::ItemKind::Folder | crate::domain::ItemKind::ComicFolder
+                    crate::domain::ItemKind::Folder
+                        | crate::domain::ItemKind::ComicFolder
+                        | crate::domain::ItemKind::Archive
                 )
             })
             .map(|entry| {
-                let has_children = if confirm_children {
+                let is_archive = entry.kind == crate::domain::ItemKind::Archive;
+                let has_children = if is_archive {
+                    Some(true)
+                } else if confirm_children {
                     has_child_folder_with_hidden(
                         root,
                         &root.join(entry.relative_path.as_str()),
@@ -5685,6 +5692,7 @@ fn enumerate_tree_children(
                 Ok(TreeEntry {
                     relative_path: entry.relative_path,
                     has_children,
+                    entry_kind: if is_archive { "archive" } else { "folder" }.into(),
                 })
             })
             .collect()

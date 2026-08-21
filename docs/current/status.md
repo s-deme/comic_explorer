@@ -33,9 +33,9 @@ codd:
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
 | P3 操作・検索 | 31 | 31 | 0 |
-| P4 大型基盤 | 12 | 7 | 5 |
+| P4 大型基盤 | 12 | 10 | 2 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **75** | **28** |
+| **合計** | **103** | **78** | **25** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -122,6 +122,8 @@ P3-UではLEY-IO-001〜006をPublishedとした。従来TypeScriptにあった�
 P3-VではLEY-IO-007〜009をPublishedとし、P3の31件を完了した。RustをCLI argument parser、cwd相対path解決、canonical/readability/file kind検証、launch plan、最大16件FIFO、公式Tauri single-instance引渡しの正本とした。pathは1件、`-f`/`--fullscreen`と`-s`/`--slideshow`は排他的に受理し、`--`、space、Unicode、relative pathを扱うが、shell再解析・環境変数・wildcard展開は行わない。後続instanceは既存windowをshow・unminimize・focusし、Rust queueへ渡す。TypeScriptは検証済みplanを既存library/catalog/viewer/fullscreen/slideshowへ適用するだけである。10,000 queue要求は9.775ms。frontend 37 files / 483件、Python 61件、Rust 226+1件、typecheck、78 modules build、SBOM 783 components・禁止license 0、sandbox外Windows canonical全12 stageはPASSした。managed sandbox内の2回のcanonicalはnative single-instance mutex/windowが起動できずproduct-shortcutで失敗したが、同一releaseの隔離probe・product-shortcut単独・sandbox外canonicalはPASSした。Windows Terminal/PowerShell/cmd/Explorer別quoting、実の後続instanceからのpath受渡し、UNC・長path、network/removable drive、起動・focus時間、CPU・working setは未測定として残す。
 
 P4-AではLEY-SHELF-001/003/004/005/007/008/009の7件をPublishedとした。SQLite schema v10とRust commandを本棚・仮想階層・順序・icon preset・起動指定・登録path再検証・明示cleanup・versioned JSON Lines import/exportの正本とし、TypeScriptは本棚dialogとIPC orchestrationだけを担当する。仮想folder/itemの変更・除去は実filesystemを変更せず、子孫除去とimportはpreview key・確認・transactionへ固定した。10,000 node snapshotは36.840ms、50,000 node import previewは1.577秒。frontend 38 files / 489件、Python 61件、Rust 233+1件、typecheck、79 modules build、SBOM 783 components・禁止license 0、sandbox外Windows canonical全12 stageはPASSした。release WebView2の大規模tree FPS/working set、native drag、保存dialog、network/removable/offline分類、cold startは未測定として残す。
+
+P4-BではLEY-FILER-002/003/004の3件をPublishedとした。filesystem treeへ対応書庫nodeを追加し、Rustが既存ZIP/RAR/7z/LZH・多重圧縮readerからfolder/image/nested archiveのopaque仮想snapshotを構築する。TypeScriptはvirtualized tree/listとRust page keyの既存Viewer適用だけを担当し、仮想nodeへfile操作・抽出・外部appを接続しない。20,000 direct entryは625.062ms、50,000 synthetic nodeは116.589ms。frontend 39 files / 494件、Python 61件、Rust 237+1件、typecheck、80 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageはPASSした。release WebView2 FPS/working set、実大規模RAR/7z/LZH、slow/removable drive、temp peak、Viewer遷移時間は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

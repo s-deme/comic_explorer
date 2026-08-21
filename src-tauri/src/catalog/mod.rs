@@ -6,7 +6,10 @@ mod pdf;
 mod thumbnail;
 
 pub(crate) use archive::read_archive_entry;
-pub use archive::{ArchiveAdapterKind, archive_adapter_kind, enumerate_archive_pages};
+pub use archive::{
+    ArchiveAdapterKind, ArchiveVirtualEntry, ArchiveVirtualEntryKind, archive_adapter_kind,
+    enumerate_archive_pages, enumerate_archive_virtual_tree,
+};
 pub use folder::{
     ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages,
     enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden, has_child_folder_with_hidden,
