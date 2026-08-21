@@ -92,6 +92,29 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P3-008 sends strict detail formatting to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.detailGridLines = "both";
+    profile.detailRowDensity = "comfortable";
+    profile.detailShowKind = false;
+    profile.detailShowSize = false;
+    profile.detailShowModified = false;
+    await saveSettingsProfile(profile, 22);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          detailGridLines: "both",
+          detailRowDensity: "comfortable",
+          detailShowKind: false,
+          detailShowSize: false,
+          detailShowModified: false,
+        }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-002 sends the mask and basename batch to the Rust matcher", async () => {
     const candidates = [
       { basename: "one.cbz", kind: "archive" as const, byteSize: 10 },

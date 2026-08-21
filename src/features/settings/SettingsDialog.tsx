@@ -80,6 +80,8 @@ import {
   FULLSCREEN_ESCAPE_BEHAVIORS,
   FILE_OPEN_RULES,
   FOLDER_OPEN_RULES,
+  DETAIL_GRID_LINE_MODES,
+  DETAIL_ROW_DENSITIES,
   MAX_TREE_WIDTH,
   MIN_TREE_WIDTH,
   TRAY_CLOSE_BEHAVIORS,
@@ -125,6 +127,12 @@ const FOLDER_OPEN_RULE_LABELS: Record<SettingsProfile["folderOpenRule"], string>
 };
 const FILE_OPEN_RULE_LABELS: Record<SettingsProfile["imageOpenRule"], string> = {
   read: "作品として読む", none: "何もしない",
+};
+const DETAIL_GRID_LINE_LABELS: Record<SettingsProfile["detailGridLines"], string> = {
+  none: "なし", horizontal: "横罫線", both: "縦横の罫線",
+};
+const DETAIL_ROW_DENSITY_LABELS: Record<SettingsProfile["detailRowDensity"], string> = {
+  compact: "コンパクト", standard: "標準", comfortable: "ゆったり",
 };
 
 type SettingsCategory = "catalog" | "viewer" | "interface" | "commands" | "profile";
@@ -359,6 +367,21 @@ export function SettingsDialog({
       id: "archive-open-rule",
       category: "catalog",
       text: `書庫 PDF 開く ダブルクリック Enter 読む 何もしない ${FILE_OPEN_RULE_LABELS[draft.archiveOpenRule]}`,
+    },
+    {
+      id: "detail-grid-lines",
+      category: "catalog",
+      text: `詳細 リスト 罫線 区切り 横 縦 ${DETAIL_GRID_LINE_LABELS[draft.detailGridLines]}`,
+    },
+    {
+      id: "detail-row-density",
+      category: "catalog",
+      text: `詳細 リスト 行 密度 高さ コンパクト 標準 ゆったり ${DETAIL_ROW_DENSITY_LABELS[draft.detailRowDensity]}`,
+    },
+    {
+      id: "detail-columns",
+      category: "catalog",
+      text: `詳細 リスト 列 種別 サイズ 更新日時 表示 ${draft.detailShowKind} ${draft.detailShowSize} ${draft.detailShowModified}`,
     },
     {
       id: "catalog-palette",
@@ -786,6 +809,23 @@ export function SettingsDialog({
                 <select aria-label="profile書庫・PDFを開く規則" value={draft.archiveOpenRule} onChange={(event) => update({ archiveOpenRule: event.target.value as SettingsProfile["archiveOpenRule"] })}>
                   {FILE_OPEN_RULES.map((rule) => <option key={rule} value={rule}>{FILE_OPEN_RULE_LABELS[rule]}</option>)}
                 </select>
+              </SettingRow>
+              <SettingRow id="detail-grid-lines" title="詳細リストの罫線" description="詳細リストの行または列の境界を表示します。" hidden={rowHidden("detail-grid-lines")}>
+                <select aria-label="profile詳細リストの罫線" value={draft.detailGridLines} onChange={(event) => update({ detailGridLines: event.target.value as SettingsProfile["detailGridLines"] })}>
+                  {DETAIL_GRID_LINE_MODES.map((mode) => <option key={mode} value={mode}>{DETAIL_GRID_LINE_LABELS[mode]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="detail-row-density" title="詳細リストの行密度" description="項目数と読みやすさに合わせて行の高さを選びます。" hidden={rowHidden("detail-row-density")}>
+                <select aria-label="profile詳細リストの行密度" value={draft.detailRowDensity} onChange={(event) => update({ detailRowDensity: event.target.value as SettingsProfile["detailRowDensity"] })}>
+                  {DETAIL_ROW_DENSITIES.map((density) => <option key={density} value={density}>{DETAIL_ROW_DENSITY_LABELS[density]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="detail-columns" title="詳細リストの列" description="名前列は常に表示し、補助列を個別に切り替えます。" hidden={rowHidden("detail-columns")}>
+                <div className="settings-inline-fields">
+                  <label><input type="checkbox" aria-label="profile詳細リストに種別を表示" checked={draft.detailShowKind} onChange={(event) => update({ detailShowKind: event.target.checked })} />種別</label>
+                  <label><input type="checkbox" aria-label="profile詳細リストにサイズを表示" checked={draft.detailShowSize} onChange={(event) => update({ detailShowSize: event.target.checked })} />サイズ</label>
+                  <label><input type="checkbox" aria-label="profile詳細リストに更新日時を表示" checked={draft.detailShowModified} onChange={(event) => update({ detailShowModified: event.target.checked })} />更新日時</label>
+                </div>
               </SettingRow>
               <SettingRow id="catalog-palette" title="一覧配色" description="判読性を確認した背景・文字・選択色の組を選びます。" hidden={rowHidden("catalog-palette")}>
                 <select aria-label="profile一覧配色" value={draft.catalogPalette} onChange={(event) => update({ catalogPalette: event.target.value as SettingsProfile["catalogPalette"] })}>

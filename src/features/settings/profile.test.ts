@@ -79,6 +79,11 @@ function validProfile(): SettingsProfile {
     folderOpenRule: "navigate",
     imageOpenRule: "read",
     archiveOpenRule: "read",
+    detailGridLines: "none",
+    detailRowDensity: "standard",
+    detailShowKind: true,
+    detailShowSize: true,
+    detailShowModified: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -126,7 +131,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 21, 99, "20", undefined])(
+  it.each([0, 22, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -250,6 +255,36 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile(withField("folderOpenRule", "open"))).toBeNull();
     expect(normalizeSettingsProfile(withField("imageOpenRule", "navigate"))).toBeNull();
     expect(normalizeSettingsProfile(withField("archiveOpenRule", false))).toBeNull();
+  });
+
+  it("REQ-LEY-P3-008 migrates v20 detail formatting and rejects malformed values", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 20;
+    for (const field of [
+      "detailGridLines", "detailRowDensity", "detailShowKind",
+      "detailShowSize", "detailShowModified",
+    ]) delete legacy[field];
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      detailGridLines: "both",
+      detailRowDensity: "compact",
+      detailShowKind: false,
+      detailShowSize: false,
+      detailShowModified: false,
+    })).toEqual(expect.objectContaining({
+      detailGridLines: "both",
+      detailRowDensity: "compact",
+      detailShowKind: false,
+      detailShowSize: false,
+      detailShowModified: false,
+    }));
+    expect(normalizeSettingsProfile(withField("detailGridLines", "vertical"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("detailRowDensity", "tiny"))).toBeNull();
+    for (const field of ["detailShowKind", "detailShowSize", "detailShowModified"]) {
+      expect(normalizeSettingsProfile(withField(field, "true"))).toBeNull();
+    }
   });
 
   it("REQ-LEY-P2-005 migrates a v7 profile with the fixed P2-D spread rules", () => {

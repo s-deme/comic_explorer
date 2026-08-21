@@ -60,6 +60,56 @@ describe("CatalogGrid", () => {
     });
   });
 
+  it("REQ-LEY-P3-008 applies bounded detail density without changing other layouts", () => {
+    expect(catalogLayoutFor("detail_list", undefined, "compact")).toMatchObject({
+      thumbnailWidth: 28, thumbnailHeight: 30, rowHeight: 46,
+    });
+    expect(catalogLayoutFor("detail_list", undefined, "comfortable")).toMatchObject({
+      thumbnailWidth: 54, thumbnailHeight: 60, rowHeight: 78,
+    });
+    expect(catalogLayoutFor("cover_list", undefined, "compact").rowHeight)
+      .toBe(catalogLayoutFor("cover_list").rowHeight);
+  });
+
+  it("REQ-LEY-P3-008 keeps header, row columns, grid lines, and accessible metadata coherent", () => {
+    const entry: CatalogEntry = {
+      relativePath: "book.cbz" as never,
+      kind: "archive",
+      archiveKind: "cbz",
+      byteSize: 2048,
+      modifiedMs: 1_700_000_000_000,
+    };
+    render(
+      <CatalogGrid
+        entries={[entry]}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        viewMode="detail_list"
+        detailGridLines="both"
+        detailRowDensity="compact"
+        detailShowKind={false}
+        detailShowSize={false}
+        detailShowModified={false}
+      />,
+    );
+
+    const grid = screen.getByRole("grid");
+    expect(grid).toHaveAttribute("data-detail-grid-lines", "both");
+    expect(grid).toHaveAttribute("data-detail-row-density", "compact");
+    expect(grid).toHaveAttribute("data-detail-columns", "name");
+    expect(grid).toHaveStyle({ "--detail-item-height": "38px" });
+    expect(document.querySelector(".catalog-list-header")).toHaveTextContent("名前");
+    expect(document.querySelector(".catalog-list-header")).not.toHaveTextContent("種別");
+    expect(document.querySelector(".catalog-list-header")).not.toHaveTextContent("サイズ");
+    expect(screen.getByRole("button", { name: /book\.cbz、CBZ、サイズ 2\.0 KB、更新日時/ }))
+      .toBeInTheDocument();
+    expect(document.querySelector(".catalog-item--detail_list .item-kind")).toBeNull();
+    expect(document.querySelector(".catalog-item--detail_list .item-size")).toBeNull();
+    expect(document.querySelector(".catalog-item--detail_list .item-modified")).toBeNull();
+  });
+
   it.each([
     ["small_thumbnail", 9, 156, 10],
     ["detail_list", 2, 62, 0],
@@ -235,6 +285,12 @@ describe("CatalogGrid", () => {
         onSelect={() => undefined}
         onNavigate={() => undefined}
         onRead={() => undefined}
+        viewMode="detail_list"
+        detailGridLines="both"
+        detailRowDensity="comfortable"
+        detailShowKind={false}
+        detailShowSize={false}
+        detailShowModified={false}
       />,
     );
     const mounted = screen.getAllByRole("gridcell").length;

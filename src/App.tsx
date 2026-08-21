@@ -248,6 +248,8 @@ import {
   type FullscreenEscapeBehavior,
   type FileOpenRule,
   type FolderOpenRule,
+  type DetailGridLineMode,
+  type DetailRowDensity,
   type StartupLocation,
   type ThumbnailGenerationScope,
 } from "./features/settings/profile";
@@ -742,6 +744,11 @@ export function App({
   const [folderOpenRule, setFolderOpenRule] = useState<FolderOpenRule>("navigate");
   const [imageOpenRule, setImageOpenRule] = useState<FileOpenRule>("read");
   const [archiveOpenRule, setArchiveOpenRule] = useState<FileOpenRule>("read");
+  const [detailGridLines, setDetailGridLines] = useState<DetailGridLineMode>("none");
+  const [detailRowDensity, setDetailRowDensity] = useState<DetailRowDensity>("standard");
+  const [detailShowKind, setDetailShowKind] = useState(true);
+  const [detailShowSize, setDetailShowSize] = useState(true);
+  const [detailShowModified, setDetailShowModified] = useState(true);
   const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
@@ -1204,6 +1211,13 @@ export function App({
             ? response.data.folderOpenRule : "navigate");
           setImageOpenRule(response.data.imageOpenRule === "none" ? "none" : "read");
           setArchiveOpenRule(response.data.archiveOpenRule === "none" ? "none" : "read");
+          setDetailGridLines(["horizontal", "both"].includes(response.data.detailGridLines)
+            ? response.data.detailGridLines : "none");
+          setDetailRowDensity(["compact", "comfortable"].includes(response.data.detailRowDensity)
+            ? response.data.detailRowDensity : "standard");
+          setDetailShowKind(response.data.detailShowKind !== false);
+          setDetailShowSize(response.data.detailShowSize !== false);
+          setDetailShowModified(response.data.detailShowModified !== false);
           if (!autoRefreshCurrentFolderRef.current) {
             void stopLibraryFolderWatch(generation.current);
           }
@@ -3095,6 +3109,11 @@ export function App({
       folderOpenRule,
       imageOpenRule,
       archiveOpenRule,
+      detailGridLines,
+      detailRowDensity,
+      detailShowKind,
+      detailShowSize,
+      detailShowModified,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -3216,6 +3235,11 @@ export function App({
       setFolderOpenRule(normalized.folderOpenRule);
       setImageOpenRule(normalized.imageOpenRule);
       setArchiveOpenRule(normalized.archiveOpenRule);
+      setDetailGridLines(normalized.detailGridLines);
+      setDetailRowDensity(normalized.detailRowDensity);
+      setDetailShowKind(normalized.detailShowKind);
+      setDetailShowSize(normalized.detailShowSize);
+      setDetailShowModified(normalized.detailShowModified);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -3373,6 +3397,7 @@ export function App({
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
+    detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
     shortcuts, mouseGestures,
   ]);
 
@@ -5886,6 +5911,11 @@ export function App({
               viewMode={catalogViewMode}
               thumbnailSizes={catalogThumbnailSizes}
               palette={catalogPalette}
+              detailGridLines={detailGridLines}
+              detailRowDensity={detailRowDensity}
+              detailShowKind={detailShowKind}
+              detailShowSize={detailShowSize}
+              detailShowModified={detailShowModified}
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}

@@ -71,6 +71,12 @@ export function normalizeCatalogThumbnailSizes(value: unknown): CatalogThumbnail
 
 export const DEFAULT_CATALOG_VIEW_MODE: CatalogViewMode = "cover_list";
 
+export const DETAIL_ROW_HEIGHTS = {
+  compact: { item: 38, virtual: 46, thumbnailWidth: 28, thumbnailHeight: 30 },
+  standard: { item: 54, virtual: 62, thumbnailWidth: 42, thumbnailHeight: 44 },
+  comfortable: { item: 70, virtual: 78, thumbnailWidth: 54, thumbnailHeight: 60 },
+} as const;
+
 export function normalizeCatalogViewMode(
   value: string | null | undefined,
 ): CatalogViewMode {

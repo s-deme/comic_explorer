@@ -115,6 +115,11 @@ pub struct Settings {
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
+    pub detail_grid_lines: String,
+    pub detail_row_density: String,
+    pub detail_show_kind: bool,
+    pub detail_show_size: bool,
+    pub detail_show_modified: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -223,6 +228,11 @@ impl Default for Settings {
             folder_open_rule: "navigate".into(),
             image_open_rule: "read".into(),
             archive_open_rule: "read".into(),
+            detail_grid_lines: "none".into(),
+            detail_row_density: "standard".into(),
+            detail_show_kind: true,
+            detail_show_size: true,
+            detail_show_modified: true,
             menu_bar_visible: true,
             toolbar_visible: true,
             address_bar_visible: true,
@@ -366,6 +376,11 @@ impl StateStore {
                 "folderOpenRule" => settings.folder_open_rule = value,
                 "imageOpenRule" => settings.image_open_rule = value,
                 "archiveOpenRule" => settings.archive_open_rule = value,
+                "detailGridLines" => settings.detail_grid_lines = value,
+                "detailRowDensity" => settings.detail_row_density = value,
+                "detailShowKind" => settings.detail_show_kind = value == "true",
+                "detailShowSize" => settings.detail_show_size = value == "true",
+                "detailShowModified" => settings.detail_show_modified = value == "true",
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
                 "addressBarVisible" => settings.address_bar_visible = value == "true",
@@ -514,6 +529,14 @@ impl StateStore {
             ("folderOpenRule", settings.folder_open_rule.clone()),
             ("imageOpenRule", settings.image_open_rule.clone()),
             ("archiveOpenRule", settings.archive_open_rule.clone()),
+            ("detailGridLines", settings.detail_grid_lines.clone()),
+            ("detailRowDensity", settings.detail_row_density.clone()),
+            ("detailShowKind", settings.detail_show_kind.to_string()),
+            ("detailShowSize", settings.detail_show_size.to_string()),
+            (
+                "detailShowModified",
+                settings.detail_show_modified.to_string(),
+            ),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
             (
@@ -1729,6 +1752,11 @@ mod tests {
                 folder_open_rule: "read".into(),
                 image_open_rule: "none".into(),
                 archive_open_rule: "none".into(),
+                detail_grid_lines: "both".into(),
+                detail_row_density: "comfortable".into(),
+                detail_show_kind: false,
+                detail_show_size: false,
+                detail_show_modified: false,
                 menu_bar_visible: false,
                 toolbar_visible: true,
                 address_bar_visible: false,
@@ -1842,6 +1870,11 @@ mod tests {
         assert_eq!(restored.folder_open_rule, "read");
         assert_eq!(restored.image_open_rule, "none");
         assert_eq!(restored.archive_open_rule, "none");
+        assert_eq!(restored.detail_grid_lines, "both");
+        assert_eq!(restored.detail_row_density, "comfortable");
+        assert!(!restored.detail_show_kind);
+        assert!(!restored.detail_show_size);
+        assert!(!restored.detail_show_modified);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);
         assert!(!restored.address_bar_visible);

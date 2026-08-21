@@ -167,6 +167,19 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".catalog-cell--reference_tile .catalog-actions", "right: 10px"
         )
+
+    def test_detail_list_formatting_uses_shared_columns_and_responsive_priority(self) -> None:
+        self.assert_rule_contains(
+            ".catalog-list-header", "var(--detail-header-columns"
+        )
+        self.assert_rule_contains(
+            ".catalog-item--detail_list", "var(--detail-columns"
+        )
+        self.assertIn('data-detail-grid-lines="horizontal"', STYLES)
+        self.assertIn('data-detail-grid-lines="both"', STYLES)
+        self.assertIn(".detail-column-modified", STYLES)
+        self.assertIn(".detail-column-kind", STYLES)
+        self.assertIn(".detail-column-size", STYLES)
         self.assert_rule_contains(
             ".catalog-cell--reference_tile .catalog-actions", "left: auto"
         )

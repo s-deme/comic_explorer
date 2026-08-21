@@ -11,9 +11,11 @@ import type { CatalogEntry } from "../../types/domain";
 import { itemKindLabel } from "./kind-label";
 import {
   DEFAULT_CATALOG_THUMBNAIL_SIZES,
+  DETAIL_ROW_HEIGHTS,
   type CatalogThumbnailSizes,
   type CatalogViewMode,
 } from "./view-mode";
+import type { DetailGridLineMode, DetailRowDensity } from "../settings/profile";
 
 interface CatalogGridProps {
   entries: CatalogEntry[];
@@ -31,6 +33,11 @@ interface CatalogGridProps {
   viewMode?: CatalogViewMode;
   thumbnailSizes?: CatalogThumbnailSizes;
   palette?: "system" | "paper" | "midnight" | "highContrast";
+  detailGridLines?: DetailGridLineMode;
+  detailRowDensity?: DetailRowDensity;
+  detailShowKind?: boolean;
+  detailShowSize?: boolean;
+  detailShowModified?: boolean;
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
   isFavorite?: (entry: CatalogEntry) => boolean;
@@ -76,9 +83,16 @@ interface CatalogLayout {
 export function catalogLayoutFor(
   viewMode: CatalogViewMode,
   thumbnailSizes: CatalogThumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
+  detailRowDensity: DetailRowDensity = "standard",
 ): CatalogLayout {
   if (viewMode === "detail_list") {
-    return { thumbnailWidth: 42, thumbnailHeight: 44, cardWidth: 0, rowHeight: 62 };
+    const detail = DETAIL_ROW_HEIGHTS[detailRowDensity];
+    return {
+      thumbnailWidth: detail.thumbnailWidth,
+      thumbnailHeight: detail.thumbnailHeight,
+      cardWidth: 0,
+      rowHeight: detail.virtual,
+    };
   }
   if (viewMode === "small_thumbnail") {
     return {
@@ -182,6 +196,11 @@ export function CatalogGrid({
   viewMode = "cover_list",
   thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
   palette = "system",
+  detailGridLines = "none",
+  detailRowDensity = "standard",
+  detailShowKind = true,
+  detailShowSize = true,
+  detailShowModified = true,
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
   isFavorite = () => false,
@@ -200,8 +219,19 @@ export function CatalogGrid({
   const incrementalSearch = useRef({ value: "", updatedAt: 0 });
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
-  const layout = catalogLayoutFor(viewMode, thumbnailSizes);
+  const layout = catalogLayoutFor(viewMode, thumbnailSizes, detailRowDensity);
   const columnCount = catalogColumnCountFor(viewMode, scrollWidth, thumbnailSizes);
+  const detailColumns = [
+    "minmax(0, 2fr)",
+    ...(detailShowKind ? ["120px"] : []),
+    ...(detailShowSize ? ["140px"] : []),
+    ...(detailShowModified ? ["180px"] : []),
+  ].join(" ");
+  const detailMediumColumns = [
+    "minmax(0, 2fr)",
+    ...(detailShowKind ? ["minmax(96px, 1fr)"] : []),
+    ...(detailShowSize ? ["minmax(76px, .7fr)"] : []),
+  ].join(" ");
 
   useEffect(() => {
     incrementalSearch.current = { value: "", updatedAt: 0 };
@@ -255,6 +285,10 @@ export function CatalogGrid({
       return () => observer.disconnect();
     },
   });
+
+  useLayoutEffect(() => {
+    if (viewMode === "detail_list") virtualizer.measure();
+  }, [detailRowDensity, virtualizer, viewMode]);
 
   useLayoutEffect(() => {
     const element = scrollRef.current;
@@ -327,12 +361,25 @@ export function CatalogGrid({
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
       data-catalog-palette={palette}
+      data-detail-grid-lines={detailGridLines}
+      data-detail-row-density={detailRowDensity}
+      data-detail-columns={[
+        "name",
+        ...(detailShowKind ? ["kind"] : []),
+        ...(detailShowSize ? ["size"] : []),
+        ...(detailShowModified ? ["modified"] : []),
+      ].join(" ")}
       style={{
         "--catalog-column-count": String(columnCount),
         "--catalog-column-gap": `${modeConfig.columnGap}px`,
         "--catalog-card-width": `${layout.cardWidth}px`,
         "--catalog-thumbnail-width": `${layout.thumbnailWidth}px`,
         "--catalog-thumbnail-height": `${layout.thumbnailHeight}px`,
+        "--detail-item-height": `${DETAIL_ROW_HEIGHTS[detailRowDensity].item}px`,
+        "--detail-columns": detailColumns,
+        "--detail-columns-medium": detailMediumColumns,
+        "--detail-header-columns": `32px ${detailColumns}`,
+        "--detail-header-columns-medium": `32px ${detailMediumColumns}`,
       } as CSSProperties}
       onContextMenu={(event) => {
         if ((event.target as Element).closest("[data-relative-path]") !== null) return;
@@ -347,10 +394,10 @@ export function CatalogGrid({
           {viewMode === "detail_list" && (
             <div className="catalog-list-header" aria-hidden="true">
               <span className="catalog-favorite-column" />
-              <span>名前</span>
-              <span>種別</span>
-              <span>サイズ</span>
-              <span>更新日時</span>
+              <span className="detail-column-name">名前</span>
+              {detailShowKind && <span className="detail-column-kind">種別</span>}
+              {detailShowSize && <span className="detail-column-size">サイズ</span>}
+              {detailShowModified && <span className="detail-column-modified">更新日時</span>}
             </div>
           )}
           <div
@@ -545,13 +592,13 @@ export function CatalogGrid({
                               {thumbnail}
                               <ItemName entry={entry} name={name} />
                             </span>
-                            <span className="item-kind">{kind}</span>
-                            <span className="item-metadata item-size">
+                            {detailShowKind && <span className="item-kind detail-column-kind">{kind}</span>}
+                            {detailShowSize && <span className="item-metadata item-size detail-column-size">
                               {size}
-                            </span>
-                            <span className="item-metadata item-modified">
+                            </span>}
+                            {detailShowModified && <span className="item-metadata item-modified detail-column-modified">
                               {modified}
-                            </span>
+                            </span>}
                           </>
                         ) : viewMode === "reference_tile" ? (
                           <>

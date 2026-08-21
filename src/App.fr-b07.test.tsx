@@ -232,6 +232,11 @@ const defaultSettings: CatalogSettings = {
     folderOpenRule: "navigate",
     imageOpenRule: "read",
     archiveOpenRule: "read",
+    detailGridLines: "none",
+    detailRowDensity: "standard",
+    detailShowKind: true,
+    detailShowSize: true,
+    detailShowModified: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };

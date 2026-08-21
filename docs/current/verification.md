@@ -385,6 +385,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | NOT RUN | resolverはSQLiteの3 enum読取とkind table判定だけで追加filesystem走査を行わないが、基準PCのactivation latency、連続入力、working setは未測定でありPASSとしない。 |
 | 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-H固有のrelease WebView2実double click、Enter/Ctrl+Enter、IME、設定変更、removable driveは直接観測していない。 |
 
+## Leeyes P3-I 詳細一覧書式
+
+対象はLEY-FILER-019の1件。詳細一覧の罫線、行密度、任意列をstrict profile v21とSQLiteへ保存し、header・rowの共有列template、狭幅縮退、accessible name、virtualizationを維持する。描画調整はCSSとvirtualizer測定だけで、filesystem、metadata、cache、他4一覧形式を変更しない。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused frontend / CSS | PASS | CatalogGrid、profile、client、Appの4 files / 245件と`test_ui_styles.py` 19件、FAIL 0。3罫線mode、3密度、列の組合せ、v20→v21移行、不正値拒否、設定payloadを含む。10,000 synthetic項目をdetail・縦横罫線・comfortable・任意列非表示で描画してmounted rowを100以下に維持した。 |
+| Focused Rust / typecheck | PASS | 設定の既定、不正enum fallback/import拒否、boolean保持、SQLite再openを含む3件、FAIL 0。`cargo check --locked`とTypeScript typecheckはexit 0。既存dead-code warningをPASSへ加算しない。 |
+| Windows tests / build | PASS | frontend 31 files / 435件とPython 60件、FAIL 0。frontend 71 modules build、CSS 42.26kB、JS 547.49kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 197件とshutdown process 1件、FAIL 0。profile/SQLiteと既存catalog・viewer・file操作・search・watch・tree境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは407.826秒で全12 stageがexit 0。Rust canonical 168.964秒、release executable 82.799秒、GUI権限付きshortcut product回帰13.118秒、cleanup audit、CoDD scan/check/verifyを含む。log rootは`src-tauri/target/verification/imp-004-20260821T041046393Z`。 |
+| 性能・上限 | PASS / 限定 | 10,000 synthetic項目でDOM上限を検証し、設定による全件DOM展開がないことを確認した。release WebView2の10,000実項目FPS、layout時間、CPU、peak working setは未測定でありPASSとしない。 |
+| 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-I固有の罫線、密度、列切替、DPI、high contrast、font scalingはrelease WebView2で直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

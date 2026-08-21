@@ -468,6 +468,11 @@ pub struct CatalogSettings {
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
+    pub detail_grid_lines: String,
+    pub detail_row_density: String,
+    pub detail_show_kind: bool,
+    pub detail_show_size: bool,
+    pub detail_show_modified: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -550,6 +555,11 @@ pub struct SettingsProfileInput {
     pub folder_open_rule: String,
     pub image_open_rule: String,
     pub archive_open_rule: String,
+    pub detail_grid_lines: String,
+    pub detail_row_density: String,
+    pub detail_show_kind: bool,
+    pub detail_show_size: bool,
+    pub detail_show_modified: bool,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -1271,6 +1281,17 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             "read" | "none" => settings.archive_open_rule,
             _ => "read".into(),
         },
+        detail_grid_lines: match settings.detail_grid_lines.as_str() {
+            "none" | "horizontal" | "both" => settings.detail_grid_lines,
+            _ => "none".into(),
+        },
+        detail_row_density: match settings.detail_row_density.as_str() {
+            "compact" | "standard" | "comfortable" => settings.detail_row_density,
+            _ => "standard".into(),
+        },
+        detail_show_kind: settings.detail_show_kind,
+        detail_show_size: settings.detail_show_size,
+        detail_show_modified: settings.detail_show_modified,
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
         address_bar_visible: settings.address_bar_visible,
@@ -2737,6 +2758,14 @@ fn validate_settings_profile(
         || !matches!(profile.image_open_rule.as_str(), "read" | "none")
         || !matches!(profile.archive_open_rule.as_str(), "read" | "none")
         || !matches!(
+            profile.detail_grid_lines.as_str(),
+            "none" | "horizontal" | "both"
+        )
+        || !matches!(
+            profile.detail_row_density.as_str(),
+            "compact" | "standard" | "comfortable"
+        )
+        || !matches!(
             profile.navigation_selection_policy.as_str(),
             "none" | "first" | "last" | "restore"
         )
@@ -2857,6 +2886,11 @@ pub fn set_settings_profile(
         settings.folder_open_rule = profile.folder_open_rule;
         settings.image_open_rule = profile.image_open_rule;
         settings.archive_open_rule = profile.archive_open_rule;
+        settings.detail_grid_lines = profile.detail_grid_lines;
+        settings.detail_row_density = profile.detail_row_density;
+        settings.detail_show_kind = profile.detail_show_kind;
+        settings.detail_show_size = profile.detail_show_size;
+        settings.detail_show_modified = profile.detail_show_modified;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
         settings.address_bar_visible = profile.address_bar_visible;
@@ -5503,6 +5537,11 @@ mod shutdown_tests {
             folder_open_rule: "navigate".into(),
             image_open_rule: "read".into(),
             archive_open_rule: "read".into(),
+            detail_grid_lines: "none".into(),
+            detail_row_density: "standard".into(),
+            detail_show_kind: true,
+            detail_show_size: true,
+            detail_show_modified: true,
             menu_bar_visible: true,
             toolbar_visible: false,
             address_bar_visible: true,
@@ -5521,6 +5560,19 @@ mod shutdown_tests {
         let (shortcuts, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(shortcuts, profile.shortcuts);
         assert_eq!(gestures, profile.mouse_gestures);
+        profile.detail_grid_lines = "vertical".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.detail_grid_lines = "both".into();
+        profile.detail_row_density = "tiny".into();
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.detail_row_density = "compact".into();
+        validate_settings_profile(&profile).unwrap();
         let json = serde_json::to_value(&profile).unwrap();
         assert_eq!(json["prefetchMemoryMiB"], 256);
         assert!(json.get("prefetchMemoryMib").is_none());
@@ -6452,6 +6504,29 @@ mod shutdown_tests {
                 .code,
             ErrorCode::InvalidRequest
         );
+    }
+
+    #[test]
+    fn req_ley_p3_008_detail_format_defaults_invalid_persisted_values() {
+        let mut settings = crate::state::Settings::default();
+        settings.detail_grid_lines = "vertical".into();
+        settings.detail_row_density = "tiny".into();
+        settings.detail_show_kind = false;
+        settings.detail_show_size = false;
+        settings.detail_show_modified = false;
+        let normalized = catalog_settings(settings);
+        assert_eq!(normalized.detail_grid_lines, "none");
+        assert_eq!(normalized.detail_row_density, "standard");
+        assert!(!normalized.detail_show_kind);
+        assert!(!normalized.detail_show_size);
+        assert!(!normalized.detail_show_modified);
+
+        let mut settings = crate::state::Settings::default();
+        settings.detail_grid_lines = "both".into();
+        settings.detail_row_density = "comfortable".into();
+        let normalized = catalog_settings(settings);
+        assert_eq!(normalized.detail_grid_lines, "both");
+        assert_eq!(normalized.detail_row_density, "comfortable");
     }
 
     #[test]

@@ -83,7 +83,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 20;
+export const SETTINGS_PROFILE_VERSION = 21;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -94,6 +94,10 @@ export const FOLDER_OPEN_RULES = ["navigate", "read", "none"] as const;
 export type FolderOpenRule = (typeof FOLDER_OPEN_RULES)[number];
 export const FILE_OPEN_RULES = ["read", "none"] as const;
 export type FileOpenRule = (typeof FILE_OPEN_RULES)[number];
+export const DETAIL_GRID_LINE_MODES = ["none", "horizontal", "both"] as const;
+export type DetailGridLineMode = (typeof DETAIL_GRID_LINE_MODES)[number];
+export const DETAIL_ROW_DENSITIES = ["compact", "standard", "comfortable"] as const;
+export type DetailRowDensity = (typeof DETAIL_ROW_DENSITIES)[number];
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
 export type FullscreenEscapeBehavior = (typeof FULLSCREEN_ESCAPE_BEHAVIORS)[number];
@@ -217,6 +221,11 @@ export interface SettingsProfile {
   folderOpenRule: FolderOpenRule;
   imageOpenRule: FileOpenRule;
   archiveOpenRule: FileOpenRule;
+  detailGridLines: DetailGridLineMode;
+  detailRowDensity: DetailRowDensity;
+  detailShowKind: boolean;
+  detailShowSize: boolean;
+  detailShowModified: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -289,6 +298,11 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     folderOpenRule: "navigate",
     imageOpenRule: "read",
     archiveOpenRule: "read",
+    detailGridLines: "none",
+    detailRowDensity: "standard",
+    detailShowKind: true,
+    detailShowSize: true,
+    detailShowModified: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -491,6 +505,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const archiveOpenRule = legacyOpenRules
     ? "read"
     : enumValue(candidate.archiveOpenRule, FILE_OPEN_RULES);
+  const legacyDetailFormat = legacyOpenRules || candidate.profileVersion === 20;
+  const detailGridLines = legacyDetailFormat
+    ? "none"
+    : enumValue(candidate.detailGridLines, DETAIL_GRID_LINE_MODES);
+  const detailRowDensity = legacyDetailFormat
+    ? "standard"
+    : enumValue(candidate.detailRowDensity, DETAIL_ROW_DENSITIES);
+  const detailShowKind = legacyDetailFormat ? true : candidate.detailShowKind;
+  const detailShowSize = legacyDetailFormat ? true : candidate.detailShowSize;
+  const detailShowModified = legacyDetailFormat ? true : candidate.detailShowModified;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -511,6 +535,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 17
       && candidate.profileVersion !== 18
       && candidate.profileVersion !== 19
+      && candidate.profileVersion !== 20
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -583,6 +608,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     folderOpenRule === null ||
     imageOpenRule === null ||
     archiveOpenRule === null ||
+    detailGridLines === null ||
+    detailRowDensity === null ||
+    typeof detailShowKind !== "boolean" ||
+    typeof detailShowSize !== "boolean" ||
+    typeof detailShowModified !== "boolean" ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -655,6 +685,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     folderOpenRule,
     imageOpenRule,
     archiveOpenRule,
+    detailGridLines,
+    detailRowDensity,
+    detailShowKind,
+    detailShowSize,
+    detailShowModified,
     shortcuts,
     mouseGestures,
   };

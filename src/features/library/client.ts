@@ -33,6 +33,8 @@ import type {
   CatalogPalette,
   FileOpenRule,
   FolderOpenRule,
+  DetailGridLineMode,
+  DetailRowDensity,
   NavigationSelectionPolicy,
   SettingsProfile,
   StartupLocation,
@@ -189,6 +191,11 @@ export interface CatalogSettings {
   folderOpenRule: FolderOpenRule;
   imageOpenRule: FileOpenRule;
   archiveOpenRule: FileOpenRule;
+  detailGridLines: DetailGridLineMode;
+  detailRowDensity: DetailRowDensity;
+  detailShowKind: boolean;
+  detailShowSize: boolean;
+  detailShowModified: boolean;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -320,6 +327,11 @@ export async function saveSettingsProfile(
       folderOpenRule: profile.folderOpenRule,
       imageOpenRule: profile.imageOpenRule,
       archiveOpenRule: profile.archiveOpenRule,
+      detailGridLines: profile.detailGridLines,
+      detailRowDensity: profile.detailRowDensity,
+      detailShowKind: profile.detailShowKind,
+      detailShowSize: profile.detailShowSize,
+      detailShowModified: profile.detailShowModified,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },

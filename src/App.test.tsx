@@ -291,6 +291,11 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
     folderOpenRule: "navigate",
     imageOpenRule: "read",
     archiveOpenRule: "read",
+    detailGridLines: "none",
+    detailRowDensity: "standard",
+    detailShowKind: true,
+    detailShowSize: true,
+    detailShowModified: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -3258,6 +3263,15 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile書庫・PDFを開く規則"), {
       target: { value: "none" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profile詳細リストの罫線"), {
+      target: { value: "both" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile詳細リストの行密度"), {
+      target: { value: "compact" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profile詳細リストに種別を表示"));
+    fireEvent.click(within(dialog).getByLabelText("profile詳細リストにサイズを表示"));
+    fireEvent.click(within(dialog).getByLabelText("profile詳細リストに更新日時を表示"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
@@ -3329,6 +3343,11 @@ describe("application shell", () => {
         folderOpenRule: "read",
         imageOpenRule: "none",
         archiveOpenRule: "none",
+        detailGridLines: "both",
+        detailRowDensity: "compact",
+        detailShowKind: false,
+        detailShowSize: false,
+        detailShowModified: false,
         viewMode: "auto",
         spreadPortraitMaxAspectPercent: 80,
         autoSpreadMinViewportAspectPercent: 160,
