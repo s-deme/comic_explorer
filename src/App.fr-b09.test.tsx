@@ -70,6 +70,7 @@ vi.mock("./features/library/client", () => ({
   restoreLibraryRoot: vi.fn(),
   takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
+  listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   saveCatalogSort: vi.fn(),
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),

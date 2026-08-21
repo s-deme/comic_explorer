@@ -232,6 +232,22 @@ fn resolve_plan(parsed: ParsedArguments, cwd: &Path) -> Result<CliLaunchPlan, St
     })
 }
 
+pub(crate) fn resolve_target_plan(
+    target: &Path,
+    mode: CliLaunchMode,
+) -> Result<CliLaunchPlan, String> {
+    let path = target
+        .to_str()
+        .ok_or_else(|| "対象pathをUnicodeとして解釈できません。".to_owned())?;
+    resolve_plan(
+        ParsedArguments {
+            path: path.to_owned(),
+            mode,
+        },
+        Path::new(""),
+    )
+}
+
 fn request_from_arguments(arguments: Vec<OsString>, cwd: &Path) -> Option<CliLaunchRequest> {
     parse_arguments(arguments).map(|parsed| {
         match parsed.and_then(|parsed| resolve_plan(parsed, cwd)) {

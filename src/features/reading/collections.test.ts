@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addBookshelfItem,
   addBookshelfItemResult,
+  clearLegacyBookshelfResult,
   listBookmarks,
   listBookshelf,
   migrateLegacyCollections,
@@ -107,6 +108,14 @@ describe("reading collections", () => {
     expect(migrateLegacyCollections("root-b").ok).toBe(true);
     expect(listBookshelf("root-a")).toEqual(["Series/01.cbz"]);
     expect(listBookshelf("root-b")).toEqual(["Other/02.cbz"]);
+  });
+
+  it("REQ-LEY-P4-001 clears only the root shelf after successful native migration", () => {
+    expect(addBookshelfItemResult("one.cbz", "root-a").ok).toBe(true);
+    expect(addBookshelfItemResult("two.cbz", "root-b").ok).toBe(true);
+    expect(clearLegacyBookshelfResult("root-a").ok).toBe(true);
+    expect(listBookshelf("root-a")).toEqual([]);
+    expect(listBookshelf("root-b")).toEqual(["two.cbz"]);
   });
 
   it("REQ-LEY-P2-003 removes only successfully migrated item bookmarks", () => {

@@ -40,6 +40,11 @@ import {
   exportCatalogCsv,
   takeCliLaunchRequest,
   listenCliLaunchPending,
+  addShelfItems,
+  createShelf,
+  executeShelvesImport,
+  previewShelvesImport,
+  migrateLegacyShelf,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -68,6 +73,31 @@ describe("library client settings contract", () => {
       }),
     );
     expect(listenMock).toHaveBeenCalledWith("cli-launch-pending", handler);
+  });
+
+  it("REQ-LEY-P4-001 keeps shelf persistence, internal drag paths, and confirmed import in Rust IPC", async () => {
+    await createShelf("読む本", "books", 80);
+    await addShelfItems(7, 9, ["Series/01.cbz", "Series/02.cbz"], 81);
+    await previewShelvesImport([0xef, 0xbb, 0xbf, 123, 125], true, 82);
+    await executeShelvesImport([0xef, 0xbb, 0xbf, 123, 125], true, "opaque", 83);
+    await migrateLegacyShelf(["legacy.cbz"], 84);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "create_shelf", expect.objectContaining({
+      name: "読む本", icon: "books",
+      context: expect.objectContaining({ generation: 80 }),
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "add_shelf_items", expect.objectContaining({
+      request: { shelfId: 7, parentId: 9, relativePaths: ["Series/01.cbz", "Series/02.cbz"] },
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "preview_shelves_import", expect.objectContaining({
+      replaceExisting: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "execute_shelves_import", expect.objectContaining({
+      previewKey: "opaque", confirmed: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "migrate_legacy_shelf", expect.objectContaining({
+      relativePaths: ["legacy.cbz"],
+    }));
   });
 
   it("REQ-LEY-P2-015 sends the required Viewer catalog sync field to Rust", async () => {

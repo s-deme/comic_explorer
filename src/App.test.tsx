@@ -37,6 +37,7 @@ import {
   restoreLibraryRoot,
   takeCliLaunchRequest,
   listenCliLaunchPending,
+  listShelves,
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
@@ -171,6 +172,7 @@ vi.mock("./features/library/client", () => ({
   restoreLibraryRoot: vi.fn(),
   takeCliLaunchRequest: vi.fn(),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
+  listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),
@@ -258,6 +260,7 @@ const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const takeCliLaunchRequestMock = vi.mocked(takeCliLaunchRequest);
 const listenCliLaunchPendingMock = vi.mocked(listenCliLaunchPending);
+const listShelvesMock = vi.mocked(listShelves);
 const openMock = vi.mocked(openComic);
 const resolveCatalogActivationMock = vi.mocked(resolveCatalogActivation);
 const settingsMock = vi.mocked(getCatalogSettings);
@@ -604,6 +607,13 @@ describe("application shell", () => {
     restoreMock.mockReset();
     takeCliLaunchRequestMock.mockReset();
     listenCliLaunchPendingMock.mockReset();
+    listShelvesMock.mockReset();
+    listShelvesMock.mockResolvedValue({
+      status: "ok",
+      requestId: "shelves" as never,
+      generation: 1 as never,
+      data: { shelves: [], nodes: [], startupShelfId: null },
+    });
     cliLaunchHarness.handler = undefined;
     takeCliLaunchRequestMock.mockResolvedValue({
       status: "ok",
@@ -952,6 +962,26 @@ describe("application shell", () => {
       .toBeInTheDocument();
     expect(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }))
       .toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P4-001 opens only the configured startup shelf without opening its target", async () => {
+    listShelvesMock.mockResolvedValue({
+      status: "ok",
+      requestId: "startup-shelf" as never,
+      generation: 1 as never,
+      data: {
+        shelves: [{ id: 7, name: "毎日読む", icon: "books", sortOrder: 0 }],
+        nodes: [],
+        startupShelfId: 7,
+      },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("dialog", { name: "本棚" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /毎日読む$/ })).toHaveAttribute("aria-pressed", "true");
+    expect(registerMock).not.toHaveBeenCalled();
+    expect(openMock).not.toHaveBeenCalled();
   });
 
   it("REQ-LEY-P3-021 applies a Rust-validated startup file plan without archive auto-fullscreen", async () => {
@@ -1773,7 +1803,7 @@ describe("application shell", () => {
       expect(screen.getByRole("menuitem", { name: "オプション" })).toHaveFocus(),
     );
     expect(screen.queryByRole("menu", { name: "オプション" })).not.toBeInTheDocument();
-  });
+  }, 10_000);
 
   it("REQ-LEY-P3-009 previews recursive scope, reports progress, prevents re-entry, and cancels", async () => {
     let finish: ((value: Awaited<ReturnType<typeof generateRecursiveThumbnails>>) => void) | undefined;

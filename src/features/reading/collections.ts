@@ -360,6 +360,20 @@ export function removeBookshelfItem(path: string, rootNamespace?: string): strin
   return removeBookshelfItemResult(path, rootNamespace).value;
 }
 
+export function clearLegacyBookshelfResult(
+  rootNamespace: string,
+): CollectionWriteResult<string[]> {
+  const envelope = readEnvelope();
+  const current = rootCollections(envelope, rootNamespace);
+  const failure = writeJson(
+    ROOT_COLLECTIONS_KEY,
+    replaceRootCollections(envelope, { ...current, bookshelf: [] }),
+  );
+  return failure === null
+    ? { ok: true, value: [] }
+    : { ok: false, value: [...current.bookshelf], reason: failure };
+}
+
 /**
  * Claims the legacy unscoped v1 data for exactly one root. The v1 keys are kept
  * intact so a failed migration is recoverable, while legacyOwner prevents a

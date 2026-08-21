@@ -1638,8 +1638,37 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .history-dialog li > span:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .history-dialog li > span:last-child { color: #657287; font-size: .82rem; }
 
+.bookshelf-dialog {
+  position: fixed;
+  z-index: 45;
+  inset: 48px 12px 32px auto;
+  width: min(820px, calc(100vw - 24px));
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid #bcc9d8;
+  border-radius: 10px;
+  background: #f7f9fc;
+  box-shadow: 0 14px 40px rgb(20 35 55 / 28%);
+}
+.bookshelf-layout { display: grid; grid-template-columns: minmax(210px, .8fr) minmax(300px, 1.3fr); gap: 14px; }
+.bookshelf-layout > section { min-width: 0; padding: 10px; border: 1px solid #d8e0ea; border-radius: 8px; background: #fff; }
+.bookshelf-layout label { display: grid; gap: 4px; margin-block: 8px; }
+.bookshelf-actions, .bookshelf-order-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 8px; }
+.bookshelf-tree { min-height: 360px; }
+.bookshelf-tree ul { margin-block: 8px; }
+.bookshelf-tree li { padding: 0; border: 0; border-radius: 3px; }
+.bookshelf-tree li > button { width: 100%; min-height: 28px; border: 0; text-align: left; background: transparent; }
+.bookshelf-tree li[aria-selected="true"] > button { background: #dcecff; }
+.bookshelf-tree fieldset { margin-block: 10px; }
+.bookshelf-drop-target { padding: 10px; border: 2px dashed #5487c5; background: #eef6ff; }
+.bookshelf-transfer { grid-column: 1 / -1; }
+.bookshelf-transfer textarea { box-sizing: border-box; width: 100%; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+
 @media (max-width: 760px) {
   .dialog-backdrop { padding: 8px; }
+  .bookshelf-dialog { inset: 8px; width: auto; }
+  .bookshelf-layout { grid-template-columns: 1fr; }
+  .bookshelf-transfer { grid-column: auto; }
   .dialog-backdrop > .settings-dialog {
     width: calc(100vw - 16px);
     height: calc(100vh - 16px);

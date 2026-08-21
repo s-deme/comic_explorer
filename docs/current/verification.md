@@ -584,6 +584,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | CoDD verify | PASS | red 3 PASS / 0 FAIL、amber 1 WARN、3 SKIP、1 VACUOUS。tests実行証拠101.23秒、typecheck executed、source integrity 13 files。SKIP/VACUOUSをPASSに加算しない。 |
 | 未測定 | NOT RUN | Windows Terminal/PowerShell/cmd/Explorer別quoting、実の後続instanceからのpath引渡し、release実contentの`-f`/`-s`、UNC・長path、network/removable drive、起動・focus時間、CPU・peak working set。PASSに加算しない。 |
 
+## Leeyes P4-A 仮想本棚
+
+対象はLEY-SHELF-001/003/004/005/007/008/009の7件。RustがSQLite schema v10、名前付き本棚、仮想階層、順序、組込みicon、起動指定、library参照検証、消失整理、再帰除去preview、JSON Lines v1 import/exportとtransactionを担当する。TypeScriptは非modal dialog、App内部drag state、確認、download、Rust検証済みopen planの適用だけを担当する。
+
+| 検証 | 結果 | 証拠 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P4-001の7件、FAIL 0。SQLite CRUD・再open、仮想階層・cycle/cross-shelf拒否、順序、起動指定、組込みicon、recursive delete key、JSONL親先行・absolute path・unknown field・上限を含む。 |
+| 性能・上限 | PASS / 限定 | debug Rustで10,000 node snapshot 36.840ms、50,000 node import preview 1.577秒。各本棚10,000、import合計50,000、16 MiB、64 KiB/行、深さ64を実装境界とした。実disk 50,000参照、IPC、React FPS、CPU、peak working setは未測定。 |
+| Frontend focused | PASS | ShelfDialog、App、client、legacy collectionの4 files / 6件、FAIL 0。本棚作成、内部drag登録、hierarchy編集、Rust open plan、除去/cleanup確認、startup、versioned text preview/import IPCを含む。 |
+| Windows tests / typecheck | PASS | Windows-native frontend 38 files / 489件、Python 61件、FAIL 0。typecheck exit 0。 |
+| Windows canonical / build / CoDD | PASS | 最終source変更後の`verify-feature-windows.ps1 -Feature IMP-004 -RustMode Canonical`は全12 stage PASS、510.420秒。Rust 233件とshutdown process 1件、79 modules build、SBOM 783 components・unknown/prohibited license 0、product shortcut、CoDD scan/check/verifyを含む。logは`src-tauri/target/verification/imp-004-20260821T140441865Z`。 |
+| 製品直接観測 | NOT RUN | release WebView2の大規模tree FPS/working set、native drag、保存dialog、network/removable/offline分類、cold start、実content openを直接操作・観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

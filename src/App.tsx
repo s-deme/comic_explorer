@@ -32,6 +32,8 @@ import {
   restoreLibraryRoot,
   takeCliLaunchRequest,
   listenCliLaunchPending,
+  listShelves,
+  migrateLegacyShelf,
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
@@ -85,6 +87,7 @@ import {
   getRenamePreferences,
   saveRenamePreferences,
   type CatalogSettings,
+  type CliLaunchPlan,
   type CliLaunchRequest,
   type CatalogActivationTrigger,
   type DiagnosticReport,
@@ -304,15 +307,14 @@ import {
 import { SettingsDialog } from "./features/settings/SettingsDialog";
 import { OfflineHelp } from "./features/help/OfflineHelp";
 import {
-  addBookshelfItemResult,
+  clearLegacyBookshelfResult,
   listBookmarks,
-  listBookshelf,
   migrateLegacyCollections,
   nextBookmark,
   removeLegacyBookmarksForItemResult,
-  removeBookshelfItemResult,
   type PageBookmark,
 } from "./features/reading/collections";
+import { ShelfDialog } from "./features/shelves/ShelfDialog";
 import {
   rangeSelection,
   selectEntriesByKind,
@@ -712,7 +714,6 @@ export function App({
   const [bookmarks, setBookmarks] = useState<PageBookmark[]>([]);
   const [bookmarkNotice, setBookmarkNotice] = useState<string | null>(null);
   const [bookshelfOpen, setBookshelfOpen] = useState(false);
-  const [bookshelfPaths, setBookshelfPaths] = useState<string[]>([]);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDescending, setSortDescending] = useState(false);
@@ -985,9 +986,19 @@ export function App({
     setRecentEntries([]);
     setBookmarks([]);
     const migration = migrateLegacyCollections(root);
-    setBookshelfPaths(migration.ok ? migration.value.bookshelf : listBookshelf(root));
     if (!migration.ok) {
       setSelectionNotice("app-local collectionをこのlibraryへ移行できませんでした。");
+    } else if (migration.value.bookshelf.length > 0) {
+      const legacyPaths = migration.value.bookshelf.slice(0, 1_000);
+      const requestGeneration = ++generation.current;
+      void migrateLegacyShelf(legacyPaths, requestGeneration)
+        .then((response) => {
+          if (response.status !== "ok") return;
+          if (!clearLegacyBookshelfResult(root).ok) {
+            setSelectionNotice("旧本棚はnative本棚へ移行しましたが、旧dataを消去できませんでした。");
+          }
+        })
+        .catch(() => undefined);
     }
   }
 
@@ -998,7 +1009,12 @@ export function App({
     }
     const plan = request.plan;
     if (plan === null) return;
+    await applyLaunchPlan(plan);
+  }
+
+  async function applyLaunchPlan(plan: CliLaunchPlan) {
     cliLaunchRequested.current = true;
+    setBookshelfOpen(false);
     const response = await registerLibraryRoot(plan.libraryRoot, ++generation.current);
     if (response.status !== "ok") {
       setSelectionNotice(
@@ -1058,6 +1074,23 @@ export function App({
       disposed = true;
       unlisten?.();
     };
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    void listShelves(1)
+      .then((response) => {
+        if (
+          !disposed
+          && response.status === "ok"
+          && response.data.startupShelfId !== null
+          && !cliLaunchRequested.current
+        ) {
+          setBookshelfOpen(true);
+        }
+      })
+      .catch(() => undefined);
+    return () => { disposed = true; };
   }, []);
 
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
@@ -2062,24 +2095,6 @@ export function App({
     }
   }
 
-  function addSelectedToBookshelf() {
-    if (selectedPath === null || libraryRoot === null) return;
-    const result = addBookshelfItemResult(selectedPath, libraryRoot);
-    setBookshelfPaths(result.value);
-    if (!result.ok) {
-      setSelectionNotice("本棚へ永続化できませんでした。保存先を確認してください。");
-    }
-  }
-
-  function removeFromBookshelf(path: string) {
-    if (libraryRoot === null) return;
-    const result = removeBookshelfItemResult(path, libraryRoot);
-    setBookshelfPaths(result.value);
-    if (!result.ok) {
-      setSelectionNotice("本棚からの削除を永続化できませんでした。");
-    }
-  }
-
   async function copySelectedPaths() {
     const paths = selectedPaths.length > 0 ? selectedPaths : selectedPath === null ? [] : [selectedPath];
     if (paths.length === 0) {
@@ -2321,12 +2336,11 @@ export function App({
   }
 
   function addPathToBookshelf(path: string) {
-    if (libraryRoot === null) return;
-    const result = addBookshelfItemResult(path, libraryRoot);
-    setBookshelfPaths(result.value);
-    setSelectionNotice(
-      result.ok ? "本棚に追加しました。" : "本棚へ永続化できませんでした。保存先を確認してください。",
-    );
+    selectionAnchor.current = path;
+    setSelectedPath(path);
+    setSelectedPaths([path]);
+    setBookshelfOpen(true);
+    setSelectionNotice("登録先の名前付き本棚を選び、「選択を登録」を実行してください。");
   }
 
   async function handleCatalogContextAction(action: CatalogContextAction) {
@@ -5267,7 +5281,7 @@ export function App({
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("options", event)}
-                onClick={() => runMenuAction(addSelectedToBookshelf, selectedPath === null)}
+                onClick={() => runMenuAction(() => setBookshelfOpen(true), selectedPath === null)}
               >
                 本棚に追加
               </button>
@@ -7055,40 +7069,15 @@ export function App({
         />
       )}
       {bookshelfOpen && (
-        <div className="dialog-backdrop">
-          <section className="bookshelf-dialog" role="dialog" aria-modal="true" aria-label="本棚">
-            <div className="quick-access-heading">
-              <h2>本棚</h2>
-              <button type="button" onClick={() => setBookshelfOpen(false)}>閉じる</button>
-            </div>
-            {bookshelfPaths.length === 0 ? (
-              <p role="status">本棚に登録された項目はありません。</p>
-            ) : (
-              <ul aria-label="本棚の項目">
-                {bookshelfPaths.map((path) => (
-                  <li key={path}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBookshelfOpen(false);
-                        navigate(parentPath(path) ?? "", "push", path);
-                      }}
-                    >
-                      {path}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`${path}を本棚から除去`}
-                      onClick={() => removeFromBookshelf(path)}
-                    >
-                      除去
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+        <ShelfDialog
+          selectedPaths={selectedPaths.length > 0 ? selectedPaths : selectedPath === null ? [] : [selectedPath]}
+          draggedPaths={draggedFilePaths}
+          onOpenPlan={async (plan) => {
+            setBookshelfOpen(false);
+            await applyLaunchPlan(plan);
+          }}
+          onClose={() => setBookshelfOpen(false)}
+        />
       )}
       {historyOpen && (
         <div className="dialog-backdrop">

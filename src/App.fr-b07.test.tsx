@@ -64,6 +64,7 @@ vi.mock("./features/library/client", () => ({
   restoreLibraryRoot: vi.fn(),
   takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
+  listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),

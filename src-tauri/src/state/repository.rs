@@ -10,7 +10,7 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
@@ -2241,6 +2241,61 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![9, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 10 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS virtual_shelves (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK(length(name) BETWEEN 1 AND 64),
+                    icon TEXT NOT NULL CHECK(icon IN ('books', 'folder', 'star', 'archive', 'image')),
+                    sort_order INTEGER NOT NULL CHECK(sort_order >= 0),
+                    created_at_ms INTEGER NOT NULL CHECK(created_at_ms >= 0),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE UNIQUE INDEX IF NOT EXISTS virtual_shelves_order
+                   ON virtual_shelves(sort_order);
+                 CREATE TABLE IF NOT EXISTS virtual_shelf_nodes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    shelf_id INTEGER NOT NULL REFERENCES virtual_shelves(id) ON DELETE CASCADE,
+                    parent_id INTEGER REFERENCES virtual_shelf_nodes(id) ON DELETE CASCADE,
+                    node_type TEXT NOT NULL CHECK(node_type IN ('folder', 'item')),
+                    name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 64),
+                    target_path TEXT,
+                    target_kind TEXT,
+                    icon TEXT NOT NULL CHECK(icon IN ('books', 'folder', 'star', 'archive', 'image')),
+                    sort_order INTEGER NOT NULL CHECK(sort_order >= 0),
+                    created_at_ms INTEGER NOT NULL CHECK(created_at_ms >= 0),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0),
+                    CHECK((node_type='folder' AND target_path IS NULL AND target_kind IS NULL)
+                       OR (node_type='item' AND target_path IS NOT NULL AND target_kind IS NOT NULL)),
+                    UNIQUE(shelf_id, parent_id, name COLLATE NOCASE),
+                    UNIQUE(shelf_id, parent_id, sort_order)
+                 );
+                 CREATE INDEX IF NOT EXISTS virtual_shelf_nodes_parent
+                   ON virtual_shelf_nodes(shelf_id, parent_id, sort_order, id);
+                 CREATE UNIQUE INDEX IF NOT EXISTS virtual_shelf_item_target
+                   ON virtual_shelf_nodes(shelf_id, IFNULL(parent_id, -1), target_path COLLATE NOCASE)
+                   WHERE node_type='item';
+                 CREATE TABLE IF NOT EXISTS virtual_shelf_preferences (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                    startup_shelf_id INTEGER REFERENCES virtual_shelves(id) ON DELETE SET NULL
+                 );
+                 INSERT OR IGNORE INTO virtual_shelf_preferences(singleton, startup_shelf_id)
+                   VALUES(1, NULL);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![10, unix_millis()],
             )
             .map_err(database_error)?;
         transaction

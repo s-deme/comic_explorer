@@ -8,6 +8,7 @@ mod library_root;
 mod recursive_thumbnails;
 mod scheduler;
 mod search_query;
+pub mod shelves;
 
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
