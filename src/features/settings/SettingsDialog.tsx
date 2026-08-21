@@ -30,6 +30,7 @@ import {
   MAX_VIEWER_GRID_SIZE,
   MAX_WHEEL_DEAD_ZONE,
   MAX_SCROLL_STEP_PERCENT,
+  MAX_KEY_SCROLL_ACCELERATION_PERCENT,
   MAX_WHEEL_SCROLL_FACTOR,
   MAX_LOUPE_SIZE,
   MAX_LOUPE_ZOOM,
@@ -39,6 +40,7 @@ import {
   MIN_VIEWER_GRID_SIZE,
   MIN_WHEEL_DEAD_ZONE,
   MIN_SCROLL_STEP_PERCENT,
+  MIN_KEY_SCROLL_ACCELERATION_PERCENT,
   MIN_WHEEL_SCROLL_FACTOR,
   MIN_LOUPE_SIZE,
   MIN_LOUPE_ZOOM,
@@ -565,7 +567,7 @@ export function SettingsDialog({
     {
       id: "scroll-step",
       category: "commands",
-      text: `スクロール ページ内 移動量 ${draft.scrollStepPercent}%`,
+      text: `スクロール ページ内 キー 移動量 ${draft.scrollStepPercent}% 加速 ${draft.keyScrollAccelerationPercent}% 連続 ${draft.keyScrollContinuous ? "有効" : "無効"}`,
     },
     {
       id: "wheel-scroll-factor",
@@ -1393,7 +1395,7 @@ export function SettingsDialog({
                   })}
                 />
               </SettingRow>
-              <SettingRow id="scroll-step" title="ページ内スクロール量" description="大きな画像で次・前コマンドが送る量を表示領域の10%〜100%で指定します。" hidden={rowHidden("scroll-step")}>
+              <SettingRow id="scroll-step" title="キー・コマンドのページ内移動量" description="大きな画像で矢印キーと次・前コマンドが送る量を表示領域の10%〜100%で指定します。" hidden={rowHidden("scroll-step")}>
                 <div className="settings-number-control">
                   <input
                     type="number"
@@ -1411,6 +1413,39 @@ export function SettingsDialog({
                   />
                   <span>%</span>
                 </div>
+              </SettingRow>
+              <SettingRow id="key-scroll-acceleration" title="キーリピート加速" description="キーを押し続けたときのページ内移動量を100%〜300%に加速します。" hidden={rowHidden("scroll-step")}>
+                <div className="settings-number-control">
+                  <input
+                    type="number"
+                    aria-label="profileキーリピート加速（%）"
+                    min={MIN_KEY_SCROLL_ACCELERATION_PERCENT}
+                    max={MAX_KEY_SCROLL_ACCELERATION_PERCENT}
+                    step="10"
+                    value={draft.keyScrollAccelerationPercent}
+                    onChange={(event) => update({
+                      keyScrollAccelerationPercent: Math.min(
+                        MAX_KEY_SCROLL_ACCELERATION_PERCENT,
+                        Math.max(
+                          MIN_KEY_SCROLL_ACCELERATION_PERCENT,
+                          Math.round(Number(event.target.value)),
+                        ),
+                      ),
+                    })}
+                  />
+                  <span>%</span>
+                </div>
+              </SettingRow>
+              <SettingRow id="key-scroll-continuous" title="キーの連続動作" description="無効にするとキーを押し続けても最初の1回だけ移動します。" hidden={rowHidden("scroll-step")}>
+                <label className="settings-switch">
+                  <input
+                    type="checkbox"
+                    aria-label="profileキーの連続動作"
+                    checked={draft.keyScrollContinuous}
+                    onChange={(event) => update({ keyScrollContinuous: event.target.checked })}
+                  />
+                  <span>{draft.keyScrollContinuous ? "有効" : "無効"}</span>
+                </label>
               </SettingRow>
               <SettingRow id="wheel-scroll-factor" title="連続スクロールのホイール速度" description="縦・横の連続レイアウトでwheel移動量を50%〜200%に調整します。" hidden={rowHidden("wheel-scroll-factor")}>
                 <div className="settings-number-control">

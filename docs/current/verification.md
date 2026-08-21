@@ -441,6 +441,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | registryは16 command×最大4 bindingに固定され、filesystem・画像・書庫処理を追加しないため専用throughput測定対象外。設定dialogの既存統合testは複数control追加後21.469秒で完了し、timeoutを40秒へ調整した。release UIの入力latency、CPU、working setは未測定。 |
 | 製品直接観測 | PASS / 限定 | GUI権限付きproduct shortcut回帰はprimary bindingのremap、競合、viewer command、reset、restart復元と原本差分0を11.232秒で確認した。alternate追加・削除、keyboard layout、IME、AltGr、DPIはrelease WebView2で直接観測していない。 |
 
+## Leeyes P3-M キースクロール設定
+
+対象はLEY-INPUT-005の1件。Rustが移動量、100〜300%のrepeat加速率、連続動作booleanをstrict profile v23とSQLiteへ保存し、TypeScriptはpaged Viewerのfocus安全なkeyboard event、4方向overflow、既存page commandへのdispatchだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-012の2件、FAIL 0。既定150%・連続有効、100〜300%境界、不正値fallback、220%・連続無効のSQLite再openを含む。 |
+| Focused frontend | PASS | model、Viewer、profile、client、Appの5 files / 289件、FAIL 0。4方向、端でのpage移動、repeat加速・抑止、smooth/reduced-motion、focus・IME保護、v22→v23移行、不正値拒否、Rust payloadを含む。 |
+| Windows tests / typecheck / build | PASS | frontend 32 files / 449件とPython 61件、FAIL 0。typecheck exit 0。frontend 73 modules build、CSS 43.17kB、JS 563.32kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 208件とshutdown process 1件、FAIL 0。設定validation・SQLite再openと既存catalog、viewer、file操作、search、watch、tree、cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは439.245秒で全12 stageがexit 0。Rust canonical 180.811秒、release executable 85.443秒、GUI権限付きshortcut product回帰12.395秒、CoDD verify 117.303秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T065813069Z`。 |
+| 性能 | NOT APPLICABLE / 限定 | 4方向target計算は固定個数の算術と単一`scrollTo`で、filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのkey-to-scroll latency、CPU、working setは未測定。 |
+| 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-M固有の実keyboard repeat rate、IME、keyboard layout、smooth scroll、DPIはrelease WebView2で直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

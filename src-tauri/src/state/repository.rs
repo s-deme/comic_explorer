@@ -105,6 +105,8 @@ pub struct Settings {
     pub pan_factor: String,
     pub wheel_dead_zone: String,
     pub scroll_step_percent: String,
+    pub key_scroll_acceleration_percent: String,
+    pub key_scroll_continuous: bool,
     pub wheel_scroll_factor: String,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
@@ -218,6 +220,8 @@ impl Default for Settings {
             pan_factor: "1".into(),
             wheel_dead_zone: "0".into(),
             scroll_step_percent: "90".into(),
+            key_scroll_acceleration_percent: "150".into(),
+            key_scroll_continuous: true,
             wheel_scroll_factor: "1".into(),
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
@@ -364,6 +368,8 @@ impl StateStore {
                 "panFactor" => settings.pan_factor = value,
                 "wheelDeadZone" => settings.wheel_dead_zone = value,
                 "scrollStepPercent" => settings.scroll_step_percent = value,
+                "keyScrollAccelerationPercent" => settings.key_scroll_acceleration_percent = value,
+                "keyScrollContinuous" => settings.key_scroll_continuous = value == "true",
                 "wheelScrollFactor" => settings.wheel_scroll_factor = value,
                 "smoothScroll" => settings.smooth_scroll = value == "true",
                 "pageScanMode" => settings.page_scan_mode = value,
@@ -525,6 +531,14 @@ impl StateStore {
             ("panFactor", settings.pan_factor.clone()),
             ("wheelDeadZone", settings.wheel_dead_zone.clone()),
             ("scrollStepPercent", settings.scroll_step_percent.clone()),
+            (
+                "keyScrollAccelerationPercent",
+                settings.key_scroll_acceleration_percent.clone(),
+            ),
+            (
+                "keyScrollContinuous",
+                settings.key_scroll_continuous.to_string(),
+            ),
             ("wheelScrollFactor", settings.wheel_scroll_factor.clone()),
             ("smoothScroll", settings.smooth_scroll.to_string()),
             ("pageScanMode", settings.page_scan_mode.clone()),
@@ -1745,7 +1759,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b17_catalog_card_modes_and_settings_survive_reopen() {
+    fn fr_b17_and_req_ley_p3_012_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1798,6 +1812,8 @@ mod tests {
                 pan_factor: "1.5".into(),
                 wheel_dead_zone: "24".into(),
                 scroll_step_percent: "75".into(),
+                key_scroll_acceleration_percent: "180".into(),
+                key_scroll_continuous: false,
                 wheel_scroll_factor: "1.4".into(),
                 smooth_scroll: false,
                 page_scan_mode: "z".into(),
@@ -1916,6 +1932,8 @@ mod tests {
         assert_eq!(restored.pan_factor, "1.5");
         assert_eq!(restored.wheel_dead_zone, "24");
         assert_eq!(restored.scroll_step_percent, "75");
+        assert_eq!(restored.key_scroll_acceleration_percent, "180");
+        assert!(!restored.key_scroll_continuous);
         assert_eq!(restored.wheel_scroll_factor, "1.4");
         assert!(!restored.smooth_scroll);
         assert_eq!(restored.page_scan_mode, "z");

@@ -101,6 +101,8 @@ P3-KではLEY-FILE-020をPublishedとした。library内dragは同一driveの明
 
 P3-LではLEY-INPUT-001をPublishedとした。各catalog/viewer commandへ順序付きで1〜4個のkeyboard bindingを追加・編集・削除でき、command単位と全体のreset、全bindingのdispatch、offline help表示を接続した。Rust registryが既知command、canonical key、件数、command内重複、command間競合、予約keyを検証し、配列をSQLiteへatomic保存する。既存SQLiteとstrict profile v1〜v21の単一文字列はprofile v22の1要素配列へ移行する。frontend 32 files / 444件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。実keyboard layout、IME、AltGr、OS別system予約key差とalternate bindingのrelease UI直接操作は未測定として残す。
 
+P3-MではLEY-INPUT-005をPublishedとした。paged Viewerのmodifierなし矢印keyで上下左右のoverflowを設定済みviewport比率だけpanし、PageUp/PageDownと前後page commandにも同じ量を共有した。repeatは100〜300%の加速率または連続動作無効を選べ、focus・modifier・IMEを保護し、左右端では走査を二重適用せず既存page移動へ進む。Rustが加速率・連続動作をstrict profile v23とSQLiteで検証・atomic保存し、TypeScriptはWebView keyboard eventとDOM scrollのadapterに限定した。frontend 32 files / 449件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。実keyboard repeat rate、IME/layout差、scroll latency、DPI、CPU・working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

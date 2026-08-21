@@ -120,6 +120,10 @@ export const DEFAULT_WHEEL_DEAD_ZONE = 0;
 export const MIN_SCROLL_STEP_PERCENT = 10;
 export const MAX_SCROLL_STEP_PERCENT = 100;
 export const DEFAULT_SCROLL_STEP_PERCENT = 90;
+export const MIN_KEY_SCROLL_ACCELERATION_PERCENT = 100;
+export const MAX_KEY_SCROLL_ACCELERATION_PERCENT = 300;
+export const DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT = 150;
+export const DEFAULT_KEY_SCROLL_CONTINUOUS = true;
 export const MIN_WHEEL_SCROLL_FACTOR = 0.5;
 export const MAX_WHEEL_SCROLL_FACTOR = 2;
 export const DEFAULT_WHEEL_SCROLL_FACTOR = 1;
@@ -148,6 +152,13 @@ export function isScrollStepPercent(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value)
     && value >= MIN_SCROLL_STEP_PERCENT
     && value <= MAX_SCROLL_STEP_PERCENT;
+}
+
+export function isKeyScrollAccelerationPercent(value: unknown): value is number {
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= MIN_KEY_SCROLL_ACCELERATION_PERCENT
+    && value <= MAX_KEY_SCROLL_ACCELERATION_PERCENT;
 }
 
 export function isWheelScrollFactor(value: unknown): value is number {
@@ -227,6 +238,7 @@ export function pageScanTarget(
   readingDirection: ReadingDirection,
   stepPercent: number,
   move: -1 | 1,
+  factor = 1,
 ): { left: number; top: number } | null {
   const maxLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
   const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
@@ -235,8 +247,9 @@ export function pageScanTarget(
   const safePercent = isScrollStepPercent(stepPercent)
     ? stepPercent
     : DEFAULT_SCROLL_STEP_PERCENT;
-  const stepX = Math.max(1, Math.floor(viewport.clientWidth * safePercent / 100));
-  const stepY = Math.max(1, Math.floor(viewport.clientHeight * safePercent / 100));
+  const safeFactor = Number.isFinite(factor) && factor >= 1 && factor <= 3 ? factor : 1;
+  const stepX = Math.max(1, Math.floor(viewport.clientWidth * safePercent / 100 * safeFactor));
+  const stepY = Math.max(1, Math.floor(viewport.clientHeight * safePercent / 100 * safeFactor));
   const forwardX = readingDirection === "rightToLeft" ? -1 : 1;
   const leadingLeft = readingDirection === "rightToLeft" ? maxLeft : 0;
   const trailingLeft = readingDirection === "rightToLeft" ? 0 : maxLeft;
@@ -275,6 +288,39 @@ export function pageScanTarget(
     if (top > 1) return { left: trailingLeft, top: Math.max(0, top - stepY) };
   }
   return null;
+}
+
+export type KeyboardScrollArrow = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
+
+export function keyboardScrollTarget(
+  viewport: PageScanViewport,
+  key: KeyboardScrollArrow,
+  stepPercent: number,
+  accelerationPercent: number,
+  repeated: boolean,
+): { left: number; top: number } | null {
+  const maxLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+  const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+  const left = Math.min(maxLeft, Math.max(0, viewport.left));
+  const top = Math.min(maxTop, Math.max(0, viewport.top));
+  const safeStep = isScrollStepPercent(stepPercent)
+    ? stepPercent
+    : DEFAULT_SCROLL_STEP_PERCENT;
+  const safeAcceleration = isKeyScrollAccelerationPercent(accelerationPercent)
+    ? accelerationPercent
+    : DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT;
+  const factor = repeated ? safeAcceleration / 100 : 1;
+  const stepX = Math.max(1, Math.floor(viewport.clientWidth * safeStep / 100 * factor));
+  const stepY = Math.max(1, Math.floor(viewport.clientHeight * safeStep / 100 * factor));
+  const target = {
+    left: key === "ArrowLeft"
+      ? Math.max(0, left - stepX)
+      : key === "ArrowRight" ? Math.min(maxLeft, left + stepX) : left,
+    top: key === "ArrowUp"
+      ? Math.max(0, top - stepY)
+      : key === "ArrowDown" ? Math.min(maxTop, top + stepY) : top,
+  };
+  return target.left === left && target.top === top ? null : target;
 }
 
 export function isPagePairable(

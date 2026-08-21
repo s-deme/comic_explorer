@@ -143,6 +143,8 @@ import {
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
   DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  DEFAULT_KEY_SCROLL_CONTINUOUS,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
@@ -168,6 +170,7 @@ import {
   isViewerGridSize,
   isWheelDeadZone,
   isScrollStepPercent,
+  isKeyScrollAccelerationPercent,
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
@@ -729,6 +732,10 @@ export function App({
   const [panFactor, setPanFactor] = useState(DEFAULT_PAN_FACTOR);
   const [wheelDeadZone, setWheelDeadZone] = useState(DEFAULT_WHEEL_DEAD_ZONE);
   const [scrollStepPercent, setScrollStepPercent] = useState(DEFAULT_SCROLL_STEP_PERCENT);
+  const [keyScrollAccelerationPercent, setKeyScrollAccelerationPercent] =
+    useState(DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT);
+  const [keyScrollContinuous, setKeyScrollContinuous] =
+    useState(DEFAULT_KEY_SCROLL_CONTINUOUS);
   const [wheelScrollFactor, setWheelScrollFactor] = useState(DEFAULT_WHEEL_SCROLL_FACTOR);
   const [smoothScroll, setSmoothScroll] = useState(DEFAULT_SMOOTH_SCROLL);
   const [pageScanMode, setPageScanMode] = useState<PageScanMode>(DEFAULT_PAGE_SCAN_MODE);
@@ -1206,6 +1213,12 @@ export function App({
           setScrollStepPercent(isScrollStepPercent(response.data.scrollStepPercent)
             ? response.data.scrollStepPercent
             : DEFAULT_SCROLL_STEP_PERCENT);
+          setKeyScrollAccelerationPercent(
+            isKeyScrollAccelerationPercent(response.data.keyScrollAccelerationPercent)
+              ? response.data.keyScrollAccelerationPercent
+              : DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+          );
+          setKeyScrollContinuous(response.data.keyScrollContinuous !== false);
           setWheelScrollFactor(isWheelScrollFactor(response.data.wheelScrollFactor)
             ? response.data.wheelScrollFactor
             : DEFAULT_WHEEL_SCROLL_FACTOR);
@@ -3283,6 +3296,8 @@ export function App({
       panFactor,
       wheelDeadZone,
       scrollStepPercent,
+      keyScrollAccelerationPercent,
+      keyScrollContinuous,
       wheelScrollFactor,
       smoothScroll,
       pageScanMode,
@@ -3402,6 +3417,8 @@ export function App({
       setPanFactor(normalized.panFactor);
       setWheelDeadZone(normalized.wheelDeadZone);
       setScrollStepPercent(normalized.scrollStepPercent);
+      setKeyScrollAccelerationPercent(normalized.keyScrollAccelerationPercent);
+      setKeyScrollContinuous(normalized.keyScrollContinuous);
       setWheelScrollFactor(normalized.wheelScrollFactor);
       setSmoothScroll(normalized.smoothScroll);
       setPageScanMode(normalized.pageScanMode);
@@ -3605,6 +3622,7 @@ export function App({
     viewerBackground, viewerPageMargin,
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
+    keyScrollAccelerationPercent, keyScrollContinuous,
     wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
     treeAutoCollapse, treeConfirmChildren, treeWidth,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
@@ -4197,6 +4215,8 @@ export function App({
           panFactor={panFactor}
           wheelDeadZone={wheelDeadZone}
           scrollStepPercent={scrollStepPercent}
+          keyScrollAccelerationPercent={keyScrollAccelerationPercent}
+          keyScrollContinuous={keyScrollContinuous}
           wheelScrollFactor={wheelScrollFactor}
           smoothScroll={smoothScroll}
           pageScanMode={pageScanMode}

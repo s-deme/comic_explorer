@@ -320,6 +320,8 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   panFactor: 1,
   wheelDeadZone: 0,
   scrollStepPercent: 90,
+  keyScrollAccelerationPercent: 150,
+  keyScrollContinuous: true,
   wheelScrollFactor: 1,
   smoothScroll: true,
   pageScanMode: "vertical",
@@ -3460,6 +3462,10 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profileページ内スクロール量（%）"), {
       target: { value: "75" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profileキーリピート加速（%）"), {
+      target: { value: "220" },
+    });
+    fireEvent.click(within(dialog).getByLabelText("profileキーの連続動作"));
     fireEvent.change(within(dialog).getByLabelText("profile連続スクロールのホイール速度（%）"), {
       target: { value: "140" },
     });
@@ -3507,6 +3513,8 @@ describe("application shell", () => {
         prefetchMemoryMiB: 192,
         scale: 1.75,
         scrollStepPercent: 75,
+        keyScrollAccelerationPercent: 220,
+        keyScrollContinuous: false,
         wheelScrollFactor: 1.4,
         smoothScroll: false,
         pageScanMode: "z",

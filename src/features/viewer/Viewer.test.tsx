@@ -1019,6 +1019,118 @@ describe("Viewer settings", () => {
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
   });
 
+  it("REQ-LEY-P3-012 pans in four directions and accelerates continuous key repeat", async () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="original"
+        scrollStepPercent={50}
+        keyScrollAccelerationPercent={200}
+        keyScrollContinuous
+        smoothScroll={false}
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 400 },
+    });
+    spread.scrollLeft = 100;
+    spread.scrollTop = 100;
+    spread.scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+      if (typeof options === "number") {
+        spread.scrollLeft = options;
+        spread.scrollTop = y ?? spread.scrollTop;
+      } else {
+        spread.scrollLeft = options?.left ?? spread.scrollLeft;
+        spread.scrollTop = options?.top ?? spread.scrollTop;
+      }
+    }) as HTMLDivElement["scrollTo"];
+
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(spread).toHaveProperty("scrollTop", 150);
+    fireEvent.keyDown(window, { key: "ArrowDown", repeat: true });
+    expect(spread).toHaveProperty("scrollTop", 250);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(spread).toHaveProperty("scrollLeft", 150);
+    fireEvent.keyDown(window, { key: "ArrowLeft", repeat: true });
+    expect(spread).toHaveProperty("scrollLeft", 50);
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    expect(spread).toHaveProperty("scrollTop", 200);
+    expect(spread.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({
+      top: 200,
+      behavior: "auto",
+    }));
+
+    markPrefetchedPagesReady();
+    spread.scrollLeft = 0;
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    await waitFor(() => expect(screen.getByText("2 / 2")).toBeInTheDocument());
+  });
+
+  it("REQ-LEY-P3-012 can suppress repeat and keeps editing and IME input untouched", () => {
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        initialScaleMode="original"
+        scrollStepPercent={50}
+        keyScrollAccelerationPercent={250}
+        keyScrollContinuous={false}
+        smoothScroll
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 300 },
+    });
+    spread.scrollTop = 50;
+    spread.scrollTo = vi.fn((options?: ScrollToOptions | number, y?: number) => {
+      const top = typeof options === "number" ? y : options?.top;
+      spread.scrollTop = top ?? spread.scrollTop;
+    }) as HTMLDivElement["scrollTo"];
+
+    fireEvent.keyDown(window, { key: "ArrowDown", repeat: true });
+    expect(spread).toHaveProperty("scrollTop", 50);
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(spread).toHaveProperty("scrollTop", 100);
+    expect(spread.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({
+      behavior: "smooth",
+    }));
+
+    const originalMatchMedia = window.matchMedia;
+    try {
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as typeof window.matchMedia;
+      fireEvent.keyDown(window, { key: "ArrowUp" });
+      expect(spread).toHaveProperty("scrollTop", 50);
+      expect(spread.scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({
+        behavior: "auto",
+      }));
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+
+    const scale = screen.getByRole("spinbutton", { name: "任意倍率（%）" });
+    fireEvent.keyDown(scale, { key: "ArrowDown" });
+    expect(spread).toHaveProperty("scrollTop", 50);
+    fireEvent.keyDown(window, { key: "ArrowDown", isComposing: true });
+    expect(spread).toHaveProperty("scrollTop", 50);
+  });
+
   it("REQ-LEY-P2-007 normalizes and scales wheel input only in continuous layouts", () => {
     render(
       <Viewer

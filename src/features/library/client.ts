@@ -169,6 +169,8 @@ export interface CatalogSettings {
   panFactor: number;
   wheelDeadZone: number;
   scrollStepPercent: number;
+  keyScrollAccelerationPercent: number;
+  keyScrollContinuous: boolean;
   wheelScrollFactor: number;
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
@@ -305,6 +307,8 @@ export async function saveSettingsProfile(
       panFactor: profile.panFactor,
       wheelDeadZone: profile.wheelDeadZone,
       scrollStepPercent: profile.scrollStepPercent,
+      keyScrollAccelerationPercent: profile.keyScrollAccelerationPercent,
+      keyScrollContinuous: profile.keyScrollContinuous,
       wheelScrollFactor: profile.wheelScrollFactor,
       smoothScroll: profile.smoothScroll,
       pageScanMode: profile.pageScanMode,

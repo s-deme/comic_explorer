@@ -21,6 +21,8 @@ import {
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
   DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  DEFAULT_KEY_SCROLL_CONTINUOUS,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
@@ -43,6 +45,7 @@ import {
   isPortraitAspectPercent,
   isWheelDeadZone,
   isScrollStepPercent,
+  isKeyScrollAccelerationPercent,
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
@@ -83,7 +86,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 22;
+export const SETTINGS_PROFILE_VERSION = 23;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -199,6 +202,8 @@ export interface SettingsProfile {
   panFactor: number;
   wheelDeadZone: number;
   scrollStepPercent: number;
+  keyScrollAccelerationPercent: number;
+  keyScrollContinuous: boolean;
   wheelScrollFactor: number;
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
@@ -276,6 +281,8 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     panFactor: DEFAULT_PAN_FACTOR,
     wheelDeadZone: DEFAULT_WHEEL_DEAD_ZONE,
     scrollStepPercent: DEFAULT_SCROLL_STEP_PERCENT,
+    keyScrollAccelerationPercent: DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+    keyScrollContinuous: DEFAULT_KEY_SCROLL_CONTINUOUS,
     wheelScrollFactor: DEFAULT_WHEEL_SCROLL_FACTOR,
     smoothScroll: DEFAULT_SMOOTH_SCROLL,
     pageScanMode: DEFAULT_PAGE_SCAN_MODE,
@@ -518,6 +525,15 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const detailShowKind = legacyDetailFormat ? true : candidate.detailShowKind;
   const detailShowSize = legacyDetailFormat ? true : candidate.detailShowSize;
   const detailShowModified = legacyDetailFormat ? true : candidate.detailShowModified;
+  const legacyKeyScrollPreferences = legacyDetailFormat
+    || candidate.profileVersion === 21
+    || candidate.profileVersion === 22;
+  const keyScrollAccelerationPercent = legacyKeyScrollPreferences
+    ? DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT
+    : candidate.keyScrollAccelerationPercent;
+  const keyScrollContinuous = legacyKeyScrollPreferences
+    ? DEFAULT_KEY_SCROLL_CONTINUOUS
+    : candidate.keyScrollContinuous;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -540,6 +556,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 19
       && candidate.profileVersion !== 20
       && candidate.profileVersion !== 21
+      && candidate.profileVersion !== 22
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -587,6 +604,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isPanFactor(panFactor) ||
     !isWheelDeadZone(wheelDeadZone) ||
     !isScrollStepPercent(scrollStepPercent) ||
+    !isKeyScrollAccelerationPercent(keyScrollAccelerationPercent) ||
+    typeof keyScrollContinuous !== "boolean" ||
     !isWheelScrollFactor(wheelScrollFactor) ||
     typeof smoothScroll !== "boolean" ||
     pageScanMode === null ||
@@ -667,6 +686,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     panFactor,
     wheelDeadZone,
     scrollStepPercent,
+    keyScrollAccelerationPercent,
+    keyScrollContinuous,
     wheelScrollFactor,
     smoothScroll,
     pageScanMode,

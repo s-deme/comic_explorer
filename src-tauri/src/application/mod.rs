@@ -488,6 +488,8 @@ pub struct CatalogSettings {
     pub pan_factor: f64,
     pub wheel_dead_zone: u16,
     pub scroll_step_percent: u16,
+    pub key_scroll_acceleration_percent: u16,
+    pub key_scroll_continuous: bool,
     pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
@@ -575,6 +577,8 @@ pub struct SettingsProfileInput {
     pub pan_factor: f64,
     pub wheel_dead_zone: u16,
     pub scroll_step_percent: u16,
+    pub key_scroll_acceleration_percent: u16,
+    pub key_scroll_continuous: bool,
     pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
@@ -651,6 +655,9 @@ const DEFAULT_PREFETCH_BEHIND: u8 = 0;
 const DEFAULT_PREFETCH_MEMORY_MIB: u16 = 256;
 const MIN_SCROLL_STEP_PERCENT: u16 = 10;
 const MAX_SCROLL_STEP_PERCENT: u16 = 100;
+const MIN_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 100;
+const MAX_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 300;
+const DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 150;
 const MIN_WHEEL_SCROLL_FACTOR: f64 = 0.5;
 const MAX_WHEEL_SCROLL_FACTOR: f64 = 2.0;
 const DEFAULT_VIEWER_PAGE_MARGIN: u16 = 0;
@@ -1129,6 +1136,18 @@ fn scroll_step_percent(settings: &crate::state::Settings) -> u16 {
         .unwrap_or(90)
 }
 
+fn key_scroll_acceleration_percent(settings: &crate::state::Settings) -> u16 {
+    settings
+        .key_scroll_acceleration_percent
+        .parse::<u16>()
+        .ok()
+        .filter(|percent| {
+            (MIN_KEY_SCROLL_ACCELERATION_PERCENT..=MAX_KEY_SCROLL_ACCELERATION_PERCENT)
+                .contains(percent)
+        })
+        .unwrap_or(DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT)
+}
+
 fn wheel_scroll_factor(settings: &crate::state::Settings) -> f64 {
     settings
         .wheel_scroll_factor
@@ -1236,6 +1255,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let pan_factor = pan_factor(&settings);
     let wheel_dead_zone = wheel_dead_zone(&settings);
     let scroll_step_percent = scroll_step_percent(&settings);
+    let key_scroll_acceleration_percent = key_scroll_acceleration_percent(&settings);
     let wheel_scroll_factor = wheel_scroll_factor(&settings);
     let page_scan_mode = page_scan_mode(&settings);
     let loupe_size = loupe_size(&settings);
@@ -1299,6 +1319,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         pan_factor,
         wheel_dead_zone,
         scroll_step_percent,
+        key_scroll_acceleration_percent,
+        key_scroll_continuous: settings.key_scroll_continuous,
         wheel_scroll_factor,
         smooth_scroll: settings.smooth_scroll,
         page_scan_mode,
@@ -2783,6 +2805,8 @@ fn validate_settings_profile(
         || profile.wheel_dead_zone > MAX_WHEEL_DEAD_ZONE
         || !(MIN_SCROLL_STEP_PERCENT..=MAX_SCROLL_STEP_PERCENT)
             .contains(&profile.scroll_step_percent)
+        || !(MIN_KEY_SCROLL_ACCELERATION_PERCENT..=MAX_KEY_SCROLL_ACCELERATION_PERCENT)
+            .contains(&profile.key_scroll_acceleration_percent)
         || !profile.wheel_scroll_factor.is_finite()
         || !(MIN_WHEEL_SCROLL_FACTOR..=MAX_WHEEL_SCROLL_FACTOR)
             .contains(&profile.wheel_scroll_factor)
@@ -2913,6 +2937,9 @@ pub fn set_settings_profile(
         settings.pan_factor = profile.pan_factor.to_string();
         settings.wheel_dead_zone = profile.wheel_dead_zone.to_string();
         settings.scroll_step_percent = profile.scroll_step_percent.to_string();
+        settings.key_scroll_acceleration_percent =
+            profile.key_scroll_acceleration_percent.to_string();
+        settings.key_scroll_continuous = profile.key_scroll_continuous;
         settings.wheel_scroll_factor = profile.wheel_scroll_factor.to_string();
         settings.smooth_scroll = profile.smooth_scroll;
         settings.page_scan_mode = profile.page_scan_mode;
@@ -5700,17 +5727,25 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn req_ley_p2_007_scroll_preferences_default_and_bound_persisted_values() {
+    fn req_ley_p2_007_and_p3_012_scroll_preferences_default_and_bound_persisted_values() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(scroll_step_percent(&settings), 90);
+        assert_eq!(key_scroll_acceleration_percent(&settings), 150);
+        assert!(settings.key_scroll_continuous);
         assert_eq!(wheel_scroll_factor(&settings), 1.0);
         settings.scroll_step_percent = "75".into();
+        settings.key_scroll_acceleration_percent = "220".into();
+        settings.key_scroll_continuous = false;
         settings.wheel_scroll_factor = "1.4".into();
         assert_eq!(scroll_step_percent(&settings), 75);
+        assert_eq!(key_scroll_acceleration_percent(&settings), 220);
+        assert!(!settings.key_scroll_continuous);
         assert_eq!(wheel_scroll_factor(&settings), 1.4);
         settings.scroll_step_percent = "101".into();
+        settings.key_scroll_acceleration_percent = "301".into();
         settings.wheel_scroll_factor = "NaN".into();
         assert_eq!(scroll_step_percent(&settings), 90);
+        assert_eq!(key_scroll_acceleration_percent(&settings), 150);
         assert_eq!(wheel_scroll_factor(&settings), 1.0);
     }
 
@@ -5862,6 +5897,8 @@ mod shutdown_tests {
             pan_factor: 1.0,
             wheel_dead_zone: 0,
             scroll_step_percent: 90,
+            key_scroll_acceleration_percent: 150,
+            key_scroll_continuous: true,
             wheel_scroll_factor: 1.0,
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
@@ -6022,6 +6059,12 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.scroll_step_percent = 75;
+        profile.key_scroll_acceleration_percent = 99;
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.key_scroll_acceleration_percent = 220;
         profile.wheel_scroll_factor = 2.01;
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,

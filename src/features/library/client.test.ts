@@ -122,6 +122,23 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P3-012 sends typed key-scroll preferences to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.keyScrollAccelerationPercent = 220;
+    profile.keyScrollContinuous = false;
+    await saveSettingsProfile(profile, 23);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          keyScrollAccelerationPercent: 220,
+          keyScrollContinuous: false,
+        }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-010 sends only typed drag/drop commands to Rust", async () => {
     await copyFileItemsToDestination(["one.cbz", "two.pdf"], "Target", 31);
     await previewNativeFileDrop(["D:\\Incoming\\one.cbz"], "Target", 32);

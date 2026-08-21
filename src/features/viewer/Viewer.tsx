@@ -23,6 +23,8 @@ import {
   DEFAULT_VIEWER_GRID_SIZE,
   DEFAULT_WHEEL_DEAD_ZONE,
   DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  DEFAULT_KEY_SCROLL_CONTINUOUS,
   DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
@@ -41,8 +43,11 @@ import {
   isViewerGridSize,
   isWheelDeadZone,
   isScrollStepPercent,
+  isKeyScrollAccelerationPercent,
+  keyboardScrollTarget,
   isWheelScrollFactor,
   isPagePairable,
+  type KeyboardScrollArrow,
   isLoupeSize,
   isLoupeZoom,
   isPrefetchPageCount,
@@ -150,6 +155,8 @@ interface ViewerProps {
   panFactor?: number;
   wheelDeadZone?: number;
   scrollStepPercent?: number;
+  keyScrollAccelerationPercent?: number;
+  keyScrollContinuous?: boolean;
   wheelScrollFactor?: number;
   smoothScroll?: boolean;
   pageScanMode?: PageScanMode;
@@ -225,6 +232,9 @@ export function Viewer({
   panFactor: initialPanFactor = DEFAULT_PAN_FACTOR,
   wheelDeadZone: initialWheelDeadZone = DEFAULT_WHEEL_DEAD_ZONE,
   scrollStepPercent: initialScrollStepPercent = DEFAULT_SCROLL_STEP_PERCENT,
+  keyScrollAccelerationPercent: initialKeyScrollAccelerationPercent =
+    DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  keyScrollContinuous: initialKeyScrollContinuous = DEFAULT_KEY_SCROLL_CONTINUOUS,
   wheelScrollFactor: initialWheelScrollFactor = DEFAULT_WHEEL_SCROLL_FACTOR,
   smoothScroll: initialSmoothScroll = DEFAULT_SMOOTH_SCROLL,
   pageScanMode: initialPageScanMode = DEFAULT_PAGE_SCAN_MODE,
@@ -279,6 +289,12 @@ export function Viewer({
   const scrollStepPercent = isScrollStepPercent(initialScrollStepPercent)
     ? initialScrollStepPercent
     : DEFAULT_SCROLL_STEP_PERCENT;
+  const keyScrollAccelerationPercent = isKeyScrollAccelerationPercent(
+    initialKeyScrollAccelerationPercent,
+  ) ? initialKeyScrollAccelerationPercent : DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT;
+  const keyScrollContinuous = typeof initialKeyScrollContinuous === "boolean"
+    ? initialKeyScrollContinuous
+    : DEFAULT_KEY_SCROLL_CONTINUOUS;
   const wheelScrollFactor = isWheelScrollFactor(initialWheelScrollFactor)
     ? initialWheelScrollFactor
     : DEFAULT_WHEEL_SCROLL_FACTOR;
@@ -588,7 +604,7 @@ export function Viewer({
     await saveReadingPosition(session, state.index, generation);
   }
 
-  function scrollPageOverflow(move: -1 | 1): boolean {
+  function scrollPageOverflow(move: -1 | 1, factor = 1): boolean {
     if (layoutMode !== "paged") return false;
     const spread = spreadRef.current;
     if (!spread) return false;
@@ -603,7 +619,7 @@ export function Viewer({
       clientHeight: spread.clientHeight,
       scrollWidth: spread.scrollWidth,
       scrollHeight: spread.scrollHeight,
-    }, pageScanMode, state.direction, scrollStepPercent, move);
+    }, pageScanMode, state.direction, scrollStepPercent, move, factor);
     pageScanInitializedRef.current = true;
     if (target === null) return false;
     if (typeof spread.scrollTo === "function") {
@@ -620,8 +636,35 @@ export function Viewer({
     return true;
   }
 
-  function next() {
-    if (scrollPageOverflow(1)) return;
+  function scrollWithKeyboardArrow(key: KeyboardScrollArrow, repeated: boolean): boolean {
+    if (layoutMode !== "paged") return false;
+    const spread = spreadRef.current;
+    if (!spread) return false;
+    const target = keyboardScrollTarget({
+      left: spread.scrollLeft,
+      top: spread.scrollTop,
+      clientWidth: spread.clientWidth,
+      clientHeight: spread.clientHeight,
+      scrollWidth: spread.scrollWidth,
+      scrollHeight: spread.scrollHeight,
+    }, key, scrollStepPercent, keyScrollAccelerationPercent, repeated);
+    if (target === null) return false;
+    if (typeof spread.scrollTo === "function") {
+      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      spread.scrollTo({
+        top: target.top,
+        left: target.left,
+        behavior: smoothScroll && !reducedMotion ? "smooth" : "auto",
+      });
+    } else {
+      spread.scrollLeft = target.left;
+      spread.scrollTop = target.top;
+    }
+    return true;
+  }
+
+  function next(factor = 1, skipOverflow = false) {
+    if (!skipOverflow && scrollPageOverflow(1, factor)) return;
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
       void flushReadingPosition().finally(() =>
         onNextItem?.(),
@@ -654,8 +697,8 @@ export function Viewer({
     }
   }, [layoutMode, pageScanMode, state.direction, state.index]);
 
-  function previous() {
-    if (scrollPageOverflow(-1)) return;
+  function previous(factor = 1, skipOverflow = false) {
+    if (!skipOverflow && scrollPageOverflow(-1, factor)) return;
     if (state.index === 0) {
       void flushReadingPosition().finally(() => onPreviousItem?.());
       return;
@@ -1154,6 +1197,7 @@ export function Viewer({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
+      if (event.isComposing) return;
       if (detached && event.key === "Escape") {
         event.preventDefault();
         handleCloseCommand();
@@ -1165,6 +1209,23 @@ export function Viewer({
         || target.closest("[contenteditable=true]") !== null
         || target.closest('[role="dialog"]') !== null
       );
+      const keyboardArrow = !editingText
+        && !event.ctrlKey
+        && !event.metaKey
+        && !event.altKey
+        && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)
+        ? event.key as KeyboardScrollArrow
+        : null;
+      if (keyboardArrow !== null) {
+        if (event.repeat && !keyScrollContinuous) {
+          event.preventDefault();
+          return;
+        }
+        if (scrollWithKeyboardArrow(keyboardArrow, event.repeat)) {
+          event.preventDefault();
+          return;
+        }
+      }
       if (!editingText && !event.ctrlKey && !event.metaKey && !event.altKey) {
         const transformAction: ImageTransformAction | undefined = event.key === "]"
           ? "rotateClockwise"
@@ -1181,21 +1242,28 @@ export function Viewer({
           return;
         }
       }
+      if (editingText) return;
       const customCommand = customShortcutCommand(event, activeShortcuts);
       const command = isViewerShortcutCommand(customCommand)
         ? customCommand
         : fallbackShortcutCommand(event, state.direction);
       if (command === undefined) return;
       event.preventDefault();
+      if (
+        event.repeat
+        && !keyScrollContinuous
+        && (command === "nextPage" || command === "previousPage")
+      ) return;
+      const keyScrollFactor = event.repeat ? keyScrollAccelerationPercent / 100 : 1;
       switch (command) {
         case "closeViewer":
           handleCloseCommand();
           break;
         case "nextPage":
-          next();
+          next(keyScrollFactor, keyboardArrow !== null);
           break;
         case "previousPage":
-          previous();
+          previous(keyScrollFactor, keyboardArrow !== null);
           break;
         case "singlePage":
           changeMode("single");
@@ -1278,8 +1346,8 @@ export function Viewer({
       <div className="page-error" role="alert">
         <h2>画像を読み込めません</h2>
         <p>{page.relativePath}</p>
-        <button onClick={previous}>前ページ</button>
-        <button data-product-id="viewer-error-next" onClick={next}>次ページ</button>
+        <button onClick={() => previous()}>前ページ</button>
+        <button data-product-id="viewer-error-next" onClick={() => next()}>次ページ</button>
         <button onClick={close}>一覧へ戻る</button>
       </div>
     ) : mediaUris[index] ? (
@@ -1502,7 +1570,7 @@ export function Viewer({
           className="viewer-icon-button"
           aria-label="前ページ"
           title="前ページへ移動"
-          onClick={previous}
+          onClick={() => previous()}
         >
           <span aria-hidden="true">◀</span>
         </button>
@@ -1510,7 +1578,7 @@ export function Viewer({
           className="viewer-icon-button"
           aria-label="次ページ"
           title="次ページへ移動"
-          onClick={next}
+          onClick={() => next()}
         >
           <span aria-hidden="true">▶</span>
         </button>

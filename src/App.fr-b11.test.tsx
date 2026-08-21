@@ -159,6 +159,8 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       panFactor: 1,
       wheelDeadZone: 0,
       scrollStepPercent: 90,
+      keyScrollAccelerationPercent: 150,
+      keyScrollContinuous: true,
       wheelScrollFactor: 1,
       smoothScroll: true,
       pageScanMode: "vertical" as const,

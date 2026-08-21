@@ -61,6 +61,8 @@ function validProfile(): SettingsProfile {
     panFactor: 1,
     wheelDeadZone: 0,
     scrollStepPercent: 90,
+    keyScrollAccelerationPercent: 150,
+    keyScrollContinuous: true,
     wheelScrollFactor: 1,
     smoothScroll: true,
     pageScanMode: "vertical",
@@ -135,7 +137,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 23, 99, "21", undefined])(
+  it.each([0, 24, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -289,6 +291,32 @@ describe("settings profile", () => {
     for (const field of ["detailShowKind", "detailShowSize", "detailShowModified"]) {
       expect(normalizeSettingsProfile(withField(field, "true"))).toBeNull();
     }
+  });
+
+  it("REQ-LEY-P3-012 migrates v22 key scrolling and validates acceleration and continuity", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 22;
+    delete legacy.keyScrollAccelerationPercent;
+    delete legacy.keyScrollContinuous;
+    expect(normalizeSettingsProfile(legacy)).toMatchObject({
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      scrollStepPercent: 90,
+      keyScrollAccelerationPercent: 150,
+      keyScrollContinuous: true,
+    });
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      keyScrollAccelerationPercent: 99,
+    })).toBeNull();
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      keyScrollAccelerationPercent: 301,
+    })).toBeNull();
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      keyScrollContinuous: "yes",
+    })).toBeNull();
   });
 
   it("REQ-LEY-P2-005 migrates a v7 profile with the fixed P2-D spread rules", () => {

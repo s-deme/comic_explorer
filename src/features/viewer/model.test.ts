@@ -26,6 +26,7 @@ import {
   isViewerGridSize,
   isWheelDeadZone,
   isScrollStepPercent,
+  isKeyScrollAccelerationPercent,
   isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
@@ -34,6 +35,7 @@ import {
   prefetchWindowIndices,
   wheelDeltaPixels,
   pageScanTarget,
+  keyboardScrollTarget,
   randomPageIndex,
   scaleForPixelDimension,
   scaleReducer,
@@ -307,6 +309,28 @@ describe("FR-B01 scale model", () => {
       .toEqual({ left: 200, top: 90 });
     expect(pageScanTarget({ ...viewport, left: 200, top: 200 }, "n", "leftToRight", 90, 1))
       .toBeNull();
+  });
+
+  it("REQ-LEY-P3-012 moves four keyboard directions and accelerates repeat within bounds", () => {
+    const viewport = {
+      left: 100, top: 100, clientWidth: 100, clientHeight: 80,
+      scrollWidth: 400, scrollHeight: 300,
+    };
+    expect(isKeyScrollAccelerationPercent(100)).toBe(true);
+    expect(isKeyScrollAccelerationPercent(300)).toBe(true);
+    expect(isKeyScrollAccelerationPercent(301)).toBe(false);
+    expect(keyboardScrollTarget(viewport, "ArrowUp", 50, 200, false))
+      .toEqual({ left: 100, top: 60 });
+    expect(keyboardScrollTarget(viewport, "ArrowDown", 50, 200, true))
+      .toEqual({ left: 100, top: 180 });
+    expect(keyboardScrollTarget(viewport, "ArrowLeft", 50, 150, true))
+      .toEqual({ left: 25, top: 100 });
+    expect(keyboardScrollTarget(viewport, "ArrowRight", 50, 150, false))
+      .toEqual({ left: 150, top: 100 });
+    expect(keyboardScrollTarget({ ...viewport, left: 0 }, "ArrowLeft", 50, 150, true))
+      .toBeNull();
+    expect(pageScanTarget(viewport, "vertical", "leftToRight", 50, 1, 2))
+      .toEqual({ left: 100, top: 180 });
   });
 
   it("REQ-LEY-P2-009 bounds loupe preferences and keeps its center inside the stage", () => {
