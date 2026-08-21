@@ -44,6 +44,9 @@ import {
   setItemRating,
   searchLibrary,
   evaluateCatalogMask,
+  listCatalogMasks,
+  saveCatalogMask,
+  deleteCatalogMask,
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
@@ -111,6 +114,9 @@ vi.mock("./features/library/client", () => ({
   setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
   evaluateCatalogMask: vi.fn(),
+  listCatalogMasks: vi.fn(),
+  saveCatalogMask: vi.fn(),
+  deleteCatalogMask: vi.fn(),
   diagnoseLibrary: vi.fn(),
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
@@ -166,6 +172,9 @@ const quitApplicationMock = vi.mocked(quitApplication);
 const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
 const catalogMaskMock = vi.mocked(evaluateCatalogMask);
+const listCatalogMasksMock = vi.mocked(listCatalogMasks);
+const saveCatalogMaskMock = vi.mocked(saveCatalogMask);
+const deleteCatalogMaskMock = vi.mocked(deleteCatalogMask);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
 const listPageBookmarksMock = vi.mocked(listPageBookmarks);
@@ -460,6 +469,9 @@ describe("application shell", () => {
     setRatingMock.mockReset();
     searchMock.mockReset();
     catalogMaskMock.mockReset();
+    listCatalogMasksMock.mockReset();
+    saveCatalogMaskMock.mockReset();
+    deleteCatalogMaskMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
     listPageBookmarksMock.mockReset();
@@ -483,12 +495,21 @@ describe("application shell", () => {
     knownFoldersMock.mockResolvedValue({
       status: "ok", requestId: "known-folders" as never, generation: 1 as never, data: [],
     });
-    catalogMaskMock.mockImplementation(async (_mask, basenames, generation) => ({
+    catalogMaskMock.mockImplementation(async (_mask, candidates, _options, generation) => ({
       status: "ok",
       requestId: "catalog-mask" as never,
       generation: generation as never,
-      data: basenames.map(() => true),
+      data: candidates.map(() => true),
     }));
+    listCatalogMasksMock.mockResolvedValue({
+      status: "ok", requestId: "catalog-masks" as never, generation: 1 as never, data: [],
+    });
+    saveCatalogMaskMock.mockResolvedValue({
+      status: "ok", requestId: "save-catalog-mask" as never, generation: 1 as never, data: [],
+    });
+    deleteCatalogMaskMock.mockResolvedValue({
+      status: "ok", requestId: "delete-catalog-mask" as never, generation: 1 as never, data: [],
+    });
     renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
     createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
@@ -2278,7 +2299,11 @@ describe("application shell", () => {
     });
     expect(catalogMaskMock).toHaveBeenCalledWith(
       "*.cbz;*.pdf",
-      ["book.cbz", "cover.jpg"],
+      [
+        expect.objectContaining({ basename: "book.cbz", kind: "archive" }),
+        expect.objectContaining({ basename: "cover.jpg", kind: "page" }),
+      ],
+      { includeFolders: true, includeFiles: true },
       expect.any(Number),
     );
     expect(screen.getByRole("button", { name: /book\.cbz/ })).toBeInTheDocument();
@@ -2326,6 +2351,93 @@ describe("application shell", () => {
     }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
     expect(within(pane).queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-003 restores, applies, replaces, and confirms deletion of detailed masks", async () => {
+    const modifiedAfterMs = new Date(2026, 0, 1).getTime();
+    const modifiedBeforeMs = new Date(2026, 1, 1).getTime();
+    const saved = {
+      name: "large recent",
+      expression: "*.cbz",
+      options: {
+        includeFolders: false,
+        includeFiles: true,
+        minSizeBytes: 100 * 1024,
+        maxSizeBytes: 500 * 1024,
+        modifiedAfterMs,
+        modifiedBeforeMs,
+      },
+      updatedAtMs: 10,
+    };
+    listCatalogMasksMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-masks-saved" as never,
+      generation: 1 as never,
+      data: [saved],
+    });
+    await registerTestLibrary([
+      { relativePath: "Folder" as never, kind: "folder", modifiedMs: modifiedAfterMs + 1 },
+      { relativePath: "small.cbz" as never, kind: "archive", byteSize: 10 * 1024, modifiedMs: modifiedAfterMs + 1 },
+      { relativePath: "large.cbz" as never, kind: "archive", byteSize: 200 * 1024, modifiedMs: modifiedAfterMs + 1 },
+    ]);
+    const pane = openSearchPane();
+    const savedSection = await within(pane).findByRole("region", { name: "保存済みファイルマスク" });
+    fireEvent.change(within(savedSection).getByLabelText("保存済み条件"), {
+      target: { value: "large recent" },
+    });
+    expect(within(pane).getByLabelText("ファイルマスク")).toHaveValue("*.cbz");
+    expect(within(pane).getByLabelText("最小サイズ (KiB)")).toHaveValue(100);
+    expect(within(pane).getByLabelText("最大サイズ (KiB)")).toHaveValue(500);
+    expect(within(pane).getByLabelText("フォルダを含む")).not.toBeChecked();
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "3");
+
+    catalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-mask-detailed" as never,
+      generation: 2 as never,
+      data: [false, false, true],
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    await waitFor(() => {
+      expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+    });
+    expect(catalogMaskMock).toHaveBeenLastCalledWith(
+      "*.cbz",
+      expect.any(Array),
+      saved.options,
+      expect.any(Number),
+    );
+
+    saveCatalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-mask-replaced" as never,
+      generation: 3 as never,
+      data: [{ ...saved, updatedAtMs: 20 }],
+    });
+    fireEvent.click(within(savedSection).getByRole("button", { name: "保存・同名置換" }));
+    await waitFor(() => expect(saveCatalogMaskMock).toHaveBeenCalledWith(
+      "large recent",
+      "*.cbz",
+      saved.options,
+      expect.any(Number),
+    ));
+
+    fireEvent.click(within(savedSection).getByRole("button", { name: "削除" }));
+    const confirmation = within(savedSection).getByRole("alertdialog", {
+      name: "保存済み条件の削除確認",
+    });
+    expect(confirmation).toHaveTextContent("large recent");
+    deleteCatalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-mask-deleted" as never,
+      generation: 4 as never,
+      data: [],
+    });
+    fireEvent.click(within(confirmation).getByRole("button", { name: "削除を確定" }));
+    await waitFor(() => expect(deleteCatalogMaskMock).toHaveBeenCalledWith(
+      "large recent",
+      expect.any(Number),
+    ));
   });
 
   it("FT-B05-002 keeps mixed file and folder result kinds visible", async () => {

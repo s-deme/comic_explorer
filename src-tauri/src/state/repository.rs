@@ -10,8 +10,9 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
+const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 
 fn default_shortcut_bindings() -> BTreeMap<String, String> {
     [
@@ -140,6 +141,19 @@ pub struct BookmarkRecord {
     pub page_key: String,
     pub natural_ordinal: u64,
     pub created_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogMaskRecord {
+    pub name: String,
+    pub expression: String,
+    pub include_folders: bool,
+    pub include_files: bool,
+    pub min_size_bytes: Option<u64>,
+    pub max_size_bytes: Option<u64>,
+    pub modified_after_ms: Option<u64>,
+    pub modified_before_ms: Option<u64>,
+    pub updated_at_ms: u64,
 }
 
 impl Default for Settings {
@@ -670,6 +684,107 @@ impl StateStore {
                  WHERE root_namespace=?1 AND item_key=?2 AND page_key=?3",
                 params![root_namespace, item_key, page_key],
             )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    pub fn list_catalog_masks(&self) -> Result<Vec<CatalogMaskRecord>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT name, expression, include_folders, include_files,
+                        min_size_bytes, max_size_bytes, modified_after_ms,
+                        modified_before_ms, updated_at_ms
+                 FROM catalog_masks
+                 ORDER BY updated_at_ms DESC, name ASC
+                 LIMIT ?1",
+            )
+            .map_err(database_error)?;
+        let values = statement
+            .query_map([MAX_SAVED_CATALOG_MASKS], |row| {
+                Ok(CatalogMaskRecord {
+                    name: row.get(0)?,
+                    expression: row.get(1)?,
+                    include_folders: row.get::<_, i64>(2)? != 0,
+                    include_files: row.get::<_, i64>(3)? != 0,
+                    min_size_bytes: optional_nonnegative_integer(row, 4)?,
+                    max_size_bytes: optional_nonnegative_integer(row, 5)?,
+                    modified_after_ms: optional_nonnegative_integer(row, 6)?,
+                    modified_before_ms: optional_nonnegative_integer(row, 7)?,
+                    updated_at_ms: row.get::<_, i64>(8)?.max(0) as u64,
+                })
+            })
+            .map_err(database_error)?;
+        values
+            .map(|value| value.map_err(database_error))
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn save_catalog_mask(&mut self, mask: &CatalogMaskRecord) -> Result<(), AppError> {
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        let exists = transaction
+            .query_row(
+                "SELECT 1 FROM catalog_masks WHERE name=?1",
+                [&mask.name],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?
+            .is_some();
+        if !exists {
+            let count = transaction
+                .query_row("SELECT COUNT(*) FROM catalog_masks", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(database_error)?;
+            if count >= MAX_SAVED_CATALOG_MASKS {
+                return Err(AppError {
+                    code: ErrorCode::InvalidRequest,
+                    message: "Saved catalog mask limit reached.".into(),
+                    target: None,
+                    retryable: false,
+                });
+            }
+        }
+        transaction
+            .execute(
+                "INSERT INTO catalog_masks(
+                   name, expression, include_folders, include_files,
+                   min_size_bytes, max_size_bytes, modified_after_ms,
+                   modified_before_ms, updated_at_ms
+                 ) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 ON CONFLICT(name) DO UPDATE SET
+                   expression=excluded.expression,
+                   include_folders=excluded.include_folders,
+                   include_files=excluded.include_files,
+                   min_size_bytes=excluded.min_size_bytes,
+                   max_size_bytes=excluded.max_size_bytes,
+                   modified_after_ms=excluded.modified_after_ms,
+                   modified_before_ms=excluded.modified_before_ms,
+                   updated_at_ms=excluded.updated_at_ms",
+                params![
+                    mask.name,
+                    mask.expression,
+                    mask.include_folders,
+                    mask.include_files,
+                    mask.min_size_bytes
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    mask.max_size_bytes
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    mask.modified_after_ms
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    mask.modified_before_ms
+                        .map(|value| i64::try_from(value).unwrap_or(i64::MAX)),
+                    i64::try_from(mask.updated_at_ms).unwrap_or(i64::MAX),
+                ],
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)
+    }
+
+    pub fn delete_catalog_mask(&self, name: &str) -> Result<(), AppError> {
+        self.connection
+            .execute("DELETE FROM catalog_masks WHERE name=?1", [name])
             .map_err(database_error)?;
         Ok(())
     }
@@ -1292,10 +1407,49 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
+    if version < 6 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS catalog_masks (
+                    name TEXT PRIMARY KEY NOT NULL CHECK(length(name) BETWEEN 1 AND 64),
+                    expression TEXT NOT NULL CHECK(length(expression) <= 1024),
+                    include_folders INTEGER NOT NULL CHECK(include_folders IN (0, 1)),
+                    include_files INTEGER NOT NULL CHECK(include_files IN (0, 1)),
+                    min_size_bytes INTEGER CHECK(min_size_bytes >= 0),
+                    max_size_bytes INTEGER CHECK(max_size_bytes >= 0),
+                    modified_after_ms INTEGER CHECK(modified_after_ms >= 0),
+                    modified_before_ms INTEGER CHECK(modified_before_ms >= 0),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE INDEX IF NOT EXISTS catalog_masks_updated
+                   ON catalog_masks(updated_at_ms DESC, name ASC);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![6, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
     connection
         .execute_batch("PRAGMA quick_check;")
         .map_err(database_error)?;
     Ok(())
+}
+
+fn optional_nonnegative_integer(
+    row: &rusqlite::Row<'_>,
+    index: usize,
+) -> rusqlite::Result<Option<u64>> {
+    Ok(row
+        .get::<_, Option<i64>>(index)?
+        .map(|value| value.max(0) as u64))
 }
 
 fn favorite_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FavoriteRecord> {
@@ -2262,6 +2416,79 @@ mod tests {
                 .unwrap_err()
                 .code,
             ErrorCode::NotFound
+        );
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_003_saved_catalog_masks_replace_reopen_delete_and_bound_count() {
+        let paths = temporary_paths("req-ley-p3-003-catalog-masks");
+        let (mut store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        for index in 0..MAX_SAVED_CATALOG_MASKS {
+            store
+                .save_catalog_mask(&CatalogMaskRecord {
+                    name: format!("mask-{index:02}"),
+                    expression: "*.cbz".into(),
+                    include_folders: false,
+                    include_files: true,
+                    min_size_bytes: Some(index as u64),
+                    max_size_bytes: None,
+                    modified_after_ms: None,
+                    modified_before_ms: None,
+                    updated_at_ms: index as u64,
+                })
+                .unwrap();
+        }
+        assert_eq!(store.list_catalog_masks().unwrap().len(), 32);
+        assert_eq!(store.list_catalog_masks().unwrap()[0].name, "mask-31");
+        assert_eq!(
+            store
+                .save_catalog_mask(&CatalogMaskRecord {
+                    name: "overflow".into(),
+                    expression: "*.pdf".into(),
+                    include_folders: true,
+                    include_files: true,
+                    min_size_bytes: None,
+                    max_size_bytes: None,
+                    modified_after_ms: None,
+                    modified_before_ms: None,
+                    updated_at_ms: 100,
+                })
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+        store
+            .save_catalog_mask(&CatalogMaskRecord {
+                name: "mask-00".into(),
+                expression: "*.pdf".into(),
+                include_folders: true,
+                include_files: false,
+                min_size_bytes: None,
+                max_size_bytes: Some(42),
+                modified_after_ms: Some(10),
+                modified_before_ms: Some(20),
+                updated_at_ms: 101,
+            })
+            .unwrap();
+        drop(store);
+
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        let restored = store.list_catalog_masks().unwrap();
+        assert_eq!(restored[0].name, "mask-00");
+        assert_eq!(restored[0].expression, "*.pdf");
+        assert_eq!(restored[0].max_size_bytes, Some(42));
+        store.delete_catalog_mask("mask-00").unwrap();
+        assert_eq!(store.list_catalog_masks().unwrap().len(), 31);
+        assert_eq!(
+            store
+                .connection()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap(),
+            SCHEMA_VERSION
         );
         drop(store);
         fs::remove_dir_all(paths.root).unwrap();

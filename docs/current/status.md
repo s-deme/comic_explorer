@@ -83,6 +83,8 @@ P3-AではLEY-SEARCH-003をPublishedとした。従来の空白を含むplain部
 
 P3-BではLEY-CATALOG-006をPublishedとした。既存のTypeScript regex maskを撤去し、P3-Aと同じRust parser・matcherへ現在catalogのbasenameを一括送信する。semicolon最外OR互換、draft/適用分離、invalid時の最終valid表示保持、100,000件・basename 1024文字上限、stale generation破棄を接続した。synthetic 10,000 basenameは84.896ms、frontend 415件、Python 59件、Rust 187+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2 IPCの100,000件serialization/working set、最大basename、worst-case wildcardは未測定として残す。
 
+P3-CではLEY-CATALOG-007をPublishedとした。folder/file、最小/最大size、local calendar開始/終了日を同じRust batch評価へ追加し、欠落metadata・範囲逆転・両種別無効を拒否する。条件一式はapp-local SQLite schema v6へ最大32件、同名atomic置換、更新順list、確認後削除として保存し、選択時はdraftだけを復元する。synthetic 10,000複合評価は104.382ms、frontend 417件、Python 59件、Rust 189+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2のtimezone/DST別日付、100,000件IPC/working set、SQLite同時利用は未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

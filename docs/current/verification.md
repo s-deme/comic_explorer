@@ -316,6 +316,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | synthetic 10,000 basenameのRust batch評価84.896ms（gate 2秒未満）。100,000件・mask/basename 1024文字・128 token・16階層を自動検証。release WebView2 IPC、100,000件のserialization/working set、最大basename、worst-case wildcardは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2での入力、Enter/適用/解除、navigation中のstale応答、IME・keyboard layout、100,000件catalogは未測定。 |
 
+## Leeyes P3-C mask詳細条件・保存
+
+対象はLEY-CATALOG-007の1件。名前式と種別・size・local calendar日付を同じRust batchでAND評価し、名前付き条件はapp-local SQLite schema v6へ保存する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust / SQLite | PASS | 複合評価・範囲拒否1件、32件上限・同名置換・更新順・再open・削除・schema v6確認1件、FAIL 0。欠落metadata、終了日半開境界、invalid name/expression/optionsを含む。 |
+| Focused frontend / typecheck | PASS | AppのREQ-LEY-P3-002/003 2件とclient contract 2件、FAIL 0。詳細draft、保存条件復元、適用、同名置換、対象名付き削除確認、Rust payloadを含む。`tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | frontend 31 files / 417件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 531.92kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 189件とshutdown process 1件、FAIL 0。schema v1〜v6移行、SQLite再open、複合mask、既存search・catalog・viewer・file操作境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは377.157秒で全12 stageがexit 0。Rust canonical 153.135秒、release executable 78.842秒、GUI権限付きshortcut product回帰14.952秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | 名前式・種別・size・日付を組み合わせたsynthetic 10,000項目をdebug testで104.382ms（gate 2秒未満）。100,000件batch、保存32件、名前64文字を制限。release WebView2の100,000件serialization/working setとSQLite同時利用は未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2でのlocal timezone/DST別日付、再起動後復元、32件管理、保存・置換・削除、100,000件catalogは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

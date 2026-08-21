@@ -599,15 +599,70 @@ export async function searchLibrary(
   });
 }
 
+export interface CatalogMaskCandidate {
+  basename: string;
+  kind: ItemKind;
+  byteSize?: number;
+  modifiedMs?: number;
+}
+
+export interface CatalogMaskOptions {
+  includeFolders: boolean;
+  includeFiles: boolean;
+  minSizeBytes?: number;
+  maxSizeBytes?: number;
+  modifiedAfterMs?: number;
+  modifiedBeforeMs?: number;
+}
+
+export interface SavedCatalogMask {
+  name: string;
+  expression: string;
+  options: CatalogMaskOptions;
+  updatedAtMs: number;
+}
+
 export async function evaluateCatalogMask(
   mask: string,
-  basenames: string[],
+  candidates: CatalogMaskCandidate[],
+  options: CatalogMaskOptions,
   generation: number,
 ): Promise<ApiResponse<boolean[]>> {
   return invoke("evaluate_catalog_mask", {
     context: context(generation),
     mask,
-    basenames,
+    candidates,
+    options,
+  });
+}
+
+export async function listCatalogMasks(
+  generation: number,
+): Promise<ApiResponse<SavedCatalogMask[]>> {
+  return invoke("list_catalog_masks", { context: context(generation) });
+}
+
+export async function saveCatalogMask(
+  name: string,
+  expression: string,
+  options: CatalogMaskOptions,
+  generation: number,
+): Promise<ApiResponse<SavedCatalogMask[]>> {
+  return invoke("save_catalog_mask", {
+    context: context(generation),
+    name,
+    expression,
+    options,
+  });
+}
+
+export async function deleteCatalogMask(
+  name: string,
+  generation: number,
+): Promise<ApiResponse<SavedCatalogMask[]>> {
+  return invoke("delete_catalog_mask", {
+    context: context(generation),
+    name,
   });
 }
 

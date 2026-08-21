@@ -37,6 +37,9 @@ import {
   setItemRating,
   searchLibrary,
   evaluateCatalogMask,
+  listCatalogMasks,
+  saveCatalogMask,
+  deleteCatalogMask,
   diagnoseLibrary,
   cancelLibraryDiagnostics,
   takeRecoveryNotice,
@@ -65,6 +68,8 @@ import {
   type FavoriteEntry,
   type FileClipboardStatus,
   type FileOperationResult,
+  type CatalogMaskOptions,
+  type SavedCatalogMask,
   type ItemMetadata,
   type TagEntry,
   type ReadingHistoryEntry,
@@ -280,6 +285,129 @@ type SearchState =
   | { status: "ready"; query: string; results: CatalogEntry[] }
   | { status: "error"; query: string; message: string };
 
+interface CatalogMaskOptionsDraft {
+  includeFolders: boolean;
+  includeFiles: boolean;
+  minSizeKiB: string;
+  maxSizeKiB: string;
+  dateStart: string;
+  dateEnd: string;
+}
+
+const DEFAULT_CATALOG_MASK_OPTIONS: CatalogMaskOptions = {
+  includeFolders: true,
+  includeFiles: true,
+};
+
+function defaultCatalogMaskOptionsDraft(): CatalogMaskOptionsDraft {
+  return {
+    includeFolders: true,
+    includeFiles: true,
+    minSizeKiB: "",
+    maxSizeKiB: "",
+    dateStart: "",
+    dateEnd: "",
+  };
+}
+
+function localDateStart(value: string): number | undefined {
+  if (value === "") return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return Number.NaN;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (
+    date.getFullYear() !== Number(match[1])
+    || date.getMonth() !== Number(match[2]) - 1
+    || date.getDate() !== Number(match[3])
+  ) return Number.NaN;
+  return date.getTime();
+}
+
+function localDateInput(value: number): string {
+  const date = new Date(value);
+  const year = date.getFullYear().toString().padStart(4, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function catalogMaskOptionsFromDraft(
+  draft: CatalogMaskOptionsDraft,
+): { options: CatalogMaskOptions } | { error: string } {
+  if (!draft.includeFolders && !draft.includeFiles) {
+    return { error: "フォルダまたはファイルを1つ以上含めてください。" };
+  }
+  const sizeValue = (value: string): number | undefined => {
+    if (value.trim() === "") return undefined;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) return Number.NaN;
+    const bytes = parsed * 1024;
+    return Number.isSafeInteger(bytes) ? bytes : Number.NaN;
+  };
+  const minSizeBytes = sizeValue(draft.minSizeKiB);
+  const maxSizeBytes = sizeValue(draft.maxSizeKiB);
+  if (Number.isNaN(minSizeBytes) || Number.isNaN(maxSizeBytes)) {
+    return { error: "サイズは0以上の整数KiBで指定してください。" };
+  }
+  if (minSizeBytes !== undefined && maxSizeBytes !== undefined && minSizeBytes > maxSizeBytes) {
+    return { error: "最小サイズは最大サイズ以下にしてください。" };
+  }
+  const modifiedAfterMs = localDateStart(draft.dateStart);
+  const endStart = localDateStart(draft.dateEnd);
+  if (Number.isNaN(modifiedAfterMs) || Number.isNaN(endStart)) {
+    return { error: "更新日は有効な日付で指定してください。" };
+  }
+  let modifiedBeforeMs: number | undefined;
+  if (endStart !== undefined) {
+    const next = new Date(endStart);
+    next.setDate(next.getDate() + 1);
+    modifiedBeforeMs = next.getTime();
+  }
+  if (
+    modifiedAfterMs !== undefined
+    && modifiedBeforeMs !== undefined
+    && modifiedAfterMs >= modifiedBeforeMs
+  ) return { error: "更新日の開始は終了以前にしてください。" };
+  return {
+    options: {
+      includeFolders: draft.includeFolders,
+      includeFiles: draft.includeFiles,
+      ...(minSizeBytes === undefined ? {} : { minSizeBytes }),
+      ...(maxSizeBytes === undefined ? {} : { maxSizeBytes }),
+      ...(modifiedAfterMs === undefined ? {} : { modifiedAfterMs }),
+      ...(modifiedBeforeMs === undefined ? {} : { modifiedBeforeMs }),
+    },
+  };
+}
+
+function catalogMaskOptionsDraftFromSaved(mask: SavedCatalogMask): CatalogMaskOptionsDraft {
+  return {
+    includeFolders: mask.options.includeFolders,
+    includeFiles: mask.options.includeFiles,
+    minSizeKiB: mask.options.minSizeBytes === undefined
+      ? ""
+      : (mask.options.minSizeBytes / 1024).toString(),
+    maxSizeKiB: mask.options.maxSizeBytes === undefined
+      ? ""
+      : (mask.options.maxSizeBytes / 1024).toString(),
+    dateStart: mask.options.modifiedAfterMs === undefined
+      ? ""
+      : localDateInput(mask.options.modifiedAfterMs),
+    dateEnd: mask.options.modifiedBeforeMs === undefined
+      ? ""
+      : localDateInput(mask.options.modifiedBeforeMs - 1),
+  };
+}
+
+function catalogMaskOptionsAreDefault(options: CatalogMaskOptions): boolean {
+  return options.includeFolders
+    && options.includeFiles
+    && options.minSizeBytes === undefined
+    && options.maxSizeBytes === undefined
+    && options.modifiedAfterMs === undefined
+    && options.modifiedBeforeMs === undefined;
+}
+
 interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
   alwaysOnTopAdapter?: AlwaysOnTopAdapter;
@@ -395,6 +523,7 @@ export function App({
   const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
   const fileMaskGeneration = useRef(0);
+  const savedCatalogMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -452,10 +581,22 @@ export function App({
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [fileMaskDraft, setFileMaskDraft] = useState("");
   const [fileMask, setFileMask] = useState("");
+  const [fileMaskOptionsDraft, setFileMaskOptionsDraft] = useState<CatalogMaskOptionsDraft>(
+    defaultCatalogMaskOptionsDraft,
+  );
+  const [fileMaskOptions, setFileMaskOptions] = useState<CatalogMaskOptions>({
+    ...DEFAULT_CATALOG_MASK_OPTIONS,
+  });
   const [fileMaskPaths, setFileMaskPaths] = useState<Set<string> | null>(null);
   const [fileMaskBusy, setFileMaskBusy] = useState(false);
   const [fileMaskError, setFileMaskError] = useState<string | null>(null);
   const fileMaskEntries = useRef<CatalogEntry[] | null>(null);
+  const [savedCatalogMasks, setSavedCatalogMasks] = useState<SavedCatalogMask[]>([]);
+  const [savedCatalogMaskName, setSavedCatalogMaskName] = useState("");
+  const [selectedSavedCatalogMask, setSelectedSavedCatalogMask] = useState("");
+  const [savedCatalogMaskBusy, setSavedCatalogMaskBusy] = useState(false);
+  const [savedCatalogMaskNotice, setSavedCatalogMaskNotice] = useState<string | null>(null);
+  const [pendingCatalogMaskDelete, setPendingCatalogMaskDelete] = useState<string | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [catalogContextMenu, setCatalogContextMenu] =
     useState<CatalogContextMenuState | null>(null);
@@ -1106,11 +1247,12 @@ export function App({
       ),
     [entries, sortDescending, sortField],
   );
+  const fileMaskActive = fileMask !== "" || !catalogMaskOptionsAreDefault(fileMaskOptions);
   const visibleEntries = useMemo(
-    () => fileMask === "" || fileMaskPaths === null
+    () => !fileMaskActive || fileMaskPaths === null
       ? sortedEntries
       : sortedEntries.filter((entry) => fileMaskPaths.has(entry.relativePath)),
-    [fileMask, fileMaskPaths, sortedEntries],
+    [fileMaskActive, fileMaskPaths, sortedEntries],
   );
   const visibleEntryPaths = useMemo(
     () => new Set<string>(visibleEntries.map((entry) => entry.relativePath)),
@@ -1120,14 +1262,18 @@ export function App({
   useEffect(() => {
     if (fileMaskEntries.current === entries) return;
     fileMaskGeneration.current += 1;
-    if (fileMask === "") {
+    if (!fileMaskActive) {
       fileMaskEntries.current = entries;
       setFileMaskBusy(false);
       setFileMaskPaths(null);
       return;
     }
-    void evaluateFileMask(fileMask, entries, false);
-  }, [entries, fileMask]);
+    void evaluateFileMask(fileMask, entries, fileMaskOptions, false);
+  }, [entries, fileMask, fileMaskActive, fileMaskOptions]);
+
+  useEffect(() => {
+    void refreshSavedCatalogMasks();
+  }, []);
 
   useEffect(() => {
     const next = selectedPaths.filter((path) => visibleEntryPaths.has(path));
@@ -2040,16 +2186,20 @@ export function App({
   async function evaluateFileMask(
     mask: string,
     candidates: CatalogEntry[],
+    options: CatalogMaskOptions,
     activate: boolean,
   ) {
     const requestGeneration = ++fileMaskGeneration.current;
-    const basenames = candidates.map((entry) =>
-      entry.relativePath.split("/").at(-1) ?? entry.relativePath
-    );
+    const maskCandidates = candidates.map((entry) => ({
+      basename: entry.relativePath.split("/").at(-1) ?? entry.relativePath,
+      kind: entry.kind,
+      ...(entry.byteSize === undefined ? {} : { byteSize: entry.byteSize }),
+      ...(entry.modifiedMs === undefined ? {} : { modifiedMs: entry.modifiedMs }),
+    }));
     setFileMaskBusy(true);
     setFileMaskError(null);
     try {
-      const response = await evaluateCatalogMask(mask, basenames, requestGeneration);
+      const response = await evaluateCatalogMask(mask, maskCandidates, options, requestGeneration);
       if (requestGeneration !== fileMaskGeneration.current) return;
       if (response.status === "ok" && response.data.length === candidates.length) {
         setFileMaskPaths(new Set(
@@ -2058,7 +2208,10 @@ export function App({
             .map((entry) => entry.relativePath),
         ));
         fileMaskEntries.current = candidates;
-        if (activate) setFileMask(mask);
+        if (activate) {
+          setFileMask(mask);
+          setFileMaskOptions(options);
+        }
       } else if (response.status === "error") {
         setFileMaskError("ファイルマスク式を確認してください。例: (*.cbz OR *.pdf) AND NOT sample*");
       } else if (response.status === "ok") {
@@ -2077,11 +2230,16 @@ export function App({
 
   function applyFileMask() {
     const mask = fileMaskDraft.trim();
-    if (mask === "") {
+    const parsed = catalogMaskOptionsFromDraft(fileMaskOptionsDraft);
+    if ("error" in parsed) {
+      setFileMaskError(parsed.error);
+      return;
+    }
+    if (mask === "" && catalogMaskOptionsAreDefault(parsed.options)) {
       clearFileMask();
       return;
     }
-    void evaluateFileMask(mask, entries, true);
+    void evaluateFileMask(mask, entries, parsed.options, true);
   }
 
   function clearFileMask() {
@@ -2089,9 +2247,98 @@ export function App({
     fileMaskEntries.current = entries;
     setFileMaskDraft("");
     setFileMask("");
+    setFileMaskOptionsDraft(defaultCatalogMaskOptionsDraft());
+    setFileMaskOptions({ ...DEFAULT_CATALOG_MASK_OPTIONS });
     setFileMaskPaths(null);
     setFileMaskBusy(false);
     setFileMaskError(null);
+  }
+
+  async function refreshSavedCatalogMasks() {
+    const requestGeneration = ++savedCatalogMaskGeneration.current;
+    try {
+      const response = await listCatalogMasks(requestGeneration);
+      if (requestGeneration !== savedCatalogMaskGeneration.current) return;
+      if (response.status === "ok") setSavedCatalogMasks(response.data);
+      else if (response.status === "error") setSavedCatalogMaskNotice(presentError(response.error));
+    } catch {
+      if (requestGeneration === savedCatalogMaskGeneration.current) {
+        setSavedCatalogMaskNotice(presentUnexpectedError());
+      }
+    }
+  }
+
+  function restoreSavedCatalogMask(name: string) {
+    setSelectedSavedCatalogMask(name);
+    setPendingCatalogMaskDelete(null);
+    const saved = savedCatalogMasks.find((candidate) => candidate.name === name);
+    if (saved === undefined) return;
+    setSavedCatalogMaskName(saved.name);
+    setFileMaskDraft(saved.expression);
+    setFileMaskOptionsDraft(catalogMaskOptionsDraftFromSaved(saved));
+    setSavedCatalogMaskNotice("保存済み条件を下書きへ復元しました。適用するまで表示は変わりません。");
+  }
+
+  async function saveCurrentCatalogMask() {
+    const parsed = catalogMaskOptionsFromDraft(fileMaskOptionsDraft);
+    if ("error" in parsed) {
+      setSavedCatalogMaskNotice(parsed.error);
+      return;
+    }
+    const requestGeneration = ++savedCatalogMaskGeneration.current;
+    setSavedCatalogMaskBusy(true);
+    setSavedCatalogMaskNotice(null);
+    try {
+      const response = await saveCatalogMask(
+        savedCatalogMaskName,
+        fileMaskDraft.trim(),
+        parsed.options,
+        requestGeneration,
+      );
+      if (requestGeneration !== savedCatalogMaskGeneration.current) return;
+      if (response.status === "ok") {
+        setSavedCatalogMasks(response.data);
+        const savedName = response.data.find((mask) =>
+          mask.name === savedCatalogMaskName.trim()
+        )?.name ?? savedCatalogMaskName.trim();
+        setSelectedSavedCatalogMask(savedName);
+        setSavedCatalogMaskName(savedName);
+        setSavedCatalogMaskNotice("名前付きマスクを保存しました。同名の場合は置き換えました。");
+      } else if (response.status === "error") {
+        setSavedCatalogMaskNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === savedCatalogMaskGeneration.current) {
+        setSavedCatalogMaskNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === savedCatalogMaskGeneration.current) setSavedCatalogMaskBusy(false);
+    }
+  }
+
+  async function deleteSavedCatalogMask(name: string) {
+    const requestGeneration = ++savedCatalogMaskGeneration.current;
+    setSavedCatalogMaskBusy(true);
+    setSavedCatalogMaskNotice(null);
+    try {
+      const response = await deleteCatalogMask(name, requestGeneration);
+      if (requestGeneration !== savedCatalogMaskGeneration.current) return;
+      if (response.status === "ok") {
+        setSavedCatalogMasks(response.data);
+        setSelectedSavedCatalogMask("");
+        setSavedCatalogMaskName("");
+        setPendingCatalogMaskDelete(null);
+        setSavedCatalogMaskNotice(`「${name}」を削除しました。`);
+      } else if (response.status === "error") {
+        setSavedCatalogMaskNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === savedCatalogMaskGeneration.current) {
+        setSavedCatalogMaskNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === savedCatalogMaskGeneration.current) setSavedCatalogMaskBusy(false);
+    }
   }
 
   async function refreshFavorites() {
@@ -4814,6 +5061,79 @@ export function App({
                   <p id="file-mask-syntax" className="search-syntax-hint">
                     検索式と同じ構文です。セミコロンはORとして使用できます。
                   </p>
+                  <fieldset className="catalog-mask-details">
+                    <legend>詳細条件</legend>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={fileMaskOptionsDraft.includeFolders}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          includeFolders: event.target.checked,
+                        }))}
+                      />
+                      フォルダを含む
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={fileMaskOptionsDraft.includeFiles}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          includeFiles: event.target.checked,
+                        }))}
+                      />
+                      ファイルを含む
+                    </label>
+                    <label>
+                      最小サイズ (KiB)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={fileMaskOptionsDraft.minSizeKiB}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          minSizeKiB: event.target.value,
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      最大サイズ (KiB)
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={fileMaskOptionsDraft.maxSizeKiB}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          maxSizeKiB: event.target.value,
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      更新日（開始）
+                      <input
+                        type="date"
+                        value={fileMaskOptionsDraft.dateStart}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          dateStart: event.target.value,
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      更新日（終了）
+                      <input
+                        type="date"
+                        value={fileMaskOptionsDraft.dateEnd}
+                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
+                          ...current,
+                          dateEnd: event.target.value,
+                        }))}
+                      />
+                    </label>
+                  </fieldset>
                   <div className="search-pane-actions">
                     <button
                       type="submit"
@@ -4834,6 +5154,59 @@ export function App({
                   </div>
                   {fileMaskBusy && <p role="status">ファイルマスクを評価しています…</p>}
                   {fileMaskError !== null && <p role="alert">{fileMaskError}</p>}
+                  <section className="saved-catalog-masks" aria-label="保存済みファイルマスク">
+                    <label htmlFor="saved-catalog-mask">保存済み条件</label>
+                    <select
+                      id="saved-catalog-mask"
+                      value={selectedSavedCatalogMask}
+                      onChange={(event) => restoreSavedCatalogMask(event.target.value)}
+                    >
+                      <option value="">選択してください</option>
+                      {savedCatalogMasks.map((mask) => (
+                        <option key={mask.name} value={mask.name}>{mask.name}</option>
+                      ))}
+                    </select>
+                    <label htmlFor="saved-catalog-mask-name">条件名</label>
+                    <input
+                      id="saved-catalog-mask-name"
+                      value={savedCatalogMaskName}
+                      maxLength={64}
+                      onChange={(event) => setSavedCatalogMaskName(event.target.value)}
+                    />
+                    <div className="search-pane-actions">
+                      <button
+                        type="button"
+                        disabled={savedCatalogMaskBusy}
+                        onClick={() => void saveCurrentCatalogMask()}
+                      >
+                        保存・同名置換
+                      </button>
+                      {selectedSavedCatalogMask !== "" && (
+                        <button
+                          type="button"
+                          disabled={savedCatalogMaskBusy}
+                          onClick={() => setPendingCatalogMaskDelete(selectedSavedCatalogMask)}
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
+                    {pendingCatalogMaskDelete !== null && (
+                      <div role="alertdialog" aria-label="保存済み条件の削除確認">
+                        <p>「{pendingCatalogMaskDelete}」を削除しますか？</p>
+                        <button
+                          type="button"
+                          onClick={() => void deleteSavedCatalogMask(pendingCatalogMaskDelete)}
+                        >
+                          削除を確定
+                        </button>
+                        <button type="button" onClick={() => setPendingCatalogMaskDelete(null)}>
+                          キャンセル
+                        </button>
+                      </div>
+                    )}
+                    {savedCatalogMaskNotice !== null && <p role="status">{savedCatalogMaskNotice}</p>}
+                  </section>
                 </form>
                 <section className="search-options" aria-label="検索オプション">
                   <h3>オプション</h3>

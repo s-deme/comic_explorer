@@ -294,6 +294,23 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   justify-content: flex-end;
   gap: 6px;
 }
+.catalog-mask-details,
+.saved-catalog-masks {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 7px;
+  border: 1px solid #d7dce2;
+}
+.catalog-mask-details legend { padding: 0 3px; font-size: .78rem; font-weight: 600; }
+.catalog-mask-details > label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px; }
+.catalog-mask-details > label:has(input[type="checkbox"]) { grid-template-columns: auto 1fr; }
+.catalog-mask-details input[type="checkbox"] { width: auto; min-height: auto; }
+.saved-catalog-masks { font-size: .78rem; }
+.saved-catalog-masks select { min-width: 0; min-height: 26px; }
+.saved-catalog-masks [role="alertdialog"] { padding: 6px; border: 1px solid #b45309; background: #fff7ed; }
+.saved-catalog-masks [role="alertdialog"] p { margin: 0 0 6px; overflow-wrap: anywhere; }
 .search-options {
   display: grid;
   gap: 6px;
