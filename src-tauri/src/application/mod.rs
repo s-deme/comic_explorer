@@ -8,7 +8,7 @@ mod search_query;
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,6 +44,7 @@ use search_query::{
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
+    search_sources: Mutex<BTreeMap<String, PathBuf>>,
     navigation: Mutex<NavigationCoordinator>,
     diagnostics: Mutex<NavigationCoordinator>,
     viewer: Arc<Mutex<NavigationCoordinator>>,
@@ -78,6 +79,8 @@ pub struct SearchOptions {
     modified_after_ms: Option<u64>,
     #[serde(default)]
     modified_before_ms: Option<u64>,
+    #[serde(default)]
+    source_roots: Vec<String>,
 }
 
 const fn default_search_subfolders() -> bool {
@@ -92,6 +95,10 @@ const fn default_search_files() -> bool {
     true
 }
 
+fn search_source_key(path: &Path) -> String {
+    library_root::display_path(path).to_lowercase()
+}
+
 impl Default for SearchOptions {
     fn default() -> Self {
         Self {
@@ -103,6 +110,7 @@ impl Default for SearchOptions {
             max_size_bytes: None,
             modified_after_ms: None,
             modified_before_ms: None,
+            source_roots: Vec::new(),
         }
     }
 }
@@ -155,6 +163,14 @@ pub struct SavedCatalogMask {
     updated_at_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultEntry {
+    #[serde(flatten)]
+    entry: CatalogEntry,
+    source_root: String,
+}
+
 impl Default for AppState {
     fn default() -> Self {
         let (store, library_root, thumbnails, recovered) = AppPaths::discover()
@@ -173,8 +189,17 @@ impl Default for AppState {
             .as_ref()
             .map(ThumbnailPipeline::pins)
             .unwrap_or_default();
+        let search_sources = library_root
+            .as_ref()
+            .map(|root| {
+                [(search_source_key(root), root.clone())]
+                    .into_iter()
+                    .collect()
+            })
+            .unwrap_or_default();
         Self {
             library_root: Mutex::new(library_root),
+            search_sources: Mutex::new(search_sources),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -2877,6 +2902,53 @@ pub async fn pick_library_root(
 }
 
 #[tauri::command]
+pub async fn pick_search_source(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Option<LibraryRoot>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    #[cfg(target_os = "windows")]
+    let picked = tauri::async_runtime::spawn_blocking(library_root::pick_folder)
+        .await
+        .map_err(|error| format!("search source picker worker failed: {error}"))?;
+    #[cfg(not(target_os = "windows"))]
+    let picked: Result<Option<PathBuf>, AppError> = Err(request_error(
+        ErrorCode::UnsupportedFormat,
+        "検索場所の選択画面はWindows版で利用できます。",
+    ));
+    let picked = match picked {
+        Ok(Some(path)) => path,
+        Ok(None) => {
+            return Ok(Response::Ok {
+                request_id: context.request_id,
+                generation: context.generation,
+                data: None,
+            });
+        }
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let canonical =
+        match tauri::async_runtime::spawn_blocking(move || validate_library_root(&picked)).await {
+            Ok(Ok(path)) => path,
+            Ok(Err(error)) => return Ok(error_response(&context, error)),
+            Err(error) => return Err(format!("search source validation worker failed: {error}")),
+        };
+    let absolute_path = library_root::display_path(&canonical);
+    state
+        .search_sources
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .insert(search_source_key(&canonical), canonical);
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: Some(LibraryRoot { absolute_path }),
+    })
+}
+
+#[tauri::command]
 pub async fn pick_library_file(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
@@ -2928,6 +3000,11 @@ fn save_library_root(
     canonical: PathBuf,
 ) -> Result<Response<LibraryRoot>, String> {
     *state.library_root.lock().map_err(|_| "state poisoned")? = Some(canonical.clone());
+    state
+        .search_sources
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .insert(search_source_key(&canonical), canonical.clone());
     if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
         let mut settings = store.load_settings().map_err(|error| error.message)?;
         settings.library_root = Some(canonical.clone());
@@ -3016,7 +3093,7 @@ pub async fn search_library(
     context: RequestContext,
     query: String,
     options: Option<SearchOptions>,
-) -> Result<Response<Vec<CatalogEntry>>, String> {
+) -> Result<Response<Vec<SearchResultEntry>>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
@@ -3034,15 +3111,21 @@ pub async fn search_library(
             ));
         }
     };
-    let options = options.unwrap_or_default();
+    let mut options = options.unwrap_or_default();
+    let sources = match resolve_search_sources(&state, &root, &options.source_roots) {
+        Ok(sources) => sources,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if sources.len() > 1 {
+        options.fixed_location = None;
+    }
     let cancellation = state
         .navigation
         .lock()
         .map_err(|_| "state poisoned")?
         .begin(context.generation);
-    let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        search_library_with_options_port(&worker_root, &query, &options, &cancellation)
+        search_library_sources_port(&sources, &query, &options, &cancellation)
     })
     .await
     .map_err(|error| format!("search worker failed: {error}"))?;
@@ -3771,6 +3854,119 @@ fn enumerate_folder_port(
 
 fn reset_thumbnail_pins_for_navigation(pins: &ThumbnailPins) -> Result<(), AppError> {
     pins.clear()
+}
+
+const MAX_SEARCH_SOURCES: usize = 8;
+const MAX_CROSS_SOURCE_RESULTS: usize = 50_000;
+
+fn resolve_search_sources(
+    state: &AppState,
+    current_root: &Path,
+    requested: &[String],
+) -> Result<Vec<PathBuf>, AppError> {
+    if requested.is_empty() {
+        return Ok(vec![current_root.to_owned()]);
+    }
+    if requested.len() > MAX_SEARCH_SOURCES {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Search accepts at most 8 sources.",
+        ));
+    }
+    let approved = state
+        .search_sources
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Search source state is unavailable."))?;
+    resolve_approved_search_sources(current_root, requested, &approved)
+}
+
+fn resolve_approved_search_sources(
+    current_root: &Path,
+    requested: &[String],
+    approved: &BTreeMap<String, PathBuf>,
+) -> Result<Vec<PathBuf>, AppError> {
+    if requested.is_empty() {
+        return Ok(vec![current_root.to_owned()]);
+    }
+    if requested.len() > MAX_SEARCH_SOURCES {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Search accepts at most 8 sources.",
+        ));
+    }
+    let mut seen = HashSet::new();
+    let mut sources = Vec::new();
+    for requested_root in requested {
+        let key = search_source_key(Path::new(requested_root));
+        let Some(source) = approved.get(&key) else {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                "Search source was not approved by the folder picker.",
+            ));
+        };
+        if seen.insert(key) {
+            sources.push(source.clone());
+        }
+    }
+    if sources.is_empty() {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Search requires at least one source.",
+        ));
+    }
+    Ok(sources)
+}
+
+fn append_cross_source_result(
+    combined: &mut Vec<SearchResultEntry>,
+    seen: &mut HashSet<String>,
+    source: &Path,
+    source_root: &str,
+    entry: CatalogEntry,
+) -> Result<(), AppError> {
+    let item_path = source.join(entry.relative_path.as_str());
+    let canonical_item = item_path.canonicalize().unwrap_or(item_path);
+    let key = library_root::display_path(&canonical_item).to_lowercase();
+    if !seen.insert(key) {
+        return Ok(());
+    }
+    if combined.len() >= MAX_CROSS_SOURCE_RESULTS {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Search result limit exceeded across sources.",
+        ));
+    }
+    combined.push(SearchResultEntry {
+        entry,
+        source_root: source_root.to_owned(),
+    });
+    Ok(())
+}
+
+fn search_library_sources_port(
+    sources: &[PathBuf],
+    query: &str,
+    options: &SearchOptions,
+    cancellation: &CancellationToken,
+) -> Result<Vec<SearchResultEntry>, AppError> {
+    if sources.is_empty() || sources.len() > MAX_SEARCH_SOURCES {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Search source count is invalid.",
+        ));
+    }
+    let mut seen = HashSet::new();
+    let mut combined = Vec::new();
+    for source in sources {
+        if cancellation.is_cancelled() {
+            return Err(AppError::cancelled());
+        }
+        let source_root = library_root::display_path(source);
+        for entry in search_library_with_options_port(source, query, options, cancellation)? {
+            append_cross_source_result(&mut combined, &mut seen, source, &source_root, entry)?;
+        }
+    }
+    Ok(combined)
 }
 
 fn search_library_port(
@@ -5337,6 +5533,7 @@ mod shutdown_tests {
     fn shutdown_is_idempotent_cancels_work_revokes_media_and_closes_store() {
         let state = AppState {
             library_root: Mutex::new(None),
+            search_sources: Mutex::new(BTreeMap::new()),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -5383,6 +5580,7 @@ mod shutdown_tests {
     fn recovery_notice_is_consumed_once_without_exposing_internal_details() {
         let state = AppState {
             library_root: Mutex::new(None),
+            search_sources: Mutex::new(BTreeMap::new()),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
@@ -5708,6 +5906,133 @@ mod shutdown_tests {
             .unwrap_err();
         assert_eq!(invalid.code, ErrorCode::InvalidRequest);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_004_cross_source_search_deduplicates_overlap_and_preserves_source_order() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-search-sources-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let first = root.join("first");
+        let nested = first.join("Nested");
+        let second = root.join("second");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        std::fs::write(first.join("Volume Root.cbz"), b"root").unwrap();
+        std::fs::write(nested.join("Volume Nested.cbz"), b"nested").unwrap();
+        std::fs::write(second.join("Volume Nested.cbz"), b"other").unwrap();
+
+        let results = search_library_sources_port(
+            &[first.clone(), nested, second.clone()],
+            "volume",
+            &SearchOptions::default(),
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].source_root, library_root::display_path(&first));
+        assert_eq!(results[1].source_root, library_root::display_path(&first));
+        assert_eq!(results[2].source_root, library_root::display_path(&second));
+        assert_eq!(
+            results[0].entry.relative_path.as_str(),
+            "Nested/Volume Nested.cbz"
+        );
+        assert_eq!(results[1].entry.relative_path.as_str(), "Volume Root.cbz");
+        assert_eq!(results[2].entry.relative_path.as_str(), "Volume Nested.cbz");
+
+        let missing = root.join("missing");
+        assert_eq!(
+            search_library_sources_port(
+                &[missing],
+                "volume",
+                &SearchOptions::default(),
+                &CancellationToken::new(),
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::NotFound
+        );
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        assert_eq!(
+            search_library_sources_port(&[first], "volume", &SearchOptions::default(), &cancelled,)
+                .unwrap_err()
+                .code,
+            ErrorCode::Cancelled
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_004_source_allowlist_and_total_result_limit_are_enforced() {
+        let current = PathBuf::from(r"C:\Library");
+        let other = PathBuf::from(r"D:\Comics");
+        let approved = [
+            (search_source_key(&current), current.clone()),
+            (search_source_key(&other), other.clone()),
+        ]
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+        let resolved = resolve_approved_search_sources(
+            &current,
+            &[
+                r"C:\Library".into(),
+                r"d:\comics".into(),
+                r"D:\Comics".into(),
+            ],
+            &approved,
+        )
+        .unwrap();
+        assert_eq!(resolved, [current.clone(), other.clone()]);
+        assert_eq!(
+            resolve_approved_search_sources(&current, &[r"E:\Unapproved".into()], &approved,)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
+        assert_eq!(
+            resolve_approved_search_sources(
+                &current,
+                &(0..=MAX_SEARCH_SOURCES)
+                    .map(|index| format!(r"C:\source-{index}"))
+                    .collect::<Vec<_>>(),
+                &approved,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::ResourceLimit
+        );
+
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-LIBRARY-001")
+            .canonicalize()
+            .unwrap();
+        let entry = search_library_port(&fixture_root, "volume", &CancellationToken::new())
+            .unwrap()
+            .into_iter()
+            .next()
+            .expect("fixture search result");
+        let source_root = library_root::display_path(&fixture_root);
+        let seeded = SearchResultEntry {
+            entry: entry.clone(),
+            source_root: source_root.clone(),
+        };
+        let mut combined = vec![seeded; MAX_CROSS_SOURCE_RESULTS];
+        let mut seen = HashSet::new();
+        assert_eq!(
+            append_cross_source_result(
+                &mut combined,
+                &mut seen,
+                &fixture_root,
+                &source_root,
+                entry,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::ResourceLimit
+        );
     }
 
     #[test]

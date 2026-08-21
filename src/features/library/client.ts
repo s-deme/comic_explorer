@@ -65,6 +65,12 @@ export async function pickLibraryRoot(
   });
 }
 
+export async function pickSearchSource(
+  generation: number,
+): Promise<ApiResponse<{ absolutePath: string } | null>> {
+  return invoke("pick_search_source", { context: context(generation) });
+}
+
 export async function pickLibraryFile(
   generation: number,
 ): Promise<ApiResponse<{ absolutePath: string } | null>> {
@@ -591,13 +597,15 @@ export async function searchLibrary(
   query: string,
   generation: number,
   options: SearchRequestOptions,
-): Promise<ApiResponse<CatalogEntry[]>> {
+): Promise<ApiResponse<SearchResultEntry[]>> {
   return invoke("search_library", {
     context: context(generation),
     query,
     options,
   });
 }
+
+export type SearchResultEntry = CatalogEntry & { sourceRoot?: string };
 
 export interface CatalogMaskCandidate {
   basename: string;

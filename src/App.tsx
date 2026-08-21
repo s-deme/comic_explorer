@@ -20,6 +20,7 @@ import {
   clearReadingHistory,
   openComic,
   pickLibraryRoot,
+  pickSearchSource,
   pickLibraryFile,
   registerLibraryRoot,
   restoreLibraryRoot,
@@ -70,6 +71,7 @@ import {
   type FileOperationResult,
   type CatalogMaskOptions,
   type SavedCatalogMask,
+  type SearchResultEntry,
   type ItemMetadata,
   type TagEntry,
   type ReadingHistoryEntry,
@@ -282,7 +284,7 @@ type LoadState =
 type SearchState =
   | { status: "idle" }
   | { status: "loading"; query: string }
-  | { status: "ready"; query: string; results: CatalogEntry[] }
+  | { status: "ready"; query: string; results: SearchResultEntry[] }
   | { status: "error"; query: string; message: string };
 
 interface CatalogMaskOptionsDraft {
@@ -522,6 +524,7 @@ export function App({
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
+  const searchSourceGeneration = useRef(0);
   const fileMaskGeneration = useRef(0);
   const savedCatalogMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
@@ -735,6 +738,9 @@ export function App({
   const [searchPaneOpen, setSearchPaneOpen] = useState(false);
   const [searchOptions, setSearchOptions] = useState<SearchOptions>(defaultSearchOptions);
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
+  const [searchSourceRoots, setSearchSourceRoots] = useState<string[]>([]);
+  const [searchSourceBusy, setSearchSourceBusy] = useState(false);
+  const [searchSourceNotice, setSearchSourceNotice] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteRefreshRevision, setFavoriteRefreshRevision] = useState(0);
@@ -838,6 +844,8 @@ export function App({
     viewerGeneration.current += 1;
     setViewerSession(null);
     setLibraryRoot(root);
+    setSearchSourceRoots([root]);
+    setSearchSourceNotice(null);
     setLoadedCatalogPath(null);
     catalogSnapshots.current.clear();
     managedThumbnailRoot.current = root;
@@ -1367,7 +1375,11 @@ export function App({
     }
   }
 
-  async function selectDrive(absolutePath: string, relativePath = ""): Promise<boolean> {
+  async function selectDrive(
+    absolutePath: string,
+    relativePath = "",
+    selectionPath: string | null = null,
+  ): Promise<boolean> {
     clearSearch();
     setDiagnosticReport(null);
     setDiagnosticNotice(null);
@@ -1377,7 +1389,7 @@ export function App({
       addressInputDirty.current = false;
       activateLibraryRoot(response.data.absolutePath);
       dispatch({ type: "reset", path: relativePath });
-      await load(relativePath);
+      await load(relativePath, selectionPath === null ? [] : [selectionPath]);
       return true;
     } else if (response.status === "error") {
       setLoadState({ status: "error", path: absolutePath, message: presentError(response.error) });
@@ -2810,10 +2822,13 @@ export function App({
     setThumbnails({});
     thumbnailRequests.current.clear();
     try {
+      const requestOptions = toSearchRequestOptions(searchOptions);
+      requestOptions.sourceRoots = [...searchSourceRoots];
+      if (searchSourceRoots.length > 1) requestOptions.fixedLocation = null;
       const response = await searchLibrary(
         query,
         requestGeneration,
-        toSearchRequestOptions(searchOptions),
+        requestOptions,
       );
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
@@ -2843,8 +2858,55 @@ export function App({
     void runSearch();
   }
 
-  function navigateToSearchResult(entry: CatalogEntry) {
+  async function addSearchSource() {
+    if (searchSourceRoots.length >= 8) {
+      setSearchSourceNotice("検索場所は最大8件です。不要な場所を外してから追加してください。");
+      return;
+    }
+    const requestGeneration = ++searchSourceGeneration.current;
+    setSearchSourceBusy(true);
+    setSearchSourceNotice(null);
+    try {
+      const response = await pickSearchSource(requestGeneration);
+      if (requestGeneration !== searchSourceGeneration.current) return;
+      if (response.status === "ok" && response.data !== null) {
+        const next = response.data.absolutePath;
+        setSearchSourceRoots((current) => current.some((source) =>
+          normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
+            === normalizeWindowsDisplayPath(next).toLocaleLowerCase("en-US")
+        ) ? current : [...current, next]);
+      } else if (response.status === "error") {
+        setSearchSourceNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === searchSourceGeneration.current) {
+        setSearchSourceNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === searchSourceGeneration.current) setSearchSourceBusy(false);
+    }
+  }
+
+  function removeSearchSource(source: string) {
+    if (
+      libraryRoot !== null
+      && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
+        === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+    ) return;
+    setSearchSourceRoots((current) => current.filter((candidate) => candidate !== source));
+  }
+
+  async function navigateToSearchResult(entry: SearchResultEntry) {
     const resultParent = parentPath(entry.relativePath);
+    if (
+      entry.sourceRoot !== undefined
+      && (libraryRoot === null
+        || normalizeWindowsDisplayPath(entry.sourceRoot).toLocaleLowerCase("en-US")
+          !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US"))
+    ) {
+      await selectDrive(entry.sourceRoot, resultParent ?? "", entry.relativePath);
+      return;
+    }
     navigate(resultParent ?? "", "push", entry.relativePath);
   }
 
@@ -5265,10 +5327,42 @@ export function App({
 
                   <fieldset className="search-options-group">
                     <legend>検索場所</legend>
+                    <ul className="search-source-list" aria-label="横断検索の場所">
+                      {searchSourceRoots.map((source) => {
+                        const currentSource = libraryRoot !== null
+                          && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
+                            === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US");
+                        return (
+                          <li key={normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")}>
+                            <span title={source}>{source}</span>
+                            {currentSource ? (
+                              <span className="search-source-current">現在</span>
+                            ) : (
+                              <button
+                                type="button"
+                                aria-label={`${source}を検索場所から外す`}
+                                onClick={() => removeSearchSource(source)}
+                              >
+                                外す
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <button
+                      type="button"
+                      disabled={searchSourceBusy || searchSourceRoots.length >= 8}
+                      onClick={() => void addSearchSource()}
+                    >
+                      {searchSourceBusy ? "選択中…" : "検索場所を追加"}
+                    </button>
+                    {searchSourceNotice !== null && <p role="status">{searchSourceNotice}</p>}
                     <label>
                       <input
                         type="checkbox"
                         checked={searchOptions.fixedLocation !== null}
+                        disabled={searchSourceRoots.length > 1}
                         onChange={(event) =>
                           setSearchOptions((current) => ({
                             ...current,
@@ -5278,6 +5372,11 @@ export function App({
                       />
                       検索場所を固定する
                     </label>
+                    {searchSourceRoots.length > 1 && (
+                      <p className="search-options-note">
+                        複数の場所を横断する間は、現在フォルダーへの固定を使用しません。
+                      </p>
+                    )}
                     {searchOptions.fixedLocation !== null && (
                       <p className="search-options-note">
                         {searchOptions.fixedLocation === ""
@@ -5583,16 +5682,18 @@ export function App({
               ) : (
                 <ul>
                   {searchState.results.map((entry) => (
-                    <li key={entry.relativePath}>
+                    <li key={`${entry.sourceRoot ?? libraryRoot ?? ""}\u0000${entry.relativePath}`}>
                       <button
                         type="button"
                         data-search-result-path={entry.relativePath}
+                        data-search-result-source={entry.sourceRoot ?? libraryRoot ?? ""}
                         data-search-result-kind={entry.kind}
                         aria-label={`${entry.relativePath}、${entryKindLabel(entry)}、元階層へ移動`}
-                        onClick={() => navigateToSearchResult(entry)}
+                        onClick={() => void navigateToSearchResult(entry)}
                       >
                         <span>{entryDisplayName(entry)}</span>
                         <span>{entryKindLabel(entry)}</span>
+                        <span>{entry.sourceRoot ?? libraryRoot}</span>
                         <span>{entry.relativePath}</span>
                         <span>元階層へ移動</span>
                       </button>

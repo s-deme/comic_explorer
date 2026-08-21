@@ -66,6 +66,7 @@ pub fn run() {
             application::set_viewer_settings,
             application::set_settings_profile,
             application::pick_library_root,
+            application::pick_search_source,
             application::pick_library_file,
             application::set_library_root,
             application::list_folder,

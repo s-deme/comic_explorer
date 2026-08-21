@@ -27,6 +27,7 @@ import {
   openComic,
   pickLibraryFile,
   pickLibraryRoot,
+  pickSearchSource,
   registerLibraryRoot,
   removeFavorite,
   restoreLibraryRoot,
@@ -78,6 +79,7 @@ vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
   pickLibraryFile: vi.fn(),
   pickLibraryRoot: vi.fn(),
+  pickSearchSource: vi.fn(),
   listFolder: vi.fn(),
   listTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({
@@ -146,6 +148,7 @@ function markViewerPrefetchReady(): void {
 
 const registerMock = vi.mocked(registerLibraryRoot);
 const pickerMock = vi.mocked(pickLibraryRoot);
+const searchSourcePickerMock = vi.mocked(pickSearchSource);
 const filePickerMock = vi.mocked(pickLibraryFile);
 const listMock = vi.mocked(listFolder);
 const treeMock = vi.mocked(listTreeChildren);
@@ -443,6 +446,7 @@ describe("application shell", () => {
   beforeEach(() => {
     registerMock.mockReset();
     pickerMock.mockReset();
+    searchSourcePickerMock.mockReset();
     filePickerMock.mockReset();
     listMock.mockReset();
     treeMock.mockReset();
@@ -632,6 +636,12 @@ describe("application shell", () => {
     pickerMock.mockResolvedValue({
       status: "ok",
       requestId: "picker" as never,
+      generation: 1 as never,
+      data: null,
+    });
+    searchSourcePickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "search-source-picker" as never,
       generation: 1 as never,
       data: null,
     });
@@ -2231,6 +2241,69 @@ describe("application shell", () => {
     expect(alert).toHaveTextContent("検索式を確認してください");
     expect(alert).toHaveTextContent("(*.cbz OR *.pdf) AND NOT sample*");
     expect(alert).not.toHaveTextContent("backend parser detail");
+  });
+
+  it("REQ-LEY-P3-004 searches picker-approved sources and opens a result in its source", async () => {
+    const currentResult = {
+      ...testEntry("Series/Volume.cbz"),
+      sourceRoot: "C:\\",
+    };
+    const otherResult = {
+      ...testEntry("Series/Volume.cbz"),
+      sourceRoot: "D:\\Comics",
+    };
+    searchSourcePickerMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "pick-search-source" as never,
+      generation: 1 as never,
+      data: { absolutePath: "D:\\Comics" },
+    });
+    searchMock.mockResolvedValueOnce(searchResponse([currentResult, otherResult]));
+    await registerTestLibrary([testEntry("root.cbz")]);
+    const pane = openSearchPane();
+
+    fireEvent.click(within(pane).getByRole("button", { name: "検索場所を追加" }));
+    await within(pane).findByText("D:\\Comics");
+    expect(within(pane).getByLabelText("検索場所を固定する")).toBeDisabled();
+    fireEvent.change(within(pane).getByLabelText("名前検索"), {
+      target: { value: "volume" },
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "検索" }));
+
+    const region = await screen.findByRole("region", { name: "名前検索結果" });
+    expect(region).toHaveAttribute("data-search-result-count", "2");
+    expect(searchMock).toHaveBeenCalledWith(
+      "volume",
+      expect.any(Number),
+      expect.objectContaining({
+        fixedLocation: null,
+        sourceRoots: ["C:\\", "D:\\Comics"],
+      }),
+    );
+    const otherButton = region.querySelector<HTMLButtonElement>(
+      '[data-search-result-source="D:\\\\Comics"]',
+    );
+    expect(otherButton).not.toBeNull();
+
+    registerMock.mockImplementationOnce(async (absolutePath) => ({
+      status: "ok",
+      requestId: "register-search-source" as never,
+      generation: 2 as never,
+      data: { absolutePath },
+    }));
+    listMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "search-source-parent" as never,
+      generation: 3 as never,
+      data: [testEntry("Series/Volume.cbz")],
+    });
+    fireEvent.click(otherButton!);
+
+    await waitFor(() => {
+      expect(registerMock).toHaveBeenLastCalledWith("D:\\Comics", expect.any(Number));
+      expect(listMock).toHaveBeenLastCalledWith("Series", expect.any(Number));
+      expect(screen.getByLabelText("アドレス")).toHaveValue("D:\\Comics\\Series");
+    });
   });
 
   it("passes active search options and retains results when requested", async () => {

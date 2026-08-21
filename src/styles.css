@@ -347,6 +347,33 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow-wrap: anywhere;
   color: #59636f;
 }
+
+.search-source-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.search-source-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.search-source-list li > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-source-current {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
 .search-options-condition,
 .search-options-radios,
 .search-options-date-row {

@@ -28,6 +28,7 @@ export interface SearchRequestOptions {
   maxSizeBytes?: number;
   modifiedAfterMs?: number;
   modifiedBeforeMs?: number;
+  sourceRoots?: string[];
 }
 
 function todayInputValue(nowMs = Date.now()): string {

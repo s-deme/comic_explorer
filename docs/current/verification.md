@@ -330,6 +330,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 名前式・種別・size・日付を組み合わせたsynthetic 10,000項目をdebug testで104.382ms（gate 2秒未満）。100,000件batch、保存32件、名前64文字を制限。release WebView2の100,000件serialization/working setとSQLite同時利用は未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2でのlocal timezone/DST別日付、再起動後復元、32件管理、保存・置換・削除、100,000件catalogは未測定。 |
 
+## Leeyes P3-D/E 複数source・複数場所検索
+
+対象はLEY-SEARCH-001/002の2件。pickerでRustが承認したsession sourceだけを既存Rust search portで横断し、canonical itemをsource入力順で重複排除する。frontendはsource選択と結果navigationだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | 2件、FAIL 0。3 source、重なり、入力順優先、別source同一relative path、未承認path、8件上限、50,000結果上限、missing、cancelを含む。 |
+| Focused frontend / typecheck | PASS | App 95件とclient contract 4件、FAIL 0。picker cancel既定、source追加、複数source payload、固定folder無効化、source別同名結果、別source root登録と親folder選択を含む。`tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | frontend 31 files / 419件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 533.96kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 191件とshutdown process 1件、FAIL 0。複数source・allowlist・上限に加え、既存search・catalog・viewer・file操作・SQLite境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは378.891秒で全12 stageがexit 0。Rust canonical 152.594秒、release executable 80.549秒、GUI権限付きshortcut product回帰13.503秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | 最大8 sourceと合計50,000結果をRust境界で自動検証。複数source走査の基準PC時間、slow/removable drive、50,000実fileのwall-clockとworking setは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2のfolder picker、cancel、network/removable folder、access変化、結果source表示と移動は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

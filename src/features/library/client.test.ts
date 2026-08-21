@@ -5,7 +5,9 @@ import {
   deleteCatalogMask,
   evaluateCatalogMask,
   listCatalogMasks,
+  pickSearchSource,
   saveCatalogMask,
+  searchLibrary,
   saveSettingsProfile,
 } from "./client";
 
@@ -77,6 +79,33 @@ describe("library client settings contract", () => {
       3,
       "delete_catalog_mask",
       expect.objectContaining({ name: "large recent" }),
+    );
+  });
+
+  it("REQ-LEY-P3-004 sends picker-approved sources to the Rust search boundary", async () => {
+    await pickSearchSource(31);
+    await searchLibrary("volume", 32, {
+      includeSubfolders: true,
+      includeFolders: true,
+      includeFiles: true,
+      fixedLocation: null,
+      sourceRoots: ["C:\\Library", "D:\\Comics"],
+    });
+
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      1,
+      "pick_search_source",
+      expect.objectContaining({ context: expect.objectContaining({ generation: 31 }) }),
+    );
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      2,
+      "search_library",
+      expect.objectContaining({
+        query: "volume",
+        options: expect.objectContaining({
+          sourceRoots: ["C:\\Library", "D:\\Comics"],
+        }),
+      }),
     );
   });
 });
