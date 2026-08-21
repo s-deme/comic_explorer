@@ -34,8 +34,8 @@ codd:
 | P2 閲覧中核 | 16 | 16 | 0 |
 | P3 操作・検索 | 31 | 31 | 0 |
 | P4 大型基盤 | 12 | 12 | 0 |
-| P5 専門機能 | 23 | 7 | 16 |
-| **合計** | **103** | **87** | **16** |
+| P5 専門機能 | 23 | 23 | 0 |
+| **合計** | **103** | **103** | **0** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -131,7 +131,7 @@ P4-DではLEY-SHELL-007をPublishedとし、P4の12件を完了した。Rust set
 
 P5-AではLEY-MEDIA-001/002/003/004/005/008/009の7件をPublishedとした。RustがWindows volume identity、reparse非追跡のbounded scan、WIC JPEG表紙、cancel generation、SQLite schema v11の単一transaction、offline snapshot、接続volume再照合、open containment、組込みiconを所有し、TypeScriptはtyped IPCと台帳dialogだけを担当する。frontend 40 files / 506件、Python 61件、Rust 249+1件、typecheck、81 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageをPASSした。50,000 entry DB transactionと再読込は2,556ms。光学disc・removable driveの抜差し、drive letter変更、実媒体50,000 file scan、巨大画像256枚、CPU・working set、台帳dialogのrelease DPI/keyboardは未測定として残す。実装commit `a88a752` はupstreamへpush済み。
 
-P5-BではLEY-FILTER-001〜016の16件をVerifiedとした。Rustが14種のRGBA pixel処理、parameter・resource上限、順序付きchain、名前付きset、active set、WIC decode、bounded PNG、SQLite schema v12を所有し、TypeScriptはtyped IPCとReact/WebViewのset editorだけを担当する。frontend 41 files / 511件、Python 61件、Rust 255+1件、typecheck、82 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageをPASSした。4K RGBAへgrayscale・gamma・contrast・blurの4 stepを適用したRust release測定は1,188ms（debug 21,168ms）。release WebView2の実画像品質、色管理、animated GIFの複数frame、実操作中のlatency、CPU・working setは未測定として残す。commit・push後にPublishedへ遷移する。
+P5-BではLEY-FILTER-001〜016の16件をPublishedとし、P1〜P5の全103件を完了した。Rustが14種のRGBA pixel処理、parameter・resource上限、順序付きchain、名前付きset、active set、WIC decode、bounded PNG、SQLite schema v12を所有し、TypeScriptはtyped IPCとReact/WebViewのset editorだけを担当する。frontend 41 files / 511件、Python 61件、Rust 255+1件、typecheck、82 modules build、SBOM 783 components・禁止license 0、Windows canonical全12 stageをPASSした。4K RGBAへgrayscale・gamma・contrast・blurの4 stepを適用したRust release測定は1,188ms（debug 21,168ms）。release WebView2の実画像品質、色管理、animated GIFの複数frame、実操作中のlatency、CPU・working setは未測定として残す。実装commit `f234432` はupstreamへpush済み。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
