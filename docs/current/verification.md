@@ -647,6 +647,7 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | debug Rustの50,000 entry単一SQLite transactionと全件再読込はfocused run内で2,556ms（直前run 2,624ms）。最大50,000 entry、深さ64、媒体64、表紙256件・1件1MiB・合計64MiBをcode/schemaで制限する。release実媒体の50,000 file scan、256枚の巨大画像decode、CPU、peak working setは未測定。 |
 | Windows canonical / build / CoDD | PASS | Rust 249件とshutdown process 1件、typecheck、81 modules release build、SBOM 783 components・unknown/prohibited license 0、freshness、product shortcut、cleanup、CoDD scan/check/verifyを含むsandbox外formal canonical全12 stage PASS、280.365秒。logは`src-tauri/target/verification/imp-004-20260821T172804804Z`。sandbox内の直前runはrelease processが起動前に消えproduct-shortcutだけFAILしたが、同一sourceのsandbox外全stage再実行でPASSした。さらに最初のrunは最終error整形後のrustfmt未適用を検出してrust-canonicalでFAILし、formatとfocused Rustを再実行後に最終runを行った。 |
 | 製品直接観測 | NOT RUN | release GUI harnessは既存shortcutを観測したが、光学disc・removable driveの抜差し、drive letter変更、媒体台帳dialogのDPI/keyboard、実表紙、長時間cancelは今回直接観測していない。 |
+| Delivery | PASS | 実装commit `a88a752` を`origin/agent/pdf-support`へpushし、tracker 7件のdelivery_refへ固定した。 |
 
 ## FR-B23 Leeyes viewer操作・外観
 
