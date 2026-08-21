@@ -83,8 +83,12 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 18;
+export const SETTINGS_PROFILE_VERSION = 19;
 export const APP_VERSION = packageMetadata.version;
+
+export const MIN_TREE_WIDTH = 180;
+export const MAX_TREE_WIDTH = 480;
+export const DEFAULT_TREE_WIDTH = 240;
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
 export type FullscreenEscapeBehavior = (typeof FULLSCREEN_ESCAPE_BEHAVIORS)[number];
@@ -190,6 +194,9 @@ export interface SettingsProfile {
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
   treeVisible: boolean;
+  treeAutoCollapse: boolean;
+  treeConfirmChildren: boolean;
+  treeWidth: number;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
   addressBarVisible: boolean;
@@ -256,6 +263,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     smoothScroll: DEFAULT_SMOOTH_SCROLL,
     pageScanMode: DEFAULT_PAGE_SCAN_MODE,
     treeVisible: true,
+    treeAutoCollapse: false,
+    treeConfirmChildren: true,
+    treeWidth: DEFAULT_TREE_WIDTH,
     menuBarVisible: true,
     toolbarVisible: true,
     addressBarVisible: true,
@@ -455,6 +465,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const autoRefreshCurrentFolder = legacyAutoRefreshCurrentFolder
     ? true
     : candidate.autoRefreshCurrentFolder;
+  const legacyTreePreferences = legacyAutoRefreshCurrentFolder
+    || candidate.profileVersion === 18;
+  const treeAutoCollapse = legacyTreePreferences ? false : candidate.treeAutoCollapse;
+  const treeConfirmChildren = legacyTreePreferences ? true : candidate.treeConfirmChildren;
+  const treeWidth = legacyTreePreferences ? DEFAULT_TREE_WIDTH : candidate.treeWidth;
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -473,6 +488,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 15
       && candidate.profileVersion !== 16
       && candidate.profileVersion !== 17
+      && candidate.profileVersion !== 18
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -524,6 +540,12 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof smoothScroll !== "boolean" ||
     pageScanMode === null ||
     typeof candidate.treeVisible !== "boolean" ||
+    typeof treeAutoCollapse !== "boolean" ||
+    typeof treeConfirmChildren !== "boolean" ||
+    typeof treeWidth !== "number" ||
+    !Number.isInteger(treeWidth) ||
+    treeWidth < MIN_TREE_WIDTH ||
+    treeWidth > MAX_TREE_WIDTH ||
     typeof candidate.menuBarVisible !== "boolean" ||
     typeof candidate.toolbarVisible !== "boolean" ||
     typeof addressBarVisible !== "boolean" ||
@@ -590,6 +612,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     smoothScroll,
     pageScanMode,
     treeVisible: candidate.treeVisible,
+    treeAutoCollapse,
+    treeConfirmChildren,
+    treeWidth,
     menuBarVisible: candidate.menuBarVisible,
     toolbarVisible: candidate.toolbarVisible,
     addressBarVisible,

@@ -270,6 +270,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   smoothScroll: true,
   pageScanMode: "vertical",
   treeVisible: true,
+  treeAutoCollapse: false,
+  treeConfirmChildren: true,
+  treeWidth: 240,
   menuBarVisible: true,
   toolbarVisible: true,
   addressBarVisible: true,
@@ -940,6 +943,15 @@ describe("application shell", () => {
     expect(splitter).toHaveAttribute("aria-valuenow", "240");
     fireEvent.keyDown(splitter, { key: "ArrowLeft" });
     expect(splitter).toHaveAttribute("aria-valuenow", "230");
+    for (let index = 0; index < 20; index += 1) {
+      fireEvent.keyDown(splitter, { key: "ArrowLeft" });
+    }
+    expect(splitter).toHaveAttribute("aria-valuenow", "180");
+    Object.defineProperty(splitter, "setPointerCapture", { value: vi.fn() });
+    Object.defineProperty(splitter, "hasPointerCapture", { value: () => true });
+    fireEvent.pointerDown(splitter, { pointerId: 1 });
+    fireEvent.pointerMove(splitter, { pointerId: 1, clientX: 999 });
+    expect(splitter).toHaveAttribute("aria-valuenow", "480");
 
     const trigger = screen.getByRole("menuitem", { name: "ヘルプ" });
     chooseAppMenuItem("ヘルプ", "一般ヘルプ…");

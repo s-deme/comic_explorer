@@ -78,6 +78,8 @@ import {
   THUMBNAIL_GENERATION_SCOPES,
   MOUSE_GESTURE_ACTIONS,
   FULLSCREEN_ESCAPE_BEHAVIORS,
+  MAX_TREE_WIDTH,
+  MIN_TREE_WIDTH,
   TRAY_CLOSE_BEHAVIORS,
   TRAY_RESTORE_GESTURES,
   type MouseGestureAction,
@@ -465,6 +467,11 @@ export function SettingsDialog({
       id: "viewer-catalog-selection-sync",
       category: "viewer",
       text: `一覧 選択 同期 Viewer 復帰 スクロール ${draft.viewerCatalogSelectionSync ? "有効" : "無効"}`,
+    },
+    {
+      id: "tree-details",
+      category: "interface",
+      text: `フォルダツリー 自動折畳み 下位確認 横幅 ${draft.treeWidth}px ${draft.treeAutoCollapse ? "自動折畳み有効" : "展開保持"} ${draft.treeConfirmChildren ? "下位確認有効" : "下位未確認"}`,
     },
     ...([
       ["tree-visible", "フォルダツリー", draft.treeVisible, "ライブラリの階層を左側へ表示します"],
@@ -1114,6 +1121,46 @@ export function SettingsDialog({
                   </label>
                 </SettingRow>
               ))}
+              <SettingRow id="tree-details" title="フォルダツリーの詳細" description="現在位置以外のbranchを閉じる動作、leaf判定、保存する横幅を指定します。書庫ツリーはP4で別途扱います。" hidden={rowHidden("tree-details")}>
+                <div className="settings-inline-actions">
+                  <label>
+                    <input
+                      type="checkbox"
+                      aria-label="profileツリーを自動折畳み"
+                      checked={draft.treeAutoCollapse}
+                      onChange={(event) => update({ treeAutoCollapse: event.target.checked })}
+                    />
+                    現在位置以外を折りたたむ
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      aria-label="profileツリーの下位を確認"
+                      checked={draft.treeConfirmChildren}
+                      onChange={(event) => update({ treeConfirmChildren: event.target.checked })}
+                    />
+                    leafを事前確認
+                  </label>
+                  <label>
+                    横幅
+                    <input
+                      type="number"
+                      aria-label="profileフォルダツリーの横幅"
+                      min={MIN_TREE_WIDTH}
+                      max={MAX_TREE_WIDTH}
+                      step="10"
+                      value={draft.treeWidth}
+                      onChange={(event) => update({
+                        treeWidth: Math.max(
+                          MIN_TREE_WIDTH,
+                          Math.min(MAX_TREE_WIDTH, Math.round(Number(event.target.value))),
+                        ),
+                      })}
+                    />
+                    px
+                  </label>
+                </div>
+              </SettingRow>
               <SettingRow id="always-on-top" title="常に手前" description="main windowを他のwindowより手前に保ちます。" hidden={rowHidden("always-on-top")}>
                 <label className="settings-switch">
                   <input

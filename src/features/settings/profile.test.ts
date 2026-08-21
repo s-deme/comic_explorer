@@ -61,6 +61,9 @@ function validProfile(): SettingsProfile {
     smoothScroll: true,
     pageScanMode: "vertical",
     treeVisible: true,
+    treeAutoCollapse: false,
+    treeConfirmChildren: true,
+    treeWidth: 240,
     menuBarVisible: true,
     toolbarVisible: true,
     addressBarVisible: true,
@@ -120,7 +123,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 19, 99, "18", undefined])(
+  it.each([0, 20, 99, "19", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -196,6 +199,31 @@ describe("settings profile", () => {
     legacy.profileVersion = 17;
     delete legacy.autoRefreshCurrentFolder;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+  });
+
+  it("REQ-LEY-P3-006 migrates v18 tree details and validates their bounds", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 18;
+    delete legacy.treeAutoCollapse;
+    delete legacy.treeConfirmChildren;
+    delete legacy.treeWidth;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      treeAutoCollapse: true,
+      treeConfirmChildren: false,
+      treeWidth: 360,
+    })).toEqual(expect.objectContaining({
+      treeAutoCollapse: true,
+      treeConfirmChildren: false,
+      treeWidth: 360,
+    }));
+    expect(normalizeSettingsProfile(withField("treeAutoCollapse", "true"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("treeConfirmChildren", 1))).toBeNull();
+    for (const width of [179, 481, 240.5, Number.NaN]) {
+      expect(normalizeSettingsProfile(withField("treeWidth", width))).toBeNull();
+    }
   });
 
   it("REQ-LEY-P2-005 migrates a v7 profile with the fixed P2-D spread rules", () => {
@@ -475,6 +503,8 @@ describe("settings profile", () => {
     "sortDescending",
     "loupeEnabled",
     "treeVisible",
+    "treeAutoCollapse",
+    "treeConfirmChildren",
     "menuBarVisible",
     "toolbarVisible",
     "viewerGridEnabled",

@@ -109,6 +109,9 @@ pub struct Settings {
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
+    pub tree_auto_collapse: bool,
+    pub tree_confirm_children: bool,
+    pub tree_width: u16,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -211,6 +214,9 @@ impl Default for Settings {
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
             tree_visible: true,
+            tree_auto_collapse: false,
+            tree_confirm_children: true,
+            tree_width: 240,
             menu_bar_visible: true,
             toolbar_visible: true,
             address_bar_visible: true,
@@ -346,6 +352,11 @@ impl StateStore {
                 "smoothScroll" => settings.smooth_scroll = value == "true",
                 "pageScanMode" => settings.page_scan_mode = value,
                 "treeVisible" => settings.tree_visible = value == "true",
+                "treeAutoCollapse" => settings.tree_auto_collapse = value == "true",
+                "treeConfirmChildren" => settings.tree_confirm_children = value == "true",
+                "treeWidth" => {
+                    settings.tree_width = value.parse::<u16>().unwrap_or(240).clamp(180, 480)
+                }
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
                 "addressBarVisible" => settings.address_bar_visible = value == "true",
@@ -485,6 +496,12 @@ impl StateStore {
             ("smoothScroll", settings.smooth_scroll.to_string()),
             ("pageScanMode", settings.page_scan_mode.clone()),
             ("treeVisible", settings.tree_visible.to_string()),
+            ("treeAutoCollapse", settings.tree_auto_collapse.to_string()),
+            (
+                "treeConfirmChildren",
+                settings.tree_confirm_children.to_string(),
+            ),
+            ("treeWidth", settings.tree_width.clamp(180, 480).to_string()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
             (
@@ -1694,6 +1711,9 @@ mod tests {
                 smooth_scroll: false,
                 page_scan_mode: "z".into(),
                 tree_visible: false,
+                tree_auto_collapse: true,
+                tree_confirm_children: false,
+                tree_width: 360,
                 menu_bar_visible: false,
                 toolbar_visible: true,
                 address_bar_visible: false,
@@ -1801,6 +1821,9 @@ mod tests {
         assert!(!restored.smooth_scroll);
         assert_eq!(restored.page_scan_mode, "z");
         assert!(!restored.tree_visible);
+        assert!(restored.tree_auto_collapse);
+        assert!(!restored.tree_confirm_children);
+        assert_eq!(restored.tree_width, 360);
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);
         assert!(!restored.address_bar_visible);

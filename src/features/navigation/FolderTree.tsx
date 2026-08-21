@@ -1,6 +1,11 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { listTreeChildren, listWindowsDrives, type WindowsDrive } from "../library/client";
+import {
+  listTreeChildren,
+  listWindowsDrives,
+  type TreeEntry,
+  type WindowsDrive,
+} from "../library/client";
 import type { FileClipboardStatus } from "../library/client";
 import { presentError } from "../errors/presentation";
 import { normalizeWindowsDisplayPath } from "./navigation";
@@ -18,12 +23,14 @@ interface TreeNode {
   kind: "pc" | "drive" | "folder";
   driveRoot?: string;
   driveIdentity?: string;
+  hasChildren?: boolean | null;
 }
 
 interface FolderTreeProps {
   libraryRoot: string | null;
   currentPath: string;
   hidden?: boolean;
+  autoCollapse?: boolean;
   onNavigate: (relativePath: string) => void;
   onSelectDrive: (absolutePath: string, relativePath?: string) => unknown | Promise<unknown>;
   clipboard?: FileClipboardStatus;
@@ -76,6 +83,7 @@ export function FolderTree({
   libraryRoot,
   currentPath,
   hidden = false,
+  autoCollapse = false,
   onNavigate,
   onSelectDrive,
   clipboard = { available: false, cut: false, items: 0 },
@@ -94,7 +102,7 @@ export function FolderTree({
   const [drives, setDrives] = useState<WindowsDrive[]>([]);
   const [driveError, setDriveError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(() => new Set(["pc"]));
-  const [children, setChildren] = useState<Map<string, string[]>>(() => new Map());
+  const [children, setChildren] = useState<Map<string, TreeEntry[]>>(() => new Map());
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
   const [loading, setLoading] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<TreeMenuState | null>(null);
@@ -114,7 +122,7 @@ export function FolderTree({
     if (response.status === "ok") {
       setChildren((previous) => {
         const next = new Map(previous);
-        next.set(pathKey, response.data.map((entry) => entry.relativePath));
+        next.set(pathKey, response.data);
         return next;
       });
       setErrors((previous) => {
@@ -157,18 +165,17 @@ export function FolderTree({
     for (let index = 0; index < segments.length; index += 1) {
       ancestors.push(segments.slice(0, index + 1).join("/"));
     }
-    setExpanded((previous) => new Set([
-      ...previous,
-      `drive:${activeDrive}`,
-      ...ancestors.map((path) => folderExpansionKey(activeDrive, path)),
-    ]));
+    const currentBranch = ancestors.map((path) => folderExpansionKey(activeDrive, path));
+    setExpanded((previous) => new Set(autoCollapse
+      ? ["pc", `drive:${activeDrive}`, ...currentBranch]
+      : [...previous, `drive:${activeDrive}`, ...currentBranch]));
     for (const ancestor of ancestors) {
       const pathKey = drivePathKey(activeDrive, ancestor);
       if (!children.has(pathKey) && !loading.has(pathKey)) {
         void loadChildren(ancestor);
       }
     }
-  }, [currentPath, activeDrive]);
+  }, [currentPath, activeDrive, autoCollapse]);
 
   const nodes = useMemo(() => {
     const flattened: TreeNode[] = [{
@@ -186,7 +193,8 @@ export function FolderTree({
       parent: string,
       depth: number,
     ) => {
-      for (const path of children.get(drivePathKey(driveIdentity, parent)) ?? []) {
+      for (const child of children.get(drivePathKey(driveIdentity, parent)) ?? []) {
+        const path = child.relativePath;
         const key = folderExpansionKey(driveIdentity, path);
         flattened.push({
           key,
@@ -196,6 +204,7 @@ export function FolderTree({
           kind: "folder",
           driveRoot,
           driveIdentity,
+          hasChildren: child.hasChildren,
         });
         if (expanded.has(key)) appendFolders(driveIdentity, driveRoot, path, depth + 1);
       }
@@ -312,13 +321,13 @@ export function FolderTree({
         >
           {virtualizer.getVirtualItems().map((virtualNode) => {
             const node = nodes[virtualNode.index];
-            const isExpanded = expanded.has(node.key);
+            const isExpanded = expanded.has(node.key) && node.hasChildren !== false;
             const nodeDrive = node.driveIdentity ?? activeDrive;
             const pathKey = drivePathKey(nodeDrive, node.path);
             const childCount = node.kind === "pc"
               ? drives.length
               : node.kind === "folder"
-                ? children.get(pathKey)?.length
+                ? node.hasChildren === false ? 0 : children.get(pathKey)?.length
                 : undefined;
             const isSelected = node.kind === "pc"
               ? libraryRoot === null

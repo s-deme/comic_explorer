@@ -69,6 +69,8 @@ separatorとcaseを比較用に正規化してからdriveとpath segment境界�
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
 address表示ではExplorerと同じ通常pathへ変換する。
 
+treeのleaf/branch判定はRustのroot-contained `list_tree_children`で行い、下位確認を有効にした場合だけ各direct child folderを非再帰・先頭一致で調べてnullable `hasChildren`を返す。frontendはleafのexpanderを無効化し、自動折畳み設定ではPC、active drive、current ancestor chainだけを展開集合へ残す。tree幅は180〜480pxへpointer/keyboard共通でclampし、これら3値をprofile v19とSQLiteへ保存する。書庫nodeおよび書庫内仮想pathはP4のLEY-FILER-002/003で扱い、このfilesystem tree境界へ先行混在させない。
+
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder移動は先に古いgenerationをcancelして
 metadata一覧を返し、placeholderを表示した後でthumbnail要求を非同期に投入する。navigation時のpin解除は
 生成・decode・cache書込を直列化するthumbnail pipelineとは独立した短時間の同期境界で行い、生成中の

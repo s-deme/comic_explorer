@@ -228,6 +228,9 @@ import {
   DEFAULT_MOUSE_GESTURES,
   DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
   DEFAULT_CATALOG_PALETTE,
+  DEFAULT_TREE_WIDTH,
+  MAX_TREE_WIDTH,
+  MIN_TREE_WIDTH,
   DEFAULT_NAVIGATION_SELECTION_POLICY,
   DEFAULT_STARTUP_LOCATION,
   DEFAULT_THUMBNAIL_GENERATION_SCOPE,
@@ -704,8 +707,10 @@ export function App({
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [activeToolbarMenu, setActiveToolbarMenu] = useState<ToolbarMenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
-  const [treeWidth, setTreeWidth] = useState(240);
+  const [treeWidth, setTreeWidth] = useState(DEFAULT_TREE_WIDTH);
   const [treeVisible, setTreeVisible] = useState(true);
+  const [treeAutoCollapse, setTreeAutoCollapse] = useState(false);
+  const [treeConfirmChildren, setTreeConfirmChildren] = useState(true);
   const [menuBarVisible, setMenuBarVisible] = useState(true);
   const [toolbarVisible, setToolbarVisible] = useState(true);
   const [addressBarVisible, setAddressBarVisible] = useState(true);
@@ -1153,6 +1158,12 @@ export function App({
             ? response.data.pageScanMode
             : DEFAULT_PAGE_SCAN_MODE);
           setTreeVisible(response.data.treeVisible);
+          setTreeAutoCollapse(response.data.treeAutoCollapse === true);
+          setTreeConfirmChildren(response.data.treeConfirmChildren !== false);
+          setTreeWidth(Math.max(
+            MIN_TREE_WIDTH,
+            Math.min(MAX_TREE_WIDTH, response.data.treeWidth ?? DEFAULT_TREE_WIDTH),
+          ));
           setMenuBarVisible(response.data.menuBarVisible);
           setToolbarVisible(response.data.toolbarVisible);
           setAddressBarVisible(response.data.addressBarVisible !== false);
@@ -3034,6 +3045,9 @@ export function App({
       smoothScroll,
       pageScanMode,
       treeVisible,
+      treeAutoCollapse,
+      treeConfirmChildren,
+      treeWidth,
       menuBarVisible,
       toolbarVisible,
       addressBarVisible,
@@ -3142,6 +3156,9 @@ export function App({
       setSmoothScroll(normalized.smoothScroll);
       setPageScanMode(normalized.pageScanMode);
       setTreeVisible(normalized.treeVisible);
+      setTreeAutoCollapse(normalized.treeAutoCollapse);
+      setTreeConfirmChildren(normalized.treeConfirmChildren);
+      setTreeWidth(normalized.treeWidth);
       setMenuBarVisible(normalized.menuBarVisible);
       setToolbarVisible(normalized.toolbarVisible);
       setAddressBarVisible(normalized.addressBarVisible);
@@ -3313,6 +3330,7 @@ export function App({
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
     wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
+    treeAutoCollapse, treeConfirmChildren, treeWidth,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
@@ -5113,9 +5131,11 @@ export function App({
         }}
       >
         <FolderTree
+          key={`tree:${libraryRoot ?? "pc"}:${treeConfirmChildren}`}
           libraryRoot={libraryRoot}
           currentPath={navigation.current}
           hidden={!treeVisible || searchPaneOpen}
+          autoCollapse={treeAutoCollapse}
           onNavigate={(path) => navigate(path)}
           onSelectDrive={(path, relativePath) => selectDrive(path, relativePath)}
           clipboard={fileClipboard}
@@ -5715,14 +5735,23 @@ export function App({
                 if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                   event.preventDefault();
                   setTreeWidth((width) =>
-                    Math.max(180, width + (event.key === "ArrowLeft" ? -10 : 10)),
+                    Math.max(
+                      MIN_TREE_WIDTH,
+                      Math.min(
+                        MAX_TREE_WIDTH,
+                        width + (event.key === "ArrowLeft" ? -10 : 10),
+                      ),
+                    ),
                   );
                 }
               }}
               onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
               onPointerMove={(event) => {
                 if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  setTreeWidth(Math.max(180, event.clientX));
+                  setTreeWidth(Math.max(
+                    MIN_TREE_WIDTH,
+                    Math.min(MAX_TREE_WIDTH, event.clientX),
+                  ));
                 }
               }}
             />

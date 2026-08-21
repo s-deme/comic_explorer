@@ -32,18 +32,18 @@ describe("FolderTree", () => {
           ? [
               {
                 relativePath: "Selected" as never,
-                kind: "folder",
+                hasChildren: false,
               },
               {
                 relativePath: "Other" as never,
-                kind: "folder",
+                hasChildren: true,
               },
             ]
           : path === "Other"
             ? [
                 {
                   relativePath: "Other/Child" as never,
-                  kind: "folder",
+                  hasChildren: false,
                 },
               ]
             : [],
@@ -123,6 +123,35 @@ describe("FolderTree", () => {
     expect(screen.getByRole("treeitem", { name: "Child" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Otherを折りたたむ" }))
       .toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("REQ-LEY-P3-006 disables leaf expansion and auto-collapses a different branch", async () => {
+    const { rerender } = render(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected"
+        autoCollapse
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Selectedを展開する" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Otherを展開する" }));
+    expect(await screen.findByRole("treeitem", { name: "Child" })).toBeInTheDocument();
+
+    rerender(
+      <FolderTree
+        libraryRoot="C:\\"
+        currentPath="Selected/Chapter"
+        autoCollapse
+        onNavigate={() => undefined}
+        onSelectDrive={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(screen.queryByRole("treeitem", { name: "Child" }))
+      .not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Otherを展開する" }))
+      .toHaveAttribute("aria-expanded", "false");
   });
 
   it("collapses every drive and folder only through the explicit action", async () => {

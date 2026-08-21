@@ -25,7 +25,8 @@ use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::catalog::enumerate_folder_pages;
 use crate::catalog::{
     CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages_with_hidden,
-    enumerate_folder_with_hidden, enumerate_pdf_pages, render_pdf_page,
+    enumerate_folder_with_hidden, enumerate_pdf_pages, has_child_folder_with_hidden,
+    render_pdf_page,
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
@@ -172,6 +173,13 @@ pub struct SearchResultEntry {
     #[serde(flatten)]
     entry: CatalogEntry,
     source_root: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeEntry {
+    pub relative_path: RelativePath,
+    pub has_children: Option<bool>,
 }
 
 const CATALOG_FOLDER_CHANGED_EVENT: &str = "catalog-folder-changed";
@@ -454,6 +462,9 @@ pub struct CatalogSettings {
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
+    pub tree_auto_collapse: bool,
+    pub tree_confirm_children: bool,
+    pub tree_width: u16,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -530,6 +541,9 @@ pub struct SettingsProfileInput {
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
+    pub tree_auto_collapse: bool,
+    pub tree_confirm_children: bool,
+    pub tree_width: u16,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -1236,6 +1250,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         smooth_scroll: settings.smooth_scroll,
         page_scan_mode,
         tree_visible: settings.tree_visible,
+        tree_auto_collapse: settings.tree_auto_collapse,
+        tree_confirm_children: settings.tree_confirm_children,
+        tree_width: settings.tree_width.clamp(180, 480),
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
         address_bar_visible: settings.address_bar_visible,
@@ -2694,6 +2711,7 @@ fn validate_settings_profile(
         || !(MIN_WHEEL_SCROLL_FACTOR..=MAX_WHEEL_SCROLL_FACTOR)
             .contains(&profile.wheel_scroll_factor)
         || !matches!(profile.page_scan_mode.as_str(), "vertical" | "n" | "z")
+        || !(180..=480).contains(&profile.tree_width)
         || !matches!(
             profile.navigation_selection_policy.as_str(),
             "none" | "first" | "last" | "restore"
@@ -2809,6 +2827,9 @@ pub fn set_settings_profile(
         settings.smooth_scroll = profile.smooth_scroll;
         settings.page_scan_mode = profile.page_scan_mode;
         settings.tree_visible = profile.tree_visible;
+        settings.tree_auto_collapse = profile.tree_auto_collapse;
+        settings.tree_confirm_children = profile.tree_confirm_children;
+        settings.tree_width = profile.tree_width;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
         settings.address_bar_visible = profile.address_bar_visible;
@@ -4453,7 +4474,7 @@ pub async fn list_tree_children(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
     relative_path: String,
-) -> Result<Response<Vec<CatalogEntry>>, String> {
+) -> Result<Response<Vec<TreeEntry>>, String> {
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
@@ -4481,25 +4502,16 @@ pub async fn list_tree_children(
         }
     };
     let requested_directory = root.join(relative_path.as_str());
-    let show_hidden = state
+    let (show_hidden, confirm_children) = state
         .store
         .lock()
         .map_err(|_| "state poisoned")?
         .as_ref()
         .and_then(|store| store.load_settings().ok())
-        .is_some_and(|settings| settings.show_hidden_files);
+        .map(|settings| (settings.show_hidden_files, settings.tree_confirm_children))
+        .unwrap_or((false, true));
     let result = tauri::async_runtime::spawn_blocking(move || {
-        enumerate_folder_with_hidden(&root, &requested_directory, show_hidden).map(|entries| {
-            entries
-                .into_iter()
-                .filter(|entry| {
-                    matches!(
-                        entry.kind,
-                        crate::domain::ItemKind::Folder | crate::domain::ItemKind::ComicFolder
-                    )
-                })
-                .collect()
-        })
+        enumerate_tree_children(&root, &requested_directory, show_hidden, confirm_children)
     })
     .await
     .map_err(|error| format!("tree worker failed: {error}"))?;
@@ -4510,6 +4522,41 @@ pub async fn list_tree_children(
             data,
         },
         Err(error) => error_response(&context, error),
+    })
+}
+
+fn enumerate_tree_children(
+    root: &Path,
+    requested_directory: &Path,
+    show_hidden: bool,
+    confirm_children: bool,
+) -> Result<Vec<TreeEntry>, AppError> {
+    enumerate_folder_with_hidden(root, requested_directory, show_hidden).and_then(|entries| {
+        entries
+            .into_iter()
+            .filter(|entry| {
+                matches!(
+                    entry.kind,
+                    crate::domain::ItemKind::Folder | crate::domain::ItemKind::ComicFolder
+                )
+            })
+            .map(|entry| {
+                let has_children = if confirm_children {
+                    has_child_folder_with_hidden(
+                        root,
+                        &root.join(entry.relative_path.as_str()),
+                        show_hidden,
+                    )
+                    .ok()
+                } else {
+                    None
+                };
+                Ok(TreeEntry {
+                    relative_path: entry.relative_path,
+                    has_children,
+                })
+            })
+            .collect()
     })
 }
 
@@ -5355,6 +5402,9 @@ mod shutdown_tests {
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
             tree_visible: false,
+            tree_auto_collapse: true,
+            tree_confirm_children: true,
+            tree_width: 320,
             menu_bar_visible: true,
             toolbar_visible: false,
             address_bar_visible: true,
@@ -6213,6 +6263,37 @@ mod shutdown_tests {
                 .code,
             ErrorCode::InvalidPath
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_006_tree_enumeration_measures_10000_direct_folders() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-tree-10000-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        for index in 0..10_000 {
+            std::fs::create_dir(root.join(format!("folder-{index:05}"))).unwrap();
+        }
+
+        let started = std::time::Instant::now();
+        let entries = enumerate_tree_children(&root, &root, false, true).unwrap();
+        let elapsed = started.elapsed();
+        eprintln!(
+            "REQ-LEY-P3-006 10000 direct folders with child confirmation: {:.3} ms",
+            elapsed.as_secs_f64() * 1000.0
+        );
+        assert_eq!(entries.len(), 10_000);
+        assert!(
+            entries
+                .iter()
+                .all(|entry| entry.has_children == Some(false))
+        );
+        assert!(elapsed < Duration::from_secs(60));
+        let unconfirmed = enumerate_tree_children(&root, &root, false, false).unwrap();
+        assert!(unconfirmed.iter().all(|entry| entry.has_children.is_none()));
         std::fs::remove_dir_all(root).unwrap();
     }
 

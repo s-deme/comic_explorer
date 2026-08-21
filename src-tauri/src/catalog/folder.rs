@@ -147,6 +147,37 @@ pub fn enumerate_folder_with_hidden(
     Ok(entries)
 }
 
+pub fn has_child_folder_with_hidden(
+    root: &Path,
+    directory: &Path,
+    show_hidden: bool,
+) -> Result<bool, AppError> {
+    let root = canonical_directory(root)?;
+    let directory = canonical_directory(directory)?;
+    ensure_contained(&root, &directory)?;
+    let iterator = fs::read_dir(&directory).map_err(|source| io_error(&directory, source))?;
+    for result in iterator {
+        let entry = match result {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let metadata = match fs::symlink_metadata(entry.path()) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        if !show_hidden && is_hidden(&entry.file_name().to_string_lossy(), &metadata) {
+            continue;
+        }
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        if metadata.is_dir() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub fn enumerate_folder_pages(root: &Path, comic: &Path) -> Result<Vec<RelativePath>, AppError> {
     enumerate_folder_pages_with_hidden(root, comic, false)
 }
@@ -362,6 +393,30 @@ mod tests {
         assert_eq!(default_entries[0].relative_path.as_str(), "visible.jpg");
         let all_entries = enumerate_folder_with_hidden(&root, &root, true).unwrap();
         assert_eq!(all_entries.len(), 3);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_006_checks_only_direct_visible_child_folders() {
+        let root = temporary_root("tree-child-presence");
+        let leaf = root.join("leaf");
+        let branch = root.join("branch");
+        let hidden_branch = root.join("hidden-branch");
+        fs::create_dir_all(&leaf).unwrap();
+        fs::create_dir_all(branch.join("child/grandchild")).unwrap();
+        fs::create_dir_all(hidden_branch.join(".child")).unwrap();
+        fs::write(leaf.join("page.jpg"), b"page").unwrap();
+
+        assert!(!has_child_folder_with_hidden(&root, &leaf, false).unwrap());
+        assert!(has_child_folder_with_hidden(&root, &branch, false).unwrap());
+        assert!(!has_child_folder_with_hidden(&root, &hidden_branch, false).unwrap());
+        assert!(has_child_folder_with_hidden(&root, &hidden_branch, true).unwrap());
+        assert_eq!(
+            has_child_folder_with_hidden(&root, &root.join("missing"), false)
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
         fs::remove_dir_all(&root).unwrap();
     }
 

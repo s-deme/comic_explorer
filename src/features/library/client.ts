@@ -169,6 +169,9 @@ export interface CatalogSettings {
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
   treeVisible: boolean;
+  treeAutoCollapse: boolean;
+  treeConfirmChildren: boolean;
+  treeWidth: number;
   menuBarVisible: boolean;
   toolbarVisible: boolean;
   addressBarVisible: boolean;
@@ -294,6 +297,9 @@ export async function saveSettingsProfile(
       smoothScroll: profile.smoothScroll,
       pageScanMode: profile.pageScanMode,
       treeVisible: profile.treeVisible,
+      treeAutoCollapse: profile.treeAutoCollapse,
+      treeConfirmChildren: profile.treeConfirmChildren,
+      treeWidth: profile.treeWidth,
       menuBarVisible: profile.menuBarVisible,
       toolbarVisible: profile.toolbarVisible,
       addressBarVisible: profile.addressBarVisible,
@@ -797,10 +803,15 @@ export async function getThumbnail(
   });
 }
 
+export interface TreeEntry {
+  relativePath: RelativePath;
+  hasChildren?: boolean | null;
+}
+
 export async function listTreeChildren(
   relativePath: string,
   generation: number,
-): Promise<ApiResponse<CatalogEntry[]>> {
+): Promise<ApiResponse<TreeEntry[]>> {
   return invoke("list_tree_children", {
     context: context(generation),
     relativePath,

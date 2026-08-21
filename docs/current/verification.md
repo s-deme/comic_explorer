@@ -358,6 +358,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 実100-event burstを250ms windowで1通知へcoalesceし、watcherを常に最大1件とするtestはPASS。10,000-event burst、network/removable drive、基準PCの反映時間・CPU・working setは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2で外部Explorerからの作成・rename・削除、設定切替、watch error表示、F5 fallbackは未測定。 |
 
+## Leeyes P3-G tree詳細動作
+
+対象はLEY-FILER-015の1件。Rustがdirect child folderとleaf/branchをroot-containedに判定し、frontendはleaf expander、自動折畳み、boundedなtree幅を提供する。設定はstrict profile v19とapp-local SQLiteへ保存し、書庫treeはP4へ分離する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust / filesystem | PASS | 2件、FAIL 0。direct childだけのleaf/branch、hidden child、missing、下位確認無効時のnullable結果、10,000直下folderを実filesystemで検証。 |
+| Focused frontend / profile | PASS | FolderTree 13件、profile 95件、client 6件、App 96件、計210件、FAIL 0。leaf expander、自動折畳み、pointer/keyboardの180〜480px clamp、v18→v19移行、Rust payloadを含む。 |
+| Windows tests / build | PASS | frontend 31 files / 427件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 539.48kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 195件とshutdown process 1件、FAIL 0。tree列挙、設定永続、watcher、既存search・catalog・viewer・file操作・SQLite境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは288.539秒で全12 stageがexit 0。Rust canonical 63.276秒、release executable 79.978秒、GUI権限付きshortcut product回帰11.124秒、cleanup audit、CoDD scan/check/verifyを含む。初回product gateは確認不能なdrive直下folderで親tree全体が停止する不足を検出し、そのnodeだけnullable未確認へfallback後に再実行した。 |
+| 性能・上限 | PASS / 限定 | Windows実filesystemの10,000直下folderを下位確認有効で2,900.692ms。test全体は作成・列挙・削除を含め16.75秒、60秒runaway上限内。CPU、peak working set、remote/removable driveは未測定。 |
+| 製品直接観測 | PASS / 限定 | release WebView2のproduct shortcutでdrive rootから深いharness folderまでcurrent ancestor treeを復元し、全127 catalog項目とshortcut操作を確認。設定dialogの各toggle、DPI別splitter drag、access変化は未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -42,6 +42,25 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P3-006 sends strict tree detail settings to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.treeAutoCollapse = true;
+    profile.treeConfirmChildren = false;
+    profile.treeWidth = 360;
+    await saveSettingsProfile(profile, 19);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          treeAutoCollapse: true,
+          treeConfirmChildren: false,
+          treeWidth: 360,
+        }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-002 sends the mask and basename batch to the Rust matcher", async () => {
     const candidates = [
       { basename: "one.cbz", kind: "archive" as const, byteSize: 10 },
