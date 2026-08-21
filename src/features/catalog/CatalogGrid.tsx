@@ -16,6 +16,11 @@ import {
   type CatalogViewMode,
 } from "./view-mode";
 import type { DetailGridLineMode, DetailRowDensity } from "../settings/profile";
+import {
+  DEFAULT_CATALOG_MOUSE_BINDINGS,
+  type CatalogMouseAction,
+  type CatalogMouseBindings,
+} from "../input/catalog-mouse";
 
 interface CatalogGridProps {
   entries: CatalogEntry[];
@@ -30,6 +35,8 @@ interface CatalogGridProps {
     entry: CatalogEntry,
     trigger: "doubleClick" | "enter" | "ctrlEnter",
   ) => void;
+  mouseBindings?: CatalogMouseBindings;
+  onMouseAction?: (action: CatalogMouseAction, entry: CatalogEntry) => void;
   viewMode?: CatalogViewMode;
   thumbnailSizes?: CatalogThumbnailSizes;
   palette?: "system" | "paper" | "midnight" | "highContrast";
@@ -197,6 +204,8 @@ export function CatalogGrid({
   onNavigate,
   onRead,
   onActivate,
+  mouseBindings = DEFAULT_CATALOG_MOUSE_BINDINGS,
+  onMouseAction,
   viewMode = "cover_list",
   thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
   palette = "system",
@@ -222,6 +231,7 @@ export function CatalogGrid({
   const previousFolderPath = useRef(currentFolderPath);
   const pendingScrollRestoration = useRef<{ path: string; scrollTop: number } | null>(null);
   const incrementalSearch = useRef({ value: "", updatedAt: 0 });
+  const primaryActionTimer = useRef<number | null>(null);
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
   const modeConfig = VIEW_MODE_CONFIG[viewMode];
   const layout = catalogLayoutFor(viewMode, thumbnailSizes, detailRowDensity);
@@ -240,7 +250,56 @@ export function CatalogGrid({
 
   useEffect(() => {
     incrementalSearch.current = { value: "", updatedAt: 0 };
+    if (primaryActionTimer.current !== null) {
+      window.clearTimeout(primaryActionTimer.current);
+      primaryActionTimer.current = null;
+    }
   }, [currentFolderPath]);
+
+  useEffect(() => () => {
+    if (primaryActionTimer.current !== null) {
+      window.clearTimeout(primaryActionTimer.current);
+    }
+  }, []);
+
+  function clearPrimaryAction() {
+    if (primaryActionTimer.current === null) return;
+    window.clearTimeout(primaryActionTimer.current);
+    primaryActionTimer.current = null;
+  }
+
+  function dispatchMouseAction(
+    action: CatalogMouseAction,
+    entry: CatalogEntry,
+    trigger: "enter" | "doubleClick" = "enter",
+  ) {
+    if (action === "none" || action === "selectOnly") return;
+    if (action === "openSelected" && onActivate !== undefined) {
+      onActivate(entry, trigger);
+      return;
+    }
+    if (onMouseAction !== undefined) {
+      onMouseAction(action, entry);
+      return;
+    }
+    if (action === "openSelected") {
+      if (onActivate !== undefined) onActivate(entry, trigger);
+      else if (entry.kind === "folder" || entry.kind === "comicFolder") onNavigate(entry);
+      else if (entry.kind === "archive" || entry.kind === "pdf" || entry.kind === "page") {
+        onRead(entry);
+      }
+    }
+  }
+
+  function schedulePrimaryAction(entry: CatalogEntry) {
+    clearPrimaryAction();
+    const action = mouseBindings.primaryClick;
+    if (action === "none" || action === "selectOnly") return;
+    primaryActionTimer.current = window.setTimeout(() => {
+      primaryActionTimer.current = null;
+      dispatchMouseAction(action, entry);
+    }, 250);
+  }
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -480,15 +539,34 @@ export function CatalogGrid({
                         onClick={(event) => {
                           if (event.shiftKey) onSelect(entry, "range");
                           else if (event.ctrlKey || event.metaKey) onSelect(entry, "toggle");
-                          else onSelect(entry);
+                          else {
+                            onSelect(entry);
+                            if (event.detail === 1) schedulePrimaryAction(entry);
+                          }
                         }}
-                        onDoubleClick={() => {
-                          if (onActivate !== undefined) {
-                            onActivate(entry, "doubleClick");
-                          } else if (canNavigate) onNavigate(entry);
-                          else if (canRead) onRead(entry);
+                        onDoubleClick={(event) => {
+                          clearPrimaryAction();
+                          if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                          dispatchMouseAction(mouseBindings.doubleClick, entry, "doubleClick");
+                        }}
+                        onMouseDown={(event) => {
+                          if ([1, 3, 4].includes(event.button)) event.preventDefault();
+                        }}
+                        onAuxClick={(event) => {
+                          const action = event.button === 1
+                            ? mouseBindings.middleClick
+                            : event.button === 3
+                              ? mouseBindings.backButton
+                              : event.button === 4 ? mouseBindings.forwardButton : null;
+                          if (action === null) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          clearPrimaryAction();
+                          onSelect(entry);
+                          dispatchMouseAction(action, entry);
                         }}
                         onDragStart={(event) => {
+                          clearPrimaryAction();
                           const paths = selectedPaths?.includes(entry.relativePath)
                             ? selectedPaths
                             : [entry.relativePath];
@@ -531,6 +609,7 @@ export function CatalogGrid({
                           );
                         }}
                         onContextMenu={(event) => {
+                          clearPrimaryAction();
                           event.preventDefault();
                           event.stopPropagation();
                           onContextMenu(entry, { x: event.clientX, y: event.clientY });

@@ -139,6 +139,27 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P3-013 sends the complete catalog mouse registry to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.catalogMouseBindings.middleClick = "toggleSearch";
+    await saveSettingsProfile(profile, 24);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          catalogMouseBindings: {
+            primaryClick: "selectOnly",
+            doubleClick: "openSelected",
+            middleClick: "toggleSearch",
+            backButton: "navigateBack",
+            forwardButton: "navigateForward",
+          },
+        }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-010 sends only typed drag/drop commands to Rust", async () => {
     await copyFileItemsToDestination(["one.cbz", "two.pdf"], "Target", 31);
     await previewNativeFileDrop(["D:\\Incoming\\one.cbz"], "Target", 32);

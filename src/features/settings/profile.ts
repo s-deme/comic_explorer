@@ -5,6 +5,11 @@ import {
   type ShortcutBindings,
 } from "../input/shortcuts";
 import {
+  DEFAULT_CATALOG_MOUSE_BINDINGS,
+  strictCatalogMouseBindings,
+  type CatalogMouseBindings,
+} from "../input/catalog-mouse";
+import {
   CATALOG_VIEW_MODES,
   DEFAULT_CATALOG_VIEW_MODE,
   DEFAULT_CATALOG_THUMBNAIL_SIZES,
@@ -86,7 +91,7 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 23;
+export const SETTINGS_PROFILE_VERSION = 24;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -232,6 +237,7 @@ export interface SettingsProfile {
   detailShowSize: boolean;
   detailShowModified: boolean;
   shortcuts: ShortcutBindings;
+  catalogMouseBindings: CatalogMouseBindings;
   mouseGestures: MouseGestureBindings;
 }
 
@@ -311,6 +317,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     detailShowSize: true,
     detailShowModified: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
+    catalogMouseBindings: { ...DEFAULT_CATALOG_MOUSE_BINDINGS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
 }
@@ -534,6 +541,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const keyScrollContinuous = legacyKeyScrollPreferences
     ? DEFAULT_KEY_SCROLL_CONTINUOUS
     : candidate.keyScrollContinuous;
+  const catalogMouseBindings = legacyKeyScrollPreferences
+    || candidate.profileVersion === 23
+    ? { ...DEFAULT_CATALOG_MOUSE_BINDINGS }
+    : strictCatalogMouseBindings(candidate.catalogMouseBindings);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -557,6 +568,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 20
       && candidate.profileVersion !== 21
       && candidate.profileVersion !== 22
+      && candidate.profileVersion !== 23
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -637,6 +649,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof detailShowSize !== "boolean" ||
     typeof detailShowModified !== "boolean" ||
     shortcuts === null ||
+    catalogMouseBindings === null ||
     mouseGestures === null
   ) {
     return null;
@@ -716,6 +729,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     detailShowSize,
     detailShowModified,
     shortcuts,
+    catalogMouseBindings,
     mouseGestures,
   };
 }

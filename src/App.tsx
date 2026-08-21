@@ -196,6 +196,12 @@ import {
   type ShortcutBindings,
   type ShortcutCommand,
 } from "./features/input/shortcuts";
+import {
+  DEFAULT_CATALOG_MOUSE_BINDINGS,
+  strictCatalogMouseBindings,
+  type CatalogMouseAction,
+  type CatalogMouseBindings,
+} from "./features/input/catalog-mouse";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type {
   TreeFileAction,
@@ -742,6 +748,9 @@ export function App({
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
     ...DEFAULT_SHORTCUTS,
   }));
+  const [catalogMouseBindings, setCatalogMouseBindings] = useState<CatalogMouseBindings>(() => ({
+    ...DEFAULT_CATALOG_MOUSE_BINDINGS,
+  }));
   const [helpOpen, setHelpOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1000,34 +1009,7 @@ export function App({
           ?? fallbackCatalogShortcutCommand(event);
         if (command !== undefined) {
           event.preventDefault();
-          setActiveMenu(null);
-          setActiveToolbarMenu(null);
-          switch (command) {
-            case "openSelected":
-              openSelectedEntry();
-              break;
-            case "navigateBack": {
-              const destination = navigation.back.at(-1);
-              if (destination !== undefined) navigate(destination, "back");
-              break;
-            }
-            case "navigateForward": {
-              const destination = navigation.forward[0];
-              if (destination !== undefined) navigate(destination, "forward");
-              break;
-            }
-            case "navigateUp": {
-              const destination = parentPath(navigation.current);
-              if (destination !== null) navigate(destination);
-              break;
-            }
-            case "refreshCatalog":
-              refreshCatalog();
-              break;
-            case "toggleSearch":
-              setSearchPaneOpen((current) => !current);
-              break;
-          }
+          runCatalogCommand(command);
           return;
         }
       }
@@ -1281,6 +1263,10 @@ export function App({
             else setSelectionNotice("常に手前を復元できませんでした。");
           });
           setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
+          setCatalogMouseBindings(
+            strictCatalogMouseBindings(response.data.catalogMouseBindings)
+              ?? { ...DEFAULT_CATALOG_MOUSE_BINDINGS },
+          );
           setMouseGestures(normalizeMouseGestures(response.data.mouseGestures));
         }
       })
@@ -1820,6 +1806,46 @@ export function App({
     const entry = sortedEntries.find((candidate) => candidate.relativePath === selectedPath);
     if (entry === undefined) return;
     void handleCatalogActivation(entry, "enter");
+  }
+
+  function runCatalogCommand(
+    command: Exclude<CatalogMouseAction, "none" | "selectOnly">,
+    eventEntry?: CatalogEntry,
+  ) {
+    setActiveMenu(null);
+    setActiveToolbarMenu(null);
+    switch (command) {
+      case "openSelected":
+        if (eventEntry !== undefined) void handleCatalogActivation(eventEntry, "enter");
+        else openSelectedEntry();
+        break;
+      case "navigateBack": {
+        const destination = navigation.back.at(-1);
+        if (destination !== undefined) navigate(destination, "back");
+        break;
+      }
+      case "navigateForward": {
+        const destination = navigation.forward[0];
+        if (destination !== undefined) navigate(destination, "forward");
+        break;
+      }
+      case "navigateUp": {
+        const destination = parentPath(navigation.current);
+        if (destination !== null) navigate(destination);
+        break;
+      }
+      case "refreshCatalog":
+        refreshCatalog();
+        break;
+      case "toggleSearch":
+        setSearchPaneOpen((current) => !current);
+        break;
+    }
+  }
+
+  function handleCatalogMouseAction(action: CatalogMouseAction, entry: CatalogEntry) {
+    if (action === "none" || action === "selectOnly") return;
+    runCatalogCommand(action, entry);
   }
 
   function rememberRecent(entry: CatalogEntry) {
@@ -3326,6 +3352,7 @@ export function App({
       detailShowSize,
       detailShowModified,
       shortcuts: { ...shortcuts },
+      catalogMouseBindings: { ...catalogMouseBindings },
       mouseGestures: { ...mouseGestures },
     };
   }
@@ -3454,6 +3481,10 @@ export function App({
       setDetailShowSize(normalized.detailShowSize);
       setDetailShowModified(normalized.detailShowModified);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
+      setCatalogMouseBindings(
+        strictCatalogMouseBindings(response.data.catalogMouseBindings)
+          ?? normalized.catalogMouseBindings,
+      );
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
       setSettingsDraft(null);
@@ -3630,7 +3661,7 @@ export function App({
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
-    shortcuts, mouseGestures,
+    shortcuts, catalogMouseBindings, mouseGestures,
   ]);
 
   function queueThumbnail(
@@ -6161,6 +6192,8 @@ export function App({
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
               onActivate={(entry, trigger) => void handleCatalogActivation(entry, trigger)}
+              mouseBindings={catalogMouseBindings}
+              onMouseAction={handleCatalogMouseAction}
               onContextMenu={openCatalogContextMenu}
               onFileDragStart={setDraggedFilePaths}
               onNativeFileDragStart={(paths) => void startDraggedItemsNative(paths)}

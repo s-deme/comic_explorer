@@ -28,6 +28,7 @@ import type { EndOfVolumePolicy } from "../catalog/end-of-volume";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
+import type { CatalogMouseBindings } from "../input/catalog-mouse";
 import type {
   MouseGestureBindings,
   CatalogPalette,
@@ -199,6 +200,7 @@ export interface CatalogSettings {
   detailShowSize: boolean;
   detailShowModified: boolean;
   shortcuts: ShortcutBindings;
+  catalogMouseBindings: CatalogMouseBindings;
   mouseGestures: MouseGestureBindings;
 }
 
@@ -337,6 +339,7 @@ export async function saveSettingsProfile(
       detailShowSize: profile.detailShowSize,
       detailShowModified: profile.detailShowModified,
       shortcuts: profile.shortcuts,
+      catalogMouseBindings: profile.catalogMouseBindings,
       mouseGestures: profile.mouseGestures,
     },
   });

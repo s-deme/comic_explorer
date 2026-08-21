@@ -23,6 +23,14 @@ import {
   type ShortcutCommand,
 } from "../input/shortcuts";
 import {
+  CATALOG_MOUSE_ACTIONS,
+  CATALOG_MOUSE_GESTURE_DESCRIPTIONS,
+  CATALOG_MOUSE_GESTURE_LABELS,
+  CATALOG_MOUSE_GESTURE_NAMES,
+  catalogMouseActionLabel,
+  type CatalogMouseAction,
+} from "../input/catalog-mouse";
+import {
   MAX_VIEWER_SPACING,
   MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
   MAX_PORTRAIT_ASPECT_PERCENT,
@@ -548,6 +556,11 @@ export function SettingsDialog({
       id: `shortcut-${command}`,
       category: "commands" as const,
       text: `${SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]} ${SHORTCUT_LABELS[command]} ショートカット キー コマンド ${draft.shortcuts[command].join(" ")} ${DEFAULT_SHORTCUTS[command].join(" ")} ${SHORTCUT_FALLBACKS[command]} ${SHORTCUT_DESCRIPTIONS[command]} ${CONFIGURABLE_MOUSE_GESTURE_NAMES.filter((name) => draft.mouseGestures[name] === command).map((name) => GESTURE_LABELS[name]).join(" ")}`,
+    })),
+    ...CATALOG_MOUSE_GESTURE_NAMES.map((name) => ({
+      id: `catalog-mouse-${name}`,
+      category: "commands" as const,
+      text: `一覧 マウス ${CATALOG_MOUSE_GESTURE_LABELS[name]} ${catalogMouseActionLabel(draft.catalogMouseBindings[name])} ${CATALOG_MOUSE_GESTURE_DESCRIPTIONS[name]}`,
     })),
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
@@ -1359,7 +1372,32 @@ export function SettingsDialog({
                   <button type="button" aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`} onClick={() => onResetShortcut(command)}>戻す</button>
                 </div>
               ))}
-              <h3 className="settings-subheading">マウスジェスチャー</h3>
+              <h3 className="settings-subheading">一覧マウス割当</h3>
+              {CATALOG_MOUSE_GESTURE_NAMES.map((name) => (
+                <SettingRow
+                  key={name}
+                  id={`catalog-mouse-${name}`}
+                  title={CATALOG_MOUSE_GESTURE_LABELS[name]}
+                  description={CATALOG_MOUSE_GESTURE_DESCRIPTIONS[name]}
+                  hidden={rowHidden(`catalog-mouse-${name}`)}
+                >
+                  <select
+                    aria-label={`profile一覧${CATALOG_MOUSE_GESTURE_LABELS[name]}割当`}
+                    value={draft.catalogMouseBindings[name]}
+                    onChange={(event) => update({
+                      catalogMouseBindings: {
+                        ...draft.catalogMouseBindings,
+                        [name]: event.target.value as CatalogMouseAction,
+                      },
+                    })}
+                  >
+                    {CATALOG_MOUSE_ACTIONS.map((action) => (
+                      <option key={action} value={action}>{catalogMouseActionLabel(action)}</option>
+                    ))}
+                  </select>
+                </SettingRow>
+              ))}
+              <h3 className="settings-subheading">Viewerマウスジェスチャー</h3>
               <SettingRow id="pan-factor" title="ドラッグ移動係数" description="画像をpointerでpanするときの移動量だけを50%〜200%で調整します。" hidden={rowHidden("pan-factor")}>
                 <div className="settings-number-control">
                   <input

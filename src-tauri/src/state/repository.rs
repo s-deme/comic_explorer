@@ -56,6 +56,19 @@ fn default_mouse_gesture_bindings() -> BTreeMap<String, String> {
     .collect()
 }
 
+fn default_catalog_mouse_bindings() -> BTreeMap<String, String> {
+    [
+        ("primaryClick", "selectOnly"),
+        ("doubleClick", "openSelected"),
+        ("middleClick", "none"),
+        ("backButton", "navigateBack"),
+        ("forwardButton", "navigateForward"),
+    ]
+    .into_iter()
+    .map(|(gesture, action)| (gesture.to_owned(), action.to_owned()))
+    .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub library_root: Option<PathBuf>,
@@ -135,6 +148,7 @@ pub struct Settings {
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcut_bindings: BTreeMap<String, Vec<String>>,
+    pub catalog_mouse_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
 
@@ -250,6 +264,7 @@ impl Default for Settings {
             restore_last_viewer: false,
             auto_refresh_current_folder: true,
             shortcut_bindings: default_shortcut_bindings(),
+            catalog_mouse_bindings: default_catalog_mouse_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
     }
@@ -415,6 +430,11 @@ impl StateStore {
                             .collect();
                     }
                 }
+                "catalogMouseBindings" => {
+                    if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
+                        settings.catalog_mouse_bindings = bindings;
+                    }
+                }
                 "mouseGestureBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.mouse_gesture_bindings = bindings;
@@ -432,6 +452,13 @@ impl StateStore {
             serde_json::to_string(&settings.shortcut_bindings).map_err(|error| AppError {
                 code: ErrorCode::Internal,
                 message: format!("Shortcut settings could not be encoded: {error}"),
+                target: None,
+                retryable: false,
+            })?;
+        let catalog_mouse_bindings = serde_json::to_string(&settings.catalog_mouse_bindings)
+            .map_err(|error| AppError {
+                code: ErrorCode::Internal,
+                message: format!("Catalog mouse settings could not be encoded: {error}"),
                 target: None,
                 retryable: false,
             })?;
@@ -588,6 +615,7 @@ impl StateStore {
                 settings.auto_refresh_current_folder.to_string(),
             ),
             ("shortcutBindings", shortcut_bindings),
+            ("catalogMouseBindings", catalog_mouse_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
         if let Some(root) = &settings.library_root {
@@ -1759,7 +1787,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b17_and_req_ley_p3_012_settings_survive_reopen() {
+    fn fr_b17_and_req_ley_p3_012_and_p3_013_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1850,6 +1878,15 @@ mod tests {
                     ("toggleDirection".into(), vec!["R".into()]),
                     ("zoomIn".into(), vec!["+".into()]),
                     ("zoomOut".into(), vec!["-".into()]),
+                ]
+                .into_iter()
+                .collect(),
+                catalog_mouse_bindings: [
+                    ("primaryClick".into(), "openSelected".into()),
+                    ("doubleClick".into(), "selectOnly".into()),
+                    ("middleClick".into(), "toggleSearch".into()),
+                    ("backButton".into(), "navigateUp".into()),
+                    ("forwardButton".into(), "refreshCatalog".into()),
                 ]
                 .into_iter()
                 .collect(),
@@ -1962,6 +1999,14 @@ mod tests {
         assert!(restored.restore_last_viewer);
         assert!(!restored.auto_refresh_current_folder);
         assert_eq!(restored.shortcut_bindings["nextPage"], ["N", "PageDown"]);
+        assert_eq!(
+            restored.catalog_mouse_bindings["primaryClick"],
+            "openSelected"
+        );
+        assert_eq!(
+            restored.catalog_mouse_bindings["middleClick"],
+            "toggleSearch"
+        );
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],
             "closeViewer"

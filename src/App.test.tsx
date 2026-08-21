@@ -350,6 +350,13 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
     detailShowSize: true,
     detailShowModified: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  catalogMouseBindings: {
+    primaryClick: "selectOnly",
+    doubleClick: "openSelected",
+    middleClick: "none",
+    backButton: "navigateBack",
+    forwardButton: "navigateForward",
+  },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 
@@ -1196,6 +1203,60 @@ describe("application shell", () => {
     fireEvent.doubleClick(screen.getByRole("button", { name: /book\.cbz/ }));
     expect(await screen.findByText(/対応していません/)).toBeInTheDocument();
     expect(openMock).not.toHaveBeenCalled();
+  });
+
+  it("REQ-LEY-P3-013 routes configured catalog mouse actions through existing handlers", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-mouse" as never,
+      generation: 1 as never,
+      data: {
+        ...DEFAULT_CATALOG_SETTINGS,
+        catalogMouseBindings: {
+          primaryClick: "toggleSearch",
+          doubleClick: "openSelected",
+          middleClick: "refreshCatalog",
+          backButton: "navigateBack",
+          forwardButton: "navigateForward",
+        },
+      },
+    });
+    openMock.mockResolvedValue(viewerResponse("book.cbz"));
+    await registerTestLibrary([testEntry("book.cbz")]);
+    await waitFor(() => expect(settingsMock).toHaveBeenCalled());
+    let item = screen.getByRole("button", { name: /book\.cbz/ });
+
+    fireEvent.click(item, { detail: 1 });
+    expect(await screen.findByRole("complementary", { name: "検索ペイン" }))
+      .toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "検索ペインを閉じる" })[0]);
+
+    const refreshBaseline = listMock.mock.calls.length;
+    fireEvent(item, new MouseEvent("auxclick", {
+      bubbles: true, cancelable: true, button: 1,
+    }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(refreshBaseline + 1));
+
+    fireEvent.change(screen.getByLabelText("アドレス"), { target: { value: "C:\\Series" } });
+    fireEvent.submit(screen.getByLabelText("アドレス").closest("form")!);
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Series"));
+    item = screen.getByRole("button", { name: /book\.cbz/ });
+    fireEvent(item, new MouseEvent("auxclick", {
+      bubbles: true, cancelable: true, button: 3,
+    }));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"));
+    item = screen.getByRole("button", { name: /book\.cbz/ });
+    fireEvent(item, new MouseEvent("auxclick", {
+      bubbles: true, cancelable: true, button: 4,
+    }));
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\Series"));
+
+    item = screen.getByRole("button", { name: /book\.cbz/ });
+    fireEvent.doubleClick(item);
+    await waitFor(() => expect(resolveCatalogActivationMock).toHaveBeenLastCalledWith(
+      "archive", "doubleClick", expect.any(Number),
+    ));
+    expect(await screen.findByLabelText("book.cbz ビューワ")).toBeInTheDocument();
   });
 
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
@@ -3381,6 +3442,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
+      target: { value: "toggleSearch" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     expect(screen.getByLabelText("一覧表示形式"))
@@ -3476,6 +3540,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
+      target: { value: "toggleSearch" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
@@ -3518,6 +3585,13 @@ describe("application shell", () => {
         wheelScrollFactor: 1.4,
         smoothScroll: false,
         pageScanMode: "z",
+        catalogMouseBindings: expect.objectContaining({
+          primaryClick: "selectOnly",
+          doubleClick: "openSelected",
+          middleClick: "toggleSearch",
+          backButton: "navigateBack",
+          forwardButton: "navigateForward",
+        }),
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
           doubleClick: "toggleFullscreen",

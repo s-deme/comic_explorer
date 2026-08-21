@@ -189,6 +189,13 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
     detailShowSize: true,
     detailShowModified: true,
       shortcuts: { ...DEFAULT_SHORTCUTS, ...shortcuts },
+      catalogMouseBindings: {
+        primaryClick: "selectOnly",
+        doubleClick: "openSelected",
+        middleClick: "none",
+        backButton: "navigateBack",
+        forwardButton: "navigateForward",
+      },
       mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
     } satisfies CatalogSettings,
   };

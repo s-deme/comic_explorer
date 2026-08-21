@@ -103,6 +103,8 @@ P3-LではLEY-INPUT-001をPublishedとした。各catalog/viewer commandへ順�
 
 P3-MではLEY-INPUT-005をPublishedとした。paged Viewerのmodifierなし矢印keyで上下左右のoverflowを設定済みviewport比率だけpanし、PageUp/PageDownと前後page commandにも同じ量を共有した。repeatは100〜300%の加速率または連続動作無効を選べ、focus・modifier・IMEを保護し、左右端では走査を二重適用せず既存page移動へ進む。Rustが加速率・連続動作をstrict profile v23とSQLiteで検証・atomic保存し、TypeScriptはWebView keyboard eventとDOM scrollのadapterに限定した。frontend 32 files / 449件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。実keyboard repeat rate、IME/layout差、scroll latency、DPI、CPU・working setは未測定として残す。
 
+P3-NではLEY-INPUT-006をPublishedとした。catalogのprimary、double、middle、back、forwardへ安全な既知commandを割り当て、primary選択、modifier複数選択、context menu、drag、favoriteを固定操作として保護した。Rustが完全なgesture/action registryをstrict profile v24とSQLiteで検証・atomic保存し、TypeScriptはWebView event、250msのsingle/double分離、設定draft、既存handlerへのdispatchに限定した。frontend 33 files / 456件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。並行負荷時の既存FT-B14-001 timeoutは単独および負荷分離した全体再実行でPASSした。実double-click interval、button 3/4、touchpad、DPI、input latency、CPU・working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

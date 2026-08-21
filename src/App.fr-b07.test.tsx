@@ -243,6 +243,13 @@ const defaultSettings: CatalogSettings = {
     detailShowSize: true,
     detailShowModified: true,
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  catalogMouseBindings: {
+    primaryClick: "selectOnly",
+    doubleClick: "openSelected",
+    middleClick: "none",
+    backButton: "navigateBack",
+    forwardButton: "navigateForward",
+  },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 

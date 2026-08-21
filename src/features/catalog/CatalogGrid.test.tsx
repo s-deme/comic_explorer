@@ -15,6 +15,7 @@ function entries(count: number): CatalogEntry[] {
 describe("CatalogGrid", () => {
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -439,6 +440,132 @@ describe("CatalogGrid", () => {
     expect(onActivate).toHaveBeenNthCalledWith(3, expect.objectContaining({ relativePath: "book-0" }), "ctrlEnter");
     expect(onNavigate).not.toHaveBeenCalled();
     expect(onRead).not.toHaveBeenCalled();
+  });
+
+  it("REQ-LEY-P3-013 separates delayed primary and double-click actions", () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    const onActivate = vi.fn();
+    const onMouseAction = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        onActivate={onActivate}
+        mouseBindings={{
+          primaryClick: "refreshCatalog",
+          doubleClick: "openSelected",
+          middleClick: "none",
+          backButton: "navigateBack",
+          forwardButton: "navigateForward",
+        }}
+        onMouseAction={onMouseAction}
+      />,
+    );
+    const item = screen.getByRole("button", { name: /book-0/ });
+
+    fireEvent.click(item, { detail: 1 });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onMouseAction).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(249);
+    expect(onMouseAction).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onMouseAction).toHaveBeenCalledWith(
+      "refreshCatalog",
+      expect.objectContaining({ relativePath: "book-0" }),
+    );
+
+    onMouseAction.mockClear();
+    fireEvent.click(item, { detail: 1 });
+    fireEvent.doubleClick(item);
+    vi.runAllTimers();
+    expect(onMouseAction).not.toHaveBeenCalled();
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onActivate).toHaveBeenCalledWith(
+      expect.objectContaining({ relativePath: "book-0" }),
+      "doubleClick",
+    );
+  });
+
+  it("REQ-LEY-P3-013 dispatches middle/back/forward while preserving fixed interactions", () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    const onMouseAction = vi.fn();
+    const onContextMenu = vi.fn();
+    const onFileDragStart = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={onSelect}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        mouseBindings={{
+          primaryClick: "refreshCatalog",
+          doubleClick: "toggleSearch",
+          middleClick: "toggleSearch",
+          backButton: "navigateUp",
+          forwardButton: "refreshCatalog",
+        }}
+        onMouseAction={onMouseAction}
+        onContextMenu={onContextMenu}
+        onFileDragStart={onFileDragStart}
+      />,
+    );
+    const item = screen.getByRole("button", { name: /book-0/ });
+
+    fireEvent(item, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+    fireEvent(item, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 3 }));
+    fireEvent(item, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 4 }));
+    expect(onMouseAction.mock.calls.map(([action]) => action))
+      .toEqual(["toggleSearch", "navigateUp", "refreshCatalog"]);
+    expect(onSelect).toHaveBeenCalledTimes(3);
+
+    onMouseAction.mockClear();
+    fireEvent.click(item, { detail: 1, ctrlKey: true });
+    fireEvent.click(item, { detail: 1, shiftKey: true });
+    vi.runAllTimers();
+    expect(onMouseAction).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith(expect.any(Object), "toggle");
+    expect(onSelect).toHaveBeenCalledWith(expect.any(Object), "range");
+
+    fireEvent.contextMenu(item, { clientX: 1, clientY: 2 });
+    expect(onContextMenu).toHaveBeenCalledTimes(1);
+    fireEvent.click(item, { detail: 1 });
+    fireEvent.dragStart(item, {
+      dataTransfer: { effectAllowed: "none", setData: vi.fn() },
+    });
+    vi.runAllTimers();
+    expect(onMouseAction).not.toHaveBeenCalled();
+    expect(onFileDragStart).toHaveBeenCalledWith(["book-0"]);
+  });
+
+  it("REQ-LEY-P3-013 cancels a pending primary action when the list unmounts", () => {
+    vi.useFakeTimers();
+    const onMouseAction = vi.fn();
+    const result = render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={() => undefined}
+        onRead={() => undefined}
+        mouseBindings={{
+          ...{ primaryClick: "refreshCatalog", doubleClick: "openSelected" } as const,
+          middleClick: "none",
+          backButton: "navigateBack",
+          forwardButton: "navigateForward",
+        }}
+        onMouseAction={onMouseAction}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /book-0/ }), { detail: 1 });
+    result.unmount();
+    vi.runAllTimers();
+    expect(onMouseAction).not.toHaveBeenCalled();
   });
 
   it("opens the item context menu from right click and Shift+F10", () => {

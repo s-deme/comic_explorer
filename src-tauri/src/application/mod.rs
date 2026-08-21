@@ -518,6 +518,7 @@ pub struct CatalogSettings {
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
+    pub catalog_mouse_bindings: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -607,6 +608,7 @@ pub struct SettingsProfileInput {
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
+    pub catalog_mouse_bindings: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -762,6 +764,23 @@ const MOUSE_GESTURE_ACTIONS: [&str; 11] = [
     "zoomOut",
     "toggleLoupe",
     "toggleFullscreen",
+];
+const CATALOG_MOUSE_GESTURE_NAMES: [&str; 5] = [
+    "primaryClick",
+    "doubleClick",
+    "middleClick",
+    "backButton",
+    "forwardButton",
+];
+const CATALOG_MOUSE_ACTIONS: [&str; 8] = [
+    "none",
+    "selectOnly",
+    "openSelected",
+    "navigateBack",
+    "navigateForward",
+    "navigateUp",
+    "refreshCatalog",
+    "toggleSearch",
 ];
 
 fn default_shortcuts() -> BTreeMap<String, Vec<String>> {
@@ -940,6 +959,32 @@ fn normalize_mouse_gestures(
     normalized.extend(gestures.clone());
     normalized.insert("doubleClick".into(), "toggleFullscreen".into());
     Some(normalized)
+}
+
+fn default_catalog_mouse_bindings() -> BTreeMap<String, String> {
+    [
+        ("primaryClick", "selectOnly"),
+        ("doubleClick", "openSelected"),
+        ("middleClick", "none"),
+        ("backButton", "navigateBack"),
+        ("forwardButton", "navigateForward"),
+    ]
+    .into_iter()
+    .map(|(gesture, action)| (gesture.to_owned(), action.to_owned()))
+    .collect()
+}
+
+fn normalize_catalog_mouse_bindings(
+    bindings: &BTreeMap<String, String>,
+) -> Option<BTreeMap<String, String>> {
+    (bindings.len() == CATALOG_MOUSE_GESTURE_NAMES.len()
+        && bindings
+            .keys()
+            .all(|gesture| CATALOG_MOUSE_GESTURE_NAMES.contains(&gesture.as_str()))
+        && bindings
+            .values()
+            .all(|action| CATALOG_MOUSE_ACTIONS.contains(&action.as_str())))
+    .then(|| bindings.clone())
 }
 
 fn shortcuts_for_settings(settings: &crate::state::Settings) -> BTreeMap<String, Vec<String>> {
@@ -1264,6 +1309,8 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let prefetch_behind = prefetch_page_count(&settings.prefetch_behind, DEFAULT_PREFETCH_BEHIND);
     let prefetch_memory_mib = prefetch_memory_mib(&settings);
     let shortcuts = shortcuts_for_settings(&settings);
+    let catalog_mouse_bindings = normalize_catalog_mouse_bindings(&settings.catalog_mouse_bindings)
+        .unwrap_or_else(default_catalog_mouse_bindings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
     CatalogSettings {
@@ -1376,6 +1423,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         restore_last_viewer: settings.restore_last_viewer,
         auto_refresh_current_folder: settings.auto_refresh_current_folder,
         shortcuts,
+        catalog_mouse_bindings,
         mouse_gestures,
     }
 }
@@ -2711,7 +2759,14 @@ pub fn set_viewer_settings(
 
 fn validate_settings_profile(
     profile: &SettingsProfileInput,
-) -> Result<(BTreeMap<String, Vec<String>>, BTreeMap<String, String>), AppError> {
+) -> Result<
+    (
+        BTreeMap<String, Vec<String>>,
+        BTreeMap<String, String>,
+        BTreeMap<String, String>,
+    ),
+    AppError,
+> {
     let shortcuts = normalize_shortcuts(&profile.shortcuts).ok_or_else(|| {
         request_error(
             ErrorCode::InvalidRequest,
@@ -2724,6 +2779,13 @@ fn validate_settings_profile(
             "Mouse gesture bindings are invalid or conflicting.",
         )
     })?;
+    let catalog_mouse_bindings = normalize_catalog_mouse_bindings(&profile.catalog_mouse_bindings)
+        .ok_or_else(|| {
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Catalog mouse bindings contain an unknown gesture or action.",
+            )
+        })?;
     if !matches!(
         profile.sort_field.as_str(),
         "name" | "modified" | "size" | "kind"
@@ -2845,7 +2907,7 @@ fn validate_settings_profile(
             "Settings profile contains an invalid value.",
         ));
     }
-    Ok((shortcuts, mouse_gestures))
+    Ok((shortcuts, catalog_mouse_bindings, mouse_gestures))
 }
 
 #[tauri::command]
@@ -2858,10 +2920,11 @@ pub fn set_settings_profile(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    let (shortcuts, mouse_gestures) = match validate_settings_profile(&profile) {
-        Ok(bindings) => bindings,
-        Err(error) => return Ok(error_response(&context, error)),
-    };
+    let (shortcuts, catalog_mouse_bindings, mouse_gestures) =
+        match validate_settings_profile(&profile) {
+            Ok(bindings) => bindings,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
     let settings = {
         let mut stores = match state.store.lock() {
             Ok(stores) => stores,
@@ -2968,6 +3031,7 @@ pub fn set_settings_profile(
         settings.restore_last_viewer = profile.restore_last_viewer;
         settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
         settings.shortcut_bindings = shortcuts;
+        settings.catalog_mouse_bindings = catalog_mouse_bindings;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
             return Ok(error_response(&context, error));
@@ -5847,7 +5911,7 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn fr_b19_settings_profile_validates_all_atomic_bindings() {
+    fn fr_b19_and_req_ley_p3_013_settings_profile_validates_all_atomic_bindings() {
         let mut profile = SettingsProfileInput {
             sort_field: "name".into(),
             sort_descending: false,
@@ -5927,10 +5991,12 @@ mod shutdown_tests {
             restore_last_viewer: false,
             auto_refresh_current_folder: true,
             shortcuts: default_shortcuts(),
+            catalog_mouse_bindings: default_catalog_mouse_bindings(),
             mouse_gestures: default_mouse_gestures(),
         };
-        let (shortcuts, gestures) = validate_settings_profile(&profile).unwrap();
+        let (shortcuts, catalog_mouse, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(shortcuts, profile.shortcuts);
+        assert_eq!(catalog_mouse, profile.catalog_mouse_bindings);
         assert_eq!(gestures, profile.mouse_gestures);
         profile.detail_grid_lines = "vertical".into();
         assert_eq!(
@@ -6110,13 +6176,29 @@ mod shutdown_tests {
         profile
             .mouse_gestures
             .insert("middleClick".into(), "nextPage".into());
-        let (_, gestures) = validate_settings_profile(&profile).unwrap();
+        let (_, _, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(gestures["doubleClick"], "toggleFullscreen");
         assert_eq!(gestures["middleClick"], "nextPage");
 
         profile
             .mouse_gestures
             .insert("middleClick".into(), "openSelected".into());
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.mouse_gestures = default_mouse_gestures();
+        profile
+            .catalog_mouse_bindings
+            .insert("middleClick".into(), "delete".into());
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.catalog_mouse_bindings = default_catalog_mouse_bindings();
+        profile
+            .catalog_mouse_bindings
+            .insert("unknownButton".into(), "none".into());
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
             ErrorCode::InvalidRequest

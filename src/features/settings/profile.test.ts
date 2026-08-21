@@ -91,6 +91,13 @@ function validProfile(): SettingsProfile {
     detailShowSize: true,
     detailShowModified: true,
     shortcuts: { ...DEFAULT_SHORTCUTS },
+    catalogMouseBindings: {
+      primaryClick: "selectOnly",
+      doubleClick: "openSelected",
+      middleClick: "none",
+      backButton: "navigateBack",
+      forwardButton: "navigateForward",
+    },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
 }
@@ -137,7 +144,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 24, 99, "21", undefined])(
+  it.each([0, 25, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -316,6 +323,37 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile({
       ...validProfile(),
       keyScrollContinuous: "yes",
+    })).toBeNull();
+  });
+
+  it("REQ-LEY-P3-013 migrates v23 catalog mouse defaults and rejects unknown bindings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 23;
+    delete legacy.catalogMouseBindings;
+    expect(normalizeSettingsProfile(legacy)).toMatchObject({
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      catalogMouseBindings: {
+        primaryClick: "selectOnly",
+        doubleClick: "openSelected",
+        middleClick: "none",
+        backButton: "navigateBack",
+        forwardButton: "navigateForward",
+      },
+    });
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      catalogMouseBindings: {
+        ...validProfile().catalogMouseBindings,
+        sideButton: "navigateBack",
+      },
+    })).toBeNull();
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      catalogMouseBindings: {
+        ...validProfile().catalogMouseBindings,
+        primaryClick: "delete",
+      },
     })).toBeNull();
   });
 
