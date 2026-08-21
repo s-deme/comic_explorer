@@ -41,25 +41,3 @@ export function rangeSelection(
   const end = Math.max(anchorIndex, targetIndex);
   return entries.slice(start, end + 1).map((entry) => entry.relativePath);
 }
-
-export function csvEscape(value: string): string {
-  const safeValue = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safeValue)
-    ? `"${safeValue.replaceAll('"', '""')}"`
-    : safeValue;
-}
-
-export function catalogCsv(entries: CatalogEntry[]): string {
-  const header = ["name", "kind", "relativePath", "size", "modified"].join(",");
-  const rows = entries.map((entry) => {
-    const name = entry.relativePath.split("/").at(-1) ?? entry.relativePath;
-    return [
-      name,
-      entry.kind,
-      entry.relativePath,
-      entry.byteSize?.toString() ?? "",
-      entry.modifiedMs?.toString() ?? "",
-    ].map(csvEscape).join(",");
-  });
-  return [header, ...rows].join("\n");
-}

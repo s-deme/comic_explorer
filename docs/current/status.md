@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 22 | 9 |
+| P3 操作・検索 | 31 | 28 | 3 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **59** | **44** |
+| **合計** | **103** | **65** | **38** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -116,6 +116,8 @@ P3-RではLEY-FILE-005/006/007をPublishedとした。Windows native pickerで�
 P3-SではLEY-FILE-022をPublishedとした。単一renameは拡張子を除く初期選択を既定とし、設定で拡張子まで選択できる。複数選択は2〜256件の基本名・separator・開始番号・桁数・拡張子保持をSQLiteへ保存し、RustがWindows名規則、library包含、reparse、欠落、大小文字を無視した重複と既存target衝突を検証して相対path previewとopaque keyを返す。明示確認後も同じ計画をmutex内で再計算し、途中失敗では完了済みrenameを逆順rollbackする。TypeScriptは選択、入力、preview確認、Tauri orchestrationだけを担当する。256実fileの計画は62.821ms。release WebView2の実disk rename、network/removable drive、途中I/O障害、長いUnicode名、CPU・working setは未測定として残す。
 
 P3-TではLEY-SETTING-004をPublishedとした。任意の外部設定fileを標準保存先へせず、用途別strict settings snapshotをapp-local SQLite schema v8へ最大16件保存する。Rustが名前・件数・case一意性、全field、保存・明示上書き、active判定、変更field数、opaque key、切替直前再検証、settings全体とactive名のatomic保存を担当する。active中の削除・上書きを拒否し、通常設定変更ではsnapshotを暗黙更新せずactive表示を解除する。TypeScriptは入力、一覧、確認、native topmost adapter、成功値のReact反映、Tauri orchestrationだけを担当する。16 full profilesのdeserialize・strict validationは4.613ms。release WebView2での切替表示、DB障害復旧、長いUnicode名、CPU・working setは未測定として残す。
+
+P3-UではLEY-IO-001〜006をPublishedとした。従来TypeScriptにあった固定CSV生成を撤去し、Rustをpreset schema、列順、header、size単位、filename分割、対象scope、filesystem再列挙、escape、出力byte列の唯一の正本とした。presetはapp-local SQLite schema v9へ最大32件保存し、選択・現在folder・recursiveをlibrary root内で再検証する。recursiveはsymlink/reparseを追跡せず深さ64、50,000行、16 MiBでfail closedし、UTF-8 BOM・CRLFとformula無害化を適用する。TypeScriptはdialog入力、確認、Tauri orchestration、Rust byte列のdownloadだけを担当する。50,000 synthetic行は808.978ms・2,639,808 bytes。frontend 37 files / 480件、Python 61件、Rust 221+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2の保存dialog、50,000実file、slow/removable drive、長いUnicode delimiter、DB障害、CPU・working setは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

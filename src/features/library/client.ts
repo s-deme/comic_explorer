@@ -1073,6 +1073,87 @@ export async function deleteCatalogMask(
   });
 }
 
+export type CsvColumn =
+  | "name"
+  | "stem"
+  | "extension"
+  | "kind"
+  | "relativePath"
+  | "size"
+  | "modifiedMs"
+  | "namePart1"
+  | "namePart2"
+  | "namePart3"
+  | "namePart4";
+
+export type CsvSizeUnit = "bytes" | "kib" | "mib";
+export type CsvExportScope = "selected" | "current" | "recursive";
+
+export interface CsvExportConfig {
+  columns: CsvColumn[];
+  includeHeader: boolean;
+  sizeUnit: CsvSizeUnit;
+  splitDelimiter?: string;
+}
+
+export interface CsvExportPreset {
+  name: string;
+  config: CsvExportConfig;
+  updatedAtMs: number;
+}
+
+export interface CsvExportResult {
+  fileName: string;
+  bytes: number[];
+  rowCount: number;
+}
+
+export async function listCsvExportPresets(
+  generation: number,
+): Promise<ApiResponse<CsvExportPreset[]>> {
+  return invoke("list_csv_export_presets", { context: context(generation) });
+}
+
+export async function saveCsvExportPreset(
+  name: string,
+  config: CsvExportConfig,
+  overwrite: boolean,
+  generation: number,
+): Promise<ApiResponse<CsvExportPreset>> {
+  return invoke("save_csv_export_preset", {
+    context: context(generation),
+    name,
+    config,
+    overwrite,
+  });
+}
+
+export async function deleteCsvExportPreset(
+  name: string,
+  generation: number,
+): Promise<ApiResponse<void>> {
+  return invoke("delete_csv_export_preset", {
+    context: context(generation),
+    name,
+    confirmed: true,
+  });
+}
+
+export async function exportCatalogCsv(
+  request: {
+    config: CsvExportConfig;
+    scope: CsvExportScope;
+    currentPath: string;
+    selectedPaths: string[];
+  },
+  generation: number,
+): Promise<ApiResponse<CsvExportResult>> {
+  return invoke("export_catalog_csv", {
+    context: context(generation),
+    request,
+  });
+}
+
 export type DiagnosticStatus =
   | "added"
   | "changed"

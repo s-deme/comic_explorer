@@ -114,6 +114,7 @@ import {
 } from "./features/catalog/CatalogContextMenu";
 import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
 import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
+import { CsvExportDialog } from "./features/catalog/CsvExportDialog";
 import {
   previousComicEntry,
   sortCatalogEntries,
@@ -310,7 +311,6 @@ import {
   type PageBookmark,
 } from "./features/reading/collections";
 import {
-  catalogCsv,
   rangeSelection,
   selectEntriesByKind,
   toggleEntrySelection,
@@ -663,6 +663,7 @@ export function App({
   const rememberedCatalogSelections = useRef(new Map<string, string>());
   const selectionAnchor = useRef<string | null>(null);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [csvExportOpen, setCsvExportOpen] = useState(false);
   const [fileMaskDraft, setFileMaskDraft] = useState("");
   const [fileMask, setFileMask] = useState("");
   const [fileMaskOptionsDraft, setFileMaskOptionsDraft] = useState<CatalogMaskOptionsDraft>(
@@ -1706,29 +1707,6 @@ export function App({
     setSelectedPaths([]);
     setSelectedPath(null);
     setSelectionNotice(null);
-  }
-
-  function downloadCatalogCsv() {
-    let url: string | null = null;
-    try {
-      if (typeof URL.createObjectURL !== "function") {
-        throw new Error("download unavailable");
-      }
-      const blob = new Blob([catalogCsv(visibleEntries)], { type: "text/csv;charset=utf-8" });
-      url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "comic-explorer-catalog.csv";
-      link.click();
-      setSelectionNotice("CSVのダウンロードを開始しました。保存完了はブラウザで確認してください。");
-    } catch {
-      setSelectionNotice("CSVを出力できませんでした。保存機能を確認してください。");
-    } finally {
-      if (url !== null) {
-        const downloadUrl = url;
-        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
-      }
-    }
   }
 
   async function saveDisplayedThumbnail() {
@@ -4779,7 +4757,7 @@ export function App({
                 tabIndex={-1}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("file", event)}
-                onClick={() => runMenuAction(downloadCatalogCsv)}
+                onClick={() => runMenuAction(() => setCsvExportOpen(true))}
               >
                 CSVで出力
               </button>
@@ -6470,6 +6448,15 @@ export function App({
             setFileTreeRevision((current) => current + 1);
             void load(navigation.current, targetPaths);
           }}
+        />
+      )}
+      {csvExportOpen && (
+        <CsvExportDialog
+          generation={generation.current}
+          currentPath={navigation.current}
+          selectedPaths={selectedPaths}
+          onNotice={setSelectionNotice}
+          onClose={() => setCsvExportOpen(false)}
         />
       )}
       {nativeFileDropDialog !== null && (

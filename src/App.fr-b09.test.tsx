@@ -86,6 +86,10 @@ vi.mock("./features/library/client", () => ({
   searchLibrary: vi.fn(),
   setItemRating: vi.fn(),
   takeRecoveryNotice: vi.fn(),
+  listCsvExportPresets: vi.fn(async () => ({ status: "ok", data: [] })),
+  saveCsvExportPreset: vi.fn(),
+  deleteCsvExportPreset: vi.fn(),
+  exportCatalogCsv: vi.fn(),
 }));
 
 const diagnoseMock = vi.mocked(diagnoseLibrary);

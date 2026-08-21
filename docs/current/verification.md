@@ -553,6 +553,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | PASS / 限定 | 16件の全field profileをJSON deserializeしRust strict validationする処理をdebug testで4.613msと実測し、5秒上限を満たした。SQLite I/O、React再描画、CPU、peak working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-T固有のprofile保存・上書き・切替表示、長いUnicode名、DB障害復旧はrelease WebView2で直接操作・観測していない。 |
 
+## Leeyes P3-U CSV preset・列・header・単位・対象・名前分割
+
+対象はLEY-IO-001〜006の6件。Rustがapp-local SQLite schema v9のpreset、strict config、library内再列挙、scope、列順、単位、名前分割、CSV escapeとbyte列生成を担当する。TypeScriptは設定dialog、上書き・削除確認、Tauri orchestration、Rust byte列のdownloadだけを担当し、従来のTypeScript `catalogCsv`は撤去した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust / SQLite / filesystem | PASS | REQ-LEY-P3-020の6件、FAIL 0。schema v9 migration・再open、preset 32件、case-insensitive conflict、明示上書き・削除、strict列schema、header、KiB単位、literal分割、formula無害化、選択scope containment、recursive列挙、symlink/reparse非追跡、深さ64、50,000行、16 MiB上限を含む。 |
+| Focused frontend / IPC | PASS | CsvExportDialog、client、Appの3 files / 5件、FAIL 0。preset読込・上書き・削除確認、ordered config、recursive scope、Rust byte列download、download adapter failure、構造化IPCを含む。 |
+| Windows tests / typecheck / build | PASS | 最終canonical内でfrontend 37 files / 480件とPython 61件、FAIL 0。typecheck exit 0。frontend 78 modules build、CSS 45.71kB、JS 596.90kB。Viteの500kB advisoryを機能PASSへ読み替えない。SBOM 746 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | lib 221件とshutdown process 1件、FAIL 0。`cargo fmt --check`、`cargo check --locked`、schema v9、CSV preset/repository/generator/filesystem境界と既存settings・viewer・search・cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | case違いpreset名のatomic上書き補強を含む最終source変更後のIMP-004 canonicalは546.126秒で全12 stageがexit 0。Rust canonical 184.740秒、release executable 129.195秒、製品shortcut回帰13.116秒、CoDD verify 137.169秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T121901095Z`。canonical前のfull frontend runは既存menu/Viewerの1秒待機flakeを各1回検出し、各単独PASSを確認して10秒の明示待機へ安定化した後、最終canonical内の全testをPASSした。 |
+| 性能・上限 | PASS / 限定 | 50,000 synthetic行・5列をdebug Rust focused testで808.978ms、2,639,808 bytesとして生成し、5秒・16 MiB上限を満たした。16 MiB超過、50,001行相当、深さ65、symlinkを自動拒否した。50,000実fileの走査・IPC serialization、slow/removable drive、CPU、peak working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-U固有のrelease WebView2保存dialog、preset操作、長いUnicode delimiter、50,000実file、DB障害復旧は直接操作・観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

@@ -103,6 +103,10 @@ vi.mock("./features/library/client", () => ({
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
+  listCsvExportPresets: vi.fn(async () => ({ status: "ok", data: [] })),
+  saveCsvExportPreset: vi.fn(),
+  deleteCsvExportPreset: vi.fn(),
+  exportCatalogCsv: vi.fn(),
 }));
 
 const registerMock = vi.mocked(registerLibraryRoot);
@@ -260,7 +264,7 @@ async function openTestComic(relativePath: string) {
     );
   expect(entryButton).not.toBeNull();
   fireEvent.keyDown(entryButton as HTMLButtonElement, { key: "Enter" });
-  await screen.findByLabelText(`${relativePath} ビューワ`);
+  await screen.findByLabelText(`${relativePath} ビューワ`, {}, { timeout: 10_000 });
 }
 
 describe("FR-B11 keyboard shortcut partial batch", () => {

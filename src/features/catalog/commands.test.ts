@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
 import {
-  catalogCsv,
   rangeSelection,
   selectEntriesByKind,
   toggleEntrySelection,
@@ -28,14 +27,4 @@ describe("catalog commands", () => {
     );
   });
 
-  it("exports stable metadata columns with CSV escaping", () => {
-    const csv = catalogCsv([
-      { ...entries[0], relativePath: "a,b.jpg" as never },
-      { ...entries[0], relativePath: "=HYPERLINK(\"https://example.invalid\")" as never },
-    ]);
-    expect(csv).toContain("name,kind,relativePath,size,modified");
-    expect(csv).toContain('"a,b.jpg",page,"a,b.jpg",10,');
-    expect(csv).toContain('"\'=HYPERLINK(""https://example.invalid"")"');
-    expect(csv).not.toContain('\n"=HYPERLINK');
-  });
 });

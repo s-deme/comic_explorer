@@ -10,12 +10,13 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
 const MAX_EXTERNAL_APP_HISTORY: i64 = 20;
 const MAX_SETTINGS_PROFILES: i64 = 16;
+const MAX_CSV_EXPORT_PRESETS: i64 = 32;
 
 fn default_shortcut_bindings() -> BTreeMap<String, Vec<String>> {
     [
@@ -235,6 +236,13 @@ pub struct NamedSettingsProfileRecord {
     pub profile_json: String,
     pub updated_at_ms: u64,
     pub active: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CsvExportPresetRecord {
+    pub name: String,
+    pub config_json: String,
+    pub updated_at_ms: u64,
 }
 
 impl Default for RenamePreferencesRecord {
@@ -769,6 +777,103 @@ impl StateStore {
             })
             .map_err(database_error)?;
         rows.map(|row| row.map_err(database_error)).collect()
+    }
+
+    pub fn list_csv_export_presets(&self) -> Result<Vec<CsvExportPresetRecord>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT name, config_json, updated_at_ms
+                 FROM csv_export_presets
+                 ORDER BY name COLLATE NOCASE ASC
+                 LIMIT ?1",
+            )
+            .map_err(database_error)?;
+        let rows = statement
+            .query_map([MAX_CSV_EXPORT_PRESETS], |row| {
+                Ok(CsvExportPresetRecord {
+                    name: row.get(0)?,
+                    config_json: row.get(1)?,
+                    updated_at_ms: row.get::<_, i64>(2)?.max(0) as u64,
+                })
+            })
+            .map_err(database_error)?;
+        rows.map(|row| row.map_err(database_error)).collect()
+    }
+
+    pub fn save_csv_export_preset(
+        &mut self,
+        record: &CsvExportPresetRecord,
+        overwrite: bool,
+    ) -> Result<(), AppError> {
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        let exists = transaction
+            .query_row(
+                "SELECT 1 FROM csv_export_presets WHERE name=?1 COLLATE NOCASE",
+                [&record.name],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?
+            .is_some();
+        if exists && !overwrite {
+            return Err(AppError {
+                code: ErrorCode::Conflict,
+                message: "A CSV export preset with that name already exists.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        if !exists {
+            let count = transaction
+                .query_row("SELECT COUNT(*) FROM csv_export_presets", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(database_error)?;
+            if count >= MAX_CSV_EXPORT_PRESETS {
+                return Err(AppError {
+                    code: ErrorCode::InvalidRequest,
+                    message: "CSV export preset limit reached.".into(),
+                    target: None,
+                    retryable: false,
+                });
+            }
+        }
+        transaction
+            .execute(
+                "INSERT INTO csv_export_presets(name, config_json, updated_at_ms)
+                 VALUES(?1, ?2, ?3)
+                 ON CONFLICT(name) DO UPDATE SET
+                   name=excluded.name,
+                   config_json=excluded.config_json,
+                   updated_at_ms=excluded.updated_at_ms",
+                params![
+                    record.name,
+                    record.config_json,
+                    i64::try_from(record.updated_at_ms).unwrap_or(i64::MAX)
+                ],
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)
+    }
+
+    pub fn delete_csv_export_preset(&mut self, name: &str) -> Result<(), AppError> {
+        let changed = self
+            .connection
+            .execute(
+                "DELETE FROM csv_export_presets WHERE name=?1 COLLATE NOCASE",
+                [name],
+            )
+            .map_err(database_error)?;
+        if changed == 0 {
+            return Err(AppError {
+                code: ErrorCode::NotFound,
+                message: "CSV export preset was not found.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        Ok(())
     }
 
     pub fn named_settings_profile(
@@ -2089,7 +2194,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, "user_version", 7)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
@@ -2111,6 +2216,31 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![8, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", 8)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 9 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS csv_export_presets (
+                    name TEXT PRIMARY KEY COLLATE NOCASE NOT NULL
+                      CHECK(length(name) BETWEEN 1 AND 64),
+                    config_json TEXT NOT NULL CHECK(length(config_json) BETWEEN 2 AND 8192),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE INDEX IF NOT EXISTS csv_export_presets_updated
+                   ON csv_export_presets(updated_at_ms DESC, name COLLATE NOCASE ASC);",
+            )
+            .map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![9, unix_millis()],
             )
             .map_err(database_error)?;
         transaction
@@ -2315,6 +2445,86 @@ mod tests {
             std::process::id(),
             unix_millis()
         )))
+    }
+
+    #[test]
+    fn req_ley_p3_020_csv_export_presets_migrate_bound_and_persist() {
+        let paths = temporary_paths("csv-export-presets");
+        {
+            let (mut store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            for index in 0..MAX_CSV_EXPORT_PRESETS {
+                store
+                    .save_csv_export_preset(
+                        &CsvExportPresetRecord {
+                            name: format!("Preset {index}"),
+                            config_json: format!(r#"{{"index":{index}}}"#),
+                            updated_at_ms: index as u64,
+                        },
+                        false,
+                    )
+                    .unwrap();
+            }
+            assert_eq!(store.list_csv_export_presets().unwrap().len(), 32);
+            assert_eq!(
+                store
+                    .save_csv_export_preset(
+                        &CsvExportPresetRecord {
+                            name: "overflow".into(),
+                            config_json: "{}".into(),
+                            updated_at_ms: 33,
+                        },
+                        false,
+                    )
+                    .unwrap_err()
+                    .code,
+                ErrorCode::InvalidRequest
+            );
+            assert_eq!(
+                store
+                    .save_csv_export_preset(
+                        &CsvExportPresetRecord {
+                            name: "preset 0".into(),
+                            config_json: r#"{"updated":true}"#.into(),
+                            updated_at_ms: 40,
+                        },
+                        false,
+                    )
+                    .unwrap_err()
+                    .code,
+                ErrorCode::Conflict
+            );
+            store
+                .save_csv_export_preset(
+                    &CsvExportPresetRecord {
+                        name: "preset 0".into(),
+                        config_json: r#"{"updated":true}"#.into(),
+                        updated_at_ms: 40,
+                    },
+                    true,
+                )
+                .unwrap();
+            assert!(
+                store
+                    .list_csv_export_presets()
+                    .unwrap()
+                    .iter()
+                    .any(|preset| preset.name == "preset 0")
+            );
+            store.delete_csv_export_preset("PRESET 0").unwrap();
+        }
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store
+                .connection()
+                .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        assert_eq!(store.list_csv_export_presets().unwrap().len(), 31);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
     }
 
     #[test]

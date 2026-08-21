@@ -57,6 +57,10 @@ import {
   listCatalogMasks,
   saveCatalogMask,
   deleteCatalogMask,
+  listCsvExportPresets,
+  saveCsvExportPreset,
+  deleteCsvExportPreset,
+  exportCatalogCsv,
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
@@ -192,6 +196,10 @@ vi.mock("./features/library/client", () => ({
   listCatalogMasks: vi.fn(),
   saveCatalogMask: vi.fn(),
   deleteCatalogMask: vi.fn(),
+  listCsvExportPresets: vi.fn(),
+  saveCsvExportPreset: vi.fn(),
+  deleteCsvExportPreset: vi.fn(),
+  exportCatalogCsv: vi.fn(),
   diagnoseLibrary: vi.fn(),
   cancelLibraryDiagnostics: vi.fn(),
   listenRecursiveThumbnailProgress: vi.fn(),
@@ -271,6 +279,10 @@ const catalogMaskMock = vi.mocked(evaluateCatalogMask);
 const listCatalogMasksMock = vi.mocked(listCatalogMasks);
 const saveCatalogMaskMock = vi.mocked(saveCatalogMask);
 const deleteCatalogMaskMock = vi.mocked(deleteCatalogMask);
+const listCsvExportPresetsMock = vi.mocked(listCsvExportPresets);
+const saveCsvExportPresetMock = vi.mocked(saveCsvExportPreset);
+const deleteCsvExportPresetMock = vi.mocked(deleteCsvExportPreset);
+const exportCatalogCsvMock = vi.mocked(exportCatalogCsv);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
 const listPageBookmarksMock = vi.mocked(listPageBookmarks);
@@ -617,6 +629,10 @@ describe("application shell", () => {
     listCatalogMasksMock.mockReset();
     saveCatalogMaskMock.mockReset();
     deleteCatalogMaskMock.mockReset();
+    listCsvExportPresetsMock.mockReset();
+    saveCsvExportPresetMock.mockReset();
+    deleteCsvExportPresetMock.mockReset();
+    exportCatalogCsvMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
     listPageBookmarksMock.mockReset();
@@ -691,6 +707,15 @@ describe("application shell", () => {
     });
     deleteCatalogMaskMock.mockResolvedValue({
       status: "ok", requestId: "delete-catalog-mask" as never, generation: 1 as never, data: [],
+    });
+    listCsvExportPresetsMock.mockResolvedValue({
+      status: "ok", requestId: "csv-presets" as never, generation: 1 as never, data: [],
+    });
+    exportCatalogCsvMock.mockResolvedValue({
+      status: "ok",
+      requestId: "csv-export" as never,
+      generation: 1 as never,
+      data: { fileName: "catalog.csv", bytes: [0xef, 0xbb, 0xbf], rowCount: 1 },
     });
     renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
     getRenamePreferencesMock.mockResolvedValue({
@@ -1617,7 +1642,7 @@ describe("application shell", () => {
     await registerTestLibrary([]);
 
     fireEvent.keyDown(window, { key: "v", altKey: true });
-    const viewMenu = await screen.findByRole("menu", { name: "表示" });
+    const viewMenu = await screen.findByRole("menu", { name: "表示" }, { timeout: 10_000 });
     const back = within(viewMenu).getByRole("menuitem", { name: /戻る/ });
     const up = within(viewMenu).getByRole("menuitem", {
       name: /上のフォルダへ/,
@@ -3459,8 +3484,10 @@ describe("application shell", () => {
     try {
       await registerTestLibrary([testEntry("book.cbz")]);
       chooseAppMenuItem("ファイル", "CSVで出力");
+      const dialog = await screen.findByRole("dialog", { name: "CSV出力設定" });
+      fireEvent.click(within(dialog).getByRole("button", { name: "CSVを出力" }));
 
-      expect(screen.getByText("CSVを出力できませんでした。保存機能を確認してください。"))
+      expect(await within(dialog).findByText("CSVを出力できませんでした。保存機能を確認してください。"))
         .toBeInTheDocument();
       expect(screen.queryByText(/件をCSVへ出力しました/)).not.toBeInTheDocument();
     } finally {

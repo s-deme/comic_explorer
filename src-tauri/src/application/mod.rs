@@ -1,4 +1,5 @@
 mod coordinator;
+pub mod csv_export;
 mod display_awake;
 pub mod file_operations;
 mod folder_watch;

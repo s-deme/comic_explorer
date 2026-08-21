@@ -1165,6 +1165,25 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 8px;
   margin-top: 18px;
 }
+
+.dialog-backdrop > .csv-export-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border-radius: 12px;
+  background: #fff;
+  color: #152238;
+  padding: 20px;
+  box-shadow: 0 18px 56px rgb(0 0 0 / 35%);
+}
+
+.csv-export-dialog fieldset { margin: 12px 0; border: 1px solid #c8d1df; border-radius: 6px; }
+.csv-export-dialog fieldset > label { margin-right: 16px; }
+.csv-column-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 12px; }
+.csv-column-order { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding-left: 24px; }
+.csv-column-order button { margin-left: 4px; }
+.csv-options-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.csv-options-grid label { display: grid; gap: 4px; }
 .dialog-backdrop .danger-button {
   color: #fff;
   border-color: #a51616;

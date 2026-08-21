@@ -34,6 +34,10 @@ import {
   previewNamedSettingsProfileSwitch,
   executeNamedSettingsProfileSwitch,
   deleteNamedSettingsProfile,
+  listCsvExportPresets,
+  saveCsvExportPreset,
+  deleteCsvExportPreset,
+  exportCatalogCsv,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -461,6 +465,42 @@ describe("library client settings contract", () => {
     }));
     expect(invokeMock).toHaveBeenNthCalledWith(5, "delete_named_settings_profile", expect.objectContaining({
       name: "Reading", confirmed: true,
+    }));
+  });
+
+  it("REQ-LEY-P3-020 keeps CSV schema and generation in structured Rust IPC", async () => {
+    const config = {
+      columns: ["namePart2", "relativePath", "size"] as const,
+      includeHeader: false,
+      sizeUnit: "mib" as const,
+      splitDelimiter: "_",
+    };
+    await listCsvExportPresets(70);
+    await saveCsvExportPreset("Detailed", { ...config, columns: [...config.columns] }, true, 71);
+    await deleteCsvExportPreset("Detailed", 72);
+    await exportCatalogCsv({
+      config: { ...config, columns: [...config.columns] },
+      scope: "selected",
+      currentPath: "Series",
+      selectedPaths: ["Series/01.cbz"],
+    }, 73);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "list_csv_export_presets", {
+      context: expect.objectContaining({ generation: 70 }),
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "save_csv_export_preset", expect.objectContaining({
+      name: "Detailed", config, overwrite: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "delete_csv_export_preset", expect.objectContaining({
+      name: "Detailed", confirmed: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "export_catalog_csv", expect.objectContaining({
+      request: {
+        config,
+        scope: "selected",
+        currentPath: "Series",
+        selectedPaths: ["Series/01.cbz"],
+      },
     }));
   });
 });
