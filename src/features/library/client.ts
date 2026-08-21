@@ -93,6 +93,32 @@ export async function restoreLibraryRoot(
   });
 }
 
+export interface CliLaunchPlan {
+  libraryRoot: string;
+  itemRelativePath: string | null;
+  itemKind: ItemKind | null;
+  mode: "normal" | "fullscreen" | "slideshow";
+}
+
+export interface CliLaunchRequest {
+  plan: CliLaunchPlan | null;
+  error: string | null;
+}
+
+export async function takeCliLaunchRequest(
+  generation: number,
+): Promise<ApiResponse<CliLaunchRequest | null>> {
+  return invoke("take_cli_launch_request", {
+    context: context(generation),
+  });
+}
+
+export async function listenCliLaunchPending(
+  handler: () => void,
+): Promise<UnlistenFn> {
+  return listen("cli-launch-pending", handler);
+}
+
 export async function setFullscreenDisplayAwake(
   enabled: boolean,
   generation: number,

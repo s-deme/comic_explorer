@@ -49,5 +49,8 @@ windows = { version = "0.62", features = [
 ] }
 zip = { version = "6", default-features = false, features = ["deflate"] }
 
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "=2.4.3"
+
 [dev-dependencies]
 sevenz-rust = { version = "=0.6.1", default-features = false, features = ["compress"] }

@@ -567,6 +567,23 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 50,000 synthetic行・5列をdebug Rust focused testで808.978ms、2,639,808 bytesとして生成し、5秒・16 MiB上限を満たした。16 MiB超過、50,001行相当、深さ65、symlinkを自動拒否した。50,000実fileの走査・IPC serialization、slow/removable drive、CPU、peak working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-U固有のrelease WebView2保存dialog、preset操作、長いUnicode delimiter、50,000実file、DB障害復旧は直接操作・観測していない。 |
 
+## Leeyes P3-V CLI path・-f・-s・single-instance
+
+対象はLEY-IO-007〜009の3件。RustがOS分割済みargument、cwd相対path、canonical/readability/file kind、normal/fullscreen/slideshow launch plan、最大16件FIFOを担当する。公式Tauri single-instance pluginを最初のpluginとし、後続起動は既存windowをshow・unminimize・focusしてqueueへ渡す。TypeScriptはRustの検証済みplanを既存library/catalog/viewerへ適用するだけとした。
+
+| 検証 | 結果 | 証拠 |
+|---|---|---|
+| Focused Rust | PASS | `application::cli_launch::tests` 5/5。space・Unicode・relative・`--`、option alias、unknown・mode重複/競合・複数path・control・32,767 UTF-16上限、missing/unsupported、file/folder plan、FIFO/溢れを検証。 |
+| Queue性能 | PASS | debug Rustで10,000要求を9.775msでbounded queueへ投入・先頭16件順序・溢れ通知を検証。 |
+| Frontend focused | PASS | `src/App.test.tsx` startup normal archiveの非全画面と後続single-instance slideshow、`src/features/library/client.test.ts` IPC/event contractの3件PASS。 |
+| Frontend full | PASS | Windows-native 37 files / 483件、FAIL 0。既存FT-B11-006の1秒待機はfull-suite並行負荷で一時失敗、単独PASS後に10秒の明示上限へ安定化し、全件再実行をPASS。 |
+| Rust canonical | PASS | lib 226件とshutdown process 1件、FAIL 0。`cargo fmt --check`、locked Cargo、single-instance plugin統合を含む。既存dead-code warning 2件はPASSに加算しない。 |
+| Typecheck / build / SBOM | PASS | Windows-native typecheck、78 modules、CSS 45.71kB、JS 598.05kB。500kB超過advisoryは失敗ではない。SBOM 783 components、unknown/prohibited license 0。 |
+| Product shortcut | PASS | release隔離probeは5秒継続、`run-product-ui-harness.ps1 -ShortcutOnly` PASS、canonicalのproduct-shortcutは11.409秒、source difference 0。managed sandbox内の2回はnative mutex/windowの起動前にCDP未開で失敗し、sandbox外の同一releaseでPASSした。 |
+| Windows canonical | PASS | `verify-feature-windows.ps1 -Feature IMP-004 -RustMode Canonical`、sandbox外で全12 stage PASS、257.394秒。log `src-tauri/target/verification/imp-004-20260821T131117174Z`。CoDD scan/check/verify、product cleanupを含む。 |
+| CoDD verify | PASS | red 3 PASS / 0 FAIL、amber 1 WARN、3 SKIP、1 VACUOUS。tests実行証拠101.23秒、typecheck executed、source integrity 13 files。SKIP/VACUOUSをPASSに加算しない。 |
+| 未測定 | NOT RUN | Windows Terminal/PowerShell/cmd/Explorer別quoting、実の後続instanceからのpath引渡し、release実contentの`-f`/`-s`、UNC・長path、network/removable drive、起動・focus時間、CPU・peak working set。PASSに加算しない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

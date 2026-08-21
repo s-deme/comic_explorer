@@ -35,6 +35,8 @@ import {
   stopLibraryFolderWatch,
   removeFavorite,
   restoreLibraryRoot,
+  takeCliLaunchRequest,
+  listenCliLaunchPending,
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
@@ -134,6 +136,10 @@ const nativeFileDropHarness = vi.hoisted(() => ({
   target: { relativePath: "Target" } as { relativePath: string } | null,
 }));
 
+const cliLaunchHarness = vi.hoisted(() => ({
+  handler: undefined as undefined | (() => void),
+}));
+
 vi.mock("./features/library/native-file-drop", () => ({
   listenNativeFileDrops: vi.fn(async (handler) => {
     nativeFileDropHarness.handler = handler;
@@ -163,6 +169,8 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   restoreLibraryRoot: vi.fn(),
+  takeCliLaunchRequest: vi.fn(),
+  listenCliLaunchPending: vi.fn(async () => () => undefined),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),
@@ -248,6 +256,8 @@ const watchLibraryFolderMock = vi.mocked(watchLibraryFolder);
 const stopLibraryFolderWatchMock = vi.mocked(stopLibraryFolderWatch);
 const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
+const takeCliLaunchRequestMock = vi.mocked(takeCliLaunchRequest);
+const listenCliLaunchPendingMock = vi.mocked(listenCliLaunchPending);
 const openMock = vi.mocked(openComic);
 const resolveCatalogActivationMock = vi.mocked(resolveCatalogActivation);
 const settingsMock = vi.mocked(getCatalogSettings);
@@ -592,6 +602,19 @@ describe("application shell", () => {
     folderWatchHarness.handler = undefined;
     treeMock.mockReset();
     restoreMock.mockReset();
+    takeCliLaunchRequestMock.mockReset();
+    listenCliLaunchPendingMock.mockReset();
+    cliLaunchHarness.handler = undefined;
+    takeCliLaunchRequestMock.mockResolvedValue({
+      status: "ok",
+      requestId: "cli-empty" as never,
+      generation: 1 as never,
+      data: null,
+    });
+    listenCliLaunchPendingMock.mockImplementation(async (handler) => {
+      cliLaunchHarness.handler = handler;
+      return vi.fn();
+    });
     openMock.mockReset();
     resolveCatalogActivationMock.mockReset();
     resolveCatalogActivationMock.mockImplementation(async (kind, _trigger, generation) => ({
@@ -929,6 +952,89 @@ describe("application shell", () => {
       .toBeInTheDocument();
     expect(await screen.findByRole("treeitem", { name: /ローカル ディスク \(C:\)/ }))
       .toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-021 applies a Rust-validated startup file plan without archive auto-fullscreen", async () => {
+    takeCliLaunchRequestMock
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "cli-startup" as never,
+        generation: 1 as never,
+        data: {
+          plan: {
+            libraryRoot: "C:\\CLI Comics",
+            itemRelativePath: "volume.cbz",
+            itemKind: "archive",
+            mode: "normal",
+          },
+          error: null,
+        },
+      })
+      .mockResolvedValue({
+        status: "ok", requestId: "cli-empty" as never, generation: 2 as never, data: null,
+      });
+    registerMock.mockResolvedValue({
+      status: "ok", requestId: "cli-root" as never, generation: 1 as never,
+      data: { absolutePath: "C:\\CLI Comics" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok", requestId: "cli-list" as never, generation: 1 as never,
+      data: [],
+    });
+    openMock.mockResolvedValue(viewerResponse("volume.cbz"));
+
+    render(<App />);
+
+    const viewer = await screen.findByLabelText("volume.cbz ビューワ");
+    expect(viewer).toHaveAttribute("data-fullscreen", "false");
+    expect(registerMock).toHaveBeenCalledWith("C:\\CLI Comics", expect.any(Number));
+    expect(openMock).toHaveBeenCalledWith("volume.cbz", expect.any(Number));
+  });
+
+  it("REQ-LEY-P3-021 drains a later single-instance slideshow request through existing viewer flow", async () => {
+    render(<App />);
+    await waitFor(() => expect(cliLaunchHarness.handler).toBeTypeOf("function"));
+    takeCliLaunchRequestMock
+      .mockResolvedValueOnce({
+        status: "ok",
+        requestId: "cli-secondary" as never,
+        generation: 2 as never,
+        data: {
+          plan: {
+            libraryRoot: "D:\\Series",
+            itemRelativePath: "next.cbz",
+            itemKind: "archive",
+            mode: "slideshow",
+          },
+          error: null,
+        },
+      })
+      .mockResolvedValue({
+        status: "ok", requestId: "cli-empty" as never, generation: 3 as never, data: null,
+      });
+    registerMock.mockResolvedValue({
+      status: "ok", requestId: "cli-root" as never, generation: 2 as never,
+      data: { absolutePath: "D:\\Series" },
+    });
+    listMock.mockResolvedValue({
+      status: "ok", requestId: "cli-list" as never, generation: 2 as never,
+      data: [],
+    });
+    const session = testSession("next.cbz");
+    session.pages.push({
+      id: "next-page-2" as never,
+      relativePath: "page-2.png" as never,
+      mediaUri: "data:image/png;base64,fixture2",
+    });
+    openMock.mockResolvedValue({
+      status: "ok", requestId: "cli-open" as never, generation: 2 as never, data: session,
+    });
+
+    cliLaunchHarness.handler?.();
+
+    const viewer = await screen.findByLabelText("next.cbz ビューワ");
+    await waitFor(() => expect(viewer).toHaveAttribute("data-slideshow", "true"));
+    expect(registerMock).toHaveBeenCalledWith("D:\\Series", expect.any(Number));
   });
 
   it("keeps drive tree, address and catalog synchronized after sidebar selection", async () => {

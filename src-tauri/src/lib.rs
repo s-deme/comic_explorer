@@ -11,11 +11,30 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let startup_arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
+    let startup_cwd = std::env::current_dir().unwrap_or_default();
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            application::cli_launch::focus_main_window(app);
+            application::cli_launch::accept_arguments(
+                app.clone(),
+                args.into_iter().skip(1).map(Into::into).collect(),
+                cwd.into(),
+            );
+        }));
+    }
+    let app = builder
         .manage(application::AppState::default())
         .manage(tray::TrayState::default())
-        .setup(|app| {
+        .setup(move |app| {
             tray::initialize(app);
+            application::cli_launch::accept_arguments(
+                app.handle().clone(),
+                startup_arguments.clone(),
+                startup_cwd.clone(),
+            );
             Ok(())
         })
         .register_uri_scheme_protocol("comic", |context, request| {
@@ -74,6 +93,7 @@ pub fn run() {
             application::csv_export::save_csv_export_preset,
             application::csv_export::delete_csv_export_preset,
             application::csv_export::export_catalog_csv,
+            application::cli_launch::take_cli_launch_request,
             application::pick_library_root,
             application::pick_search_source,
             application::pick_library_file,

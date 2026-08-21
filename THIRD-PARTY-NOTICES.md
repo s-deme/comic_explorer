@@ -14,6 +14,16 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / arbitrary | 1.4.2 | MIT OR Apache-2.0 |
 | cargo / arrayref | 0.3.9 | BSD-2-Clause |
 | cargo / arrayvec | 0.7.8 | MIT OR Apache-2.0 |
+| cargo / async-broadcast | 0.7.2 | MIT OR Apache-2.0 |
+| cargo / async-channel | 2.5.0 | Apache-2.0 OR MIT |
+| cargo / async-executor | 1.14.0 | Apache-2.0 OR MIT |
+| cargo / async-io | 2.6.0 | Apache-2.0 OR MIT |
+| cargo / async-lock | 3.4.2 | Apache-2.0 OR MIT |
+| cargo / async-process | 2.5.0 | Apache-2.0 OR MIT |
+| cargo / async-recursion | 1.1.1 | MIT OR Apache-2.0 |
+| cargo / async-signal | 0.2.14 | Apache-2.0 OR MIT |
+| cargo / async-task | 4.7.1 | Apache-2.0 OR MIT |
+| cargo / async-trait | 0.1.92 | MIT OR Apache-2.0 |
 | cargo / atk-sys | 0.18.2 | MIT |
 | cargo / atk | 0.18.2 | MIT |
 | cargo / atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
@@ -28,6 +38,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | cargo / block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | cargo / block2 | 0.6.2 | MIT |
+| cargo / blocking | 1.6.2 | Apache-2.0 OR MIT |
 | cargo / brotli-decompressor | 5.0.3 | BSD-3-Clause OR MIT |
 | cargo / brotli | 8.0.4 | BSD-3-Clause AND MIT |
 | cargo / bumpalo | 3.20.3 | MIT OR Apache-2.0 |
@@ -49,6 +60,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / chrono | 0.4.45 | MIT OR Apache-2.0 |
 | cargo / color_quant | 1.1.0 | MIT |
 | cargo / combine | 4.6.7 | MIT |
+| cargo / concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | cargo / cookie | 0.18.1 | MIT OR Apache-2.0 |
 | cargo / core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
 | cargo / core-foundation | 0.10.1 | MIT OR Apache-2.0 |
@@ -94,9 +106,15 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | cargo / embed-resource | 3.0.11 | MIT |
 | cargo / embed_plist | 1.2.2 | MIT OR Apache-2.0 |
+| cargo / endi | 1.1.1 | MIT |
+| cargo / enumflags2 | 0.7.12 | MIT OR Apache-2.0 |
+| cargo / enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 |
 | cargo / equivalent | 1.0.2 | Apache-2.0 OR MIT |
 | cargo / erased-serde | 0.4.10 | MIT OR Apache-2.0 |
+| cargo / errno | 0.3.14 | MIT OR Apache-2.0 |
 | cargo / euclid | 0.22.14 | MIT OR Apache-2.0 |
+| cargo / event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT |
+| cargo / event-listener | 5.4.2 | Apache-2.0 OR MIT |
 | cargo / fallible-iterator | 0.3.0 | MIT OR Apache-2.0 |
 | cargo / fallible-streaming-iterator | 0.1.9 | MIT OR Apache-2.0 |
 | cargo / fastrand | 2.5.0 | Apache-2.0 OR MIT |
@@ -122,6 +140,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / futures-core | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-executor | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-io | 0.3.33 | MIT OR Apache-2.0 |
+| cargo / futures-lite | 2.6.1 | Apache-2.0 OR MIT |
 | cargo / futures-macro | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-sink | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / futures-task | 0.3.33 | MIT OR Apache-2.0 |
@@ -155,6 +174,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / hashlink | 0.10.0 | MIT OR Apache-2.0 |
 | cargo / heck | 0.4.1 | MIT OR Apache-2.0 |
 | cargo / heck | 0.5.0 | MIT OR Apache-2.0 |
+| cargo / hermit-abi | 0.5.2 | MIT OR Apache-2.0 |
 | cargo / hex | 0.4.3 | MIT OR Apache-2.0 |
 | cargo / html5ever | 0.38.0 | MIT OR Apache-2.0 |
 | cargo / http-body-util | 0.1.4 | MIT |
@@ -207,6 +227,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / libm | 0.2.16 | MIT |
 | cargo / libredox | 0.1.18 | MIT |
 | cargo / libsqlite3-sys | 0.35.0 | MIT |
+| cargo / linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | cargo / litemap | 0.8.2 | Unicode-3.0 |
 | cargo / lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | cargo / log | 0.4.33 | MIT OR Apache-2.0 |
@@ -248,8 +269,10 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / objc2 | 0.6.4 | MIT |
 | cargo / once_cell | 1.21.4 | MIT OR Apache-2.0 |
 | cargo / option-ext | 0.2.0 | MPL-2.0 |
+| cargo / ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
 | cargo / pango-sys | 0.18.0 | MIT |
 | cargo / pango | 0.18.3 | MIT |
+| cargo / parking | 2.2.1 | Apache-2.0 OR MIT |
 | cargo / parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | cargo / parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
 | cargo / percent-encoding | 2.3.2 | MIT OR Apache-2.0 |
@@ -260,10 +283,12 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / phf_shared | 0.13.1 | MIT |
 | cargo / pico-args | 0.5.0 | MIT |
 | cargo / pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
+| cargo / piper | 0.2.5 | MIT OR Apache-2.0 |
 | cargo / pkg-config | 0.3.33 | MIT OR Apache-2.0 |
 | cargo / plist | 1.8.0 | MIT |
 | cargo / png | 0.17.16 | MIT OR Apache-2.0 |
 | cargo / png | 0.18.1 | MIT OR Apache-2.0 |
+| cargo / polling | 3.11.0 | Apache-2.0 OR MIT |
 | cargo / potential_utf | 0.1.5 | Unicode-3.0 |
 | cargo / powerfmt | 0.2.0 | MIT OR Apache-2.0 |
 | cargo / precomputed-hash | 0.1.1 | MIT |
@@ -294,6 +319,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / rusqlite | 0.37.0 | MIT |
 | cargo / rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | cargo / rustc_version | 0.4.1 | MIT OR Apache-2.0 |
+| cargo / rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | cargo / rustversion | 1.0.23 | MIT OR Apache-2.0 |
 | cargo / rustybuzz | 0.20.1 | MIT |
 | cargo / same-file | 1.0.6 | Unlicense OR MIT |
@@ -321,6 +347,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / sevenz-rust | 0.6.1 | Apache-2.0 |
 | cargo / sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | cargo / shlex | 2.0.1 | MIT OR Apache-2.0 |
+| cargo / signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
 | cargo / simd-adler32 | 0.3.10 | MIT |
 | cargo / simplecss | 0.2.2 | Apache-2.0 OR MIT |
 | cargo / siphasher | 1.0.3 | MIT OR Apache-2.0 |
@@ -350,11 +377,13 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / tauri-build | 2.6.3 | Apache-2.0 OR MIT |
 | cargo / tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | cargo / tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
+| cargo / tauri-plugin-single-instance | 2.4.3 | Apache-2.0 OR MIT |
 | cargo / tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
 | cargo / tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
 | cargo / tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
 | cargo / tauri-winres | 0.3.6 | MIT |
 | cargo / tauri | 2.11.5 | Apache-2.0 OR MIT |
+| cargo / tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | cargo / tendril | 0.5.1 | MIT OR Apache-2.0 |
 | cargo / thiserror-impl | 1.0.69 | MIT OR Apache-2.0 |
 | cargo / thiserror-impl | 2.0.19 | MIT OR Apache-2.0 |
@@ -387,6 +416,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / tower-layer | 0.3.3 | MIT |
 | cargo / tower-service | 0.3.3 | MIT |
 | cargo / tower | 0.5.3 | MIT |
+| cargo / tracing-attributes | 0.1.31 | MIT |
 | cargo / tracing-core | 0.1.36 | MIT |
 | cargo / tracing | 0.1.44 | MIT |
 | cargo / tray-icon | 0.24.2 | MIT OR Apache-2.0 |
@@ -394,6 +424,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / ttf-parser | 0.25.1 | MIT OR Apache-2.0 |
 | cargo / typeid | 1.0.3 | MIT OR Apache-2.0 |
 | cargo / typenum | 1.20.1 | MIT OR Apache-2.0 |
+| cargo / uds_windows | 1.2.1 | MIT |
 | cargo / unic-char-property | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / unic-char-range | 0.9.0 | MIT OR Apache-2.0 |
 | cargo / unic-common | 0.9.0 | MIT OR Apache-2.0 |
@@ -507,6 +538,9 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / xmlwriter | 0.1.0 | MIT |
 | cargo / yoke-derive | 0.8.2 | Unicode-3.0 |
 | cargo / yoke | 0.8.3 | Unicode-3.0 |
+| cargo / zbus | 5.13.2 | MIT |
+| cargo / zbus_macros | 5.13.2 | MIT |
+| cargo / zbus_names | 4.3.1 | MIT |
 | cargo / zerocopy-derive | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | cargo / zerocopy | 0.8.56 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | cargo / zerofrom-derive | 0.1.7 | Unicode-3.0 |
@@ -520,6 +554,9 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / zopfli | 0.8.3 | Apache-2.0 |
 | cargo / zune-core | 0.4.12 | MIT OR Apache-2.0 OR Zlib |
 | cargo / zune-jpeg | 0.4.21 | MIT OR Apache-2.0 OR Zlib |
+| cargo / zvariant | 5.9.2 | MIT |
+| cargo / zvariant_derive | 5.9.2 | MIT |
+| cargo / zvariant_utils | 3.3.0 | MIT |
 | npm / @acemir/cssom | 0.9.31 | MIT |
 | npm / @adobe/css-tools | 4.5.0 | MIT |
 | npm / @asamuzakjp/css-color | 4.1.2 | MIT |

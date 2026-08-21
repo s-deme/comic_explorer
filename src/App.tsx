@@ -30,6 +30,8 @@ import {
   watchLibraryFolder,
   stopLibraryFolderWatch,
   restoreLibraryRoot,
+  takeCliLaunchRequest,
+  listenCliLaunchPending,
   saveCatalogSort,
   saveCatalogViewMode,
   saveEndOfVolumePolicy,
@@ -83,6 +85,7 @@ import {
   getRenamePreferences,
   saveRenamePreferences,
   type CatalogSettings,
+  type CliLaunchRequest,
   type CatalogActivationTrigger,
   type DiagnosticReport,
   type FavoriteEntry,
@@ -602,6 +605,9 @@ export function App({
   const savedCatalogMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
   const nativeFileDropGeneration = useRef(0);
+  const cliLaunchGeneration = useRef(0);
+  const cliLaunchRequested = useRef(false);
+  const cliLaunchChain = useRef<Promise<void>>(Promise.resolve());
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -985,6 +991,75 @@ export function App({
     }
   }
 
+  async function applyCliLaunchRequest(request: CliLaunchRequest) {
+    if (request.error !== null) {
+      setSelectionNotice(request.error);
+      return;
+    }
+    const plan = request.plan;
+    if (plan === null) return;
+    cliLaunchRequested.current = true;
+    const response = await registerLibraryRoot(plan.libraryRoot, ++generation.current);
+    if (response.status !== "ok") {
+      setSelectionNotice(
+        response.status === "error" ? presentError(response.error) : "CLI起動をキャンセルしました。",
+      );
+      return;
+    }
+    activateLibraryRoot(response.data.absolutePath);
+    dispatch({ type: "reset", path: "" });
+    await load("", plan.itemRelativePath === null ? [] : [plan.itemRelativePath]);
+    if (plan.itemRelativePath === null || plan.itemKind === null) return;
+    await openComicEntry(
+      {
+        relativePath: plan.itemRelativePath as CatalogEntry["relativePath"],
+        kind: plan.itemKind,
+      },
+      plan.mode,
+      "restored",
+      false,
+    );
+  }
+
+  function drainCliLaunchRequests() {
+    cliLaunchChain.current = cliLaunchChain.current
+      .then(async () => {
+        while (true) {
+          const response = await takeCliLaunchRequest(++cliLaunchGeneration.current);
+          if (response.status !== "ok") {
+            if (response.status === "error") setSelectionNotice(presentError(response.error));
+            return;
+          }
+          if (response.data === null) return;
+          await applyCliLaunchRequest(response.data);
+        }
+      })
+      .catch(() => setSelectionNotice("CLI起動要求を取得できませんでした。"));
+  }
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenCliLaunchPending(() => {
+      if (!disposed) drainCliLaunchRequests();
+    })
+      .then((stop) => {
+        if (disposed) {
+          stop();
+          return;
+        }
+        unlisten = stop;
+        drainCliLaunchRequests();
+      })
+      .catch(() => {
+        if (!disposed) drainCliLaunchRequests();
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   function selectEntry(entry: CatalogEntry, action: SelectionAction = "replace") {
     const next = action === "toggle"
       ? toggleEntrySelection(selectedPaths, entry.relativePath)
@@ -1340,6 +1415,7 @@ export function App({
     void settingsStartupBoundary.then(() => restoreLibraryRoot(requestGeneration))
       .then(async (response) => {
         if (
+          !cliLaunchRequested.current &&
           requestGeneration === generation.current &&
           response.status === "ok" &&
           response.data
@@ -4226,8 +4302,9 @@ export function App({
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
     startAt: "restored" | "first" | "last" = "restored",
+    preferArchiveFullscreen = true,
   ): Promise<boolean> {
-    const resolvedLaunchMode = launchMode === "normal" && entry.kind === "archive"
+    const resolvedLaunchMode = preferArchiveFullscreen && launchMode === "normal" && entry.kind === "archive"
       ? "fullscreen"
       : launchMode;
     setViewerLaunchMode(resolvedLaunchMode);

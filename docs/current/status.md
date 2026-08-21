@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 28 | 3 |
+| P3 操作・検索 | 31 | 31 | 0 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **65** | **38** |
+| **合計** | **103** | **68** | **35** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -118,6 +118,8 @@ P3-SではLEY-FILE-022をPublishedとした。単一renameは拡張子を除く�
 P3-TではLEY-SETTING-004をPublishedとした。任意の外部設定fileを標準保存先へせず、用途別strict settings snapshotをapp-local SQLite schema v8へ最大16件保存する。Rustが名前・件数・case一意性、全field、保存・明示上書き、active判定、変更field数、opaque key、切替直前再検証、settings全体とactive名のatomic保存を担当する。active中の削除・上書きを拒否し、通常設定変更ではsnapshotを暗黙更新せずactive表示を解除する。TypeScriptは入力、一覧、確認、native topmost adapter、成功値のReact反映、Tauri orchestrationだけを担当する。16 full profilesのdeserialize・strict validationは4.613ms。release WebView2での切替表示、DB障害復旧、長いUnicode名、CPU・working setは未測定として残す。
 
 P3-UではLEY-IO-001〜006をPublishedとした。従来TypeScriptにあった固定CSV生成を撤去し、Rustをpreset schema、列順、header、size単位、filename分割、対象scope、filesystem再列挙、escape、出力byte列の唯一の正本とした。presetはapp-local SQLite schema v9へ最大32件保存し、選択・現在folder・recursiveをlibrary root内で再検証する。recursiveはsymlink/reparseを追跡せず深さ64、50,000行、16 MiBでfail closedし、UTF-8 BOM・CRLFとformula無害化を適用する。TypeScriptはdialog入力、確認、Tauri orchestration、Rust byte列のdownloadだけを担当する。50,000 synthetic行は808.978ms・2,639,808 bytes。frontend 37 files / 480件、Python 61件、Rust 221+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2の保存dialog、50,000実file、slow/removable drive、長いUnicode delimiter、DB障害、CPU・working setは未測定として残す。
+
+P3-VではLEY-IO-007〜009をPublishedとし、P3の31件を完了した。RustをCLI argument parser、cwd相対path解決、canonical/readability/file kind検証、launch plan、最大16件FIFO、公式Tauri single-instance引渡しの正本とした。pathは1件、`-f`/`--fullscreen`と`-s`/`--slideshow`は排他的に受理し、`--`、space、Unicode、relative pathを扱うが、shell再解析・環境変数・wildcard展開は行わない。後続instanceは既存windowをshow・unminimize・focusし、Rust queueへ渡す。TypeScriptは検証済みplanを既存library/catalog/viewer/fullscreen/slideshowへ適用するだけである。10,000 queue要求は9.775ms。frontend 37 files / 483件、Python 61件、Rust 226+1件、typecheck、78 modules build、SBOM 783 components・禁止license 0、sandbox外Windows canonical全12 stageはPASSした。managed sandbox内の2回のcanonicalはnative single-instance mutex/windowが起動できずproduct-shortcutで失敗したが、同一releaseの隔離probe・product-shortcut単独・sandbox外canonicalはPASSした。Windows Terminal/PowerShell/cmd/Explorer別quoting、実の後続instanceからのpath受渡し、UNC・長path、network/removable drive、起動・focus時間、CPU・working setは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

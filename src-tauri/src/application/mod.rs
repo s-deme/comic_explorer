@@ -1,3 +1,4 @@
+pub mod cli_launch;
 mod coordinator;
 pub mod csv_export;
 mod display_awake;
@@ -66,6 +67,7 @@ pub struct AppState {
     display_awake: Mutex<display_awake::DisplayAwakeRequest>,
     pub(crate) media: Mutex<MediaTokenRegistry>,
     recovery_notice: Mutex<bool>,
+    cli_launch: cli_launch::CliLaunchQueue,
     shutting_down: AtomicBool,
 }
 
@@ -265,6 +267,7 @@ impl Default for AppState {
             display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(15 * 60))),
             recovery_notice: Mutex::new(recovered),
+            cli_launch: cli_launch::CliLaunchQueue::default(),
             shutting_down: AtomicBool::new(false),
         }
     }
@@ -7117,6 +7120,7 @@ mod shutdown_tests {
             display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(false),
+            cli_launch: cli_launch::CliLaunchQueue::default(),
             shutting_down: AtomicBool::new(false),
         };
         let cancellation = state.navigation.lock().unwrap().begin(Generation(7));
@@ -7221,6 +7225,7 @@ mod shutdown_tests {
             display_awake: Mutex::new(display_awake::DisplayAwakeRequest::default()),
             media: Mutex::new(MediaTokenRegistry::new(Duration::from_secs(60))),
             recovery_notice: Mutex::new(true),
+            cli_launch: cli_launch::CliLaunchQueue::default(),
             shutting_down: AtomicBool::new(false),
         };
 

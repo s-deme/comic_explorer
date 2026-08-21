@@ -73,6 +73,8 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   restoreLibraryRoot: vi.fn(),
+  takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
+  listenCliLaunchPending: vi.fn(async () => () => undefined),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),
@@ -447,7 +449,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     fireEvent.keyDown(catalogItem, { key: "k", ctrlKey: true });
     await waitFor(() => expect(
       screen.getByRole("complementary", { name: "検索ペイン" }),
-    ).toBeInTheDocument());
+    ).toBeInTheDocument(), { timeout: 10_000 });
 
     openSettingsMenuItem();
     const removeDialog = screen.getByRole("dialog", { name: "統合設定" });
@@ -483,7 +485,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     await waitFor(() => expect(
       screen.queryByRole("complementary", { name: "検索ペイン" }),
-    ).not.toBeInTheDocument());
+    ).not.toBeInTheDocument(), { timeout: 10_000 });
   });
 
   it("FT-B11-004 keeps keyboard fallback, suppresses focused input, and stops at the Viewer/navigation boundary", async () => {

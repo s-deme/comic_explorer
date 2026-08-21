@@ -88,6 +88,8 @@ vi.mock("./features/library/client", () => ({
   renameTag: vi.fn(),
   resolveFavorite: vi.fn(),
   restoreLibraryRoot: vi.fn(),
+  takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
+  listenCliLaunchPending: vi.fn(async () => () => undefined),
   saveCatalogSort: vi.fn(),
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),

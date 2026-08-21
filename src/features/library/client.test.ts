@@ -38,6 +38,8 @@ import {
   saveCsvExportPreset,
   deleteCsvExportPreset,
   exportCatalogCsv,
+  takeCliLaunchRequest,
+  listenCliLaunchPending,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -52,6 +54,20 @@ describe("library client settings contract", () => {
     invokeMock.mockResolvedValue({ status: "cancelled" });
     listenMock.mockReset();
     listenMock.mockResolvedValue(vi.fn());
+  });
+
+  it("REQ-LEY-P3-021 uses typed Rust queue IPC and the bounded native event", async () => {
+    const handler = vi.fn();
+    await takeCliLaunchRequest(29);
+    await listenCliLaunchPending(handler);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "take_cli_launch_request",
+      expect.objectContaining({
+        context: expect.objectContaining({ generation: 29 }),
+      }),
+    );
+    expect(listenMock).toHaveBeenCalledWith("cli-launch-pending", handler);
   });
 
   it("REQ-LEY-P2-015 sends the required Viewer catalog sync field to Rust", async () => {
