@@ -59,6 +59,8 @@ import {
   generateRecursiveThumbnails,
   cancelRecursiveThumbnailGeneration,
   renameFileItem,
+  getRenamePreferences,
+  saveRenamePreferences,
   createFileFolder,
   copyFileItemsToFolder,
   moveFileItemsToFolder,
@@ -192,6 +194,10 @@ vi.mock("./features/library/client", () => ({
   savePageBookmark: vi.fn(),
   deletePageBookmark: vi.fn(),
   renameFileItem: vi.fn(),
+  getRenamePreferences: vi.fn(),
+  saveRenamePreferences: vi.fn(),
+  previewBatchRename: vi.fn(),
+  executeBatchRename: vi.fn(),
   createFileFolder: vi.fn(),
   copyFileItemsToFolder: vi.fn(),
   moveFileItemsToFolder: vi.fn(),
@@ -261,6 +267,8 @@ const listenRecursiveThumbnailProgressMock = vi.mocked(listenRecursiveThumbnailP
 const generateRecursiveThumbnailsMock = vi.mocked(generateRecursiveThumbnails);
 const cancelRecursiveThumbnailGenerationMock = vi.mocked(cancelRecursiveThumbnailGeneration);
 const renameFileItemMock = vi.mocked(renameFileItem);
+const getRenamePreferencesMock = vi.mocked(getRenamePreferences);
+const saveRenamePreferencesMock = vi.mocked(saveRenamePreferences);
 const createFileFolderMock = vi.mocked(createFileFolder);
 const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
 const moveFileItemsToFolderMock = vi.mocked(moveFileItemsToFolder);
@@ -601,6 +609,8 @@ describe("application shell", () => {
     cancelRecursiveThumbnailGenerationMock.mockReset();
     recursiveThumbnailHarness.handler = undefined;
     renameFileItemMock.mockReset();
+    getRenamePreferencesMock.mockReset();
+    saveRenamePreferencesMock.mockReset();
     createFileFolderMock.mockReset();
     copyFileItemsToFolderMock.mockReset();
     moveFileItemsToFolderMock.mockReset();
@@ -663,6 +673,14 @@ describe("application shell", () => {
       status: "ok", requestId: "delete-catalog-mask" as never, generation: 1 as never, data: [],
     });
     renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
+    getRenamePreferencesMock.mockResolvedValue({
+      status: "ok", requestId: "rename-preferences" as never, generation: 1 as never,
+      data: { selectExtension: false, sequenceStart: 1, sequenceDigits: 3, separator: "_", preserveExtension: true },
+    });
+    saveRenamePreferencesMock.mockResolvedValue({
+      status: "ok", requestId: "save-rename-preferences" as never, generation: 1 as never,
+      data: { selectExtension: false, sequenceStart: 1, sequenceDigits: 3, separator: "_", preserveExtension: true },
+    });
     createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
     moveFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("move"));
@@ -4081,7 +4099,16 @@ describe("application shell", () => {
     fireEvent.click(within(menu).getByRole("menuitem", { name: "名前の変更" }));
 
     const renameDialog = screen.getByRole("dialog", { name: "名前の変更" });
-    fireEvent.change(within(renameDialog).getByLabelText("ファイル名"), {
+    let renameInput = within(renameDialog).getByLabelText("ファイル名") as HTMLInputElement;
+    expect(renameInput.selectionStart).toBe(0);
+    expect(renameInput.selectionEnd).toBe(3);
+    fireEvent.click(within(renameDialog).getByRole("checkbox", { name: "拡張子も選択" }));
+    await waitFor(() => expect(saveRenamePreferencesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ selectExtension: true }), expect.any(Number),
+    ));
+    renameInput = within(renameDialog).getByLabelText("ファイル名") as HTMLInputElement;
+    expect(renameInput.selectionEnd).toBe("old.cbz".length);
+    fireEvent.change(renameInput, {
       target: { value: "new.cbz" },
     });
     listMock.mockResolvedValue({

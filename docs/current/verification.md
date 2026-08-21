@@ -525,6 +525,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | registry 16件、固定引数16件、対象64件、履歴20件へ固定上限を設け、preview計算は対象数に対して線形である。第三者appの起動時間、slow/removable executable、CPU・working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-R固有のnative `.exe` picker、第三者app/UAC、長いUnicode path、removable executable、履歴表示はrelease WebView2で直接操作・観測していない。 |
 
+## Leeyes P3-S 名前変更設定
+
+対象はLEY-FILE-022の1件。RustがSQLite設定、単一・一括rename入力の検証、連番・拡張子解析、library containment、Windows名規則、衝突判定、preview key、実renameと逆順rollbackを担当する。TypeScriptはWebViewの選択範囲、複数選択、設定draft、preview確認、Tauri orchestrationだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-018の3件、FAIL 0。設定永続化、mixed extension、大小文字非依存の重複、既存target衝突、不正設定、途中失敗と実file rollback、256実fileを含む。256件の計画は62.821ms。 |
+| Focused frontend | PASS | App、BatchRenameDialog、CatalogContextMenu、clientの4 files / 123件、FAIL 0。単一名のstem/full選択、設定保存、複数選択preview、二段階確認、構造化IPCを含む。開発中の初回全体testがasync設定応答と利用者checkbox操作の競合を検出したためrevision境界を追加し、対象testと最終全体testで回帰した。 |
+| Windows tests / typecheck / build | PASS | 最終canonical内でfrontend 36 files / 476件とPython 61件、FAIL 0。typecheck exit 0。frontend 77 modules build、CSS 44.54kB、JS 585.65kB。Viteの500kB advisoryを機能PASSへ読み替えない。SBOM 746 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | lib 214件とshutdown process 1件、FAIL 0。`cargo fmt --check`、`cargo check --locked`、rename設定・計画・rollbackと既存filesystem・viewer・search・cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後のIMP-004 canonicalは385.417秒で全12 stageがexit 0。Rust canonical 106.940秒、release executable 88.392秒、製品shortcut回帰15.741秒、CoDD verify 129.356秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T104532125Z`。これ以前の1回は既存FT-B11-004のViewer開始待機だけがtimeoutしたが、同test単独は535.959msでPASSし、source変更なしの全12 stage再実行もPASSした。 |
+| 性能 | PASS / 限定 | 256個の1-byte JPEG実fileを作成し、全source metadata確認、target生成、衝突確認、preview key生成までをdebug testで62.821msと実測し、5秒上限を満たした。実rename throughput、network/removable drive、CPU、peak working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-S固有の実disk一括rename、途中I/O障害、長いUnicode名、衝突dialog、rollback結果はrelease WebView2で直接操作・観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

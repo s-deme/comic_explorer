@@ -75,6 +75,8 @@ import {
   revealFileItem,
   openFileItemDefault,
   openFileItemWith,
+  getRenamePreferences,
+  saveRenamePreferences,
   type CatalogSettings,
   type CatalogActivationTrigger,
   type DiagnosticReport,
@@ -82,6 +84,7 @@ import {
   type FileClipboardStatus,
   type FileOperationResult,
   type NativeFileDropPreview,
+  type RenamePreferences,
   type CatalogMaskOptions,
   type SavedCatalogMask,
   type SearchResultEntry,
@@ -103,6 +106,7 @@ import {
   type CatalogContextAction,
 } from "./features/catalog/CatalogContextMenu";
 import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
+import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
 import {
   previousComicEntry,
   sortCatalogEntries,
@@ -476,6 +480,14 @@ interface FileNameDialogState {
   value: string;
 }
 
+const DEFAULT_RENAME_PREFERENCES: RenamePreferences = {
+  selectExtension: false,
+  sequenceStart: 1,
+  sequenceDigits: 3,
+  separator: "_",
+  preserveExtension: true,
+};
+
 interface FileDeleteDialogState {
   paths: string[];
   permanent: boolean;
@@ -666,6 +678,10 @@ export function App({
   const [catalogContextMenu, setCatalogContextMenu] =
     useState<CatalogContextMenuState | null>(null);
   const [externalAppPaths, setExternalAppPaths] = useState<string[] | null>(null);
+  const [batchRenamePaths, setBatchRenamePaths] = useState<string[] | null>(null);
+  const [renamePreferences, setRenamePreferences] = useState(DEFAULT_RENAME_PREFERENCES);
+  const renameNameInputRef = useRef<HTMLInputElement>(null);
+  const renamePreferencesRevision = useRef(0);
   const [fileClipboard, setFileClipboardStatus] = useState<FileClipboardStatus>({
     available: false,
     cut: false,
@@ -2354,8 +2370,27 @@ export function App({
         }
         return;
       case "rename":
-        if (entry !== null) {
-          setFileNameDialog({ kind: "rename", entry, value: entryDisplayName(entry) });
+        if (paths.length > 1) {
+          setBatchRenamePaths(paths.slice(0, 256));
+        } else if (entry !== null) {
+          const value = entryDisplayName(entry);
+          const preferencesRevision = renamePreferencesRevision.current + 1;
+          renamePreferencesRevision.current = preferencesRevision;
+          setFileNameDialog({ kind: "rename", entry, value });
+          void getRenamePreferences(generation.current).then((response) => {
+            if (
+              response.status === "ok"
+              && renamePreferencesRevision.current === preferencesRevision
+            ) {
+              setRenamePreferences(response.data);
+              renameNameInputRef.current?.setSelectionRange(
+                0,
+                renameSelectionEnd(value, response.data.selectExtension),
+              );
+            } else if (response.status === "error") {
+              setSelectionNotice(presentError(response.error));
+            }
+          });
         }
         return;
       case "properties":
@@ -6298,6 +6333,20 @@ export function App({
           onClose={() => setExternalAppPaths(null)}
         />
       )}
+      {batchRenamePaths !== null && (
+        <BatchRenameDialog
+          generation={generation.current}
+          paths={batchRenamePaths}
+          onClose={() => setBatchRenamePaths(null)}
+          onComplete={(targetPaths, affected) => {
+            setBatchRenamePaths(null);
+            catalogSnapshots.current.clear();
+            setSelectionNotice(`${affected}件の名前を変更しました。`);
+            setFileTreeRevision((current) => current + 1);
+            void load(navigation.current, targetPaths);
+          }}
+        />
+      )}
       {nativeFileDropDialog !== null && (
         <div className="dialog-backdrop">
           <section
@@ -6368,16 +6417,47 @@ export function App({
             <label>
               名前
               <input
+                ref={renameNameInputRef}
                 autoFocus
                 required
                 aria-label="ファイル名"
                 value={fileNameDialog.value}
-                onFocus={(event) => event.currentTarget.select()}
+                onFocus={(event) => {
+                  if (fileNameDialog.kind !== "rename" || renamePreferences.selectExtension) {
+                    event.currentTarget.select();
+                    return;
+                  }
+                  event.currentTarget.setSelectionRange(
+                    0,
+                    renameSelectionEnd(fileNameDialog.value, false),
+                  );
+                }}
                 onChange={(event) => setFileNameDialog((current) => current === null
                   ? current
                   : { ...current, value: event.target.value })}
               />
             </label>
+            {fileNameDialog.kind === "rename" && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={renamePreferences.selectExtension}
+                  onChange={(event) => {
+                    renamePreferencesRevision.current += 1;
+                    const next = { ...renamePreferences, selectExtension: event.target.checked };
+                    renameNameInputRef.current?.setSelectionRange(
+                      0,
+                      renameSelectionEnd(fileNameDialog.value, next.selectExtension),
+                    );
+                    setRenamePreferences(next);
+                    void saveRenamePreferences(next, generation.current).then((response) => {
+                      if (response.status === "error") setSelectionNotice(presentError(response.error));
+                    });
+                  }}
+                />
+                拡張子も選択
+              </label>
+            )}
             <div className="dialog-actions">
               <button type="button" disabled={fileOperationBusy} onClick={() => setFileNameDialog(null)}>
                 キャンセル

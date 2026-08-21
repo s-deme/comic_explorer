@@ -219,6 +219,27 @@ pub struct ExternalAppHistoryRecord {
     pub launched_at_ms: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenamePreferencesRecord {
+    pub select_extension: bool,
+    pub sequence_start: u64,
+    pub sequence_digits: u8,
+    pub separator: String,
+    pub preserve_extension: bool,
+}
+
+impl Default for RenamePreferencesRecord {
+    fn default() -> Self {
+        Self {
+            select_extension: false,
+            sequence_start: 1,
+            sequence_digits: 3,
+            separator: "_".into(),
+            preserve_extension: true,
+        }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -1127,6 +1148,72 @@ impl StateStore {
                 [MAX_EXTERNAL_APP_HISTORY],
             )
             .map_err(database_error)?;
+        transaction.commit().map_err(database_error)
+    }
+
+    pub fn load_rename_preferences(&self) -> Result<RenamePreferencesRecord, AppError> {
+        let mut preferences = RenamePreferencesRecord::default();
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT key, value FROM settings WHERE key IN (
+               'renameSelectExtension', 'renameSequenceStart', 'renameSequenceDigits',
+               'renameSeparator', 'renamePreserveExtension'
+             )",
+            )
+            .map_err(database_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(database_error)?;
+        for row in rows {
+            let (key, value) = row.map_err(database_error)?;
+            match key.as_str() {
+                "renameSelectExtension" => preferences.select_extension = value == "true",
+                "renameSequenceStart" => preferences.sequence_start = value.parse().unwrap_or(1),
+                "renameSequenceDigits" => preferences.sequence_digits = value.parse().unwrap_or(3),
+                "renameSeparator" => preferences.separator = value,
+                "renamePreserveExtension" => preferences.preserve_extension = value == "true",
+                _ => {}
+            }
+        }
+        Ok(preferences)
+    }
+
+    pub fn save_rename_preferences(
+        &mut self,
+        preferences: &RenamePreferencesRecord,
+    ) -> Result<(), AppError> {
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        let values = [
+            (
+                "renameSelectExtension",
+                preferences.select_extension.to_string(),
+            ),
+            (
+                "renameSequenceStart",
+                preferences.sequence_start.to_string(),
+            ),
+            (
+                "renameSequenceDigits",
+                preferences.sequence_digits.to_string(),
+            ),
+            ("renameSeparator", preferences.separator.clone()),
+            (
+                "renamePreserveExtension",
+                preferences.preserve_extension.to_string(),
+            ),
+        ];
+        for (key, value) in values {
+            transaction
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES(?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    params![key, value],
+                )
+                .map_err(database_error)?;
+        }
         transaction.commit().map_err(database_error)
     }
 
@@ -2086,6 +2173,40 @@ mod tests {
             ["--read-only", "literal argument"]
         );
         assert_eq!(store.list_external_app_history().unwrap().len(), 20);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_018_rename_preferences_persist_separately_from_profile_settings() {
+        let paths = temporary_paths("rename-preferences");
+        {
+            let (mut store, _) = StateStore::open(&paths).unwrap();
+            assert_eq!(
+                store.load_rename_preferences().unwrap(),
+                RenamePreferencesRecord::default()
+            );
+            store
+                .save_rename_preferences(&RenamePreferencesRecord {
+                    select_extension: true,
+                    sequence_start: 42,
+                    sequence_digits: 5,
+                    separator: "-".into(),
+                    preserve_extension: false,
+                })
+                .unwrap();
+        }
+        let (store, _) = StateStore::open(&paths).unwrap();
+        assert_eq!(
+            store.load_rename_preferences().unwrap(),
+            RenamePreferencesRecord {
+                select_extension: true,
+                sequence_start: 42,
+                sequence_digits: 5,
+                separator: "-".into(),
+                preserve_extension: false,
+            }
+        );
         drop(store);
         fs::remove_dir_all(paths.root).unwrap();
     }

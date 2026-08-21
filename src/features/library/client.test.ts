@@ -26,6 +26,9 @@ import {
   previewExternalAppLaunch,
   launchExternalApp,
   listExternalAppHistory,
+  saveRenamePreferences,
+  previewBatchRename,
+  executeBatchRename,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -235,6 +238,25 @@ describe("library client settings contract", () => {
     });
     expect(invokeMock).toHaveBeenNthCalledWith(4, "list_external_app_history", {
       context: expect.objectContaining({ generation: 43 }),
+    });
+  });
+
+  it("REQ-LEY-P3-018 sends rename preferences and preview key as structured fields", async () => {
+    const preferences = { selectExtension: false, sequenceStart: 7, sequenceDigits: 3,
+      separator: "_" as const, preserveExtension: true };
+    await saveRenamePreferences(preferences, 50);
+    await previewBatchRename(["a.jpg", "b.png"], "Page", preferences, 51);
+    await executeBatchRename(["a.jpg", "b.png"], "Page", preferences, "opaque", 52);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "save_rename_preferences", {
+      context: expect.objectContaining({ generation: 50 }), preferences,
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "preview_batch_rename", {
+      context: expect.objectContaining({ generation: 51 }), itemRelativePaths: ["a.jpg", "b.png"],
+      baseName: "Page", preferences,
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "execute_batch_rename", {
+      context: expect.objectContaining({ generation: 52 }), itemRelativePaths: ["a.jpg", "b.png"],
+      baseName: "Page", preferences, previewKey: "opaque", confirmed: true,
     });
   });
 

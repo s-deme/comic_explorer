@@ -1119,6 +1119,32 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: #f4f7fb;
 }
 
+.dialog-backdrop > .batch-rename-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+}
+
+.batch-rename-dialog > label {
+  display: grid;
+  gap: 6px;
+  margin-block: 8px;
+}
+
+.batch-rename-preview {
+  margin-block-start: 14px;
+  padding: 12px;
+  border: 1px solid #8093aa;
+  border-radius: 8px;
+  background: #f4f7fb;
+}
+
+.batch-rename-preview ol {
+  max-height: 280px;
+  overflow: auto;
+  padding-inline-start: 24px;
+}
+
 @media (max-width: 720px) {
   .external-app-layout { grid-template-columns: 1fr; }
 }

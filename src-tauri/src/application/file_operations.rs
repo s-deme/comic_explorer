@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::{AppState, error_response, request_error, validate_request};
 use crate::api::{MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::domain::{AppError, ErrorCode, RelativePath};
-use crate::state::{ExternalAppHistoryRecord, ExternalAppRecord};
+use crate::state::{ExternalAppHistoryRecord, ExternalAppRecord, RenamePreferencesRecord};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -440,6 +440,218 @@ fn rename_item(
     })
 }
 
+const MAX_BATCH_RENAME_ITEMS: usize = 256;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenamePreferences {
+    pub select_extension: bool,
+    pub sequence_start: u64,
+    pub sequence_digits: u8,
+    pub separator: String,
+    pub preserve_extension: bool,
+}
+
+impl From<RenamePreferencesRecord> for RenamePreferences {
+    fn from(value: RenamePreferencesRecord) -> Self {
+        Self {
+            select_extension: value.select_extension,
+            sequence_start: value.sequence_start,
+            sequence_digits: value.sequence_digits,
+            separator: value.separator,
+            preserve_extension: value.preserve_extension,
+        }
+    }
+}
+
+impl From<RenamePreferences> for RenamePreferencesRecord {
+    fn from(value: RenamePreferences) -> Self {
+        Self {
+            select_extension: value.select_extension,
+            sequence_start: value.sequence_start,
+            sequence_digits: value.sequence_digits,
+            separator: value.separator,
+            preserve_extension: value.preserve_extension,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchRenamePreviewItem {
+    pub source_relative_path: String,
+    pub target_relative_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchRenamePreview {
+    pub items: Vec<BatchRenamePreviewItem>,
+    pub unchanged: usize,
+    pub preview_key: String,
+}
+
+#[derive(Debug, Clone)]
+struct BatchRenamePlan {
+    changes: Vec<(RelativePath, PathBuf, PathBuf)>,
+    preview: BatchRenamePreview,
+}
+
+fn validate_rename_preferences(preferences: &RenamePreferences) -> Result<(), AppError> {
+    if preferences.sequence_start > 999_999 || !(1..=6).contains(&preferences.sequence_digits) {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Rename sequence start or digit count is outside the supported range.",
+        ));
+    }
+    if !matches!(preferences.separator.as_str(), "" | " " | "-" | "_") {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Rename separator must be empty, a space, hyphen, or underscore.",
+        ));
+    }
+    Ok(())
+}
+
+fn batch_rename_plan(
+    root: &Path,
+    relative_paths: Vec<String>,
+    base_name: String,
+    preferences: RenamePreferences,
+) -> Result<BatchRenamePlan, AppError> {
+    validate_rename_preferences(&preferences)?;
+    let base_name = base_name.trim();
+    if base_name.is_empty()
+        || base_name.contains(['/', '\\'])
+        || base_name.chars().any(char::is_control)
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Rename base name is invalid.",
+        ));
+    }
+    if relative_paths.len() < 2 || relative_paths.len() > MAX_BATCH_RENAME_ITEMS {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Batch rename requires between 2 and 256 selected items.",
+        ));
+    }
+    let selected = contained_sources(root, relative_paths)?;
+    let mut generated = HashSet::new();
+    let mut changes = Vec::new();
+    let mut items = Vec::new();
+    let mut unchanged = 0;
+    for (index, (relative, source)) in selected.into_iter().enumerate() {
+        let sequence = preferences
+            .sequence_start
+            .checked_add(index as u64)
+            .filter(|value| *value <= 999_999)
+            .ok_or_else(|| {
+                request_error(ErrorCode::ResourceLimit, "Rename sequence exceeds 999999.")
+            })?;
+        let mut new_name = format!(
+            "{}{}{:0width$}",
+            base_name,
+            preferences.separator,
+            sequence,
+            width = usize::from(preferences.sequence_digits)
+        );
+        if preferences.preserve_extension && source.is_file() {
+            if let Some(extension) = source
+                .extension()
+                .and_then(OsStr::to_str)
+                .filter(|value| !value.is_empty())
+            {
+                new_name.push('.');
+                new_name.push_str(extension);
+            }
+        }
+        let new_name = validate_item_name(&new_name)?.to_owned();
+        let parent = source.parent().ok_or_else(|| {
+            request_error(
+                ErrorCode::InvalidPath,
+                "A selected item has no parent folder.",
+            )
+        })?;
+        let target = parent.join(&new_name);
+        let folded_target = target.to_string_lossy().to_lowercase();
+        if !generated.insert(folded_target) {
+            return Err(request_error(
+                ErrorCode::Conflict,
+                "Batch rename generates duplicate names.",
+            ));
+        }
+        if same_windows_path(&source, &target) {
+            unchanged += 1;
+            continue;
+        }
+        if target.exists() {
+            return Err(target_conflict(&target));
+        }
+        let target_relative = match relative.as_str().rsplit_once('/') {
+            Some((parent, _)) => format!("{parent}/{new_name}"),
+            None => new_name,
+        };
+        items.push(BatchRenamePreviewItem {
+            source_relative_path: relative.to_string(),
+            target_relative_path: target_relative,
+        });
+        changes.push((relative, source, target));
+    }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    base_name.hash(&mut hasher);
+    preferences.select_extension.hash(&mut hasher);
+    preferences.sequence_start.hash(&mut hasher);
+    preferences.sequence_digits.hash(&mut hasher);
+    preferences.separator.hash(&mut hasher);
+    preferences.preserve_extension.hash(&mut hasher);
+    for (_, source, target) in &changes {
+        source.to_string_lossy().to_lowercase().hash(&mut hasher);
+        target.to_string_lossy().to_lowercase().hash(&mut hasher);
+    }
+    Ok(BatchRenamePlan {
+        changes,
+        preview: BatchRenamePreview {
+            items,
+            unchanged,
+            preview_key: format!("{:016x}", hasher.finish()),
+        },
+    })
+}
+
+fn apply_batch_rename(plan: BatchRenamePlan) -> Result<FileOperationResult, AppError> {
+    apply_batch_rename_with(plan, |source, target| fs::rename(source, target))
+}
+
+fn apply_batch_rename_with(
+    plan: BatchRenamePlan,
+    mut rename: impl FnMut(&Path, &Path) -> io::Result<()>,
+) -> Result<FileOperationResult, AppError> {
+    let mut completed: Vec<(RelativePath, PathBuf, PathBuf)> = Vec::new();
+    for (relative, source, target) in plan.changes {
+        if let Err(error) = rename(&source, &target) {
+            let mut operation_error = file_io_error(Some(relative), error);
+            for (_, rollback_source, rollback_target) in completed.iter().rev() {
+                if let Err(rollback_error) = rename(rollback_target, rollback_source) {
+                    operation_error.message = format!(
+                        "{} Rollback also failed for {}: {}",
+                        operation_error.message,
+                        rollback_target.display(),
+                        rollback_error
+                    );
+                    break;
+                }
+            }
+            return Err(operation_error);
+        }
+        completed.push((relative, source, target));
+    }
+    Ok(FileOperationResult {
+        operation: FileOperationKind::Rename,
+        affected: completed.len(),
+    })
+}
+
 fn create_folder(
     root: &Path,
     parent: RelativePath,
@@ -635,6 +847,119 @@ pub async fn rename_file_item(
     })
     .await
     .map_err(|error| format!("rename worker failed: {error}"))?;
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
+pub fn get_rename_preferences(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<RenamePreferences>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let result = stores
+        .as_ref()
+        .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))
+        .and_then(|store| store.load_rename_preferences())
+        .map(RenamePreferences::from)
+        .and_then(|preferences| {
+            validate_rename_preferences(&preferences)?;
+            Ok(preferences)
+        });
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub fn save_rename_preferences(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    preferences: RenamePreferences,
+) -> Result<Response<RenamePreferences>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let result = validate_rename_preferences(&preferences).and_then(|()| {
+        let mut stores = state
+            .store
+            .lock()
+            .map_err(|_| request_error(ErrorCode::Internal, "Local metadata is unavailable."))?;
+        stores
+            .as_mut()
+            .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))?
+            .save_rename_preferences(&preferences.clone().into())?;
+        Ok(preferences)
+    });
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub async fn preview_batch_rename(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_paths: Vec<String>,
+    base_name: String,
+    preferences: RenamePreferences,
+) -> Result<Response<BatchRenamePreview>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        batch_rename_plan(&root, item_relative_paths, base_name, preferences)
+            .map(|plan| plan.preview)
+    })
+    .await
+    .map_err(|error| format!("batch rename preview worker failed: {error}"))?;
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub async fn execute_batch_rename(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_paths: Vec<String>,
+    base_name: String,
+    preferences: RenamePreferences,
+    preview_key: String,
+    confirmed: bool,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !confirmed {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Explicit batch rename confirmation is required.",
+            ),
+        ));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let lock = state.file_operations.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        let plan = batch_rename_plan(&root, item_relative_paths, base_name, preferences)?;
+        if preview_key != plan.preview.preview_key {
+            return Err(request_error(
+                ErrorCode::Conflict,
+                "The selected items or rename settings changed; preview again.",
+            ));
+        }
+        apply_batch_rename(plan)
+    })
+    .await
+    .map_err(|error| format!("batch rename worker failed: {error}"))?;
     Ok(operation_response(context, result))
 }
 
@@ -2210,6 +2535,108 @@ mod tests {
             .code,
             ErrorCode::InvalidRequest
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_018_batch_rename_previews_extensions_conflicts_and_rolls_back() {
+        let root = fixture("batch-rename");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("first.jpg"), b"one").unwrap();
+        fs::write(root.join("second.png"), b"two").unwrap();
+        let preferences = RenamePreferences {
+            select_extension: false,
+            sequence_start: 7,
+            sequence_digits: 3,
+            separator: "_".into(),
+            preserve_extension: true,
+        };
+        let paths = vec!["first.jpg".into(), "second.png".into()];
+        let plan =
+            batch_rename_plan(&root, paths.clone(), "Page".into(), preferences.clone()).unwrap();
+        assert_eq!(
+            plan.preview.items,
+            vec![
+                BatchRenamePreviewItem {
+                    source_relative_path: "first.jpg".into(),
+                    target_relative_path: "Page_007.jpg".into()
+                },
+                BatchRenamePreviewItem {
+                    source_relative_path: "second.png".into(),
+                    target_relative_path: "Page_008.png".into()
+                },
+            ]
+        );
+        assert_eq!(plan.preview.preview_key.len(), 16);
+
+        let failed = apply_batch_rename_with(plan, |source, target| {
+            if source.file_name() == Some(OsStr::new("second.png")) {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "forced failure",
+                ))
+            } else {
+                fs::rename(source, target)
+            }
+        });
+        assert_eq!(failed.unwrap_err().code, ErrorCode::AccessDenied);
+        assert_eq!(fs::read(root.join("first.jpg")).unwrap(), b"one");
+        assert_eq!(fs::read(root.join("second.png")).unwrap(), b"two");
+        assert!(!root.join("Page_007.jpg").exists());
+
+        fs::write(root.join("Page_007.jpg"), b"collision").unwrap();
+        assert_eq!(
+            batch_rename_plan(&root, paths, "Page".into(), preferences)
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
+        assert_eq!(
+            validate_rename_preferences(&RenamePreferences {
+                select_extension: false,
+                sequence_start: 1,
+                sequence_digits: 0,
+                separator: ".".into(),
+                preserve_extension: true,
+            })
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidRequest
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_018_plans_256_real_files_within_bounded_time() {
+        let root = fixture("batch-rename-performance");
+        fs::create_dir_all(&root).unwrap();
+        let mut paths = Vec::new();
+        for index in 0..MAX_BATCH_RENAME_ITEMS {
+            let name = format!("source-{index:03}.jpg");
+            fs::write(root.join(&name), b"x").unwrap();
+            paths.push(name);
+        }
+        let started = std::time::Instant::now();
+        let plan = batch_rename_plan(
+            &root,
+            paths,
+            "Page".into(),
+            RenamePreferences {
+                select_extension: false,
+                sequence_start: 1,
+                sequence_digits: 4,
+                separator: "_".into(),
+                preserve_extension: true,
+            },
+        )
+        .unwrap();
+        let elapsed = started.elapsed();
+        eprintln!(
+            "REQ-LEY-P3-018 planned 256 files in {:.3} ms",
+            elapsed.as_secs_f64() * 1000.0
+        );
+        assert_eq!(plan.preview.items.len(), MAX_BATCH_RENAME_ITEMS);
+        assert!(elapsed < std::time::Duration::from_secs(5));
         fs::remove_dir_all(root).unwrap();
     }
 

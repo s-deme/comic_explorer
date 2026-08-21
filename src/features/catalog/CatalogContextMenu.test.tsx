@@ -35,7 +35,7 @@ describe("CatalogContextMenu", () => {
     expect(screen.getByRole("menuitem", { name: "登録アプリで開く…" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "新しいフォルダ" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: /削除.*Del/ })).toBeEnabled();
-    expect(screen.getByRole("menuitem", { name: "名前の変更" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "連番で名前を変更…" })).toBeEnabled();
   });
 
   it("dispatches actions and closes with Escape", () => {

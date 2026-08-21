@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 20 | 11 |
+| P3 操作・検索 | 31 | 21 | 10 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **57** | **46** |
+| **合計** | **103** | **58** | **45** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -112,6 +112,8 @@ P3-PではLEY-INPUT-009をPublishedとした。Viewer stageのmodifierなしrigh
 P3-QではLEY-INPUT-013をPublishedとした。paged Viewer toolbarから明示的に1回だけ矩形ズームをarmedにし、12px以上のmouse drag範囲を中央に保って1〜800%の範囲で拡大できる。Rust commandがviewport・selection・scroll・現在倍率を検証して倍率とscroll planを計算し、TypeScriptはpointer capture、stage clamp、一時overlay、DOM適用に限定した。pan・4象限・right click・middle/side・wheel・touch・pen・modifierを分離し、Escape・cancel・blur・layout/session変更で安全に解除する。frontend 34 files / 470件、Python 61件、Rust 209+1件、typecheck、75 modules build、SBOM 746 components・禁止license 0、再実行したWindows canonical全12 stageはPASSした。初回canonicalの既存folder thumbnail待機testだけの一時timeoutは単独product shortcutとsource変更なしの全stage再実行でPASSし、原本差分0を確認した。Leeyes 2.6.1の現行起動gesture、実pointer capture、DPI、高倍率画像、input・zoom latency、CPU・working setは未測定として残す。
 
 P3-RではLEY-FILE-005/006/007をPublishedとした。Windows native pickerで明示選択した`.exe`だけを最大16件登録し、Rustがcanonical executable、固定引数、対象mode、library containment、最大64対象、preview keyを再検証して`Command::new`へ引数を個別に渡す。起動前の確認を必須とし、成功履歴はapp名・mode・件数・時刻だけをSQLite schema v7へ最大20件保存してpathと引数を残さない。TypeScriptは登録draft、選択収集、確認dialog、Tauri orchestrationだけを担当し、既存Windows「アプリケーションから開く…」も維持した。release製品でのnative picker、第三者app/UAC、長いUnicode path、removable executable、起動時間は未測定として残す。
+
+P3-SではLEY-FILE-022をPublishedとした。単一renameは拡張子を除く初期選択を既定とし、設定で拡張子まで選択できる。複数選択は2〜256件の基本名・separator・開始番号・桁数・拡張子保持をSQLiteへ保存し、RustがWindows名規則、library包含、reparse、欠落、大小文字を無視した重複と既存target衝突を検証して相対path previewとopaque keyを返す。明示確認後も同じ計画をmutex内で再計算し、途中失敗では完了済みrenameを逆順rollbackする。TypeScriptは選択、入力、preview確認、Tauri orchestrationだけを担当する。256実fileの計画は62.821ms。release WebView2の実disk rename、network/removable drive、途中I/O障害、長いUnicode名、CPU・working setは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

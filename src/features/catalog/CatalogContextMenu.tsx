@@ -168,7 +168,7 @@ export function CatalogContextMenu({
       <div className="menu-separator" role="separator" />
       {item("createFolder", "新しいフォルダ", false)}
       {item("recycle", "削除", !hasSelection, "Del")}
-      {item("rename", "名前の変更", entry === null || selectionCount !== 1)}
+      {item("rename", selectionCount > 1 ? "連番で名前を変更…" : "名前の変更", !hasSelection)}
       {item("properties", "プロパティ", entry === null || selectionCount !== 1)}
       <div className="menu-separator" role="separator" />
       {item("permanentDelete", "親フォルダ/書庫を完全に削除", entry === null)}

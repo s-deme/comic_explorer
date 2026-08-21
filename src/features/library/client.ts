@@ -606,6 +606,59 @@ export async function renameFileItem(
   });
 }
 
+export interface RenamePreferences {
+  selectExtension: boolean;
+  sequenceStart: number;
+  sequenceDigits: number;
+  separator: "" | " " | "-" | "_";
+  preserveExtension: boolean;
+}
+
+export interface BatchRenamePreviewItem {
+  sourceRelativePath: string;
+  targetRelativePath: string;
+}
+
+export interface BatchRenamePreview {
+  items: BatchRenamePreviewItem[];
+  unchanged: number;
+  previewKey: string;
+}
+
+export async function getRenamePreferences(generation: number): Promise<ApiResponse<RenamePreferences>> {
+  return invoke("get_rename_preferences", { context: context(generation) });
+}
+
+export async function saveRenamePreferences(
+  preferences: RenamePreferences,
+  generation: number,
+): Promise<ApiResponse<RenamePreferences>> {
+  return invoke("save_rename_preferences", { context: context(generation), preferences });
+}
+
+export async function previewBatchRename(
+  itemRelativePaths: string[],
+  baseName: string,
+  preferences: RenamePreferences,
+  generation: number,
+): Promise<ApiResponse<BatchRenamePreview>> {
+  return invoke("preview_batch_rename", {
+    context: context(generation), itemRelativePaths, baseName, preferences,
+  });
+}
+
+export async function executeBatchRename(
+  itemRelativePaths: string[],
+  baseName: string,
+  preferences: RenamePreferences,
+  previewKey: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("execute_batch_rename", {
+    context: context(generation), itemRelativePaths, baseName, preferences, previewKey, confirmed: true,
+  });
+}
+
 export async function createFileFolder(
   parentRelativePath: string,
   name: string,
