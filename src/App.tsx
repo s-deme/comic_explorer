@@ -202,6 +202,11 @@ import {
   type CatalogMouseAction,
   type CatalogMouseBindings,
 } from "./features/input/catalog-mouse";
+import {
+  DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  strictViewerQuadrantBindings,
+  type ViewerQuadrantBindings,
+} from "./features/input/viewer-quadrants";
 import { FolderTree } from "./features/navigation/FolderTree";
 import type {
   TreeFileAction,
@@ -751,6 +756,9 @@ export function App({
   const [catalogMouseBindings, setCatalogMouseBindings] = useState<CatalogMouseBindings>(() => ({
     ...DEFAULT_CATALOG_MOUSE_BINDINGS,
   }));
+  const [viewerQuadrantBindings, setViewerQuadrantBindings] = useState<ViewerQuadrantBindings>(() => ({
+    ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  }));
   const [helpOpen, setHelpOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1266,6 +1274,10 @@ export function App({
           setCatalogMouseBindings(
             strictCatalogMouseBindings(response.data.catalogMouseBindings)
               ?? { ...DEFAULT_CATALOG_MOUSE_BINDINGS },
+          );
+          setViewerQuadrantBindings(
+            strictViewerQuadrantBindings(response.data.viewerQuadrantBindings)
+              ?? { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
           );
           setMouseGestures(normalizeMouseGestures(response.data.mouseGestures));
         }
@@ -3353,6 +3365,7 @@ export function App({
       detailShowModified,
       shortcuts: { ...shortcuts },
       catalogMouseBindings: { ...catalogMouseBindings },
+      viewerQuadrantBindings: { ...viewerQuadrantBindings },
       mouseGestures: { ...mouseGestures },
     };
   }
@@ -3484,6 +3497,10 @@ export function App({
       setCatalogMouseBindings(
         strictCatalogMouseBindings(response.data.catalogMouseBindings)
           ?? normalized.catalogMouseBindings,
+      );
+      setViewerQuadrantBindings(
+        strictViewerQuadrantBindings(response.data.viewerQuadrantBindings)
+          ?? normalized.viewerQuadrantBindings,
       );
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -3661,7 +3678,7 @@ export function App({
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
-    shortcuts, catalogMouseBindings, mouseGestures,
+    shortcuts, catalogMouseBindings, viewerQuadrantBindings, mouseGestures,
   ]);
 
   function queueThumbnail(
@@ -4293,6 +4310,7 @@ export function App({
             activeViewerGeneration,
           )}
           mouseGestures={mouseGestures}
+          quadrantBindings={viewerQuadrantBindings}
           detached={viewerDetached}
           onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}

@@ -31,6 +31,13 @@ import {
   type CatalogMouseAction,
 } from "../input/catalog-mouse";
 import {
+  VIEWER_QUADRANT_ACTIONS,
+  VIEWER_QUADRANT_LABELS,
+  VIEWER_QUADRANT_NAMES,
+  viewerQuadrantActionLabel,
+  type ViewerQuadrantAction,
+} from "../input/viewer-quadrants";
+import {
   MAX_VIEWER_SPACING,
   MAX_AUTO_VIEWPORT_ASPECT_PERCENT,
   MAX_PORTRAIT_ASPECT_PERCENT,
@@ -561,6 +568,11 @@ export function SettingsDialog({
       id: `catalog-mouse-${name}`,
       category: "commands" as const,
       text: `一覧 マウス ${CATALOG_MOUSE_GESTURE_LABELS[name]} ${catalogMouseActionLabel(draft.catalogMouseBindings[name])} ${CATALOG_MOUSE_GESTURE_DESCRIPTIONS[name]}`,
+    })),
+    ...VIEWER_QUADRANT_NAMES.map((name) => ({
+      id: `viewer-quadrant-${name}`,
+      category: "commands" as const,
+      text: `Viewer 4象限 クリック ${VIEWER_QUADRANT_LABELS[name]} ${viewerQuadrantActionLabel(draft.viewerQuadrantBindings[name])} stage 片手 読書`,
     })),
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
@@ -1393,6 +1405,31 @@ export function SettingsDialog({
                   >
                     {CATALOG_MOUSE_ACTIONS.map((action) => (
                       <option key={action} value={action}>{catalogMouseActionLabel(action)}</option>
+                    ))}
+                  </select>
+                </SettingRow>
+              ))}
+              <h3 className="settings-subheading">Viewer 4象限クリック</h3>
+              {VIEWER_QUADRANT_NAMES.map((name) => (
+                <SettingRow
+                  key={name}
+                  id={`viewer-quadrant-${name}`}
+                  title={`${VIEWER_QUADRANT_LABELS[name]}のクリック`}
+                  description="Viewer stageを中央で4分割します。ドラッグ、touch、pen、修飾キー付き操作とダブルクリックには反応しません。"
+                  hidden={rowHidden(`viewer-quadrant-${name}`)}
+                >
+                  <select
+                    aria-label={`profileViewer${VIEWER_QUADRANT_LABELS[name]}クリック割当`}
+                    value={draft.viewerQuadrantBindings[name]}
+                    onChange={(event) => update({
+                      viewerQuadrantBindings: {
+                        ...draft.viewerQuadrantBindings,
+                        [name]: event.target.value as ViewerQuadrantAction,
+                      },
+                    })}
+                  >
+                    {VIEWER_QUADRANT_ACTIONS.map((action) => (
+                      <option key={action} value={action}>{viewerQuadrantActionLabel(action)}</option>
                     ))}
                   </select>
                 </SettingRow>

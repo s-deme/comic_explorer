@@ -34,6 +34,7 @@ import {
   type ShortcutBindings,
 } from "./features/input/shortcuts";
 import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
 import {
   getCatalogSettings,
   getItemMetadata,
@@ -196,6 +197,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
         backButton: "navigateBack",
         forwardButton: "navigateForward",
       },
+      viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
       mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
     } satisfies CatalogSettings,
   };

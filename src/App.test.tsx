@@ -83,6 +83,7 @@ import {
 } from "./features/library/client";
 import type { CatalogEntry, ImageFormat } from "./types/domain";
 import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
 import {
   APP_VERSION,
   DEFAULT_MOUSE_GESTURES,
@@ -357,6 +358,7 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
     backButton: "navigateBack",
     forwardButton: "navigateForward",
   },
+  viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 
@@ -1257,6 +1259,42 @@ describe("application shell", () => {
       "archive", "doubleClick", expect.any(Number),
     ));
     expect(await screen.findByLabelText("book.cbz ビューワ")).toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-014 applies the Rust-restored quadrant registry to Viewer clicks", async () => {
+    settingsMock.mockResolvedValue({
+      status: "ok",
+      requestId: "settings-quadrants" as never,
+      generation: 1 as never,
+      data: {
+        ...DEFAULT_CATALOG_SETTINGS,
+        viewerQuadrantBindings: {
+          topLeft: "zoomIn",
+          topRight: "nextPage",
+          bottomLeft: "previousPage",
+          bottomRight: "nextPage",
+        },
+      },
+    });
+    openMock.mockResolvedValue(viewerResponse("book.cbz"));
+    await registerTestLibrary([testEntry("book.cbz")]);
+    await waitFor(() => expect(settingsMock).toHaveBeenCalled());
+    fireEvent.doubleClick(screen.getByRole("button", { name: /book\.cbz/ }));
+    expect(await screen.findByLabelText("book.cbz ビューワ")).toBeInTheDocument();
+
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, width: 100, height: 100,
+      right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(stage, {
+      pointerId: 1, pointerType: "mouse", button: 0, clientX: 25, clientY: 25,
+    });
+    fireEvent.pointerUp(stage, {
+      pointerId: 1, pointerType: "mouse", button: 0, clientX: 25, clientY: 25,
+    });
+    await waitFor(() => expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-scale", "1.1"));
   });
 
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
@@ -3445,6 +3483,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
       target: { value: "toggleSearch" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profileViewer左上クリック割当"), {
+      target: { value: "zoomIn" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
 
     expect(screen.getByLabelText("一覧表示形式"))
@@ -3543,6 +3584,9 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
       target: { value: "toggleSearch" },
     });
+    fireEvent.change(within(dialog).getByLabelText("profileViewer左上クリック割当"), {
+      target: { value: "zoomIn" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "統合設定" })).not.toBeInTheDocument());
@@ -3591,6 +3635,12 @@ describe("application shell", () => {
           middleClick: "toggleSearch",
           backButton: "navigateBack",
           forwardButton: "navigateForward",
+        }),
+        viewerQuadrantBindings: expect.objectContaining({
+          topLeft: "zoomIn",
+          topRight: "nextPage",
+          bottomLeft: "previousPage",
+          bottomRight: "nextPage",
         }),
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",

@@ -105,6 +105,8 @@ P3-MではLEY-INPUT-005をPublishedとした。paged Viewerのmodifierなし矢�
 
 P3-NではLEY-INPUT-006をPublishedとした。catalogのprimary、double、middle、back、forwardへ安全な既知commandを割り当て、primary選択、modifier複数選択、context menu、drag、favoriteを固定操作として保護した。Rustが完全なgesture/action registryをstrict profile v24とSQLiteで検証・atomic保存し、TypeScriptはWebView event、250msのsingle/double分離、設定draft、既存handlerへのdispatchに限定した。frontend 33 files / 456件、Python 61件、Rust 208+1件、typecheck、build、Windows canonical全12 stageはPASSした。並行負荷時の既存FT-B14-001 timeoutは単独および負荷分離した全体再実行でPASSした。実double-click interval、button 3/4、touchpad、DPI、input latency、CPU・working setは未測定として残す。
 
+P3-OではLEY-INPUT-008をPublishedとした。Viewer stageを4象限に分け、安全な既知Viewer commandを象限別に割り当てた。Rustが完全な象限/action registryをstrict profile v25とSQLiteで検証・atomic保存し、TypeScriptはWebView座標、mouse/pan境界、250msのsingle/double分離、既存handlerへのdispatchに限定した。touch・pen・modifier・4px以上のpan・swipe・middle/side button・wheelと固定double click全画面切替を保護し、拡大画像でも移動量4px未満のmouse clickを利用できる。frontend 34 files / 463件、Python 61件、Rust 208+1件、typecheck、build、再実行したWindows canonical全12 stageはPASSした。初回canonicalの最終CoDD test commandだけの一時失敗は単独再実行と全stage再実行でPASSを確認した。実double-click interval、touchpad、pen、DPI、input latency、CPU・working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

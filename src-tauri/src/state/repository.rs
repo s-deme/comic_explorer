@@ -69,6 +69,18 @@ fn default_catalog_mouse_bindings() -> BTreeMap<String, String> {
     .collect()
 }
 
+fn default_viewer_quadrant_bindings() -> BTreeMap<String, String> {
+    [
+        ("topLeft", "previousPage"),
+        ("topRight", "nextPage"),
+        ("bottomLeft", "previousPage"),
+        ("bottomRight", "nextPage"),
+    ]
+    .into_iter()
+    .map(|(quadrant, action)| (quadrant.to_owned(), action.to_owned()))
+    .collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub library_root: Option<PathBuf>,
@@ -149,6 +161,7 @@ pub struct Settings {
     pub auto_refresh_current_folder: bool,
     pub shortcut_bindings: BTreeMap<String, Vec<String>>,
     pub catalog_mouse_bindings: BTreeMap<String, String>,
+    pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
 }
 
@@ -265,6 +278,7 @@ impl Default for Settings {
             auto_refresh_current_folder: true,
             shortcut_bindings: default_shortcut_bindings(),
             catalog_mouse_bindings: default_catalog_mouse_bindings(),
+            viewer_quadrant_bindings: default_viewer_quadrant_bindings(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
         }
     }
@@ -435,6 +449,11 @@ impl StateStore {
                         settings.catalog_mouse_bindings = bindings;
                     }
                 }
+                "viewerQuadrantBindings" => {
+                    if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
+                        settings.viewer_quadrant_bindings = bindings;
+                    }
+                }
                 "mouseGestureBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.mouse_gesture_bindings = bindings;
@@ -459,6 +478,13 @@ impl StateStore {
             .map_err(|error| AppError {
                 code: ErrorCode::Internal,
                 message: format!("Catalog mouse settings could not be encoded: {error}"),
+                target: None,
+                retryable: false,
+            })?;
+        let viewer_quadrant_bindings = serde_json::to_string(&settings.viewer_quadrant_bindings)
+            .map_err(|error| AppError {
+                code: ErrorCode::Internal,
+                message: format!("Viewer quadrant settings could not be encoded: {error}"),
                 target: None,
                 retryable: false,
             })?;
@@ -616,6 +642,7 @@ impl StateStore {
             ),
             ("shortcutBindings", shortcut_bindings),
             ("catalogMouseBindings", catalog_mouse_bindings),
+            ("viewerQuadrantBindings", viewer_quadrant_bindings),
             ("mouseGestureBindings", mouse_gesture_bindings),
         ];
         if let Some(root) = &settings.library_root {
@@ -1787,7 +1814,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b17_and_req_ley_p3_012_and_p3_013_settings_survive_reopen() {
+    fn fr_b17_and_req_ley_p3_012_to_p3_014_settings_survive_reopen() {
         let paths = temporary_paths("state-reopen");
         {
             let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1887,6 +1914,14 @@ mod tests {
                     ("middleClick".into(), "toggleSearch".into()),
                     ("backButton".into(), "navigateUp".into()),
                     ("forwardButton".into(), "refreshCatalog".into()),
+                ]
+                .into_iter()
+                .collect(),
+                viewer_quadrant_bindings: [
+                    ("topLeft".into(), "zoomIn".into()),
+                    ("topRight".into(), "nextPage".into()),
+                    ("bottomLeft".into(), "previousPage".into()),
+                    ("bottomRight".into(), "toggleLoupe".into()),
                 ]
                 .into_iter()
                 .collect(),
@@ -2006,6 +2041,11 @@ mod tests {
         assert_eq!(
             restored.catalog_mouse_bindings["middleClick"],
             "toggleSearch"
+        );
+        assert_eq!(restored.viewer_quadrant_bindings["topLeft"], "zoomIn");
+        assert_eq!(
+            restored.viewer_quadrant_bindings["bottomRight"],
+            "toggleLoupe"
         );
         assert_eq!(
             restored.mouse_gesture_bindings["doubleClick"],

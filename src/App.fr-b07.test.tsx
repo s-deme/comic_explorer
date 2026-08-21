@@ -30,6 +30,7 @@ import {
 } from "./features/library/client";
 import type { CatalogEntry } from "./types/domain";
 import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
 import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
 
 function openLibraryMenuItem(name: "閲覧履歴") {
@@ -250,6 +251,7 @@ const defaultSettings: CatalogSettings = {
     backButton: "navigateBack",
     forwardButton: "navigateForward",
   },
+  viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
 

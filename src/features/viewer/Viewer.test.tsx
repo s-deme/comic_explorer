@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copyViewerPageToClipboard, loadPage, saveReadingPosition } from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import { Viewer } from "./Viewer";
 
 vi.mock("../library/client", () => ({
@@ -55,6 +56,7 @@ function markPrefetchedPagesReady(): void {
 
 describe("Viewer settings", () => {
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
     vi.mocked(loadPage).mockReset();
     vi.mocked(saveReadingPosition).mockReset();
@@ -2037,5 +2039,131 @@ describe("Viewer settings", () => {
     fireEvent.wheel(stage!, { deltaY: -120, buttons: 2 });
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
     fireEvent.pointerUp(stage!, { button: 2 });
+  });
+
+  it("REQ-LEY-P3-014 maps all four stage quadrants and center boundaries", () => {
+    vi.useFakeTimers();
+    render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        quadrantBindings={{
+          topLeft: "previousPage",
+          topRight: "nextPage",
+          bottomLeft: "toggleDirection",
+          bottomRight: "zoomIn",
+        }}
+      />,
+    );
+    markPrefetchedPagesReady();
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 10, top: 20, width: 100, height: 80,
+      right: 110, bottom: 100, x: 10, y: 20, toJSON: () => ({}),
+    });
+    const click = (x: number, y: number, pointerId: number) => {
+      fireEvent.pointerDown(stage, { pointerId, pointerType: "mouse", button: 0, clientX: x, clientY: y });
+      fireEvent.pointerUp(stage, { pointerId, pointerType: "mouse", button: 0, clientX: x, clientY: y });
+      act(() => vi.advanceTimersByTime(250));
+    };
+
+    click(90, 40, 1);
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    click(30, 40, 2);
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    click(30, 80, 3);
+    expect(screen.getByText("左開き")).toBeInTheDocument();
+    click(60, 60, 4);
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
+  });
+
+  it("REQ-LEY-P3-014 protects double click, pan, touch, pen, modifiers, and cleanup", async () => {
+    vi.useFakeTimers();
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(false),
+    };
+    const onClose = vi.fn();
+    const view = render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={onClose}
+        fullscreenAdapter={adapter}
+        quadrantBindings={{
+          ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
+          topLeft: "closeViewer",
+          topRight: "zoomIn",
+        }}
+      />,
+    );
+    const stage = document.querySelector<HTMLElement>(".viewer-stage")!;
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, width: 100, height: 100,
+      right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    });
+    Object.defineProperties(spread, {
+      clientWidth: { configurable: true, value: 50 },
+      clientHeight: { configurable: true, value: 50 },
+      scrollWidth: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 100 },
+    });
+
+    fireEvent.pointerDown(stage, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
+    fireEvent.pointerUp(stage, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
+    fireEvent.doubleClick(stage);
+    await act(async () => Promise.resolve());
+    act(() => vi.advanceTimersByTime(250));
+    expect(adapter.enter).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(stage, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    fireEvent.pointerMove(stage, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 80, clientY: 25 });
+    fireEvent.pointerMove(stage, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    fireEvent.pointerUp(stage, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    act(() => vi.advanceTimersByTime(250));
+    expect(spread).toHaveAttribute("data-scale", "1");
+
+    for (const [pointerType, modifier] of [
+      ["touch", {}],
+      ["pen", {}],
+      ["mouse", { ctrlKey: true }],
+    ] as const) {
+      fireEvent.pointerDown(stage, { pointerId: 3, pointerType, button: 0, clientX: 75, clientY: 25, ...modifier });
+      fireEvent.pointerUp(stage, { pointerId: 3, pointerType, button: 0, clientX: 75, clientY: 25, ...modifier });
+    }
+    act(() => vi.advanceTimersByTime(250));
+    expect(spread).toHaveAttribute("data-scale", "1");
+
+    fireEvent.pointerDown(stage, { pointerId: 4, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    fireEvent.pointerUp(stage, { pointerId: 4, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    act(() => vi.advanceTimersByTime(250));
+    expect(spread).toHaveAttribute("data-scale", "1.1");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
+      target: { value: "vertical_scroll" },
+    });
+    fireEvent.pointerDown(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    fireEvent.pointerUp(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
+    act(() => vi.advanceTimersByTime(250));
+    expect(spread).toHaveAttribute("data-scale", "1.1");
+    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
+      target: { value: "paged" },
+    });
+
+    fireEvent.pointerDown(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
+    fireEvent.pointerUp(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
+    view.unmount();
+    act(() => vi.advanceTimersByTime(250));
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -160,6 +160,26 @@ describe("library client settings contract", () => {
     );
   });
 
+  it("REQ-LEY-P3-014 sends the complete Viewer quadrant registry to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.viewerQuadrantBindings.topLeft = "zoomIn";
+    await saveSettingsProfile(profile, 25);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          viewerQuadrantBindings: {
+            topLeft: "zoomIn",
+            topRight: "nextPage",
+            bottomLeft: "previousPage",
+            bottomRight: "nextPage",
+          },
+        }),
+      }),
+    );
+  });
+
   it("REQ-LEY-P3-010 sends only typed drag/drop commands to Rust", async () => {
     await copyFileItemsToDestination(["one.cbz", "two.pdf"], "Target", 31);
     await previewNativeFileDrop(["D:\\Incoming\\one.cbz"], "Target", 32);

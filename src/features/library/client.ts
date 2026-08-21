@@ -29,6 +29,7 @@ import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mod
 import type { SearchRequestOptions } from "../catalog/search-options";
 import type { ShortcutBindings } from "../input/shortcuts";
 import type { CatalogMouseBindings } from "../input/catalog-mouse";
+import type { ViewerQuadrantBindings } from "../input/viewer-quadrants";
 import type {
   MouseGestureBindings,
   CatalogPalette,
@@ -201,6 +202,7 @@ export interface CatalogSettings {
   detailShowModified: boolean;
   shortcuts: ShortcutBindings;
   catalogMouseBindings: CatalogMouseBindings;
+  viewerQuadrantBindings: ViewerQuadrantBindings;
   mouseGestures: MouseGestureBindings;
 }
 
@@ -340,6 +342,7 @@ export async function saveSettingsProfile(
       detailShowModified: profile.detailShowModified,
       shortcuts: profile.shortcuts,
       catalogMouseBindings: profile.catalogMouseBindings,
+      viewerQuadrantBindings: profile.viewerQuadrantBindings,
       mouseGestures: profile.mouseGestures,
     },
   });

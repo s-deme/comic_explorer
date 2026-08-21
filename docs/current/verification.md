@@ -469,6 +469,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | registryは5 gesture、dispatchは1 eventにつき固定個数の分岐、primary判定timerは最大1件に固定され、filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput latency、CPU、working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-N固有の実double-click interval、button 3/4、touchpad、DPI、設定UI操作はrelease WebView2で直接観測していない。 |
 
+## Leeyes P3-O 4象限クリック
+
+対象はLEY-INPUT-008の1件。RustがViewerの4象限完全shapeと安全な既知actionをstrict profile v25・SQLiteで検証・保存し、TypeScriptはWebView stage座標、mouse/pan境界、250ms timer、既存Viewer commandへのdispatchだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-014の2件、FAIL 0。既定値、完全shape、未知象限/action拒否、custom割当のSQLite再open、profile atomic validationを含む。 |
+| Focused frontend | PASS | viewer-quadrants、Viewer、profile、client、Appの5 files / 275件、FAIL 0。4象限と中央境界、single/double分離、pan・touch・pen・modifier保護、拡大画像click、timer cleanup、action routing、v24→v25移行と不正値拒否を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 34 files / 463件とPython 61件、FAIL 0。typecheck exit 0。frontend 75 modules build、CSS 43.17kB、JS 569.60kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 208件とshutdown process 1件、FAIL 0。quadrant registry・SQLite/profile再openと既存catalog、viewer、file操作、search、watch、tree、cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは337.970秒で全12 stageがexit 0。Rust canonical 70.349秒、release executable 85.244秒、GUI権限付きshortcut product回帰13.841秒、CoDD verify 123.765秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T083122335Z`。これ以前の1回は最終CoDD verify内のtest commandだけがexit 1となったが、同commandを直後に単独実行してfrontend 463件・Python 61件PASSを確認し、source変更なしの全12 stage再実行もPASSした。その後の連続layout除外追加に対しても上記最終canonicalを全stage再実行した。 |
+| 性能 | NOT APPLICABLE / 限定 | 象限判定は4領域への固定個数の比較、待機timerは最大1件で、filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput latency、CPU、working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-O固有の実double-click interval、touchpad、pen、DPI、設定UI操作はrelease WebView2で直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

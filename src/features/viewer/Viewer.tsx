@@ -90,6 +90,12 @@ import {
   normalizeShortcutBindings,
   type ShortcutBindings,
 } from "../input/shortcuts";
+import {
+  DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  strictViewerQuadrantBindings,
+  viewerQuadrantAt,
+  type ViewerQuadrantBindings,
+} from "../input/viewer-quadrants";
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import {
   normalizeMouseGestures,
@@ -173,6 +179,7 @@ interface ViewerProps {
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
   mouseGestures?: MouseGestureBindings;
+  quadrantBindings?: ViewerQuadrantBindings;
   detached?: boolean;
   onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
@@ -197,6 +204,8 @@ interface PointerDragState {
   lastX: number;
   lastY: number;
   pannable: boolean;
+  quadrantClickEligible: boolean;
+  moved: boolean;
 }
 
 export function Viewer({
@@ -251,6 +260,7 @@ export function Viewer({
   bookmarks = [],
   onPageChange,
   mouseGestures,
+  quadrantBindings,
   detached = false,
   onToggleDetached,
   onSaveBookmark,
@@ -368,6 +378,11 @@ export function Viewer({
     () => normalizeMouseGestures(mouseGestures),
     [mouseGestures],
   );
+  const activeQuadrantBindings = useMemo(
+    () => strictViewerQuadrantBindings(quadrantBindings)
+      ?? { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
+    [quadrantBindings],
+  );
   const stageRef = useRef<HTMLDivElement>(null);
   const spreadRef = useRef<HTMLDivElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
@@ -375,6 +390,7 @@ export function Viewer({
   const retainedIndicesRef = useRef(new Set<number>());
   const scrollAnchorFrameRef = useRef<number | null>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
+  const quadrantClickTimerRef = useRef<number | null>(null);
   const pageScanInitializedRef = useRef(false);
   const rightButtonHeldRef = useRef(false);
   const [panning, setPanning] = useState(false);
@@ -1195,6 +1211,28 @@ export function Viewer({
     }
   }
 
+  function clearQuadrantClickTimer() {
+    if (quadrantClickTimerRef.current === null) return;
+    window.clearTimeout(quadrantClickTimerRef.current);
+    quadrantClickTimerRef.current = null;
+  }
+
+  function scheduleQuadrantClick(clientX: number, clientY: number) {
+    clearQuadrantClickTimer();
+    const bounds = stageRef.current?.getBoundingClientRect();
+    if (bounds === undefined) return;
+    const quadrant = viewerQuadrantAt(clientX, clientY, bounds);
+    if (quadrant === null) return;
+    const action = activeQuadrantBindings[quadrant];
+    if (action === "none") return;
+    quadrantClickTimerRef.current = window.setTimeout(() => {
+      quadrantClickTimerRef.current = null;
+      applyMouseGesture(action);
+    }, 250);
+  }
+
+  useEffect(() => clearQuadrantClickTimer, []);
+
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.isComposing) return;
@@ -1868,6 +1906,7 @@ export function Viewer({
           const deltaX = event.clientX - drag.lastX;
           const deltaY = event.clientY - drag.lastY;
           if (Math.abs(event.clientX - drag.startX) >= 4 || Math.abs(event.clientY - drag.startY) >= 4) {
+            drag.moved = true;
             setPanning(true);
           }
           spread.scrollLeft -= deltaX * panFactor;
@@ -1884,6 +1923,7 @@ export function Viewer({
           setLoupe(null);
         }}
         onPointerDown={(event) => {
+          clearQuadrantClickTimer();
           clearCursorHideTimer();
           setCursorHidden(false);
           if (event.button === 2) {
@@ -1917,6 +1957,13 @@ export function Viewer({
             lastX: event.clientX,
             lastY: event.clientY,
             pannable,
+            quadrantClickEligible: event.pointerType === "mouse"
+              && layoutMode === "paged"
+              && !event.ctrlKey
+              && !event.metaKey
+              && !event.shiftKey
+              && !event.altKey,
+            moved: false,
           };
           if (pannable) event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
@@ -1935,21 +1982,40 @@ export function Viewer({
           pointerDragRef.current = null;
           setPanning(false);
           scheduleCursorHide();
-          if (!drag || drag.pointerId !== event.pointerId || drag.pannable) return;
-          if (Math.abs(event.clientX - drag.startX) < 48) return;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          const deltaX = event.clientX - drag.startX;
+          const deltaY = event.clientY - drag.startY;
+          const moved = drag.moved || Math.abs(deltaX) >= 4 || Math.abs(deltaY) >= 4;
+          if (
+            !moved
+            && drag.quadrantClickEligible
+            && event.pointerType === "mouse"
+            && !event.ctrlKey
+            && !event.metaKey
+            && !event.shiftKey
+            && !event.altKey
+          ) {
+            scheduleQuadrantClick(event.clientX, event.clientY);
+            return;
+          }
+          if (drag.pannable || Math.abs(deltaX) < 48) return;
           const action = event.clientX < drag.startX
             ? activeMouseGestures.swipeLeft
             : activeMouseGestures.swipeRight;
           applyMouseGesture(action);
         }}
         onPointerCancel={() => {
+          clearQuadrantClickTimer();
           rightButtonHeldRef.current = false;
           pointerDragRef.current = null;
           setPanning(false);
           scheduleCursorHide();
         }}
         onContextMenu={(event) => event.preventDefault()}
-        onDoubleClick={() => void requestFullscreen(!fullscreen)}
+        onDoubleClick={() => {
+          clearQuadrantClickTimer();
+          void requestFullscreen(!fullscreen);
+        }}
         onWheel={(event) => {
           const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
           if (rightWheel && event.deltaY !== 0) {

@@ -4,6 +4,7 @@ import {
   LEGACY_SHORTCUT_COMMANDS,
   SHORTCUT_COMMANDS,
 } from "../input/shortcuts";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import packageMetadata from "../../../package.json";
 import {
   APP_VERSION,
@@ -98,6 +99,7 @@ function validProfile(): SettingsProfile {
       backButton: "navigateBack",
       forwardButton: "navigateForward",
     },
+    viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
 }
@@ -144,7 +146,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 25, 99, "21", undefined])(
+  it.each([0, 26, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -353,6 +355,38 @@ describe("settings profile", () => {
       catalogMouseBindings: {
         ...validProfile().catalogMouseBindings,
         primaryClick: "delete",
+      },
+    })).toBeNull();
+  });
+
+  it("REQ-LEY-P3-014 migrates v24 quadrant defaults and rejects unknown bindings", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 24;
+    delete legacy.viewerQuadrantBindings;
+    expect(normalizeSettingsProfile(legacy)).toMatchObject({
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      viewerQuadrantBindings: DEFAULT_VIEWER_QUADRANT_BINDINGS,
+    });
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerQuadrantBindings: {
+        ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
+        topLeft: "zoomIn",
+      },
+    })).toMatchObject({ viewerQuadrantBindings: { topLeft: "zoomIn" } });
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerQuadrantBindings: {
+        ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
+        center: "nextPage",
+      },
+    })).toBeNull();
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      viewerQuadrantBindings: {
+        ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
+        topLeft: "delete",
       },
     })).toBeNull();
   });

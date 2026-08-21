@@ -519,6 +519,7 @@ pub struct CatalogSettings {
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
     pub catalog_mouse_bindings: BTreeMap<String, String>,
+    pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -609,6 +610,7 @@ pub struct SettingsProfileInput {
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
     pub catalog_mouse_bindings: BTreeMap<String, String>,
+    pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub mouse_gestures: BTreeMap<String, String>,
 }
 
@@ -781,6 +783,20 @@ const CATALOG_MOUSE_ACTIONS: [&str; 8] = [
     "navigateUp",
     "refreshCatalog",
     "toggleSearch",
+];
+const VIEWER_QUADRANT_NAMES: [&str; 4] = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
+const VIEWER_QUADRANT_ACTIONS: [&str; 11] = [
+    "none",
+    "nextPage",
+    "previousPage",
+    "closeViewer",
+    "singlePage",
+    "spreadPage",
+    "toggleDirection",
+    "zoomIn",
+    "zoomOut",
+    "toggleLoupe",
+    "toggleFullscreen",
 ];
 
 fn default_shortcuts() -> BTreeMap<String, Vec<String>> {
@@ -984,6 +1000,31 @@ fn normalize_catalog_mouse_bindings(
         && bindings
             .values()
             .all(|action| CATALOG_MOUSE_ACTIONS.contains(&action.as_str())))
+    .then(|| bindings.clone())
+}
+
+fn default_viewer_quadrant_bindings() -> BTreeMap<String, String> {
+    [
+        ("topLeft", "previousPage"),
+        ("topRight", "nextPage"),
+        ("bottomLeft", "previousPage"),
+        ("bottomRight", "nextPage"),
+    ]
+    .into_iter()
+    .map(|(quadrant, action)| (quadrant.to_owned(), action.to_owned()))
+    .collect()
+}
+
+fn normalize_viewer_quadrant_bindings(
+    bindings: &BTreeMap<String, String>,
+) -> Option<BTreeMap<String, String>> {
+    (bindings.len() == VIEWER_QUADRANT_NAMES.len()
+        && bindings
+            .keys()
+            .all(|quadrant| VIEWER_QUADRANT_NAMES.contains(&quadrant.as_str()))
+        && bindings
+            .values()
+            .all(|action| VIEWER_QUADRANT_ACTIONS.contains(&action.as_str())))
     .then(|| bindings.clone())
 }
 
@@ -1311,6 +1352,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
     let shortcuts = shortcuts_for_settings(&settings);
     let catalog_mouse_bindings = normalize_catalog_mouse_bindings(&settings.catalog_mouse_bindings)
         .unwrap_or_else(default_catalog_mouse_bindings);
+    let viewer_quadrant_bindings =
+        normalize_viewer_quadrant_bindings(&settings.viewer_quadrant_bindings)
+            .unwrap_or_else(default_viewer_quadrant_bindings);
     let mouse_gestures = normalize_mouse_gestures(&settings.mouse_gesture_bindings)
         .unwrap_or_else(default_mouse_gestures);
     CatalogSettings {
@@ -1424,6 +1468,7 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         auto_refresh_current_folder: settings.auto_refresh_current_folder,
         shortcuts,
         catalog_mouse_bindings,
+        viewer_quadrant_bindings,
         mouse_gestures,
     }
 }
@@ -2764,6 +2809,7 @@ fn validate_settings_profile(
         BTreeMap<String, Vec<String>>,
         BTreeMap<String, String>,
         BTreeMap<String, String>,
+        BTreeMap<String, String>,
     ),
     AppError,
 > {
@@ -2784,6 +2830,13 @@ fn validate_settings_profile(
             request_error(
                 ErrorCode::InvalidRequest,
                 "Catalog mouse bindings contain an unknown gesture or action.",
+            )
+        })?;
+    let viewer_quadrant_bindings =
+        normalize_viewer_quadrant_bindings(&profile.viewer_quadrant_bindings).ok_or_else(|| {
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Viewer quadrant bindings contain an unknown quadrant or action.",
             )
         })?;
     if !matches!(
@@ -2907,7 +2960,12 @@ fn validate_settings_profile(
             "Settings profile contains an invalid value.",
         ));
     }
-    Ok((shortcuts, catalog_mouse_bindings, mouse_gestures))
+    Ok((
+        shortcuts,
+        catalog_mouse_bindings,
+        viewer_quadrant_bindings,
+        mouse_gestures,
+    ))
 }
 
 #[tauri::command]
@@ -2920,7 +2978,7 @@ pub fn set_settings_profile(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    let (shortcuts, catalog_mouse_bindings, mouse_gestures) =
+    let (shortcuts, catalog_mouse_bindings, viewer_quadrant_bindings, mouse_gestures) =
         match validate_settings_profile(&profile) {
             Ok(bindings) => bindings,
             Err(error) => return Ok(error_response(&context, error)),
@@ -3032,6 +3090,7 @@ pub fn set_settings_profile(
         settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
         settings.shortcut_bindings = shortcuts;
         settings.catalog_mouse_bindings = catalog_mouse_bindings;
+        settings.viewer_quadrant_bindings = viewer_quadrant_bindings;
         settings.mouse_gesture_bindings = mouse_gestures;
         if let Err(error) = store.save_settings(&settings) {
             return Ok(error_response(&context, error));
@@ -5911,7 +5970,7 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn fr_b19_and_req_ley_p3_013_settings_profile_validates_all_atomic_bindings() {
+    fn fr_b19_and_req_ley_p3_013_and_p3_014_settings_profile_validates_all_atomic_bindings() {
         let mut profile = SettingsProfileInput {
             sort_field: "name".into(),
             sort_descending: false,
@@ -5992,11 +6051,14 @@ mod shutdown_tests {
             auto_refresh_current_folder: true,
             shortcuts: default_shortcuts(),
             catalog_mouse_bindings: default_catalog_mouse_bindings(),
+            viewer_quadrant_bindings: default_viewer_quadrant_bindings(),
             mouse_gestures: default_mouse_gestures(),
         };
-        let (shortcuts, catalog_mouse, gestures) = validate_settings_profile(&profile).unwrap();
+        let (shortcuts, catalog_mouse, quadrants, gestures) =
+            validate_settings_profile(&profile).unwrap();
         assert_eq!(shortcuts, profile.shortcuts);
         assert_eq!(catalog_mouse, profile.catalog_mouse_bindings);
+        assert_eq!(quadrants, profile.viewer_quadrant_bindings);
         assert_eq!(gestures, profile.mouse_gestures);
         profile.detail_grid_lines = "vertical".into();
         assert_eq!(
@@ -6176,7 +6238,7 @@ mod shutdown_tests {
         profile
             .mouse_gestures
             .insert("middleClick".into(), "nextPage".into());
-        let (_, _, gestures) = validate_settings_profile(&profile).unwrap();
+        let (_, _, _, gestures) = validate_settings_profile(&profile).unwrap();
         assert_eq!(gestures["doubleClick"], "toggleFullscreen");
         assert_eq!(gestures["middleClick"], "nextPage");
 
@@ -6199,6 +6261,22 @@ mod shutdown_tests {
         profile
             .catalog_mouse_bindings
             .insert("unknownButton".into(), "none".into());
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.catalog_mouse_bindings = default_catalog_mouse_bindings();
+        profile
+            .viewer_quadrant_bindings
+            .insert("topLeft".into(), "delete".into());
+        assert_eq!(
+            validate_settings_profile(&profile).unwrap_err().code,
+            ErrorCode::InvalidRequest
+        );
+        profile.viewer_quadrant_bindings = default_viewer_quadrant_bindings();
+        profile
+            .viewer_quadrant_bindings
+            .insert("center".into(), "none".into());
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
             ErrorCode::InvalidRequest
