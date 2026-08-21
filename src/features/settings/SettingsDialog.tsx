@@ -78,6 +78,8 @@ import {
   THUMBNAIL_GENERATION_SCOPES,
   MOUSE_GESTURE_ACTIONS,
   FULLSCREEN_ESCAPE_BEHAVIORS,
+  FILE_OPEN_RULES,
+  FOLDER_OPEN_RULES,
   MAX_TREE_WIDTH,
   MIN_TREE_WIDTH,
   TRAY_CLOSE_BEHAVIORS,
@@ -117,6 +119,12 @@ const THUMBNAIL_GENERATION_LABELS: Record<SettingsProfile["thumbnailGenerationSc
 };
 const STARTUP_LOCATION_LABELS: Record<SettingsProfile["startupLocation"], string> = {
   last: "前回のフォルダ", driveRoot: "前回ドライブのルート",
+};
+const FOLDER_OPEN_RULE_LABELS: Record<SettingsProfile["folderOpenRule"], string> = {
+  navigate: "フォルダーへ移動", read: "作品として読む", none: "何もしない",
+};
+const FILE_OPEN_RULE_LABELS: Record<SettingsProfile["imageOpenRule"], string> = {
+  read: "作品として読む", none: "何もしない",
 };
 
 type SettingsCategory = "catalog" | "viewer" | "interface" | "commands" | "profile";
@@ -336,6 +344,21 @@ export function SettingsDialog({
       id: "auto-refresh-current-folder",
       category: "catalog",
       text: `現在 フォルダー 自動 更新 監視 ${draft.autoRefreshCurrentFolder ? "有効" : "無効"}`,
+    },
+    {
+      id: "folder-open-rule",
+      category: "catalog",
+      text: `フォルダー 開く ダブルクリック Enter 移動 読む 何もしない ${FOLDER_OPEN_RULE_LABELS[draft.folderOpenRule]}`,
+    },
+    {
+      id: "image-open-rule",
+      category: "catalog",
+      text: `画像 ページ 開く ダブルクリック Enter 読む 何もしない ${FILE_OPEN_RULE_LABELS[draft.imageOpenRule]}`,
+    },
+    {
+      id: "archive-open-rule",
+      category: "catalog",
+      text: `書庫 PDF 開く ダブルクリック Enter 読む 何もしない ${FILE_OPEN_RULE_LABELS[draft.archiveOpenRule]}`,
     },
     {
       id: "catalog-palette",
@@ -748,6 +771,21 @@ export function SettingsDialog({
                   <input type="checkbox" aria-label="profile現在フォルダーを自動更新" checked={draft.autoRefreshCurrentFolder} onChange={(event) => update({ autoRefreshCurrentFolder: event.target.checked })} />
                   <span>{draft.autoRefreshCurrentFolder ? "有効" : "無効"}</span>
                 </label>
+              </SettingRow>
+              <SettingRow id="folder-open-rule" title="フォルダーを開く規則" description="ダブルクリックまたはEnterでフォルダーを移動・閲覧するか選びます。" hidden={rowHidden("folder-open-rule")}>
+                <select aria-label="profileフォルダーを開く規則" value={draft.folderOpenRule} onChange={(event) => update({ folderOpenRule: event.target.value as SettingsProfile["folderOpenRule"] })}>
+                  {FOLDER_OPEN_RULES.map((rule) => <option key={rule} value={rule}>{FOLDER_OPEN_RULE_LABELS[rule]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="image-open-rule" title="画像を開く規則" description="画像ページを閲覧するか、選択だけに留めるか選びます。" hidden={rowHidden("image-open-rule")}>
+                <select aria-label="profile画像を開く規則" value={draft.imageOpenRule} onChange={(event) => update({ imageOpenRule: event.target.value as SettingsProfile["imageOpenRule"] })}>
+                  {FILE_OPEN_RULES.map((rule) => <option key={rule} value={rule}>{FILE_OPEN_RULE_LABELS[rule]}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow id="archive-open-rule" title="書庫・PDFを開く規則" description="書庫またはPDFを閲覧するか、選択だけに留めるか選びます。" hidden={rowHidden("archive-open-rule")}>
+                <select aria-label="profile書庫・PDFを開く規則" value={draft.archiveOpenRule} onChange={(event) => update({ archiveOpenRule: event.target.value as SettingsProfile["archiveOpenRule"] })}>
+                  {FILE_OPEN_RULES.map((rule) => <option key={rule} value={rule}>{FILE_OPEN_RULE_LABELS[rule]}</option>)}
+                </select>
               </SettingRow>
               <SettingRow id="catalog-palette" title="一覧配色" description="判読性を確認した背景・文字・選択色の組を選びます。" hidden={rowHidden("catalog-palette")}>
                 <select aria-label="profile一覧配色" value={draft.catalogPalette} onChange={(event) => update({ catalogPalette: event.target.value as SettingsProfile["catalogPalette"] })}>

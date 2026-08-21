@@ -83,12 +83,17 @@ import {
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
 
-export const SETTINGS_PROFILE_VERSION = 19;
+export const SETTINGS_PROFILE_VERSION = 20;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
 export const MAX_TREE_WIDTH = 480;
 export const DEFAULT_TREE_WIDTH = 240;
+
+export const FOLDER_OPEN_RULES = ["navigate", "read", "none"] as const;
+export type FolderOpenRule = (typeof FOLDER_OPEN_RULES)[number];
+export const FILE_OPEN_RULES = ["read", "none"] as const;
+export type FileOpenRule = (typeof FILE_OPEN_RULES)[number];
 
 export const FULLSCREEN_ESCAPE_BEHAVIORS = ["exitFullscreen", "closeViewer"] as const;
 export type FullscreenEscapeBehavior = (typeof FULLSCREEN_ESCAPE_BEHAVIORS)[number];
@@ -209,6 +214,9 @@ export interface SettingsProfile {
   catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
   autoRefreshCurrentFolder: boolean;
+  folderOpenRule: FolderOpenRule;
+  imageOpenRule: FileOpenRule;
+  archiveOpenRule: FileOpenRule;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -278,6 +286,9 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     catalogPalette: DEFAULT_CATALOG_PALETTE,
     restoreLastViewer: false,
     autoRefreshCurrentFolder: true,
+    folderOpenRule: "navigate",
+    imageOpenRule: "read",
+    archiveOpenRule: "read",
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -470,6 +481,16 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const treeAutoCollapse = legacyTreePreferences ? false : candidate.treeAutoCollapse;
   const treeConfirmChildren = legacyTreePreferences ? true : candidate.treeConfirmChildren;
   const treeWidth = legacyTreePreferences ? DEFAULT_TREE_WIDTH : candidate.treeWidth;
+  const legacyOpenRules = legacyTreePreferences || candidate.profileVersion === 19;
+  const folderOpenRule = legacyOpenRules
+    ? "navigate"
+    : enumValue(candidate.folderOpenRule, FOLDER_OPEN_RULES);
+  const imageOpenRule = legacyOpenRules
+    ? "read"
+    : enumValue(candidate.imageOpenRule, FILE_OPEN_RULES);
+  const archiveOpenRule = legacyOpenRules
+    ? "read"
+    : enumValue(candidate.archiveOpenRule, FILE_OPEN_RULES);
   if (
     (candidate.profileVersion !== 1
       && candidate.profileVersion !== 2
@@ -489,6 +510,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 16
       && candidate.profileVersion !== 17
       && candidate.profileVersion !== 18
+      && candidate.profileVersion !== 19
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -558,6 +580,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     catalogPalette === null ||
     typeof restoreLastViewer !== "boolean" ||
     typeof autoRefreshCurrentFolder !== "boolean" ||
+    folderOpenRule === null ||
+    imageOpenRule === null ||
+    archiveOpenRule === null ||
     shortcuts === null ||
     mouseGestures === null
   ) {
@@ -627,6 +652,9 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     catalogPalette,
     restoreLastViewer,
     autoRefreshCurrentFolder,
+    folderOpenRule,
+    imageOpenRule,
+    archiveOpenRule,
     shortcuts,
     mouseGestures,
   };

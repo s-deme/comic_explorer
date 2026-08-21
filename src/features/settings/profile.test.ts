@@ -76,6 +76,9 @@ function validProfile(): SettingsProfile {
     catalogPalette: "system",
     restoreLastViewer: false,
     autoRefreshCurrentFolder: true,
+    folderOpenRule: "navigate",
+    imageOpenRule: "read",
+    archiveOpenRule: "read",
     shortcuts: { ...DEFAULT_SHORTCUTS },
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
   };
@@ -123,7 +126,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 20, 99, "19", undefined])(
+  it.each([0, 21, 99, "20", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -224,6 +227,29 @@ describe("settings profile", () => {
     for (const width of [179, 481, 240.5, Number.NaN]) {
       expect(normalizeSettingsProfile(withField("treeWidth", width))).toBeNull();
     }
+  });
+
+  it("REQ-LEY-P3-007 migrates v19 open rules and validates current enums", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 19;
+    delete legacy.folderOpenRule;
+    delete legacy.imageOpenRule;
+    delete legacy.archiveOpenRule;
+    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
+
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      folderOpenRule: "read",
+      imageOpenRule: "none",
+      archiveOpenRule: "none",
+    })).toEqual(expect.objectContaining({
+      folderOpenRule: "read",
+      imageOpenRule: "none",
+      archiveOpenRule: "none",
+    }));
+    expect(normalizeSettingsProfile(withField("folderOpenRule", "open"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("imageOpenRule", "navigate"))).toBeNull();
+    expect(normalizeSettingsProfile(withField("archiveOpenRule", false))).toBeNull();
   });
 
   it("REQ-LEY-P2-005 migrates a v7 profile with the fixed P2-D spread rules", () => {

@@ -26,6 +26,7 @@ import {
   listPageBookmarks,
   clearReadingHistory,
   openComic,
+  resolveCatalogActivation,
   pickLibraryFile,
   pickLibraryRoot,
   pickSearchSource,
@@ -114,6 +115,7 @@ vi.mock("./features/library/client", () => ({
   })),
   restoreLibraryRoot: vi.fn(),
   openComic: vi.fn(),
+  resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   addFavorite: vi.fn(),
   listFavorites: vi.fn(),
   removeFavorite: vi.fn(),
@@ -177,6 +179,7 @@ const stopLibraryFolderWatchMock = vi.mocked(stopLibraryFolderWatch);
 const treeMock = vi.mocked(listTreeChildren);
 const restoreMock = vi.mocked(restoreLibraryRoot);
 const openMock = vi.mocked(openComic);
+const resolveCatalogActivationMock = vi.mocked(resolveCatalogActivation);
 const settingsMock = vi.mocked(getCatalogSettings);
 const metadataMock = vi.mocked(getItemMetadata);
 const thumbnailMock = vi.mocked(getThumbnail);
@@ -284,7 +287,10 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   showHiddenFiles: false,
   catalogPalette: "system",
   restoreLastViewer: false,
-  autoRefreshCurrentFolder: true,
+    autoRefreshCurrentFolder: true,
+    folderOpenRule: "navigate",
+    imageOpenRule: "read",
+    archiveOpenRule: "read",
   shortcuts: { ...DEFAULT_SHORTCUTS },
   mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
 };
@@ -483,6 +489,13 @@ describe("application shell", () => {
     treeMock.mockReset();
     restoreMock.mockReset();
     openMock.mockReset();
+    resolveCatalogActivationMock.mockReset();
+    resolveCatalogActivationMock.mockImplementation(async (kind, _trigger, generation) => ({
+      status: "ok",
+      requestId: "activation" as never,
+      generation: generation as never,
+      data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read",
+    }));
     settingsMock.mockReset();
     metadataMock.mockReset();
     thumbnailMock.mockReset();
@@ -1054,6 +1067,44 @@ describe("application shell", () => {
       expect(screen.getByLabelText("アドレス")).toHaveValue("C:\\"),
     );
     expect(grid).toHaveProperty("scrollTop", 480);
+  });
+
+  it("REQ-LEY-P3-007 honors none and discards stale or failed activation results", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
+    const item = screen.getByRole("button", { name: /book\.cbz/ });
+
+    resolveCatalogActivationMock.mockResolvedValueOnce({
+      status: "ok", requestId: "none" as never, generation: 1 as never, data: "none",
+    });
+    fireEvent.doubleClick(item);
+    await waitFor(() => expect(resolveCatalogActivationMock).toHaveBeenCalledTimes(1));
+    expect(openMock).not.toHaveBeenCalled();
+
+    let releaseStale!: (value: Awaited<ReturnType<typeof resolveCatalogActivation>>) => void;
+    resolveCatalogActivationMock.mockImplementationOnce(() => new Promise((resolve) => {
+      releaseStale = resolve;
+    }));
+    resolveCatalogActivationMock.mockResolvedValueOnce({
+      status: "ok", requestId: "latest" as never, generation: 3 as never, data: "none",
+    });
+    fireEvent.doubleClick(item);
+    fireEvent.keyDown(item, { key: "Enter" });
+    await waitFor(() => expect(resolveCatalogActivationMock).toHaveBeenCalledTimes(3));
+    releaseStale({
+      status: "ok", requestId: "stale" as never, generation: 2 as never, data: "read",
+    });
+    await act(async () => undefined);
+    expect(openMock).not.toHaveBeenCalled();
+
+    resolveCatalogActivationMock.mockResolvedValueOnce({
+      status: "error",
+      requestId: "failed" as never,
+      generation: 4 as never,
+      error: { code: "INVALID_REQUEST", message: "open rule failed", retryable: false },
+    });
+    fireEvent.doubleClick(screen.getByRole("button", { name: /book\.cbz/ }));
+    expect(await screen.findByText(/対応していません/)).toBeInTheDocument();
+    expect(openMock).not.toHaveBeenCalled();
   });
 
   it("keeps exactly one top-level menu trigger in the roving tab stop", async () => {
@@ -3198,6 +3249,15 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByRole("spinbutton", {
       name: "profileカードグリッドのサイズ（px）",
     }), { target: { value: "224" } });
+    fireEvent.change(within(dialog).getByLabelText("profileフォルダーを開く規則"), {
+      target: { value: "read" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile画像を開く規則"), {
+      target: { value: "none" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("profile書庫・PDFを開く規則"), {
+      target: { value: "none" },
+    });
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
     fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
@@ -3266,6 +3326,9 @@ describe("application shell", () => {
           referenceTile: 176,
         },
         treeVisible: false,
+        folderOpenRule: "read",
+        imageOpenRule: "none",
+        archiveOpenRule: "none",
         viewMode: "auto",
         spreadPortraitMaxAspectPercent: 80,
         autoSpreadMinViewportAspectPercent: 160,

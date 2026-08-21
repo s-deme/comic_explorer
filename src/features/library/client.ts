@@ -31,6 +31,8 @@ import type { ShortcutBindings } from "../input/shortcuts";
 import type {
   MouseGestureBindings,
   CatalogPalette,
+  FileOpenRule,
+  FolderOpenRule,
   NavigationSelectionPolicy,
   SettingsProfile,
   StartupLocation,
@@ -184,6 +186,9 @@ export interface CatalogSettings {
   catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
   autoRefreshCurrentFolder: boolean;
+  folderOpenRule: FolderOpenRule;
+  imageOpenRule: FileOpenRule;
+  archiveOpenRule: FileOpenRule;
   shortcuts: ShortcutBindings;
   mouseGestures: MouseGestureBindings;
 }
@@ -312,6 +317,9 @@ export async function saveSettingsProfile(
       catalogPalette: profile.catalogPalette,
       restoreLastViewer: profile.restoreLastViewer,
       autoRefreshCurrentFolder: profile.autoRefreshCurrentFolder,
+      folderOpenRule: profile.folderOpenRule,
+      imageOpenRule: profile.imageOpenRule,
+      archiveOpenRule: profile.archiveOpenRule,
       shortcuts: profile.shortcuts,
       mouseGestures: profile.mouseGestures,
     },
@@ -352,6 +360,21 @@ export async function getCatalogSettings(
   generation: number,
 ): Promise<ApiResponse<CatalogSettings>> {
   return invoke("get_catalog_settings", { context: context(generation) });
+}
+
+export type CatalogActivationTrigger = "doubleClick" | "enter" | "ctrlEnter";
+export type CatalogActivationAction = "navigate" | "read" | "none";
+
+export async function resolveCatalogActivation(
+  kind: ItemKind,
+  trigger: CatalogActivationTrigger,
+  generation: number,
+): Promise<ApiResponse<CatalogActivationAction>> {
+  return invoke("resolve_catalog_activation", {
+    context: context(generation),
+    kind,
+    trigger,
+  });
 }
 
 export type FavoriteStatus = "available" | "moved" | "missing";

@@ -92,6 +92,7 @@ pub fn run() {
             application::diagnose_library,
             application::get_thumbnail,
             application::list_tree_children,
+            application::resolve_catalog_activation,
             application::cancel_navigation,
             application::cancel_library_diagnostics,
             application::open_comic,

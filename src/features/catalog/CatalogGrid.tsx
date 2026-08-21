@@ -24,6 +24,10 @@ interface CatalogGridProps {
   onSelect: (entry: CatalogEntry, action?: "toggle" | "range") => void;
   onNavigate: (entry: CatalogEntry) => void;
   onRead: (entry: CatalogEntry) => void;
+  onActivate?: (
+    entry: CatalogEntry,
+    trigger: "doubleClick" | "enter" | "ctrlEnter",
+  ) => void;
   viewMode?: CatalogViewMode;
   thumbnailSizes?: CatalogThumbnailSizes;
   palette?: "system" | "paper" | "midnight" | "highContrast";
@@ -174,6 +178,7 @@ export function CatalogGrid({
   onSelect,
   onNavigate,
   onRead,
+  onActivate,
   viewMode = "cover_list",
   thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
   palette = "system",
@@ -423,11 +428,12 @@ export function CatalogGrid({
                           else if (event.ctrlKey || event.metaKey) onSelect(entry, "toggle");
                           else onSelect(entry);
                         }}
-                        onDoubleClick={() =>
-                          canNavigate
-                            ? onNavigate(entry)
-                            : canRead && onRead(entry)
-                        }
+                        onDoubleClick={() => {
+                          if (onActivate !== undefined) {
+                            onActivate(entry, "doubleClick");
+                          } else if (canNavigate) onNavigate(entry);
+                          else if (canRead) onRead(entry);
+                        }}
                         onDragStart={(event) => {
                           const paths = selectedPaths?.includes(entry.relativePath)
                             ? selectedPaths
@@ -525,7 +531,9 @@ export function CatalogGrid({
                           if (event.key === "Enter") {
                             event.preventDefault();
                             onSelect(entry);
-                            if (event.ctrlKey && canRead) onRead(entry);
+                            if (onActivate !== undefined) {
+                              onActivate(entry, event.ctrlKey ? "ctrlEnter" : "enter");
+                            } else if (event.ctrlKey && canRead) onRead(entry);
                             else if (canNavigate) onNavigate(entry);
                             else if (canRead) onRead(entry);
                           }

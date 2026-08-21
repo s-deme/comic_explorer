@@ -465,6 +465,9 @@ pub struct CatalogSettings {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub folder_open_rule: String,
+    pub image_open_rule: String,
+    pub archive_open_rule: String,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -544,6 +547,9 @@ pub struct SettingsProfileInput {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub folder_open_rule: String,
+    pub image_open_rule: String,
+    pub archive_open_rule: String,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -1253,6 +1259,18 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
         tree_auto_collapse: settings.tree_auto_collapse,
         tree_confirm_children: settings.tree_confirm_children,
         tree_width: settings.tree_width.clamp(180, 480),
+        folder_open_rule: match settings.folder_open_rule.as_str() {
+            "navigate" | "read" | "none" => settings.folder_open_rule,
+            _ => "navigate".into(),
+        },
+        image_open_rule: match settings.image_open_rule.as_str() {
+            "read" | "none" => settings.image_open_rule,
+            _ => "read".into(),
+        },
+        archive_open_rule: match settings.archive_open_rule.as_str() {
+            "read" | "none" => settings.archive_open_rule,
+            _ => "read".into(),
+        },
         menu_bar_visible: settings.menu_bar_visible,
         toolbar_visible: settings.toolbar_visible,
         address_bar_visible: settings.address_bar_visible,
@@ -2713,6 +2731,12 @@ fn validate_settings_profile(
         || !matches!(profile.page_scan_mode.as_str(), "vertical" | "n" | "z")
         || !(180..=480).contains(&profile.tree_width)
         || !matches!(
+            profile.folder_open_rule.as_str(),
+            "navigate" | "read" | "none"
+        )
+        || !matches!(profile.image_open_rule.as_str(), "read" | "none")
+        || !matches!(profile.archive_open_rule.as_str(), "read" | "none")
+        || !matches!(
             profile.navigation_selection_policy.as_str(),
             "none" | "first" | "last" | "restore"
         )
@@ -2830,6 +2854,9 @@ pub fn set_settings_profile(
         settings.tree_auto_collapse = profile.tree_auto_collapse;
         settings.tree_confirm_children = profile.tree_confirm_children;
         settings.tree_width = profile.tree_width;
+        settings.folder_open_rule = profile.folder_open_rule;
+        settings.image_open_rule = profile.image_open_rule;
+        settings.archive_open_rule = profile.archive_open_rule;
         settings.menu_bar_visible = profile.menu_bar_visible;
         settings.toolbar_visible = profile.toolbar_visible;
         settings.address_bar_visible = profile.address_bar_visible;
@@ -4525,6 +4552,74 @@ pub async fn list_tree_children(
     })
 }
 
+#[tauri::command]
+pub fn resolve_catalog_activation(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    kind: ItemKind,
+    trigger: String,
+) -> Result<Response<String>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let settings = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .map(|store| store.load_settings())
+        .transpose();
+    let settings = match settings {
+        Ok(Some(settings)) => settings,
+        Ok(None) => crate::state::Settings::default(),
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let action = match catalog_activation_action(kind, &trigger, &settings) {
+        Ok(action) => action,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: action.into(),
+    })
+}
+
+fn catalog_activation_action(
+    kind: ItemKind,
+    trigger: &str,
+    settings: &crate::state::Settings,
+) -> Result<&'static str, AppError> {
+    if !matches!(trigger, "doubleClick" | "enter" | "ctrlEnter") {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Catalog activation trigger is invalid.",
+        ));
+    }
+    if trigger == "ctrlEnter" {
+        return Ok(match kind {
+            ItemKind::Page | ItemKind::Archive | ItemKind::Pdf => "read",
+            _ => "none",
+        });
+    }
+    Ok(match kind {
+        ItemKind::Folder | ItemKind::ComicFolder => match settings.folder_open_rule.as_str() {
+            "read" => "read",
+            "none" => "none",
+            _ => "navigate",
+        },
+        ItemKind::Page => match settings.image_open_rule.as_str() {
+            "none" => "none",
+            _ => "read",
+        },
+        ItemKind::Archive | ItemKind::Pdf => match settings.archive_open_rule.as_str() {
+            "none" => "none",
+            _ => "read",
+        },
+        ItemKind::Unsupported => "none",
+    })
+}
+
 fn enumerate_tree_children(
     root: &Path,
     requested_directory: &Path,
@@ -5405,6 +5500,9 @@ mod shutdown_tests {
             tree_auto_collapse: true,
             tree_confirm_children: true,
             tree_width: 320,
+            folder_open_rule: "navigate".into(),
+            image_open_rule: "read".into(),
+            archive_open_rule: "read".into(),
             menu_bar_visible: true,
             toolbar_visible: false,
             address_bar_visible: true,
@@ -6295,6 +6393,65 @@ mod shutdown_tests {
         let unconfirmed = enumerate_tree_children(&root, &root, false, false).unwrap();
         assert!(unconfirmed.iter().all(|entry| entry.has_children.is_none()));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_007_resolves_kind_rules_and_force_read_in_rust() {
+        let mut settings = crate::state::Settings::default();
+        for (kind, expected) in [
+            (ItemKind::Folder, "navigate"),
+            (ItemKind::ComicFolder, "navigate"),
+            (ItemKind::Page, "read"),
+            (ItemKind::Archive, "read"),
+            (ItemKind::Pdf, "read"),
+            (ItemKind::Unsupported, "none"),
+        ] {
+            assert_eq!(
+                catalog_activation_action(kind, "doubleClick", &settings).unwrap(),
+                expected
+            );
+            assert_eq!(
+                catalog_activation_action(kind, "enter", &settings).unwrap(),
+                expected
+            );
+        }
+
+        settings.folder_open_rule = "read".into();
+        assert_eq!(
+            catalog_activation_action(ItemKind::Folder, "enter", &settings).unwrap(),
+            "read"
+        );
+        settings.folder_open_rule = "none".into();
+        settings.image_open_rule = "none".into();
+        settings.archive_open_rule = "none".into();
+        for kind in [
+            ItemKind::Folder,
+            ItemKind::ComicFolder,
+            ItemKind::Page,
+            ItemKind::Archive,
+            ItemKind::Pdf,
+        ] {
+            assert_eq!(
+                catalog_activation_action(kind, "doubleClick", &settings).unwrap(),
+                "none"
+            );
+        }
+        for kind in [ItemKind::Page, ItemKind::Archive, ItemKind::Pdf] {
+            assert_eq!(
+                catalog_activation_action(kind, "ctrlEnter", &settings).unwrap(),
+                "read"
+            );
+        }
+        assert_eq!(
+            catalog_activation_action(ItemKind::Folder, "ctrlEnter", &settings).unwrap(),
+            "none"
+        );
+        assert_eq!(
+            catalog_activation_action(ItemKind::Page, "singleClick", &settings)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
     }
 
     #[test]

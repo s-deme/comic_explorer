@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 7 | 24 |
+| P3 操作・検索 | 31 | 8 | 23 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **44** | **59** |
+| **合計** | **103** | **45** | **58** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -90,6 +90,8 @@ P3-D/EではLEY-SEARCH-001/002をPublishedとした。Windows folder pickerで�
 P3-FではLEY-FILER-010をPublishedとした。既定有効・profile v18/SQLite永続の設定で、Rust `notify` OS watcherを表示中canonical folderへ非再帰で最大1件だけ設定し、250ms windowでevent stormをcoalesceする。generation/root/pathが一致するeventだけを既存一覧再走査へ渡し、残存selectionを復元する。frontend 422件、Python 59件、Rust 193+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2、network/removable drive、10,000-event burstの反映時間・CPU・working setは未測定として残す。
 
 P3-GではLEY-FILER-015をPublishedとした。Rustのtree列挙へ非再帰のdirect-child確認とnullable `hasChildren`を追加し、leaf expander、自動折畳み、180〜480px幅をprofile v19・SQLite・設定dialogへ接続した。10,000直下folderの下位確認は2,900.692ms。初回product gateがdrive直下の確認不能folderで親tree全体を停止する不足を検出したため、そのnodeだけ未確認へfallbackして再実行し、frontend 427件、Python 59件、Rust 195+1件、typecheck、build、Windows canonical全12 stageをPASSした。書庫treeはP4へ分離し、remote/removable drive、DPI別drag、CPU・working setは未測定として残す。
+
+P3-HではLEY-FILER-017をPublishedとした。folder/comic folder、画像、書庫/PDFのdouble click・Enter規則をstrict profile v20・SQLite・設定dialogへ接続し、TypeScriptはgesture/kind/generationだけを渡してRustが`navigate`/`read`/`none`を決定する。Ctrl+Enterは画像・書庫・PDFだけを強制読書し、folderとunsupported fileでは無操作とする。stale/cancel/errorの推測実行を防ぎ、外部app・書庫tree・single click openは追加していない。release WebView2の実mouse/keyboard、IME、removable drive、activation latencyは未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

@@ -358,6 +358,33 @@ describe("CatalogGrid", () => {
     );
   });
 
+  it("REQ-LEY-P3-007 delegates double click, Enter, and Ctrl+Enter to the rule resolver", () => {
+    const onActivate = vi.fn();
+    const onNavigate = vi.fn();
+    const onRead = vi.fn();
+    render(
+      <CatalogGrid
+        entries={entries(1)}
+        selectedPath={null}
+        onSelect={() => undefined}
+        onNavigate={onNavigate}
+        onRead={onRead}
+        onActivate={onActivate}
+      />,
+    );
+    const item = screen.getByRole("button", { name: /book-0/ });
+
+    fireEvent.doubleClick(item);
+    fireEvent.keyDown(item, { key: "Enter" });
+    fireEvent.keyDown(item, { key: "Enter", ctrlKey: true });
+
+    expect(onActivate).toHaveBeenNthCalledWith(1, expect.objectContaining({ relativePath: "book-0" }), "doubleClick");
+    expect(onActivate).toHaveBeenNthCalledWith(2, expect.objectContaining({ relativePath: "book-0" }), "enter");
+    expect(onActivate).toHaveBeenNthCalledWith(3, expect.objectContaining({ relativePath: "book-0" }), "ctrlEnter");
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onRead).not.toHaveBeenCalled();
+  });
+
   it("opens the item context menu from right click and Shift+F10", () => {
     const onContextMenu = vi.fn();
     render(

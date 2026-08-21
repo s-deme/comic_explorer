@@ -112,6 +112,9 @@ pub struct Settings {
     pub tree_auto_collapse: bool,
     pub tree_confirm_children: bool,
     pub tree_width: u16,
+    pub folder_open_rule: String,
+    pub image_open_rule: String,
+    pub archive_open_rule: String,
     pub menu_bar_visible: bool,
     pub toolbar_visible: bool,
     pub address_bar_visible: bool,
@@ -217,6 +220,9 @@ impl Default for Settings {
             tree_auto_collapse: false,
             tree_confirm_children: true,
             tree_width: 240,
+            folder_open_rule: "navigate".into(),
+            image_open_rule: "read".into(),
+            archive_open_rule: "read".into(),
             menu_bar_visible: true,
             toolbar_visible: true,
             address_bar_visible: true,
@@ -357,6 +363,9 @@ impl StateStore {
                 "treeWidth" => {
                     settings.tree_width = value.parse::<u16>().unwrap_or(240).clamp(180, 480)
                 }
+                "folderOpenRule" => settings.folder_open_rule = value,
+                "imageOpenRule" => settings.image_open_rule = value,
+                "archiveOpenRule" => settings.archive_open_rule = value,
                 "menuBarVisible" => settings.menu_bar_visible = value == "true",
                 "toolbarVisible" => settings.toolbar_visible = value == "true",
                 "addressBarVisible" => settings.address_bar_visible = value == "true",
@@ -502,6 +511,9 @@ impl StateStore {
                 settings.tree_confirm_children.to_string(),
             ),
             ("treeWidth", settings.tree_width.clamp(180, 480).to_string()),
+            ("folderOpenRule", settings.folder_open_rule.clone()),
+            ("imageOpenRule", settings.image_open_rule.clone()),
+            ("archiveOpenRule", settings.archive_open_rule.clone()),
             ("menuBarVisible", settings.menu_bar_visible.to_string()),
             ("toolbarVisible", settings.toolbar_visible.to_string()),
             (
@@ -1714,6 +1726,9 @@ mod tests {
                 tree_auto_collapse: true,
                 tree_confirm_children: false,
                 tree_width: 360,
+                folder_open_rule: "read".into(),
+                image_open_rule: "none".into(),
+                archive_open_rule: "none".into(),
                 menu_bar_visible: false,
                 toolbar_visible: true,
                 address_bar_visible: false,
@@ -1824,6 +1839,9 @@ mod tests {
         assert!(restored.tree_auto_collapse);
         assert!(!restored.tree_confirm_children);
         assert_eq!(restored.tree_width, 360);
+        assert_eq!(restored.folder_open_rule, "read");
+        assert_eq!(restored.image_open_rule, "none");
+        assert_eq!(restored.archive_open_rule, "none");
         assert!(!restored.menu_bar_visible);
         assert!(restored.toolbar_visible);
         assert!(!restored.address_bar_visible);

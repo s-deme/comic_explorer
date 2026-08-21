@@ -13,6 +13,7 @@ import {
   stopLibraryFolderWatch,
   watchLibraryFolder,
   saveSettingsProfile,
+  resolveCatalogActivation,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -57,6 +58,36 @@ describe("library client settings contract", () => {
           treeConfirmChildren: false,
           treeWidth: 360,
         }),
+      }),
+    );
+  });
+
+  it("REQ-LEY-P3-007 sends open rules and activation context to Rust", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.folderOpenRule = "read";
+    profile.imageOpenRule = "none";
+    profile.archiveOpenRule = "none";
+    await saveSettingsProfile(profile, 20);
+    await resolveCatalogActivation("archive", "ctrlEnter", 21);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      1,
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          folderOpenRule: "read",
+          imageOpenRule: "none",
+          archiveOpenRule: "none",
+        }),
+      }),
+    );
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      2,
+      "resolve_catalog_activation",
+      expect.objectContaining({
+        context: expect.objectContaining({ generation: 21 }),
+        kind: "archive",
+        trigger: "ctrlEnter",
       }),
     );
   });

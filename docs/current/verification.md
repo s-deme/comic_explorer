@@ -372,6 +372,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | Windows実filesystemの10,000直下folderを下位確認有効で2,900.692ms。test全体は作成・列挙・削除を含め16.75秒、60秒runaway上限内。CPU、peak working set、remote/removable driveは未測定。 |
 | 製品直接観測 | PASS / 限定 | release WebView2のproduct shortcutでdrive rootから深いharness folderまでcurrent ancestor treeを復元し、全127 catalog項目とshortcut操作を確認。設定dialogの各toggle、DPI別splitter drag、access変化は未測定。 |
 
+## Leeyes P3-H open規則
+
+対象はLEY-FILER-017の1件。double click、Enter、Ctrl+EnterをTypeScriptからRust resolverへ渡し、保存済みのfolder・画像・書庫/PDF規則とtyped kindに基づく`navigate`/`read`/`none`だけを既存portへdispatchする。strict profile v20とSQLiteへ保存し、v1〜v19へ現行互換の既定値を補う。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | 1件、FAIL 0。全kindの既定、folder read/none、画像・書庫/PDF none、Ctrl+Enter強制読書、folder抑止、不正trigger拒否を純粋Rust判定で検証。 |
+| Windows tests / typecheck / build | PASS | frontend 31 files / 431件とPython 59件、FAIL 0。gesture、none、stale/error、設定UI、profile v19→v20移行、Rust payloadを含む。typecheck exit 0、frontend 71 modules build。bundle 542.58kBの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 196件とshutdown process 1件、FAIL 0。resolver、SQLite再open、既存catalog・viewer・file操作・search・watch・tree境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは406.295秒で全12 stageがexit 0。Rust canonical 173.494秒、release executable 80.460秒、GUI権限付きshortcut product回帰15.095秒、cleanup audit、CoDD scan/check/verifyを含む。log rootは`src-tauri/target/verification/imp-004-20260821T034701763Z`。 |
+| 性能・上限 | NOT RUN | resolverはSQLiteの3 enum読取とkind table判定だけで追加filesystem走査を行わないが、基準PCのactivation latency、連続入力、working setは未測定でありPASSとしない。 |
+| 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-H固有のrelease WebView2実double click、Enter/Ctrl+Enter、IME、設定変更、removable driveは直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

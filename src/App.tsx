@@ -33,6 +33,7 @@ import {
   saveItemMemo,
   savePageBookmark,
   saveSettingsProfile,
+  resolveCatalogActivation,
   saveViewerSettings,
   assignTag,
   removeTag,
@@ -68,6 +69,7 @@ import {
   openFileItemDefault,
   openFileItemWith,
   type CatalogSettings,
+  type CatalogActivationTrigger,
   type DiagnosticReport,
   type FavoriteEntry,
   type FileClipboardStatus,
@@ -244,6 +246,8 @@ import {
   type NavigationSelectionPolicy,
   type SettingsProfile,
   type FullscreenEscapeBehavior,
+  type FileOpenRule,
+  type FolderOpenRule,
   type StartupLocation,
   type ThumbnailGenerationScope,
 } from "./features/settings/profile";
@@ -521,6 +525,7 @@ export function App({
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
+  const catalogActivationGeneration = useRef(0);
   const trayGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
   const metadataGeneration = useRef(0);
@@ -734,6 +739,9 @@ export function App({
   const restoreLastViewerRef = useRef(false);
   const [autoRefreshCurrentFolder, setAutoRefreshCurrentFolder] = useState(true);
   const autoRefreshCurrentFolderRef = useRef(true);
+  const [folderOpenRule, setFolderOpenRule] = useState<FolderOpenRule>("navigate");
+  const [imageOpenRule, setImageOpenRule] = useState<FileOpenRule>("read");
+  const [archiveOpenRule, setArchiveOpenRule] = useState<FileOpenRule>("read");
   const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
   const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
@@ -1192,6 +1200,10 @@ export function App({
           setRestoreLastViewer(restoreLastViewerRef.current);
           autoRefreshCurrentFolderRef.current = response.data.autoRefreshCurrentFolder !== false;
           setAutoRefreshCurrentFolder(autoRefreshCurrentFolderRef.current);
+          setFolderOpenRule(["navigate", "read", "none"].includes(response.data.folderOpenRule)
+            ? response.data.folderOpenRule : "navigate");
+          setImageOpenRule(response.data.imageOpenRule === "none" ? "none" : "read");
+          setArchiveOpenRule(response.data.archiveOpenRule === "none" ? "none" : "read");
           if (!autoRefreshCurrentFolderRef.current) {
             void stopLibraryFolderWatch(generation.current);
           }
@@ -1667,13 +1679,7 @@ export function App({
   function openSelectedEntry() {
     const entry = sortedEntries.find((candidate) => candidate.relativePath === selectedPath);
     if (entry === undefined) return;
-    if (entry.kind === "folder") navigate(entry.relativePath);
-    else if (
-      entry.kind === "comicFolder" || entry.kind === "archive" || entry.kind === "pdf"
-      || entry.kind === "page"
-    ) {
-      openComicEntry(entry);
-    }
+    void handleCatalogActivation(entry, "enter");
   }
 
   function rememberRecent(entry: CatalogEntry) {
@@ -2262,6 +2268,32 @@ export function App({
     else dispatch(history);
     void load(path, selectionPath === null ? [] : [selectionPath]);
   }
+
+  async function handleCatalogActivation(
+    entry: CatalogEntry,
+    trigger: CatalogActivationTrigger,
+  ) {
+    const requestGeneration = ++catalogActivationGeneration.current;
+    try {
+      const response = await resolveCatalogActivation(entry.kind, trigger, requestGeneration);
+      if (requestGeneration !== catalogActivationGeneration.current) return;
+      if (response.status === "cancelled") return;
+      if (response.status === "error") {
+        setSelectionNotice(presentError(response.error));
+        return;
+      }
+      if (response.data === "navigate") navigate(entry.relativePath);
+      else if (response.data === "read") void openComicEntry(entry);
+    } catch {
+      if (requestGeneration === catalogActivationGeneration.current) {
+        setSelectionNotice(presentUnexpectedError());
+      }
+    }
+  }
+
+  useEffect(() => {
+    catalogActivationGeneration.current += 1;
+  }, [libraryRoot, navigation.current]);
 
   function clearSearch() {
     generation.current += 1;
@@ -3060,6 +3092,9 @@ export function App({
       catalogPalette,
       restoreLastViewer,
       autoRefreshCurrentFolder,
+      folderOpenRule,
+      imageOpenRule,
+      archiveOpenRule,
       shortcuts: { ...shortcuts },
       mouseGestures: { ...mouseGestures },
     };
@@ -3178,6 +3213,9 @@ export function App({
       const autoRefreshChanged = normalized.autoRefreshCurrentFolder !== autoRefreshCurrentFolder;
       autoRefreshCurrentFolderRef.current = normalized.autoRefreshCurrentFolder;
       setAutoRefreshCurrentFolder(normalized.autoRefreshCurrentFolder);
+      setFolderOpenRule(normalized.folderOpenRule);
+      setImageOpenRule(normalized.imageOpenRule);
+      setArchiveOpenRule(normalized.archiveOpenRule);
       setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
       setMouseGestures(normalized.mouseGestures);
       setSettingsOpen(false);
@@ -3334,7 +3372,7 @@ export function App({
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
-    autoRefreshCurrentFolder,
+    autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     shortcuts, mouseGestures,
   ]);
 
@@ -5851,6 +5889,7 @@ export function App({
               onSelect={selectEntry}
               onNavigate={(entry) => navigate(entry.relativePath)}
               onRead={openComicEntry}
+              onActivate={(entry, trigger) => void handleCatalogActivation(entry, trigger)}
               onContextMenu={openCatalogContextMenu}
               onFileDragStart={setDraggedFilePaths}
               onFileDragEnd={() => setDraggedFilePaths([])}
