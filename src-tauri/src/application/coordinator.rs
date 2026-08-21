@@ -49,6 +49,10 @@ impl NavigationCoordinator {
         }
     }
 
+    pub fn cancel_current(&mut self) {
+        self.cancellation.cancel();
+    }
+
     pub fn shutdown(&mut self) {
         self.shutting_down = true;
         self.cancellation.cancel();
@@ -78,6 +82,17 @@ mod tests {
         coordinator.shutdown();
         assert!(coordinator.begin(Generation(1)).is_cancelled());
         assert!(!coordinator.is_current(Generation(1)));
+    }
+
+    #[test]
+    fn cancel_current_stops_active_work_without_disabling_future_generations() {
+        let mut coordinator = NavigationCoordinator::default();
+        let current = coordinator.begin(Generation(3));
+        coordinator.cancel_current();
+        assert!(current.is_cancelled());
+        let next = coordinator.begin(Generation(4));
+        assert!(!next.is_cancelled());
+        assert!(coordinator.is_current(Generation(4)));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

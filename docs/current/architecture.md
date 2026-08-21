@@ -154,6 +154,8 @@ DB transactionでindexを更新する。cache rootは`%LOCALAPPDATA%\ComicExplor
 10GiB LRU、利用者が明示importするJPEG storeは3MiB上限でrootごとに分離する。生成中・表示中のentryを
 pinし、negative cacheで破損fileの無限retryを防ぐ。
 
+再帰サムネイル一括生成はnavigationと分離したRust generation/cancellationを持ち、現在folderまたはlibrary rootから候補を全件列挙して上限検証した後だけ生成へ進む。列挙はhidden設定を共有し、symlink/reparse pointを辿らず、深さ64、走査50,000項目、生成候補10,000件で停止する。folderは直下に対応画像があるもの、fileは対応画像・書庫・PDFだけを自然順の候補とする。各候補は既存2-worker queueへ1件ずつbackground priorityで投入し、visible/near要求へ譲りながら同じfingerprint、atomic cache write、negative cache、LRU/hard capを通す。各処理後はbatchのpinを解放し、破損・access errorを失敗件数へ集約して続行する。progress eventと最終reportはgenerationでgateし、新しいbatch、root変更、cancel、shutdownで旧結果を破棄する。
+
 ## SQLiteと利用者状態
 
 SQLite WALはsettings、reading position、fingerprint、thumbnail index、favorite、tag、memo、history、

@@ -165,7 +165,7 @@ fn pipeline_io_error(error: impl std::fmt::Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
     fn temporary_paths(name: &str) -> AppPaths {
         AppPaths::under(std::env::temp_dir().join(format!(
@@ -256,6 +256,34 @@ mod tests {
         );
         pipeline.retry(&broken);
         assert!(pipeline.negative(broken.as_str()).is_none());
+        drop(store);
+        std::fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p3_009_measures_small_real_recursive_batch_through_shared_pipeline() {
+        let paths = temporary_paths("recursive-batch-measure");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let mut pipeline = ThumbnailPipeline::new(&paths).unwrap();
+        let fixture_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");
+        let candidates = [
+            RelativePath::parse("FIX-IMAGE-001").unwrap(),
+            RelativePath::parse("FIX-IMAGE-001/portrait.png").unwrap(),
+            RelativePath::parse("FIX-LIBRARY-001/same-a.cbz").unwrap(),
+        ];
+        let started = Instant::now();
+        for (index, candidate) in candidates.iter().enumerate() {
+            let thumbnail = pipeline
+                .resolve(&store, &fixture_root, candidate, 1_000 + index as i64)
+                .unwrap();
+            assert!(thumbnail.path.is_file());
+            pipeline.replace_pins(&[]).unwrap();
+        }
+        let elapsed = started.elapsed();
+        assert!(elapsed < std::time::Duration::from_secs(60));
+        eprintln!("REQ-LEY-P3-009 3 real thumbnail batch generation: {elapsed:?}");
         drop(store);
         std::fs::remove_dir_all(paths.root).unwrap();
     }

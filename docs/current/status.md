@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 9 | 22 |
+| P3 操作・検索 | 31 | 10 | 21 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **46** | **57** |
+| **合計** | **103** | **47** | **56** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -94,6 +94,8 @@ P3-GではLEY-FILER-015をPublishedとした。Rustのtree列挙へ非再帰のd
 P3-HではLEY-FILER-017をPublishedとした。folder/comic folder、画像、書庫/PDFのdouble click・Enter規則をstrict profile v20・SQLite・設定dialogへ接続し、TypeScriptはgesture/kind/generationだけを渡してRustが`navigate`/`read`/`none`を決定する。Ctrl+Enterは画像・書庫・PDFだけを強制読書し、folderとunsupported fileでは無操作とする。stale/cancel/errorの推測実行を防ぎ、外部app・書庫tree・single click openは追加していない。release WebView2の実mouse/keyboard、IME、removable drive、activation latencyは未測定として残す。
 
 P3-IではLEY-FILER-019をPublishedとした。詳細一覧へ区切りなし・横罫線・縦横罫線、compact・standard・comfortableの行密度、種別・サイズ・更新日時の列別表示をstrict profile v21・SQLite・設定dialogへ接続した。列headerとrowは同じCSS grid templateを共有し、狭幅の縮退、非表示列を含むaccessible name、他一覧形式、選択・sort・virtualizationを維持する。frontend 435件、Python 60件、Rust 197+1件、typecheck、build、Windows canonical全12 stageはPASSした。10,000項目のDOM上限は自動検証したが、release WebView2の実10,000項目FPS・working set、DPI、high contrast、font scalingは未測定として残す。
+
+P3-JではLEY-CATALOG-016をPublishedとした。サムネイル管理から現在folder以下またはlibrary全体を選び、Rustがhidden、containment、symlink/reparse、深さ64、走査50,000、候補10,000の境界で自然順列挙してから、既存2-worker queueと`ThumbnailPipeline`へbackground priorityで1件ずつ投入する。独立generationで新規実行、root変更、cancel、shutdownを停止し、進捗と新規/cache hit/失敗件数を表示する。10,000候補列挙は2.276秒、共有pipelineの実folder・画像・書庫3件生成は104.668ms。frontend 437件、Python 61件、Rust 203+1件、typecheck、build、Windows canonical全12 stageはPASSした。releaseの10,000実画像、巨大画像、書庫/PDF混在、slow/removable drive、CPU・working set・cache eviction時間は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

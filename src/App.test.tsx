@@ -55,6 +55,9 @@ import {
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
+  listenRecursiveThumbnailProgress,
+  generateRecursiveThumbnails,
+  cancelRecursiveThumbnailGeneration,
   renameFileItem,
   createFileFolder,
   copyFileItemsToFolder,
@@ -90,6 +93,19 @@ const folderWatchHarness = vi.hoisted(() => ({
     relativePath: string;
     status: "changed" | "error";
     message?: string | null;
+  }) => void),
+}));
+
+const recursiveThumbnailHarness = vi.hoisted(() => ({
+  handler: undefined as undefined | ((progress: {
+    generation: number;
+    phase: "enumerating" | "generating" | "completed" | "cancelled";
+    relativePath: string;
+    processed: number;
+    total: number;
+    generated: number;
+    cacheHits: number;
+    failed: number;
   }) => void),
 }));
 
@@ -143,6 +159,9 @@ vi.mock("./features/library/client", () => ({
   deleteCatalogMask: vi.fn(),
   diagnoseLibrary: vi.fn(),
   cancelLibraryDiagnostics: vi.fn(),
+  listenRecursiveThumbnailProgress: vi.fn(),
+  generateRecursiveThumbnails: vi.fn(),
+  cancelRecursiveThumbnailGeneration: vi.fn(),
   takeRecoveryNotice: vi.fn(),
   listReadingHistory: vi.fn(),
   listPageBookmarks: vi.fn(),
@@ -211,6 +230,9 @@ const clearHistoryMock = vi.mocked(clearReadingHistory);
 const savePageBookmarkMock = vi.mocked(savePageBookmark);
 const deletePageBookmarkMock = vi.mocked(deletePageBookmark);
 const diagnoseMock = vi.mocked(diagnoseLibrary);
+const listenRecursiveThumbnailProgressMock = vi.mocked(listenRecursiveThumbnailProgress);
+const generateRecursiveThumbnailsMock = vi.mocked(generateRecursiveThumbnails);
+const cancelRecursiveThumbnailGenerationMock = vi.mocked(cancelRecursiveThumbnailGeneration);
 const renameFileItemMock = vi.mocked(renameFileItem);
 const createFileFolderMock = vi.mocked(createFileFolder);
 const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
@@ -532,6 +554,10 @@ describe("application shell", () => {
     savePageBookmarkMock.mockReset();
     deletePageBookmarkMock.mockReset();
     diagnoseMock.mockReset();
+    listenRecursiveThumbnailProgressMock.mockReset();
+    generateRecursiveThumbnailsMock.mockReset();
+    cancelRecursiveThumbnailGenerationMock.mockReset();
+    recursiveThumbnailHarness.handler = undefined;
     renameFileItemMock.mockReset();
     createFileFolderMock.mockReset();
     copyFileItemsToFolderMock.mockReset();
@@ -551,6 +577,15 @@ describe("application shell", () => {
     listenCatalogFolderChangesMock.mockImplementation(async (handler) => {
       folderWatchHarness.handler = handler;
       return vi.fn();
+    });
+    listenRecursiveThumbnailProgressMock.mockImplementation(async (handler) => {
+      recursiveThumbnailHarness.handler = handler;
+      return vi.fn();
+    });
+    cancelRecursiveThumbnailGenerationMock.mockResolvedValue({
+      status: "cancelled",
+      requestId: "cancel-recursive-thumbnails" as never,
+      generation: 1 as never,
     });
     watchLibraryFolderMock.mockImplementation(async (_path, generation) => ({
       status: "ok",
@@ -1390,6 +1425,63 @@ describe("application shell", () => {
       expect(screen.getByRole("menuitem", { name: "オプション" })).toHaveFocus(),
     );
     expect(screen.queryByRole("menu", { name: "オプション" })).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P3-009 previews recursive scope, reports progress, prevents re-entry, and cancels", async () => {
+    let finish: ((value: Awaited<ReturnType<typeof generateRecursiveThumbnails>>) => void) | undefined;
+    generateRecursiveThumbnailsMock.mockImplementation(() => new Promise((resolve) => {
+      finish = resolve;
+    }));
+    await registerTestLibrary([]);
+
+    chooseAppMenuItem("オプション", "サムネイル管理…");
+    const dialog = screen.getByRole("dialog", { name: "サムネイル管理" });
+    expect(within(dialog).getByText(/深さ64、走査50,000項目、候補10,000件/))
+      .toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "library全体" }));
+    const start = within(dialog).getByRole("button", { name: "一括生成を開始" });
+    fireEvent.click(start);
+    expect(generateRecursiveThumbnailsMock).toHaveBeenCalledTimes(1);
+    expect(generateRecursiveThumbnailsMock).toHaveBeenCalledWith("", expect.any(Number));
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(generateRecursiveThumbnailsMock).toHaveBeenCalledTimes(1);
+
+    const requestGeneration = generateRecursiveThumbnailsMock.mock.calls[0][1];
+    act(() => recursiveThumbnailHarness.handler?.({
+      generation: requestGeneration,
+      phase: "generating",
+      relativePath: "",
+      processed: 25,
+      total: 100,
+      generated: 20,
+      cacheHits: 4,
+      failed: 1,
+    }));
+    expect(within(dialog).getByRole("status")).toHaveTextContent("処理 25 / 100");
+    expect(within(dialog).getByRole("progressbar", { name: "サムネイル一括生成の進捗" }))
+      .toHaveAttribute("value", "25");
+    act(() => recursiveThumbnailHarness.handler?.({
+      generation: requestGeneration + 1,
+      phase: "generating",
+      relativePath: "",
+      processed: 80,
+      total: 100,
+      generated: 70,
+      cacheHits: 8,
+      failed: 2,
+    }));
+    expect(within(dialog).getByRole("status")).toHaveTextContent("処理 25 / 100");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "一括生成をキャンセル" }));
+    expect(cancelRecursiveThumbnailGenerationMock).toHaveBeenCalledWith(requestGeneration);
+    await act(async () => finish?.({
+      status: "cancelled",
+      requestId: "recursive-thumbnails" as never,
+      generation: requestGeneration as never,
+    }));
+    expect(await within(dialog).findByText(/一括生成をキャンセルしました/)).toBeInTheDocument();
+    expect(start).not.toBeDisabled();
   });
 
   it("connects Navigation history and prevents diagnostics re-entry while busy", async () => {

@@ -3,6 +3,7 @@ mod display_awake;
 pub mod file_operations;
 mod folder_watch;
 mod library_root;
+mod recursive_thumbnails;
 mod scheduler;
 mod search_query;
 
@@ -39,6 +40,7 @@ use crate::state::{
     ThumbnailPipeline,
 };
 use library_root::validate_library_root;
+use recursive_thumbnails::collect_recursive_thumbnail_candidates;
 #[cfg(test)]
 use search_query::normalize_search_text;
 use search_query::{
@@ -51,6 +53,7 @@ pub struct AppState {
     folder_watch: Mutex<Option<folder_watch::FolderWatch>>,
     navigation: Mutex<NavigationCoordinator>,
     diagnostics: Mutex<NavigationCoordinator>,
+    recursive_thumbnails: Mutex<NavigationCoordinator>,
     viewer: Arc<Mutex<NavigationCoordinator>>,
     store: Arc<Mutex<Option<StateStore>>>,
     thumbnails: Arc<Mutex<Option<ThumbnailPipeline>>>,
@@ -183,6 +186,7 @@ pub struct TreeEntry {
 }
 
 const CATALOG_FOLDER_CHANGED_EVENT: &str = "catalog-folder-changed";
+const RECURSIVE_THUMBNAIL_PROGRESS_EVENT: &str = "recursive-thumbnail-progress";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -192,6 +196,28 @@ struct CatalogFolderChangeEvent {
     relative_path: String,
     status: String,
     message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecursiveThumbnailProgress {
+    generation: Generation,
+    phase: String,
+    relative_path: String,
+    processed: usize,
+    total: usize,
+    generated: usize,
+    cache_hits: usize,
+    failed: usize,
+}
+
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RecursiveThumbnailReport {
+    total: usize,
+    generated: usize,
+    cache_hits: usize,
+    failed: usize,
 }
 
 impl Default for AppState {
@@ -226,6 +252,7 @@ impl Default for AppState {
             folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
+            recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(store)),
             thumbnails: Arc::new(Mutex::new(thumbnails)),
@@ -251,6 +278,9 @@ impl AppState {
         }
         if let Ok(mut diagnostics) = self.diagnostics.lock() {
             diagnostics.shutdown();
+        }
+        if let Ok(mut recursive_thumbnails) = self.recursive_thumbnails.lock() {
+            recursive_thumbnails.shutdown();
         }
         if let Ok(mut viewer) = self.viewer.lock() {
             viewer.shutdown();
@@ -3104,6 +3134,11 @@ fn save_library_root(
     context: &RequestContext,
     canonical: PathBuf,
 ) -> Result<Response<LibraryRoot>, String> {
+    state
+        .recursive_thumbnails
+        .lock()
+        .map_err(|_| "recursive thumbnail state poisoned")?
+        .cancel_current();
     *state.library_root.lock().map_err(|_| "state poisoned")? = Some(canonical.clone());
     state
         .search_sources
@@ -3783,6 +3818,251 @@ pub async fn get_thumbnail(
             cache_hit: thumbnail.cache_hit,
         },
     })
+}
+
+#[tauri::command]
+pub async fn generate_recursive_thumbnails(
+    state: tauri::State<'_, AppState>,
+    app: tauri::AppHandle,
+    context: RequestContext,
+    relative_path: String,
+) -> Result<Response<RecursiveThumbnailReport>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let start = match RelativePath::parse(relative_path) {
+        Ok(path) => path,
+        Err(message) => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, message),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let show_hidden = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .is_some_and(|settings| settings.show_hidden_files);
+    let cancellation = state
+        .recursive_thumbnails
+        .lock()
+        .map_err(|_| "recursive thumbnail state poisoned")?
+        .begin(context.generation);
+    emit_recursive_thumbnail_progress(
+        &app,
+        &context,
+        "enumerating",
+        &start,
+        &RecursiveThumbnailReport::default(),
+        0,
+    );
+    let worker_root = root.clone();
+    let worker_start = start.clone();
+    let worker_cancellation = cancellation.clone();
+    let candidates = tauri::async_runtime::spawn_blocking(move || {
+        collect_recursive_thumbnail_candidates(
+            &worker_root,
+            &worker_start,
+            show_hidden,
+            &worker_cancellation,
+        )
+    })
+    .await
+    .map_err(|error| format!("recursive thumbnail enumeration failed: {error}"))?;
+    let is_current = state
+        .recursive_thumbnails
+        .lock()
+        .map_err(|_| "recursive thumbnail state poisoned")?
+        .is_current(context.generation);
+    let candidates = match candidates {
+        Ok(candidates) if is_current && !cancellation.is_cancelled() => candidates,
+        result => {
+            return Ok(port_response(
+                context,
+                result.map(|_| RecursiveThumbnailReport::default()),
+                is_current,
+            ));
+        }
+    };
+
+    let mut report = RecursiveThumbnailReport {
+        total: candidates.len(),
+        ..RecursiveThumbnailReport::default()
+    };
+    emit_recursive_thumbnail_progress(&app, &context, "generating", &start, &report, 0);
+    for candidate in candidates {
+        if cancellation.is_cancelled() {
+            emit_recursive_thumbnail_progress(
+                &app,
+                &context,
+                "cancelled",
+                &start,
+                &report,
+                report.generated + report.cache_hits + report.failed,
+            );
+            return Ok(Response::Cancelled {
+                request_id: context.request_id,
+                generation: context.generation,
+            });
+        }
+        let result =
+            resolve_recursive_thumbnail_candidate(&state, &root, &candidate, &cancellation).await;
+        match record_recursive_thumbnail_result(&mut report, result) {
+            Ok(Some(content_hash)) => state.thumbnail_pins.unpin(&content_hash),
+            Ok(None) => {}
+            Err(error) if error.code == ErrorCode::Cancelled => {
+                emit_recursive_thumbnail_progress(
+                    &app,
+                    &context,
+                    "cancelled",
+                    &start,
+                    &report,
+                    report.generated + report.cache_hits + report.failed,
+                );
+                return Ok(Response::Cancelled {
+                    request_id: context.request_id,
+                    generation: context.generation,
+                });
+            }
+            Err(_) => unreachable!("only cancellation stops recursive thumbnail generation"),
+        }
+        let processed = report.generated + report.cache_hits + report.failed;
+        if processed == report.total || processed % 25 == 0 {
+            emit_recursive_thumbnail_progress(
+                &app,
+                &context,
+                "generating",
+                &start,
+                &report,
+                processed,
+            );
+        }
+    }
+    let is_current = state
+        .recursive_thumbnails
+        .lock()
+        .map_err(|_| "recursive thumbnail state poisoned")?
+        .is_current(context.generation);
+    if !is_current || cancellation.is_cancelled() {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    emit_recursive_thumbnail_progress(&app, &context, "completed", &start, &report, report.total);
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: report,
+    })
+}
+
+fn record_recursive_thumbnail_result(
+    report: &mut RecursiveThumbnailReport,
+    result: Result<crate::state::ThumbnailResult, AppError>,
+) -> Result<Option<String>, AppError> {
+    match result {
+        Ok(thumbnail) => {
+            if thumbnail.cache_hit {
+                report.cache_hits += 1;
+            } else {
+                report.generated += 1;
+            }
+            Ok(Some(thumbnail.content_hash))
+        }
+        Err(error) if error.code == ErrorCode::Cancelled => Err(error),
+        Err(_) => {
+            report.failed += 1;
+            Ok(None)
+        }
+    }
+}
+
+async fn resolve_recursive_thumbnail_candidate(
+    state: &AppState,
+    root: &Path,
+    candidate: &RelativePath,
+    cancellation: &CancellationToken,
+) -> Result<crate::state::ThumbnailResult, AppError> {
+    loop {
+        if cancellation.is_cancelled() {
+            return Err(AppError::cancelled());
+        }
+        let pipelines = state.thumbnails.clone();
+        let stores = state.store.clone();
+        let thumbnail_pins = state.thumbnail_pins.clone();
+        let worker_root = root.to_owned();
+        let worker_candidate = candidate.clone();
+        let worker_cancellation = cancellation.clone();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        state
+            .thumbnail_workers
+            .submit(Priority::Background, cancellation.clone(), move || {
+                let result = resolve_thumbnail(
+                    &pipelines,
+                    &stores,
+                    &worker_root,
+                    &worker_candidate,
+                    false,
+                    unix_millis(),
+                );
+                if worker_cancellation.is_cancelled() {
+                    if let Ok(thumbnail) = &result {
+                        thumbnail_pins.unpin(&thumbnail.content_hash);
+                    }
+                } else if let Err(result) = sender.send(result) {
+                    if let Ok(thumbnail) = result {
+                        thumbnail_pins.unpin(&thumbnail.content_hash);
+                    }
+                }
+            })
+            .map_err(|_| AppError::cancelled())?;
+        match receiver.await {
+            Ok(result) => return result,
+            Err(_) if cancellation.is_cancelled() => return Err(AppError::cancelled()),
+            Err(_) => tokio::task::yield_now().await,
+        }
+    }
+}
+
+fn emit_recursive_thumbnail_progress(
+    app: &tauri::AppHandle,
+    context: &RequestContext,
+    phase: &str,
+    start: &RelativePath,
+    report: &RecursiveThumbnailReport,
+    processed: usize,
+) {
+    let _ = app.emit(
+        RECURSIVE_THUMBNAIL_PROGRESS_EVENT,
+        RecursiveThumbnailProgress {
+            generation: context.generation,
+            phase: phase.into(),
+            relative_path: start.as_str().into(),
+            processed,
+            total: report.total,
+            generated: report.generated,
+            cache_hits: report.cache_hits,
+            failed: report.failed,
+        },
+    );
 }
 
 fn resolve_thumbnail(
@@ -4716,6 +4996,23 @@ pub fn cancel_library_diagnostics(
         .diagnostics
         .lock()
         .map_err(|_| "state poisoned")?
+        .cancel(generation);
+    Ok(Response::Cancelled {
+        request_id,
+        generation,
+    })
+}
+
+#[tauri::command]
+pub fn cancel_recursive_thumbnail_generation(
+    state: tauri::State<'_, AppState>,
+    request_id: RequestId,
+    generation: Generation,
+) -> Result<Response<()>, String> {
+    state
+        .recursive_thumbnails
+        .lock()
+        .map_err(|_| "recursive thumbnail state poisoned")?
         .cancel(generation);
     Ok(Response::Cancelled {
         request_id,
@@ -5885,6 +6182,7 @@ mod shutdown_tests {
             folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
+            recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),
@@ -5898,6 +6196,11 @@ mod shutdown_tests {
             shutting_down: AtomicBool::new(false),
         };
         let cancellation = state.navigation.lock().unwrap().begin(Generation(7));
+        let recursive_cancellation = state
+            .recursive_thumbnails
+            .lock()
+            .unwrap()
+            .begin(Generation(8));
         let token = state.media.lock().unwrap().issue(MediaGrant {
             page_id: PageId::parse("shutdown-page").unwrap(),
             mime_type: "image/png",
@@ -5909,6 +6212,7 @@ mod shutdown_tests {
         state.shutdown();
 
         assert!(cancellation.is_cancelled());
+        assert!(recursive_cancellation.is_cancelled());
         assert!(state.is_shutting_down());
         assert!(state.media.lock().unwrap().resolve(&token).is_err());
         assert!(state.store.lock().unwrap().is_none());
@@ -5926,6 +6230,55 @@ mod shutdown_tests {
     }
 
     #[test]
+    fn req_ley_p3_009_counts_generated_cache_hits_and_continues_after_item_failure() {
+        let mut report = RecursiveThumbnailReport {
+            total: 3,
+            ..RecursiveThumbnailReport::default()
+        };
+        let generated = crate::state::ThumbnailResult {
+            content_hash: "generated".into(),
+            path: PathBuf::from("generated.jpg"),
+            cache_hit: false,
+        };
+        let cached = crate::state::ThumbnailResult {
+            content_hash: "cached".into(),
+            path: PathBuf::from("cached.jpg"),
+            cache_hit: true,
+        };
+        assert_eq!(
+            record_recursive_thumbnail_result(&mut report, Ok(generated)).unwrap(),
+            Some("generated".into())
+        );
+        assert_eq!(
+            record_recursive_thumbnail_result(
+                &mut report,
+                Err(request_error(ErrorCode::CorruptImage, "broken cover")),
+            )
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            record_recursive_thumbnail_result(&mut report, Ok(cached)).unwrap(),
+            Some("cached".into())
+        );
+        assert_eq!(
+            report,
+            RecursiveThumbnailReport {
+                total: 3,
+                generated: 1,
+                cache_hits: 1,
+                failed: 1,
+            }
+        );
+        assert_eq!(
+            record_recursive_thumbnail_result(&mut report, Err(AppError::cancelled()))
+                .unwrap_err()
+                .code,
+            ErrorCode::Cancelled
+        );
+    }
+
+    #[test]
     fn recovery_notice_is_consumed_once_without_exposing_internal_details() {
         let state = AppState {
             library_root: Mutex::new(None),
@@ -5933,6 +6286,7 @@ mod shutdown_tests {
             folder_watch: Mutex::new(None),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
+            recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
             viewer: Arc::new(Mutex::new(NavigationCoordinator::default())),
             store: Arc::new(Mutex::new(None)),
             thumbnails: Arc::new(Mutex::new(None)),

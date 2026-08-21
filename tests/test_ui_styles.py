@@ -314,6 +314,16 @@ class UiStyleContractTests(unittest.TestCase):
             "animation: diagnostic-activity-spin .8s linear infinite",
         )
 
+    def test_recursive_thumbnail_progress_is_bounded_to_the_manager_dialog(self) -> None:
+        self.assert_rule_contains(".recursive-thumbnail-panel", "display: grid")
+        self.assert_rule_contains(
+            ".recursive-thumbnail-panel", "border-top: 1px solid #d9e3ef"
+        )
+        self.assert_rule_contains(".recursive-thumbnail-progress", "display: grid")
+        self.assert_rule_contains(
+            ".recursive-thumbnail-progress progress", "width: 100%"
+        )
+
     def test_dialogs_share_a_readable_visual_system(self) -> None:
         self.assert_rule_contains(
             '.dialog-backdrop > [role="dialog"]', "border-radius: 12px"

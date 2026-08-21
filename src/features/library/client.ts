@@ -838,6 +838,51 @@ export async function getThumbnail(
   });
 }
 
+export interface RecursiveThumbnailProgress {
+  generation: number;
+  phase: "enumerating" | "generating" | "completed" | "cancelled";
+  relativePath: string;
+  processed: number;
+  total: number;
+  generated: number;
+  cacheHits: number;
+  failed: number;
+}
+
+export interface RecursiveThumbnailReport {
+  total: number;
+  generated: number;
+  cacheHits: number;
+  failed: number;
+}
+
+export async function listenRecursiveThumbnailProgress(
+  handler: (progress: RecursiveThumbnailProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<RecursiveThumbnailProgress>("recursive-thumbnail-progress", (event) =>
+    handler(event.payload));
+}
+
+export async function generateRecursiveThumbnails(
+  relativePath: string,
+  generation: number,
+): Promise<ApiResponse<RecursiveThumbnailReport>> {
+  return invoke("generate_recursive_thumbnails", {
+    context: context(generation),
+    relativePath,
+  });
+}
+
+export async function cancelRecursiveThumbnailGeneration(
+  generation: number,
+): Promise<ApiResponse<void>> {
+  const request = context(generation);
+  return invoke("cancel_recursive_thumbnail_generation", {
+    requestId: request.requestId,
+    generation: request.generation,
+  });
+}
+
 export interface TreeEntry {
   relativePath: RelativePath;
   hasChildren?: boolean | null;

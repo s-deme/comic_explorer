@@ -14,6 +14,9 @@ import {
   getItemMetadata,
   getItemTags,
   getThumbnail,
+  generateRecursiveThumbnails,
+  cancelRecursiveThumbnailGeneration,
+  listenRecursiveThumbnailProgress,
   listTags,
   listReadingHistory,
   listPageBookmarks,
@@ -80,6 +83,8 @@ import {
   type ItemMetadata,
   type TagEntry,
   type ReadingHistoryEntry,
+  type RecursiveThumbnailProgress,
+  type RecursiveThumbnailReport,
   type TrayStatus,
   type ViewerSession,
   type WindowsKnownFolder,
@@ -537,6 +542,7 @@ export function App({
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
+  const recursiveThumbnailGeneration = useRef(0);
   const searchSourceGeneration = useRef(0);
   const fileMaskGeneration = useRef(0);
   const savedCatalogMaskGeneration = useRef(0);
@@ -589,6 +595,13 @@ export function App({
   const managedThumbnailRoot = useRef<string | null>(null);
   const [thumbnailManagerOpen, setThumbnailManagerOpen] = useState(false);
   const [thumbnailManagerNotice, setThumbnailManagerNotice] = useState<string | null>(null);
+  const [recursiveThumbnailScope, setRecursiveThumbnailScope] =
+    useState<"current" | "library">("current");
+  const [recursiveThumbnailRunning, setRecursiveThumbnailRunning] = useState(false);
+  const [recursiveThumbnailProgress, setRecursiveThumbnailProgress] =
+    useState<RecursiveThumbnailProgress | null>(null);
+  const [recursiveThumbnailReport, setRecursiveThumbnailReport] =
+    useState<RecursiveThumbnailReport | null>(null);
   const [legacyThumbnailDataPresent, setLegacyThumbnailDataPresent] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
@@ -866,6 +879,14 @@ export function App({
   }
 
   function activateLibraryRoot(root: string) {
+    const previousBatchGeneration = recursiveThumbnailGeneration.current;
+    recursiveThumbnailGeneration.current += 1;
+    if (previousBatchGeneration > 0) {
+      void cancelRecursiveThumbnailGeneration(previousBatchGeneration).catch(() => undefined);
+    }
+    setRecursiveThumbnailRunning(false);
+    setRecursiveThumbnailProgress(null);
+    setRecursiveThumbnailReport(null);
     viewerGeneration.current += 1;
     setViewerSession(null);
     setLibraryRoot(root);
@@ -1474,6 +1495,24 @@ export function App({
       unlisten?.();
     };
   }, [autoRefreshCurrentFolder, libraryRoot, navigation.current, selectedPath, selectedPaths]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenRecursiveThumbnailProgress((progress) => {
+      if (disposed || progress.generation !== recursiveThumbnailGeneration.current) return;
+      setRecursiveThumbnailProgress(progress);
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    }).catch(() => {
+      if (!disposed) setThumbnailManagerNotice("一括生成の進捗通知を受信できません。");
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   async function selectDrive(
     absolutePath: string,
@@ -2925,6 +2964,56 @@ export function App({
 
   function cancelDiagnostics() {
     void cancelLibraryDiagnostics(diagnosticGeneration.current).catch(() => undefined);
+  }
+
+  async function runRecursiveThumbnailGeneration() {
+    if (libraryRoot === null || recursiveThumbnailRunning) return;
+    const requestGeneration = ++recursiveThumbnailGeneration.current;
+    const rootAtStart = libraryRoot;
+    const target = recursiveThumbnailScope === "library" ? "" : navigation.current;
+    setRecursiveThumbnailRunning(true);
+    setRecursiveThumbnailProgress({
+      generation: requestGeneration,
+      phase: "enumerating",
+      relativePath: target,
+      processed: 0,
+      total: 0,
+      generated: 0,
+      cacheHits: 0,
+      failed: 0,
+    });
+    setRecursiveThumbnailReport(null);
+    setThumbnailManagerNotice(null);
+    try {
+      const response = await generateRecursiveThumbnails(target, requestGeneration);
+      if (
+        requestGeneration !== recursiveThumbnailGeneration.current
+        || rootAtStart !== libraryRoot
+      ) return;
+      if (response.status === "ok") {
+        setRecursiveThumbnailReport(response.data);
+        setThumbnailManagerNotice(
+          `一括生成を完了しました。新規 ${response.data.generated}件 / cache hit ${response.data.cacheHits}件 / 失敗 ${response.data.failed}件`,
+        );
+      } else if (response.status === "cancelled") {
+        setThumbnailManagerNotice("サムネイル一括生成をキャンセルしました。完了済みcacheは保持しています。");
+      } else {
+        setThumbnailManagerNotice(presentError(response.error));
+      }
+    } catch {
+      if (requestGeneration === recursiveThumbnailGeneration.current) {
+        setThumbnailManagerNotice(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === recursiveThumbnailGeneration.current) {
+        setRecursiveThumbnailRunning(false);
+      }
+    }
+  }
+
+  function cancelRecursiveThumbnails() {
+    void cancelRecursiveThumbnailGeneration(recursiveThumbnailGeneration.current)
+      .catch(() => undefined);
   }
 
   async function runSearch() {
@@ -4763,6 +4852,8 @@ export function App({
                 onClick={() =>
                   runMenuAction(() => {
                     setThumbnailManagerNotice(null);
+                    setRecursiveThumbnailReport(null);
+                    setRecursiveThumbnailProgress(null);
                     setThumbnailManagerOpen(true);
                   })
                 }
@@ -6081,7 +6172,15 @@ export function App({
           >
             <div className="quick-access-heading">
               <h2>サムネイル管理</h2>
-              <button type="button" onClick={() => setThumbnailManagerOpen(false)}>閉じる</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (recursiveThumbnailRunning) cancelRecursiveThumbnails();
+                  setThumbnailManagerOpen(false);
+                }}
+              >
+                閉じる
+              </button>
             </div>
             <p>
               利用者が読み込んだJPEGだけをapp-localに管理します。内部生成cacheは自動管理され、
@@ -6123,6 +6222,79 @@ export function App({
                 読み込んだthumbnailを削除
               </button>
             </div>
+            <section className="recursive-thumbnail-panel" aria-labelledby="recursive-thumbnail-title">
+              <h3 id="recursive-thumbnail-title">再帰サムネイル一括生成</h3>
+              <p>
+                指定範囲のfolder直下画像、対応画像、書庫、PDFをapp-local cacheへ生成します。
+                原本は変更しません。深さ64、走査50,000項目、候補10,000件が上限です。
+              </p>
+              <fieldset disabled={recursiveThumbnailRunning || libraryRoot === null}>
+                <legend>生成範囲</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="recursive-thumbnail-scope"
+                    checked={recursiveThumbnailScope === "current"}
+                    onChange={() => setRecursiveThumbnailScope("current")}
+                  />
+                  現在folder以下（{navigation.current === "" ? "library root" : navigation.current}）
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="recursive-thumbnail-scope"
+                    checked={recursiveThumbnailScope === "library"}
+                    onChange={() => setRecursiveThumbnailScope("library")}
+                  />
+                  library全体
+                </label>
+              </fieldset>
+              <div className="thumbnail-manager-actions">
+                <button
+                  type="button"
+                  disabled={recursiveThumbnailRunning || libraryRoot === null}
+                  onClick={() => void runRecursiveThumbnailGeneration()}
+                >
+                  一括生成を開始
+                </button>
+                {recursiveThumbnailRunning && (
+                  <button type="button" onClick={cancelRecursiveThumbnails}>
+                    一括生成をキャンセル
+                  </button>
+                )}
+              </div>
+              {recursiveThumbnailProgress !== null && (
+                <div
+                  className="recursive-thumbnail-progress"
+                  role="status"
+                  aria-live="polite"
+                  data-phase={recursiveThumbnailProgress.phase}
+                  data-generation={recursiveThumbnailProgress.generation}
+                >
+                  <strong>
+                    {recursiveThumbnailProgress.phase === "enumerating"
+                      ? "対象を列挙中です"
+                      : `処理 ${recursiveThumbnailProgress.processed} / ${recursiveThumbnailProgress.total}`}
+                  </strong>
+                  <span>
+                    新規 {recursiveThumbnailProgress.generated} / cache hit {recursiveThumbnailProgress.cacheHits} / 失敗 {recursiveThumbnailProgress.failed}
+                  </span>
+                  {recursiveThumbnailProgress.total > 0 && (
+                    <progress
+                      aria-label="サムネイル一括生成の進捗"
+                      value={recursiveThumbnailProgress.processed}
+                      max={recursiveThumbnailProgress.total}
+                    />
+                  )}
+                </div>
+              )}
+              {recursiveThumbnailReport !== null && (
+                <p data-recursive-thumbnail-summary>
+                  対象 {recursiveThumbnailReport.total}件、新規 {recursiveThumbnailReport.generated}件、
+                  cache hit {recursiveThumbnailReport.cacheHits}件、失敗 {recursiveThumbnailReport.failed}件
+                </p>
+              )}
+            </section>
             {thumbnailManagerNotice !== null && <p role="status">{thumbnailManagerNotice}</p>}
           </section>
         </div>

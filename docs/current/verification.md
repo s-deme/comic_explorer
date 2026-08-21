@@ -399,6 +399,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | 10,000 synthetic項目でDOM上限を検証し、設定による全件DOM展開がないことを確認した。release WebView2の10,000実項目FPS、layout時間、CPU、peak working setは未測定でありPASSとしない。 |
 | 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-I固有の罫線、密度、列切替、DPI、high contrast、font scalingはrelease WebView2で直接観測していない。 |
 
+## Leeyes P3-J 再帰サムネイル一括生成
+
+対象はLEY-CATALOG-016の1件。サムネイル管理で現在folder以下またはlibrary全体を明示選択し、Rustが全候補を安全上限内で列挙してから、既存bounded workerと同じcache pipelineへbackground priorityで逐次投入する。TypeScriptは範囲payload、generation付きprogress/result、二重開始防止、cancel表示だけを担当し、filesystem走査・対象判定・cache生成は行わない。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-009の5件、FAIL 0。自然順、hidden、unsupported/空folder除外、missing、depth 64、候補10,000上限、事前cancel、新規/cache hit/失敗継続、shutdown cancel、共有pipeline実生成を含む。 |
+| Focused frontend / CSS | PASS | clientとAppの2 files / 107件、`test_ui_styles.py` 20件、FAIL 0。current/library範囲、上限preview、generation付きprogress、二重開始防止、cancel、stale event破棄、typed command/eventを含む。 |
+| Windows tests / typecheck / build | PASS | frontend 31 files / 437件とPython 61件、FAIL 0。初回全体回帰でApp.fr-b09/b10の新listener mock漏れ10件を検出しfixture修正後に再実行した。typecheck exit 0。frontend 71 modules build、CSS 42.73kB、JS 550.78kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 203件とshutdown process 1件、FAIL 0。再帰列挙、coordinator、共有thumbnail pipeline、SQLite/cacheと既存catalog・viewer・file操作・search・watch・tree境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 性能test追加後の最終sourceに対する`IMP-004` canonicalは408.559秒で全12 stageがexit 0。Rust canonical 167.572秒、release executable 82.412秒、GUI権限付きshortcut product回帰11.444秒、cleanup audit、CoDD scan/check/verifyを含む。log rootは`src-tauri/target/verification/imp-004-20260821T045756238Z`。 |
+| 性能・上限 | PASS / 限定 | Windows実filesystem上で5,000 folderと各1画像から10,000候補を2.2759029秒で列挙し、10,001候補を`RESOURCE_LIMIT`で拒否した。既存共有pipelineによる実folder・画像・CBZの3件生成は104.6683ms。focused 5件全体はfixture作成・列挙・上限再走査・削除を含め14.01秒。releaseの10,000実画像、巨大画像、書庫/PDF混在、slow/removable drive、CPU、peak working set、cache eviction時間は未測定でありPASSとしない。 |
+| 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-J固有のrelease WebView2範囲選択、長時間progress、実cancel、root変更、cache再利用は直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

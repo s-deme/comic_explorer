@@ -14,6 +14,9 @@ import {
   watchLibraryFolder,
   saveSettingsProfile,
   resolveCatalogActivation,
+  cancelRecursiveThumbnailGeneration,
+  generateRecursiveThumbnails,
+  listenRecursiveThumbnailProgress,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -112,6 +115,41 @@ describe("library client settings contract", () => {
           detailShowModified: false,
         }),
       }),
+    );
+  });
+
+  it("REQ-LEY-P3-009 connects recursive generation, progress, and cancellation", async () => {
+    const handler = vi.fn();
+    await listenRecursiveThumbnailProgress(handler);
+    await generateRecursiveThumbnails("Series", 24);
+    await cancelRecursiveThumbnailGeneration(24);
+
+    expect(listenMock).toHaveBeenCalledWith("recursive-thumbnail-progress", expect.any(Function));
+    const eventCallback = listenMock.mock.calls[0][1] as (event: { payload: unknown }) => void;
+    const payload = {
+      generation: 24,
+      phase: "generating" as const,
+      relativePath: "Series",
+      processed: 25,
+      total: 100,
+      generated: 20,
+      cacheHits: 4,
+      failed: 1,
+    };
+    eventCallback({ payload });
+    expect(handler).toHaveBeenCalledWith(payload);
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      1,
+      "generate_recursive_thumbnails",
+      expect.objectContaining({
+        context: expect.objectContaining({ generation: 24 }),
+        relativePath: "Series",
+      }),
+    );
+    expect(invokeMock).toHaveBeenNthCalledWith(
+      2,
+      "cancel_recursive_thumbnail_generation",
+      expect.objectContaining({ generation: 24 }),
     );
   });
 
