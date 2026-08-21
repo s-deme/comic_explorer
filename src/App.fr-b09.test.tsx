@@ -72,6 +72,8 @@ vi.mock("./features/library/client", () => ({
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   listArchiveVirtualTree: vi.fn(async () => ({ status: "ok", data: { archiveRelativePath: "book.cbz", entries: [] } })),
+  getFileUndoStatus: vi.fn(async () => ({ status: "ok", data: { available: false, operation: null, affected: 0 } })),
+  undoLastFileOperation: vi.fn(),
   saveCatalogSort: vi.fn(),
   saveCatalogViewMode: vi.fn(),
   saveEndOfVolumePolicy: vi.fn(),

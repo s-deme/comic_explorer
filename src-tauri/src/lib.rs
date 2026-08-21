@@ -135,6 +135,8 @@ pub fn run() {
             application::file_operations::copy_native_file_drop,
             application::file_operations::start_native_file_drag,
             application::file_operations::delete_file_items,
+            application::file_operations::get_file_undo_status,
+            application::file_operations::undo_last_file_operation,
             application::file_operations::set_file_clipboard,
             application::file_operations::file_clipboard_status,
             application::file_operations::paste_file_items,

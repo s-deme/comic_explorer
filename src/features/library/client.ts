@@ -916,7 +916,8 @@ export type FileOperationKind =
   | "dragCopy"
   | "reveal"
   | "openDefault"
-  | "openWith";
+  | "openWith"
+  | "undo";
 
 export interface FileOperationResult {
   operation: FileOperationKind;
@@ -927,6 +928,12 @@ export interface FileClipboardStatus {
   available: boolean;
   cut: boolean;
   items: number;
+}
+
+export interface FileUndoStatus {
+  available: boolean;
+  operation: FileOperationKind | null;
+  affected: number;
 }
 
 export interface NativeFileDropItem {
@@ -1106,6 +1113,18 @@ export async function deleteFileItems(
     itemRelativePaths,
     permanent,
   });
+}
+
+export async function getFileUndoStatus(
+  generation: number,
+): Promise<ApiResponse<FileUndoStatus>> {
+  return invoke("get_file_undo_status", { context: context(generation) });
+}
+
+export async function undoLastFileOperation(
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("undo_last_file_operation", { context: context(generation) });
 }
 
 export async function setFileClipboard(

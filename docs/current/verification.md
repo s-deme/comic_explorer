@@ -610,6 +610,19 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | Windows tests / canonical / build / CoDD | PASS | frontend 39 files / 494件、Python 61件、Rust 237件とshutdown process 1件、typecheck、80 modules build、SBOM 783 components・unknown/prohibited license 0。最終source変更後のformal canonicalは全12 stage PASS、536.254秒。logは`src-tauri/target/verification/imp-004-20260821T144314621Z`。 |
 | 製品直接観測 | NOT RUN | release WebView2の50,000 node FPS/working set、実大規模RAR/7z/LZH、slow/removable drive、temp peak、Viewer遷移時間を直接観測していない。 |
 
+## Leeyes P4-C file-operation undo
+
+対象はLEY-FILE-016の1件。Rustがsession内1段journal、対象操作、変更後fingerprint、root・reparse・外部変更・復元先衝突の検証、copy/create削除、rename/move逆rename、rollbackと部分失敗後の残存journalを担当する。TypeScriptはmenu/shortcut、typed IPC、既存catalog/tree refreshだけを担当する。
+
+| 検証 | 結果 | 証拠 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P4-003の6件、FAIL 0。rename/copy/create undo、外部変更・root不一致・復元先衝突、copy部分失敗、複数move rollback、reparse、全体50,000 node上限を含む。 |
+| 性能・上限 | PASS / 限定 | debug Rustで10,000 nodeのtype・size・mtime・directory manifest fingerprintを410.828msで構築した。全対象合計50,000 node超過はfail closed。実巨大file内容hash、network/removable drive、CPU、peak working setは未測定。 |
+| Frontend focused | PASS | App 2件とclient 1件、FAIL 0。menu label/enable、typed status/execute IPC、Ctrl+Z、editing・tree・Viewer保護、成功notice・再照会を含む。 |
+| Typecheck | PASS | Windows-native typecheck exit 0。 |
+| Windows tests / canonical / build / CoDD | PASS | frontend 39 files / 497件、Python 61件、Rust 243件とshutdown process 1件、typecheck、80 modules build、SBOM 783 components・unknown/prohibited license 0。最終source後のsandbox外formal canonicalは全12 stage PASS、278.255秒。logは`src-tauri/target/verification/imp-004-20260821T160025974Z`。その直前のcanonicalでは最終CoDD verify内test commandだけが一過性FAILしたが、standalone Windows tests（frontend 497件・Python 61件）とCoDD verifyを再実行してPASSし、続く全stage再実行もPASSした。managed sandbox内の初回canonicalは同一releaseのWebView2 processが起動前に消えproduct-shortcutだけFAILしたが、sandbox外product-shortcut単独と全stage再実行でPASSし、source difference 0を確認した。 |
+| 製品直接観測 | NOT RUN | release WebView2の実menu/shortcut、network/removable drive、外部process競合、巨大directory、CPU・working setを直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

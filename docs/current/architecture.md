@@ -179,6 +179,7 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 - catalogとfolder treeのfolder context pasteとdrag/dropはcatalogの現在位置ではなく操作対象のfolderをdestinationとする。tree folder自身も同一drive内のdrag sourceとし、treeのごみ箱deleteはcatalogと同じ確認dialogへ集約する。変更成功後はcatalogと展開済みfolder-tree branchを再列挙する。
 - native ExplorerからのdropはRustが最大256件の絶対pathをcanonicalizeし、通常file/folder、重複、reparse point、衝突、source自身・子孫をpreview時と実行直前の両方で検証する。利用者が確認した後もcopyだけを許可し、外部sourceのmove、上書き、暗黙のopen・library登録は行わない。
 - Explorerへのdrag-outはRustが検証済みlibrary内pathからWindows Shell `IDataObject`を構築し、`SHDoDragDrop`へcopy effectだけを渡す。TypeScriptはphysical座標から明示的なdrop targetを特定し、修飾keyと確認dialogを調整するだけで、path検証、file I/O、Shell payload構築を担当しない。
+- 直近1件のfile-operation undoはRustのsession journalだけが所有する。library root内で完結したrename・一括rename・folder作成・copy/move・paste・内部dragとlibrary内へ作成したnative drop copyについて、変更後pathのfile種別・size・mtimeとdirectory relative manifestを合計50,000 nodeまで記録する。status照会と実行はfile-operation mutex内でroot identity、非reparse、fingerprint一致、復元先非存在を再検証し、copy/createは作成物の削除、rename/moveは元pathへの逆renameを行う。複数move/renameの失敗は逆順rollbackし、copy削除の部分失敗は残存entryだけをjournalへ戻す。成功時はjournalを消費し、redo・再起動後復元・OS shell履歴・ごみ箱/完全削除・library外moveのundoへ拡張しない。TypeScriptはavailable・operation・件数のmenu表示、catalog局所Ctrl+Z、typed IPC、既存再列挙だけを担当する。
 - archive entry名をlibrary側host pathへ結合せず、暗号化、未対応compression、traversal、再帰深度・個数・size上限超過を読む前またはstream境界で拒否する。
 - cache、DB、profile、export、temp、recovery、logはlibrary root外だけに置く。
 - CSVへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。明示的なpath copyだけはOS操作用の絶対pathをclipboardへ出す。

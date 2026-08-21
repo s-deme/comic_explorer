@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +31,7 @@ pub enum FileOperationKind {
     Reveal,
     OpenDefault,
     OpenWith,
+    Undo,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +47,14 @@ pub struct FileClipboardStatus {
     pub available: bool,
     pub cut: bool,
     pub items: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileUndoStatus {
+    pub available: bool,
+    pub operation: Option<FileOperationKind>,
+    pub affected: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,6 +91,455 @@ const MAX_NATIVE_FILE_DROP_ITEMS: usize = 256;
 const MAX_FILE_NAME_UTF16: usize = 255;
 const MAX_CLIPBOARD_PATH_UTF16: usize = 32_767;
 const MAX_CLIPBOARD_TOTAL_UTF16: usize = 16 * 1024 * 1024;
+const MAX_UNDO_FINGERPRINT_NODES: usize = 50_000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PathFingerprint {
+    nodes: usize,
+    digest: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UndoAction {
+    RemoveCreated,
+    MoveBack,
+}
+
+#[derive(Debug, Clone)]
+struct FileUndoEntry {
+    current: PathBuf,
+    original: Option<PathBuf>,
+    fingerprint: PathFingerprint,
+}
+
+#[derive(Debug, Clone)]
+struct FileUndoRecord {
+    root: PathBuf,
+    operation: FileOperationKind,
+    action: UndoAction,
+    entries: Vec<FileUndoEntry>,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct FileUndoJournal {
+    record: Option<FileUndoRecord>,
+}
+
+fn unavailable_undo_status() -> FileUndoStatus {
+    FileUndoStatus {
+        available: false,
+        operation: None,
+        affected: 0,
+    }
+}
+
+fn undo_status_response(
+    context: RequestContext,
+    result: Result<FileUndoStatus, AppError>,
+) -> Response<FileUndoStatus> {
+    match result {
+        Ok(data) => Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        },
+        Err(error) => error_response(&context, error),
+    }
+}
+
+fn fingerprint_path(path: &Path) -> Result<PathFingerprint, AppError> {
+    fingerprint_path_with_limit(path, MAX_UNDO_FINGERPRINT_NODES)
+}
+
+fn fingerprint_path_with_limit(path: &Path, max_nodes: usize) -> Result<PathFingerprint, AppError> {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let mut nodes = 0;
+    fingerprint_path_into(path, Path::new(""), &mut nodes, max_nodes, &mut hasher)?;
+    Ok(PathFingerprint {
+        nodes,
+        digest: hasher.finish(),
+    })
+}
+
+fn fingerprint_path_into(
+    path: &Path,
+    relative: &Path,
+    nodes: &mut usize,
+    max_nodes: usize,
+    hasher: &mut impl Hasher,
+) -> Result<(), AppError> {
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        request_error(
+            ErrorCode::ResourceLimit,
+            "Undo fingerprint node count overflowed.",
+        )
+    })?;
+    if *nodes > max_nodes {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Undo is unavailable for items containing more than 50000 nodes.",
+        ));
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|error| file_io_error(None, error))?;
+    if metadata_is_reparse_point(&metadata) {
+        return Err(request_error(
+            ErrorCode::OutsideLibraryRoot,
+            "Undo does not follow symbolic links or reparse points.",
+        ));
+    }
+    relative.to_string_lossy().hash(hasher);
+    metadata.is_file().hash(hasher);
+    metadata.is_dir().hash(hasher);
+    metadata.len().hash(hasher);
+    metadata.permissions().readonly().hash(hasher);
+    let modified = metadata
+        .modified()
+        .map_err(|error| file_io_error(None, error))?
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| {
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Undo cannot fingerprint an item with a pre-epoch timestamp.",
+            )
+        })?;
+    modified.as_nanos().hash(hasher);
+    if metadata.is_dir() {
+        let mut children = fs::read_dir(path)
+            .map_err(|error| file_io_error(None, error))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| file_io_error(None, error))?;
+        children.sort_by(|left, right| {
+            left.file_name()
+                .to_string_lossy()
+                .to_lowercase()
+                .cmp(&right.file_name().to_string_lossy().to_lowercase())
+                .then_with(|| left.file_name().cmp(&right.file_name()))
+        });
+        for child in children {
+            fingerprint_path_into(
+                &child.path(),
+                &relative.join(child.file_name()),
+                nodes,
+                max_nodes,
+                hasher,
+            )?;
+        }
+    } else if !metadata.is_file() {
+        return Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "Undo supports only regular files and folders.",
+        ));
+    }
+    Ok(())
+}
+
+fn canonical_root_identity(root: &Path) -> Result<PathBuf, AppError> {
+    canonical_root(root)
+}
+
+fn path_is_within_root(root: &Path, path: &Path) -> bool {
+    path.starts_with(root) && path != root
+}
+
+fn accumulate_undo_nodes(total: &mut usize, nodes: usize) -> Result<(), AppError> {
+    *total = total
+        .checked_add(nodes)
+        .filter(|nodes| *nodes <= MAX_UNDO_FINGERPRINT_NODES)
+        .ok_or_else(|| {
+            request_error(
+                ErrorCode::ResourceLimit,
+                "Undo fingerprint exceeds 50000 nodes across all items.",
+            )
+        })?;
+    Ok(())
+}
+
+fn build_remove_undo_record(
+    root: &Path,
+    operation: FileOperationKind,
+    targets: Vec<PathBuf>,
+) -> Result<FileUndoRecord, AppError> {
+    let root = canonical_root_identity(root)?;
+    let mut entries = Vec::with_capacity(targets.len());
+    let mut total_nodes = 0usize;
+    for target in targets {
+        let current = target
+            .canonicalize()
+            .map_err(|error| file_io_error(None, error))?;
+        if !path_is_within_root(&root, &current) {
+            return Err(request_error(
+                ErrorCode::OutsideLibraryRoot,
+                "Undo target is outside the configured library root.",
+            ));
+        }
+        let fingerprint = fingerprint_path_with_limit(
+            &current,
+            MAX_UNDO_FINGERPRINT_NODES.saturating_sub(total_nodes),
+        )?;
+        accumulate_undo_nodes(&mut total_nodes, fingerprint.nodes)?;
+        entries.push(FileUndoEntry {
+            fingerprint,
+            current,
+            original: None,
+        });
+    }
+    Ok(FileUndoRecord {
+        root,
+        operation,
+        action: UndoAction::RemoveCreated,
+        entries,
+    })
+}
+
+fn build_move_undo_record(
+    root: &Path,
+    operation: FileOperationKind,
+    paths: Vec<(PathBuf, PathBuf)>,
+) -> Result<FileUndoRecord, AppError> {
+    let root = canonical_root_identity(root)?;
+    let mut entries = Vec::with_capacity(paths.len());
+    let mut total_nodes = 0usize;
+    for (original, target) in paths {
+        let original_name = original.file_name().ok_or_else(|| {
+            request_error(
+                ErrorCode::InvalidPath,
+                "Undo restore target has no file name.",
+            )
+        })?;
+        let original = original
+            .parent()
+            .ok_or_else(|| {
+                request_error(
+                    ErrorCode::InvalidPath,
+                    "Undo restore target has no parent folder.",
+                )
+            })?
+            .canonicalize()
+            .map_err(|error| file_io_error(None, error))?
+            .join(original_name);
+        let current = target
+            .canonicalize()
+            .map_err(|error| file_io_error(None, error))?;
+        if !path_is_within_root(&root, &current) || !path_is_within_root(&root, &original) {
+            return Err(request_error(
+                ErrorCode::OutsideLibraryRoot,
+                "Undo move paths must stay inside the configured library root.",
+            ));
+        }
+        let fingerprint = fingerprint_path_with_limit(
+            &current,
+            MAX_UNDO_FINGERPRINT_NODES.saturating_sub(total_nodes),
+        )?;
+        accumulate_undo_nodes(&mut total_nodes, fingerprint.nodes)?;
+        entries.push(FileUndoEntry {
+            fingerprint,
+            current,
+            original: Some(original),
+        });
+    }
+    Ok(FileUndoRecord {
+        root,
+        operation,
+        action: UndoAction::MoveBack,
+        entries,
+    })
+}
+
+fn transfer_undo_record(
+    root: &Path,
+    operation: FileOperationKind,
+    sources: &[PathBuf],
+    destination: &Path,
+    kind: TransferKind,
+) -> Option<FileUndoRecord> {
+    let destination = destination.canonicalize().ok()?;
+    let paths = sources
+        .iter()
+        .map(|source| Some((source.clone(), destination.join(source.file_name()?))))
+        .collect::<Option<Vec<_>>>()?;
+    match kind {
+        TransferKind::Copy => build_remove_undo_record(
+            root,
+            operation,
+            paths.into_iter().map(|(_, target)| target).collect(),
+        )
+        .ok(),
+        TransferKind::Move => build_move_undo_record(root, operation, paths).ok(),
+    }
+}
+
+fn replace_undo_after_mutation(
+    journal: &std::sync::Mutex<FileUndoJournal>,
+    affected: usize,
+    record: Option<FileUndoRecord>,
+) {
+    if affected == 0 {
+        return;
+    }
+    if let Ok(mut journal) = journal.lock() {
+        journal.record = record;
+    }
+}
+
+fn validate_restore_target(root: &Path, target: &Path) -> Result<(), AppError> {
+    if !path_is_within_root(root, target) {
+        return Err(request_error(
+            ErrorCode::OutsideLibraryRoot,
+            "Undo restore target is outside the configured library root.",
+        ));
+    }
+    if target.exists() {
+        return Err(request_error(
+            ErrorCode::Conflict,
+            "Undo cannot replace an item created after the original operation.",
+        ));
+    }
+    let parent = target.parent().ok_or_else(|| {
+        request_error(
+            ErrorCode::InvalidPath,
+            "Undo restore target has no parent folder.",
+        )
+    })?;
+    let parent = parent
+        .canonicalize()
+        .map_err(|error| file_io_error(None, error))?;
+    if !parent.starts_with(root) {
+        return Err(request_error(
+            ErrorCode::OutsideLibraryRoot,
+            "Undo restore parent is outside the configured library root.",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_undo_record(root: &Path, record: &FileUndoRecord) -> Result<(), AppError> {
+    let root = canonical_root_identity(root)?;
+    if !same_windows_path(&root, &record.root) {
+        return Err(request_error(
+            ErrorCode::Conflict,
+            "Undo belongs to a different library root.",
+        ));
+    }
+    for entry in &record.entries {
+        if !path_is_within_root(&root, &entry.current) {
+            return Err(request_error(
+                ErrorCode::OutsideLibraryRoot,
+                "Undo item is outside the configured library root.",
+            ));
+        }
+        let current = entry
+            .current
+            .canonicalize()
+            .map_err(|error| file_io_error(None, error))?;
+        if !same_windows_path(&current, &entry.current)
+            || fingerprint_path(&current)? != entry.fingerprint
+        {
+            return Err(request_error(
+                ErrorCode::Conflict,
+                "An undo item changed after the original operation.",
+            ));
+        }
+        if let Some(original) = &entry.original {
+            validate_restore_target(&root, original)?;
+        }
+    }
+    Ok(())
+}
+
+fn remove_undo_entries_with(
+    record: FileUndoRecord,
+    mut remove: impl FnMut(&Path, bool) -> io::Result<()>,
+) -> Result<FileOperationResult, (AppError, FileUndoRecord)> {
+    let affected = record.entries.len();
+    for (index, entry) in record.entries.iter().enumerate() {
+        let result = remove(&entry.current, entry.current.is_dir());
+        if let Err(error) = result {
+            let completed = index;
+            let mut remaining = record.clone();
+            remaining.entries = record.entries[index..].to_vec();
+            let mut error = file_io_error(None, error);
+            error.message = format!(
+                "Undo removed {completed} of {affected} item(s); {} item(s) remain: {}",
+                remaining.entries.len(),
+                error.message
+            );
+            return Err((error, remaining));
+        }
+    }
+    Ok(FileOperationResult {
+        operation: FileOperationKind::Undo,
+        affected,
+    })
+}
+
+fn remove_undo_entries(
+    record: FileUndoRecord,
+) -> Result<FileOperationResult, (AppError, FileUndoRecord)> {
+    remove_undo_entries_with(record, |path, is_dir| {
+        if is_dir {
+            fs::remove_dir_all(path)
+        } else {
+            fs::remove_file(path)
+        }
+    })
+}
+
+fn move_back_undo_entries_with(
+    record: FileUndoRecord,
+    mut rename: impl FnMut(&Path, &Path) -> io::Result<()>,
+) -> Result<FileOperationResult, (AppError, FileUndoRecord)> {
+    let affected = record.entries.len();
+    let mut completed: Vec<FileUndoEntry> = Vec::new();
+    for entry in &record.entries {
+        let original = entry
+            .original
+            .as_ref()
+            .expect("move-back entry has original");
+        if let Err(error) = rename(&entry.current, original) {
+            let mut operation_error = file_io_error(None, error);
+            for completed_entry in completed.iter().rev() {
+                let completed_original = completed_entry
+                    .original
+                    .as_ref()
+                    .expect("move-back entry has original");
+                if let Err(rollback_error) = rename(completed_original, &completed_entry.current) {
+                    operation_error.message = format!(
+                        "{} Undo rollback also failed for {}: {}",
+                        operation_error.message,
+                        completed_original.display(),
+                        rollback_error
+                    );
+                    break;
+                }
+            }
+            return Err((operation_error, record));
+        }
+        completed.push(entry.clone());
+    }
+    Ok(FileOperationResult {
+        operation: FileOperationKind::Undo,
+        affected,
+    })
+}
+
+fn move_back_undo_entries(
+    record: FileUndoRecord,
+) -> Result<FileOperationResult, (AppError, FileUndoRecord)> {
+    move_back_undo_entries_with(record, |source, target| fs::rename(source, target))
+}
+
+fn apply_undo_record(
+    root: &Path,
+    record: FileUndoRecord,
+) -> Result<FileOperationResult, (AppError, FileUndoRecord)> {
+    if let Err(error) = validate_undo_record(root, &record) {
+        return Err((error, record));
+    }
+    match record.action {
+        UndoAction::RemoveCreated => remove_undo_entries(record),
+        UndoAction::MoveBack => move_back_undo_entries(record),
+    }
+}
 
 fn operation_response(
     context: RequestContext,
@@ -727,15 +1186,35 @@ fn transfer_items(
     kind: TransferKind,
 ) -> Result<FileOperationResult, AppError> {
     let destination = validate_transfer(&sources, &destination)?;
+    let mut completed: Vec<(PathBuf, PathBuf)> = Vec::new();
     for source in &sources {
         let name = source.file_name().ok_or_else(|| {
             request_error(ErrorCode::InvalidPath, "A source item has no file name.")
         })?;
         let target = destination.join(name);
-        match kind {
-            TransferKind::Copy => copy_path(source, &target)?,
-            TransferKind::Move => move_path(source, &target)?,
+        let transfer = match kind {
+            TransferKind::Copy => copy_path(source, &target),
+            TransferKind::Move => move_path(source, &target),
+        };
+        if let Err(mut operation_error) = transfer {
+            for (completed_source, completed_target) in completed.iter().rev() {
+                let rollback = match kind {
+                    TransferKind::Copy => remove_path(completed_target),
+                    TransferKind::Move => move_path(completed_target, completed_source),
+                };
+                if let Err(rollback_error) = rollback {
+                    operation_error.message = format!(
+                        "{} Transfer rollback also failed for {}: {}",
+                        operation_error.message,
+                        completed_target.display(),
+                        rollback_error.message
+                    );
+                    break;
+                }
+            }
+            return Err(operation_error);
         }
+        completed.push((source.clone(), target));
     }
     Ok(FileOperationResult {
         operation: match kind {
@@ -744,6 +1223,26 @@ fn transfer_items(
         },
         affected: sources.len(),
     })
+}
+
+fn remove_path(path: &Path) -> Result<(), AppError> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| file_io_error(None, error))?;
+    if metadata_is_reparse_point(&metadata) {
+        return Err(request_error(
+            ErrorCode::OutsideLibraryRoot,
+            "Transfer rollback does not follow symbolic links or reparse points.",
+        ));
+    }
+    if metadata.is_dir() {
+        fs::remove_dir_all(path).map_err(|error| file_io_error(None, error))
+    } else if metadata.is_file() {
+        fs::remove_file(path).map_err(|error| file_io_error(None, error))
+    } else {
+        Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "Transfer rollback supports only regular files and folders.",
+        ))
+    }
 }
 
 fn copy_path(source: &Path, target: &Path) -> Result<(), AppError> {
@@ -839,11 +1338,25 @@ pub async fn rename_file_item(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        rename_item(&root, relative, new_name)
+        let original = contained_existing_path(&root, &relative)?;
+        let validated_name = validate_item_name(&new_name)?.to_owned();
+        let target = original
+            .parent()
+            .ok_or_else(|| request_error(ErrorCode::InvalidPath, "The item has no parent folder."))?
+            .join(validated_name);
+        let result = rename_item(&root, relative, new_name)?;
+        let record = if result.affected == 0 {
+            None
+        } else {
+            build_move_undo_record(&root, FileOperationKind::Rename, vec![(original, target)]).ok()
+        };
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("rename worker failed: {error}"))?;
@@ -945,6 +1458,7 @@ pub async fn execute_batch_rename(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
@@ -956,7 +1470,15 @@ pub async fn execute_batch_rename(
                 "The selected items or rename settings changed; preview again.",
             ));
         }
-        apply_batch_rename(plan)
+        let paths = plan
+            .changes
+            .iter()
+            .map(|(_, source, target)| (source.clone(), target.clone()))
+            .collect();
+        let result = apply_batch_rename(plan)?;
+        let record = build_move_undo_record(&root, FileOperationKind::Rename, paths).ok();
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("batch rename worker failed: {error}"))?;
@@ -982,11 +1504,18 @@ pub async fn create_file_folder(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        create_folder(&root, parent, name)
+        let parent_path = contained_directory(&root, &parent)?;
+        let target = parent_path.join(validate_item_name(&name)?);
+        let result = create_folder(&root, parent, name)?;
+        let record =
+            build_remove_undo_record(&root, FileOperationKind::CreateFolder, vec![target]).ok();
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("create folder worker failed: {error}"))?;
@@ -1029,11 +1558,15 @@ async fn transfer_to_picked_folder(
         });
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        transfer_items(sources, destination, kind)
+        let result = transfer_items(sources.clone(), destination.clone(), kind)?;
+        let record = transfer_undo_record(&root, result.operation, &sources, &destination, kind);
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("file transfer worker failed: {error}"))?;
@@ -1083,11 +1616,21 @@ pub async fn move_file_items_to_destination(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        transfer_items(sources, destination, TransferKind::Move)
+        let result = transfer_items(sources.clone(), destination.clone(), TransferKind::Move)?;
+        let record = transfer_undo_record(
+            &root,
+            result.operation,
+            &sources,
+            &destination,
+            TransferKind::Move,
+        );
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("file drag-and-drop worker failed: {error}"))?;
@@ -1119,11 +1662,21 @@ pub async fn copy_file_items_to_destination(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        transfer_items(sources, destination, TransferKind::Copy)
+        let result = transfer_items(sources.clone(), destination.clone(), TransferKind::Copy)?;
+        let record = transfer_undo_record(
+            &root,
+            result.operation,
+            &sources,
+            &destination,
+            TransferKind::Copy,
+        );
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("file drag-and-drop copy worker failed: {error}"))?;
@@ -1168,13 +1721,23 @@ pub async fn copy_native_file_drop(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
         let (_, sources, destination) =
             preview_native_drop(&root, absolute_paths, destination_relative_path)?;
-        transfer_items(sources, destination, TransferKind::Copy)
+        let result = transfer_items(sources.clone(), destination.clone(), TransferKind::Copy)?;
+        let record = transfer_undo_record(
+            &root,
+            result.operation,
+            &sources,
+            &destination,
+            TransferKind::Copy,
+        );
+        replace_undo_after_mutation(&undo, result.affected, record);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("native file-drop copy worker failed: {error}"))?;
@@ -1264,14 +1827,101 @@ pub async fn delete_file_items(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
         })?;
-        delete_items(sources, permanent)
+        let result = delete_items(sources, permanent)?;
+        replace_undo_after_mutation(&undo, result.affected, None);
+        Ok(result)
     })
     .await
     .map_err(|error| format!("delete worker failed: {error}"))?;
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
+pub async fn get_file_undo_status(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<FileUndoStatus>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let operations = state.file_operations.clone();
+    let undo = state.file_undo.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = operations.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        let record = undo
+            .lock()
+            .map_err(|_| request_error(ErrorCode::Internal, "Undo journal is unavailable."))?
+            .record
+            .clone();
+        let Some(record) = record else {
+            return Ok(unavailable_undo_status());
+        };
+        if validate_undo_record(&root, &record).is_err() {
+            return Ok(unavailable_undo_status());
+        }
+        Ok(FileUndoStatus {
+            available: true,
+            operation: Some(record.operation),
+            affected: record.entries.len(),
+        })
+    })
+    .await
+    .map_err(|error| format!("undo status worker failed: {error}"))?;
+    Ok(undo_status_response(context, result))
+}
+
+#[tauri::command]
+pub async fn undo_last_file_operation(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let operations = state.file_operations.clone();
+    let undo = state.file_undo.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = operations.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        let record = undo
+            .lock()
+            .map_err(|_| request_error(ErrorCode::Internal, "Undo journal is unavailable."))?
+            .record
+            .take()
+            .ok_or_else(|| {
+                request_error(
+                    ErrorCode::InvalidRequest,
+                    "There is no file operation to undo.",
+                )
+            })?;
+        match apply_undo_record(&root, record) {
+            Ok(result) => Ok(result),
+            Err((error, remaining)) => {
+                if let Ok(mut journal) = undo.lock() {
+                    journal.record = Some(remaining);
+                }
+                Err(error)
+            }
+        }
+    })
+    .await
+    .map_err(|error| format!("undo worker failed: {error}"))?;
     Ok(operation_response(context, result))
 }
 
@@ -1350,6 +2000,7 @@ pub async fn paste_file_items(
         Err(error) => return Ok(error_response(&context, error)),
     };
     let lock = state.file_operations.clone();
+    let undo = state.file_undo.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let _guard = lock.lock().map_err(|_| {
             request_error(ErrorCode::Internal, "File operation state is unavailable.")
@@ -1366,20 +2017,24 @@ pub async fn paste_file_items(
         } else {
             TransferKind::Copy
         };
-        transfer_items(sources.clone(), destination, kind)?;
+        let result = transfer_items(sources.clone(), destination.clone(), kind)?;
         if cut {
             // The move has already committed. A clipboard lock must not turn a
             // successful filesystem mutation into a reported failure.
             let _ = clear_clipboard();
         }
-        Ok(FileOperationResult {
+        let response = FileOperationResult {
             operation: if cut {
                 FileOperationKind::PasteMove
             } else {
                 FileOperationKind::PasteCopy
             },
             affected: sources.len(),
-        })
+        };
+        let record = transfer_undo_record(&root, response.operation, &sources, &destination, kind);
+        replace_undo_after_mutation(&undo, response.affected, record);
+        let _ = result;
+        Ok(response)
     })
     .await
     .map_err(|error| format!("paste worker failed: {error}"))?;
@@ -2808,6 +3463,194 @@ mod tests {
             ErrorCode::NotFound
         );
         fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_003_undoes_rename_copy_and_created_folder_once() {
+        let root = fixture("undo-basic");
+        fs::create_dir_all(&root).unwrap();
+
+        let original = root.join("before.cbz");
+        let current = root.join("after.cbz");
+        fs::write(&original, b"book").unwrap();
+        fs::rename(&original, &current).unwrap();
+        let rename = build_move_undo_record(
+            &root,
+            FileOperationKind::Rename,
+            vec![(original.clone(), current.clone())],
+        )
+        .unwrap();
+        assert!(validate_undo_record(&root, &rename).is_ok());
+        assert_eq!(apply_undo_record(&root, rename).unwrap().affected, 1);
+        assert_eq!(fs::read(&original).unwrap(), b"book");
+        assert!(!current.exists());
+
+        let copied = root.join("copy.cbz");
+        fs::write(&copied, b"copy").unwrap();
+        let copy =
+            build_remove_undo_record(&root, FileOperationKind::Copy, vec![copied.clone()]).unwrap();
+        assert_eq!(apply_undo_record(&root, copy).unwrap().affected, 1);
+        assert!(!copied.exists());
+
+        let folder = root.join("created");
+        fs::create_dir(&folder).unwrap();
+        let created =
+            build_remove_undo_record(&root, FileOperationKind::CreateFolder, vec![folder.clone()])
+                .unwrap();
+        assert_eq!(apply_undo_record(&root, created).unwrap().affected, 1);
+        assert!(!folder.exists());
+
+        let journal = std::sync::Mutex::new(FileUndoJournal::default());
+        replace_undo_after_mutation(&journal, 0, None);
+        assert!(journal.lock().unwrap().record.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_003_rejects_changed_items_restore_conflicts_and_other_roots() {
+        let root = fixture("undo-conflict");
+        let other_root = fixture("undo-other-root");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&other_root).unwrap();
+        let copied = root.join("copy.cbz");
+        fs::write(&copied, b"copy").unwrap();
+        let copy =
+            build_remove_undo_record(&root, FileOperationKind::Copy, vec![copied.clone()]).unwrap();
+        fs::write(&copied, b"externally changed").unwrap();
+        assert_eq!(
+            validate_undo_record(&root, &copy).unwrap_err().code,
+            ErrorCode::Conflict
+        );
+        assert_eq!(
+            validate_undo_record(&other_root, &copy).unwrap_err().code,
+            ErrorCode::Conflict
+        );
+
+        let original = root.join("before.cbz");
+        let current = root.join("after.cbz");
+        fs::write(&current, b"book").unwrap();
+        let rename = build_move_undo_record(
+            &root,
+            FileOperationKind::Rename,
+            vec![(original.clone(), current)],
+        )
+        .unwrap();
+        fs::write(&original, b"new occupant").unwrap();
+        assert_eq!(
+            validate_undo_record(&root, &rename).unwrap_err().code,
+            ErrorCode::Conflict
+        );
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(other_root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_003_preserves_remaining_copy_undo_after_partial_failure() {
+        let root = fixture("undo-partial-copy");
+        fs::create_dir_all(&root).unwrap();
+        let first = root.join("first.cbz");
+        let second = root.join("second.cbz");
+        fs::write(&first, b"first").unwrap();
+        fs::write(&second, b"second").unwrap();
+        let record = build_remove_undo_record(
+            &root,
+            FileOperationKind::Copy,
+            vec![first.clone(), second.clone()],
+        )
+        .unwrap();
+        let mut calls = 0;
+        let (error, remaining) = remove_undo_entries_with(record, |path, _| {
+            calls += 1;
+            if calls == 2 {
+                Err(io::Error::new(io::ErrorKind::PermissionDenied, "blocked"))
+            } else {
+                fs::remove_file(path)
+            }
+        })
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::AccessDenied);
+        assert!(error.message.contains("1 of 2"));
+        assert_eq!(remaining.entries.len(), 1);
+        assert!(!first.exists());
+        assert!(second.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_003_rolls_back_multi_move_when_undo_fails() {
+        let root = fixture("undo-move-rollback");
+        fs::create_dir_all(&root).unwrap();
+        let originals = [root.join("one.cbz"), root.join("two.cbz")];
+        let currents = [root.join("one-moved.cbz"), root.join("two-moved.cbz")];
+        fs::write(&currents[0], b"one").unwrap();
+        fs::write(&currents[1], b"two").unwrap();
+        let record = build_move_undo_record(
+            &root,
+            FileOperationKind::Move,
+            originals
+                .iter()
+                .cloned()
+                .zip(currents.iter().cloned())
+                .collect(),
+        )
+        .unwrap();
+        let mut calls = 0;
+        let result = move_back_undo_entries_with(record, |source, target| {
+            calls += 1;
+            if calls == 2 {
+                Err(io::Error::new(io::ErrorKind::PermissionDenied, "blocked"))
+            } else {
+                fs::rename(source, target)
+            }
+        });
+        assert_eq!(result.unwrap_err().0.code, ErrorCode::AccessDenied);
+        assert!(currents.iter().all(|path| path.exists()));
+        assert!(originals.iter().all(|path| !path.exists()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p4_003_enforces_global_node_cap_and_measures_ten_thousand_nodes() {
+        let mut nodes = 0;
+        accumulate_undo_nodes(&mut nodes, 49_999).unwrap();
+        accumulate_undo_nodes(&mut nodes, 1).unwrap();
+        assert_eq!(
+            accumulate_undo_nodes(&mut nodes, 1).unwrap_err().code,
+            ErrorCode::ResourceLimit
+        );
+
+        let root = fixture("undo-10000");
+        let folder = root.join("copied");
+        fs::create_dir_all(&folder).unwrap();
+        for index in 0..9_999 {
+            fs::write(folder.join(format!("{index:05}.cbz")), []).unwrap();
+        }
+        let started = std::time::Instant::now();
+        let record =
+            build_remove_undo_record(&root, FileOperationKind::Copy, vec![folder]).unwrap();
+        let elapsed = started.elapsed();
+        eprintln!("10000-node undo fingerprint: {elapsed:?}");
+        assert_eq!(record.entries[0].fingerprint.nodes, 10_000);
+        assert!(elapsed < std::time::Duration::from_secs(2));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p4_003_rejects_reparse_point_in_undo_fingerprint() {
+        let root = fixture("undo-reparse");
+        fs::create_dir_all(&root).unwrap();
+        let target = root.join("target.cbz");
+        let link = root.join("link.cbz");
+        fs::write(&target, b"book").unwrap();
+        if std::os::windows::fs::symlink_file(&target, &link).is_ok() {
+            assert_eq!(
+                fingerprint_path(&link).unwrap_err().code,
+                ErrorCode::OutsideLibraryRoot
+            );
+            fs::remove_file(link).unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(target_os = "windows")]

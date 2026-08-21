@@ -46,6 +46,8 @@ import {
   previewShelvesImport,
   migrateLegacyShelf,
   listArchiveVirtualTree,
+  getFileUndoStatus,
+  undoLastFileOperation,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -106,6 +108,17 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenCalledWith("list_archive_virtual_tree", {
       context: expect.objectContaining({ generation: 85 }),
       archiveRelativePath: "Series/book.cbz",
+    });
+  });
+
+  it("REQ-LEY-P4-003 keeps undo status and execution in the Rust file-operation boundary", async () => {
+    await getFileUndoStatus(86);
+    await undoLastFileOperation(87);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "get_file_undo_status", {
+      context: expect.objectContaining({ generation: 86 }),
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "undo_last_file_operation", {
+      context: expect.objectContaining({ generation: 87 }),
     });
   });
 

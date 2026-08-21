@@ -77,6 +77,8 @@ import {
   copyNativeFileDrop,
   startNativeFileDrag,
   deleteFileItems,
+  getFileUndoStatus,
+  undoLastFileOperation,
   deletePageBookmark,
   setFileClipboard,
   getFileClipboardStatus,
@@ -94,6 +96,7 @@ import {
   type FavoriteEntry,
   type FileClipboardStatus,
   type FileOperationResult,
+  type FileUndoStatus,
   type NativeFileDropPreview,
   type RenamePreferences,
   type NamedSettingsProfileSummary,
@@ -607,6 +610,7 @@ export function App({
   const fileMaskGeneration = useRef(0);
   const savedCatalogMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
+  const fileUndoGeneration = useRef(0);
   const nativeFileDropGeneration = useRef(0);
   const cliLaunchGeneration = useRef(0);
   const cliLaunchRequested = useRef(false);
@@ -705,6 +709,11 @@ export function App({
     items: 0,
   });
   const [fileOperationBusy, setFileOperationBusy] = useState(false);
+  const [fileUndo, setFileUndo] = useState<FileUndoStatus>({
+    available: false,
+    operation: null,
+    affected: 0,
+  });
   const [fileTreeRevision, setFileTreeRevision] = useState(0);
   const [draggedFilePaths, setDraggedFilePaths] = useState<string[]>([]);
   const [nativeFileDropDialog, setNativeFileDropDialog] =
@@ -1157,6 +1166,20 @@ export function App({
         || (target instanceof HTMLElement && target.isContentEditable);
       const insideFolderTree = target instanceof Element
         && target.closest('[role="tree"]') !== null;
+      if (
+        !editing
+        && !insideFolderTree
+        && libraryRoot !== null
+        && viewerSession === null
+        && !event.altKey
+        && !event.shiftKey
+        && (event.ctrlKey || event.metaKey)
+        && event.key.toLowerCase() === "z"
+      ) {
+        event.preventDefault();
+        if (fileUndo.available && !fileOperationBusy) void performFileUndo();
+        return;
+      }
       if (!editing && libraryRoot !== null && viewerSession === null) {
         const command = customCatalogShortcutCommand(event, shortcuts)
           ?? fallbackCatalogShortcutCommand(event);
@@ -1242,7 +1265,7 @@ export function App({
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, activeToolbarMenu, entries, libraryRoot, navigation, selectedPath, selectedPaths, shortcuts, viewerSession]);
+  }, [activeMenu, activeToolbarMenu, entries, fileOperationBusy, fileUndo.available, libraryRoot, navigation, selectedPath, selectedPaths, shortcuts, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -1749,6 +1772,15 @@ export function App({
     };
   }, [fileOperationBusy, libraryRoot]);
 
+  useEffect(() => {
+    fileUndoGeneration.current += 1;
+    if (libraryRoot === null) {
+      setFileUndo({ available: false, operation: null, affected: 0 });
+      return;
+    }
+    void refreshFileUndoStatus();
+  }, [libraryRoot]);
+
   async function selectDrive(
     absolutePath: string,
     relativePath = "",
@@ -2163,6 +2195,42 @@ export function App({
     }
   }
 
+  async function refreshFileUndoStatus() {
+    const requestGeneration = ++fileUndoGeneration.current;
+    try {
+      const response = await getFileUndoStatus(requestGeneration);
+      if (requestGeneration !== fileUndoGeneration.current) return;
+      if (response.status === "ok") setFileUndo(response.data);
+      else setFileUndo({ available: false, operation: null, affected: 0 });
+    } catch {
+      if (requestGeneration === fileUndoGeneration.current) {
+        setFileUndo({ available: false, operation: null, affected: 0 });
+      }
+    }
+  }
+
+  async function performFileUndo() {
+    await runFileOperation(
+      (requestGeneration) => undoLastFileOperation(requestGeneration),
+      (result) => `${result.affected}件のファイル操作を元に戻しました。`,
+    );
+  }
+
+  function fileUndoLabel(): string {
+    const operation = fileUndo.operation === "rename"
+      ? "名前変更"
+      : fileUndo.operation === "createFolder"
+        ? "フォルダー作成"
+        : fileUndo.operation === "move" || fileUndo.operation === "pasteMove"
+          ? "移動"
+          : fileUndo.operation === "copy" || fileUndo.operation === "pasteCopy"
+            ? "コピー"
+            : "ファイル操作";
+    return fileUndo.available
+      ? `元に戻す: ${operation} (${fileUndo.affected}件)`
+      : "元に戻す";
+  }
+
   function openCatalogContextMenu(
     entry: CatalogEntry | null,
     position: { x: number; y: number },
@@ -2214,6 +2282,7 @@ export function App({
           setFileTreeRevision((current) => current + 1);
         }
         setFileOperationBusy(false);
+        void refreshFileUndoStatus();
       }
     }
   }
@@ -4946,6 +5015,22 @@ export function App({
                 type="button"
                 role="menuitem"
                 tabIndex={0}
+                aria-disabled={!fileUndo.available || fileOperationBusy}
+                aria-keyshortcuts="Control+Z"
+                onFocus={(event) => markMenuItemActive(event.currentTarget)}
+                onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}
+                onClick={() => runMenuAction(
+                  () => void performFileUndo(),
+                  !fileUndo.available || fileOperationBusy,
+                )}
+              >
+                {fileUndoLabel()} <span aria-hidden="true">Ctrl+Z</span>
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
                 aria-disabled={selectedPaths.length === 0}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("edit", event)}

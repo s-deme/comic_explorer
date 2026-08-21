@@ -86,6 +86,8 @@ import {
   deletePageBookmark,
   setFileClipboard,
   getFileClipboardStatus,
+  getFileUndoStatus,
+  undoLastFileOperation,
   pasteFileItems,
   revealFileItem,
   openFileItemDefault,
@@ -239,6 +241,8 @@ vi.mock("./features/library/client", () => ({
   deleteFileItems: vi.fn(),
   setFileClipboard: vi.fn(),
   getFileClipboardStatus: vi.fn(),
+  getFileUndoStatus: vi.fn(),
+  undoLastFileOperation: vi.fn(),
   pasteFileItems: vi.fn(),
   revealFileItem: vi.fn(),
   openFileItemDefault: vi.fn(),
@@ -323,6 +327,8 @@ const startNativeFileDragMock = vi.mocked(startNativeFileDrag);
 const deleteFileItemsMock = vi.mocked(deleteFileItems);
 const setFileClipboardMock = vi.mocked(setFileClipboard);
 const getFileClipboardStatusMock = vi.mocked(getFileClipboardStatus);
+const getFileUndoStatusMock = vi.mocked(getFileUndoStatus);
+const undoLastFileOperationMock = vi.mocked(undoLastFileOperation);
 const pasteFileItemsMock = vi.mocked(pasteFileItems);
 const revealFileItemMock = vi.mocked(revealFileItem);
 const openFileItemDefaultMock = vi.mocked(openFileItemDefault);
@@ -703,6 +709,8 @@ describe("application shell", () => {
     deleteFileItemsMock.mockReset();
     setFileClipboardMock.mockReset();
     getFileClipboardStatusMock.mockReset();
+    getFileUndoStatusMock.mockReset();
+    undoLastFileOperationMock.mockReset();
     pasteFileItemsMock.mockReset();
     revealFileItemMock.mockReset();
     openFileItemDefaultMock.mockReset();
@@ -799,6 +807,13 @@ describe("application shell", () => {
       generation: 1 as never,
       data: { available: true, cut: false, items: 2 },
     });
+    getFileUndoStatusMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-undo-status" as never,
+      generation: 1 as never,
+      data: { available: false, operation: null, affected: 0 },
+    });
+    undoLastFileOperationMock.mockResolvedValue(fileOperationResponse("undo"));
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
       requestId: "recovery" as never,
@@ -4462,6 +4477,60 @@ describe("application shell", () => {
       false,
       expect.any(Number),
     ));
+  });
+
+  it("REQ-LEY-P4-003 exposes the Rust-owned latest operation in the Edit menu", async () => {
+    getFileUndoStatusMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-undo-available" as never,
+      generation: 1 as never,
+      data: { available: true, operation: "rename", affected: 2 },
+    });
+    await registerTestLibrary([testEntry("books/renamed.cbz")]);
+    await waitFor(() => expect(getFileUndoStatusMock).toHaveBeenCalled());
+
+    const editMenu = openAppMenu("編集");
+    const undo = within(editMenu).getByRole("menuitem", {
+      name: "元に戻す: 名前変更 (2件)",
+    });
+    expect(undo).toHaveAttribute("aria-disabled", "false");
+    expect(undo).toHaveAttribute("aria-keyshortcuts", "Control+Z");
+    fireEvent.click(undo);
+
+    await waitFor(() => expect(undoLastFileOperationMock).toHaveBeenCalledOnce());
+    expect(await screen.findByText("1件のファイル操作を元に戻しました。")).toBeInTheDocument();
+    await waitFor(() => expect(getFileUndoStatusMock.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("REQ-LEY-P4-003 limits Ctrl+Z to catalog focus and protects editing, tree, and Viewer", async () => {
+    getFileUndoStatusMock.mockResolvedValue({
+      status: "ok",
+      requestId: "file-undo-available" as never,
+      generation: 1 as never,
+      data: { available: true, operation: "copy", affected: 1 },
+    });
+    const entry = testEntry("books/copy.cbz");
+    await registerTestLibrary([entry]);
+    await waitFor(() => expect(getFileUndoStatusMock).toHaveBeenCalled());
+    const editMenu = openAppMenu("編集");
+    await waitFor(() => expect(within(editMenu).getByRole("menuitem", {
+      name: "元に戻す: コピー (1件)",
+    })).toHaveAttribute("aria-disabled", "false"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "編集" }));
+
+    fireEvent.keyDown(screen.getByLabelText("アドレス"), { key: "z", ctrlKey: true });
+    fireEvent.keyDown(screen.getByRole("tree"), { key: "z", ctrlKey: true });
+    expect(undoLastFileOperationMock).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(undoLastFileOperationMock).toHaveBeenCalledOnce());
+
+    openMock.mockResolvedValue(viewerResponse(entry.relativePath));
+    fireEvent.doubleClick(screen.getByRole("button", { name: /copy\.cbz/ }));
+    await waitFor(() => expect(openMock).toHaveBeenCalled());
+    expect(await screen.findByLabelText("books/copy.cbz ビューワ")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(undoLastFileOperationMock).toHaveBeenCalledOnce();
   });
 
   it("pastes into the catalog folder that was right-clicked", async () => {

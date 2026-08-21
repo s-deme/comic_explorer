@@ -95,7 +95,7 @@ LEY-FILE-012,ファイル操作,名前変更,Equivalent,NoAction,Existing,NA,,,,
 LEY-FILE-013,ファイル操作,プロパティ,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILE-014,ファイル操作,新規フォルダ,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILE-015,ファイル操作,親単位削除,Alternative,ReviewAlternative,AlternativeExisting,NA,,,,,,,,,明示選択削除,誤削除,2026-08-20,
-LEY-FILE-016,ファイル操作,元に戻す,Missing,Selected,NotStarted,L,P4,11,安全なoperation journal基盤,,,,,,operation journal,外部変更・回復不能操作,2026-08-21,
+LEY-FILE-016,ファイル操作,元に戻す,Missing,Selected,Published,L,P4,11,安全なoperation journal基盤,REQ-LEY-P4-003,requirements.md#REQ-LEY-P4-003,src-tauri/src/application/file_operations.rs;src-tauri/src/application/mod.rs;src-tauri/src/lib.rs;src/features/library/client.ts;src/App.tsx,src-tauri/src/application/file_operations.rs#tests;src/features/library/client.test.ts;src/App.test.tsx,verification.md#leeyes-p4-c-file-operation-undo,operation journal,session内1段のみ;file内容hashではなくtype・size・mtime・bounded directory manifest;release競合未測定,2026-08-22,SELF
 LEY-FILE-017,ファイル操作,切取・コピー・貼付,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILE-018,ファイル操作,指定先へコピー・移動,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
 LEY-FILE-019,ファイル操作,パス・親パスコピー,Equivalent,NoAction,Existing,NA,,,,,,,,,,,2026-08-20,
