@@ -283,6 +283,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 26px;
   padding: 3px 6px;
 }
+.search-syntax-hint {
+  margin: 0;
+  color: #59636f;
+  font-size: .72rem;
+  line-height: 1.4;
+}
 .search-pane-actions {
   display: flex;
   justify-content: flex-end;

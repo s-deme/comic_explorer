@@ -2498,7 +2498,9 @@ export function App({
         setSearchState({
           status: "error",
           query,
-          message: presentError(response.error),
+          message: response.error.code === "INVALID_REQUEST"
+            ? "検索式を確認してください。例: (*.cbz OR *.pdf) AND NOT sample*"
+            : presentError(response.error),
         });
       }
     } catch {
@@ -4691,10 +4693,14 @@ export function App({
                     ref={searchInputRef}
                     id="catalog-search"
                     aria-label="名前検索"
+                    aria-describedby="catalog-search-syntax"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="検索する名前"
+                    placeholder="名前、*.cbz、または AND / OR / NOT"
                   />
+                  <p id="catalog-search-syntax" className="search-syntax-hint">
+                    * と ?、AND / OR / NOT、丸括弧、引用符を使用できます。
+                  </p>
                   <div className="search-pane-actions">
                     <button type="submit" aria-label="検索" title="名前で検索">
                       <span aria-hidden="true">⌕</span>

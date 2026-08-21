@@ -3,6 +3,7 @@ mod display_awake;
 pub mod file_operations;
 mod library_root;
 mod scheduler;
+mod search_query;
 
 pub use coordinator::NavigationCoordinator;
 pub use scheduler::{BoundedPriorityQueue, Priority, PriorityTaskPool, QueueItem};
@@ -34,6 +35,9 @@ use crate::state::{
     AppPaths, BookmarkRecord, FavoriteRecord, StateStore, ThumbnailPins, ThumbnailPipeline,
 };
 use library_root::validate_library_root;
+#[cfg(test)]
+use search_query::normalize_search_text;
+use search_query::{SearchExpression, matches_search_query, parse_search_query};
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
@@ -2965,7 +2969,6 @@ pub async fn search_library(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    let normalized_query = normalize_search_text(&query);
     let root = match state
         .library_root
         .lock()
@@ -2988,7 +2991,7 @@ pub async fn search_library(
         .begin(context.generation);
     let worker_root = root.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        search_library_with_options_port(&worker_root, &normalized_query, &options, &cancellation)
+        search_library_with_options_port(&worker_root, &query, &options, &cancellation)
     })
     .await
     .map_err(|error| format!("search worker failed: {error}"))?;
@@ -3466,9 +3469,8 @@ fn search_library_with_options_port(
     options: &SearchOptions,
     cancellation: &CancellationToken,
 ) -> Result<Vec<CatalogEntry>, AppError> {
-    if query.is_empty() {
-        return Ok(Vec::new());
-    }
+    let expression = parse_search_query(query)
+        .map_err(|error| request_error(ErrorCode::InvalidRequest, error.0))?;
     if cancellation.is_cancelled() {
         return Err(AppError::cancelled());
     }
@@ -3508,7 +3510,7 @@ fn search_library_with_options_port(
     search_directory(
         &root,
         &directory,
-        query,
+        &expression,
         options,
         cancellation,
         &mut results,
@@ -3526,7 +3528,7 @@ fn search_library_with_options_port(
 fn search_directory(
     root: &std::path::Path,
     directory: &std::path::Path,
-    query: &str,
+    query: &SearchExpression,
     options: &SearchOptions,
     cancellation: &CancellationToken,
     results: &mut Vec<CatalogEntry>,
@@ -3545,7 +3547,7 @@ fn search_directory(
             .rsplit('/')
             .next()
             .unwrap_or(entry.relative_path.as_str());
-        if normalize_search_text(name).contains(query) && matches_search_options(&entry, options) {
+        if matches_search_query(query, name) && matches_search_options(&entry, options) {
             results.push(entry.clone());
         }
         if options.include_subfolders
@@ -3590,23 +3592,6 @@ fn matches_search_options(entry: &CatalogEntry, options: &SearchOptions) -> bool
         }
     }
     true
-}
-
-fn normalize_search_text(value: &str) -> String {
-    value
-        .trim()
-        .chars()
-        .flat_map(|character| {
-            let folded = match character {
-                '\u{3000}' => ' ',
-                '\u{ff01}'..='\u{ff5e}' => {
-                    char::from_u32(character as u32 - 0xfee0).unwrap_or(character)
-                }
-                _ => character,
-            };
-            folded.to_lowercase()
-        })
-        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -5367,6 +5352,43 @@ mod shutdown_tests {
             search_library_port(&root, &normalize_search_text("CAFÉ"), &cancellation).unwrap();
         assert_eq!(unicode.len(), 1);
         assert_eq!(unicode[0].kind, ItemKind::Page);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_001_search_port_combines_wildcards_logic_and_existing_options() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-search-expression-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        std::fs::create_dir_all(root.join("Nested")).unwrap();
+        std::fs::write(root.join("Final 01.cbz"), b"archive").unwrap();
+        std::fs::write(root.join("Sample 02.cbz"), b"archive").unwrap();
+        std::fs::write(root.join("Final 03.pdf"), b"pdf").unwrap();
+        std::fs::write(root.join("Nested/Final 04.cbz"), b"nested").unwrap();
+
+        let cancellation = CancellationToken::new();
+        let mut options = SearchOptions::default();
+        options.include_subfolders = false;
+        let results = search_library_with_options_port(
+            &root,
+            "(*.cbz OR *.pdf) AND NOT sample*",
+            &options,
+            &cancellation,
+        )
+        .unwrap();
+        assert_eq!(
+            results
+                .iter()
+                .map(|entry| entry.relative_path.as_str())
+                .collect::<Vec<_>>(),
+            ["Final 01.cbz", "Final 03.pdf"]
+        );
+
+        let invalid = search_library_with_options_port(&root, "*.cbz AND", &options, &cancellation)
+            .unwrap_err();
+        assert_eq!(invalid.code, ErrorCode::InvalidRequest);
         std::fs::remove_dir_all(root).unwrap();
     }
 

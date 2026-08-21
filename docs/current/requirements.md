@@ -180,6 +180,12 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P2-015 | LEY-VIEWER-012 | Viewerのanchor page移動に合わせて背後のcatalog選択と復帰時のscroll位置を同期する設定を設け、既定は有効とする。画像folderを閲覧中で現在pageが読み込み済みcatalogに存在する場合は、そのpageだけをactive selectionとselection anchorにする。archive・PDF・comic folder等でpage自体がcatalog項目でない場合は、現在作品のitem keyがcatalogに存在するときその作品を選択する。次巻・前巻移動では新しいviewer sessionのitem keyへ同期する。同期無効時はviewer開始前のcatalog選択を変えず、検索・mask・別folderにより候補が現在のvisible catalogに存在しない場合も選択やnavigationを強制変更しない。Viewerを閉じてcatalogが再mountされたときは既存virtualizerの選択scroll契約で同期対象を表示し、page callbackは現行viewer sessionとgenerationに一致する場合だけ反映する。設定はstrict profile v17とapp-local SQLiteへatomicに保存し、profile v1〜v16およびkeyがない既存SQLiteには有効を補う。原本・読書位置・bookmarkは変更せず、同期処理にnative I/O、polling、page数比例の追加stateを導入しない。release製品で大量catalogの復帰scrollを直接観測していない場合は未測定として記録する。 |
 | REQ-LEY-P2-016 | LEY-VIEWER-030 | Viewer toolbarと固定keyboard操作から、現在のanchor pageだけへ時計回り90度回転、左右反転、上下反転、変換resetを適用する。keyboardは入力欄・select・contenteditable・dialog操作中には発火せず、`]`、`H`、`V`、`0`をそれぞれ割り当ててbutton titleでも説明する。変換はpageごとのsession一時stateとして合成し、pageを離れて戻った場合は同一session内だけ保持し、次巻・前巻を含む新sessionまたはViewer終了で破棄する。左右・上下は画面上の軸を意味し、見開きでも隣pageや原本へ波及しない。EXIF補正済みmediaをCSSで非破壊変換し、media URI、decode/prefetch cache、読書位置、bookmark、画像clipboardの原データは変更しない。90/270度では幅・高さを入れ替えてauto見開き判定と全体fit倍率を再計算し、paged・連続layoutの既存overflow/pan境界を維持する。loupeは現在pageと同じ回転・反転を同じ表示座標で描画し、gridは画面固定overlayのままとする。stateは変換したpage数以下、操作は現在pageのO(1)更新とし、canvas再decode、native I/O、timerを追加しない。helper、Viewer、CSS contractを自動検証し、release WebView2の実画像・見開き・DPI・GPU描画を直接観測していない場合は未測定として記録する。 |
 
+## Leeyes P3 操作・検索の受入条件
+
+| Requirement | Leeyes ID | 受入条件 |
+|---|---|---|
+| REQ-LEY-P3-001 | LEY-SEARCH-003 | 名前検索は従来の空白を含むplain文字列のcase・全半角英数非依存部分一致を維持しつつ、`*`（0文字以上）と`?`（任意1文字）のwildcard term、case-insensitiveな`AND`・`OR`・`NOT`、丸括弧を受理する。優先順位は括弧、NOT、AND、ORとし、論理演算子はtoken境界だけで認識する。quoted termは空白と演算子文字列をliteralとして部分一致し、backslashは次の特殊文字をescapeする。wildcard termはbasename全体へ、plain/quoted termはbasename内へ適用し、検索scope・kind・size・date・固定場所条件とはANDで組み合わせる。空式、dangling operator、unclosed quote/parenthesis、unexpected token、1024文字超、128 token超、16階層超をfilesystem走査前に`INVALID_REQUEST`として拒否し、UIは構文例と修正可能なerrorを表示する。評価は短絡し、termごとのregex engineやbacktrackingを使わず、basename長×式token数の有界な独自matcherとする。Leeyesの厳密な優先順位・escapeは未確認のため、この明示構文を安全で予測可能な現代化として採用し、原本、検索場所、index/cacheを変更しない。 |
+
 ## 非採用と将来候補の境界
 
 | 区分 | 安定ID | 扱い |

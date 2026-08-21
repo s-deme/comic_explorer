@@ -79,6 +79,8 @@ P2-OではLEY-VIEWER-012をPublishedとした。既定有効の選択同期をpr
 
 P2-PではLEY-VIEWER-030をPublishedとした。現在anchor pageへ時計回り90度、screen軸の左右・上下反転、resetをtoolbarと固定keyから適用し、page別の疎なsession state、回転後寸法によるauto spread・fit再計算、main imageとloupeの同一transformを実装した。原画像、Rust decode、media URI、cache、clipboard、読書位置は変更しない。frontend 414件、Python 59件、Rust 180+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2の実画像・見開き・DPI・GPU描画は未測定として残す。
 
+P3-AではLEY-SEARCH-003をPublishedとした。従来の空白を含むplain部分一致を維持し、Rust search portへ`*`・`?`、quoted literal、backslash escape、NOT/AND/OR、括弧と明示的な優先順位を持つbounded parser・非regex matcherを追加した。1024文字・128 token・16階層を走査前に検証し、frontendは構文案内と修正可能なerrorだけを表示する。synthetic 10,000 basenameはdebug testで83.403ms、frontend 415件、Python 59件、Rust 185+1件、typecheck、build、Windows canonical全12 stageはPASSした。release filesystemの10,000実file、最大basename、worst-case wildcard、working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

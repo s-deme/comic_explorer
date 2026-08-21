@@ -288,6 +288,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | PASS / 限定 | 非identity pageだけをMapへ保持し、現在pageの参照・更新はO(1)。操作ごとのcanvas decode、native I/O、timer、原画像copyはない。大量pageを実際に変換したrelease process memory・GPU frame timeは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2の実画像、見開き、縦横scroll、fit各mode、loupe、DPI別表示、GPU描画、keyboard layout差は未測定。 |
 
+## Leeyes P3-A wildcard論理検索
+
+対象はLEY-SEARCH-003の1件。Rust search portでplain部分一致と、wildcard・quoted literal・escape・NOT/AND/OR・括弧をfilesystem走査前にparseし、basenameだけへ短絡評価する。frontendは構文例と安全なparser errorだけを表示する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust / frontend | PASS | Rust parser 3件、実filesystem・既存option統合1件、frontend構文案内/error 1件、FAIL 0。plain互換、case・全半角英数、wildcard、escape、quoted operator、優先順位、invalid、1024文字、128 token、16階層を含む。 |
+| TypeScript typecheck | PASS | `tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | frontend 31 files / 415件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 523.86kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 185件とshutdown process 1件、FAIL 0。parser、実filesystem、既存catalog・viewer・file操作境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは368.632秒で全12 stageがexit 0。Rust canonical 148.831秒、release executable 78.781秒、GUI権限付きshortcut product回帰14.009秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | parserは1024文字・128 token・括弧16階層で拒否し、matcherはregex engineを使わず短絡評価する。synthetic 10,000 basenameをdebug testで83.403ms（gate 2秒未満）。release filesystemの10,000実file、最大basename、worst-case wildcard、wall-clock・working setは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2での日本語・全角・quoted/escaped入力、keyboard layout、検索cancel、removable/slow diskは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

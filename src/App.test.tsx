@@ -2177,6 +2177,31 @@ describe("application shell", () => {
     );
   });
 
+  it("REQ-LEY-P3-001 explains logical wildcard syntax and presents parser errors as repairable", async () => {
+    searchMock.mockResolvedValueOnce({
+      status: "error",
+      requestId: "invalid-search-expression" as never,
+      generation: 1 as never,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "backend parser detail",
+        retryable: false,
+      },
+    });
+    await registerTestLibrary([testEntry("root.cbz")]);
+    const pane = openSearchPane();
+    const input = within(pane).getByLabelText("名前検索");
+    expect(input).toHaveAccessibleDescription(/AND \/ OR \/ NOT/);
+
+    fireEvent.change(input, { target: { value: "*.cbz AND" } });
+    fireEvent.click(within(pane).getByRole("button", { name: "検索" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("検索式を確認してください");
+    expect(alert).toHaveTextContent("(*.cbz OR *.pdf) AND NOT sample*");
+    expect(alert).not.toHaveTextContent("backend parser detail");
+  });
+
   it("passes active search options and retains results when requested", async () => {
     const result = testEntry("Series/large-volume.cbz");
     searchMock.mockResolvedValueOnce(searchResponse([result]));
