@@ -43,6 +43,7 @@ import {
   quitApplication,
   setItemRating,
   searchLibrary,
+  evaluateCatalogMask,
   takeRecoveryNotice,
   resolveFavorite,
   diagnoseLibrary,
@@ -109,6 +110,7 @@ vi.mock("./features/library/client", () => ({
   quitApplication: vi.fn(),
   setItemRating: vi.fn(),
   searchLibrary: vi.fn(),
+  evaluateCatalogMask: vi.fn(),
   diagnoseLibrary: vi.fn(),
   cancelLibraryDiagnostics: vi.fn(),
   takeRecoveryNotice: vi.fn(),
@@ -163,6 +165,7 @@ const storeMainWindowInTrayMock = vi.mocked(storeMainWindowInTray);
 const quitApplicationMock = vi.mocked(quitApplication);
 const setRatingMock = vi.mocked(setItemRating);
 const searchMock = vi.mocked(searchLibrary);
+const catalogMaskMock = vi.mocked(evaluateCatalogMask);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
 const listPageBookmarksMock = vi.mocked(listPageBookmarks);
@@ -456,6 +459,7 @@ describe("application shell", () => {
     quitApplicationMock.mockReset();
     setRatingMock.mockReset();
     searchMock.mockReset();
+    catalogMaskMock.mockReset();
     recoveryNoticeMock.mockReset();
     historyMock.mockReset();
     listPageBookmarksMock.mockReset();
@@ -479,6 +483,12 @@ describe("application shell", () => {
     knownFoldersMock.mockResolvedValue({
       status: "ok", requestId: "known-folders" as never, generation: 1 as never, data: [],
     });
+    catalogMaskMock.mockImplementation(async (_mask, basenames, generation) => ({
+      status: "ok",
+      requestId: "catalog-mask" as never,
+      generation: generation as never,
+      data: basenames.map(() => true),
+    }));
     renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
     createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
@@ -2244,7 +2254,7 @@ describe("application shell", () => {
     expect(await screen.findByRole("region", { name: "名前検索結果" })).toBeInTheDocument();
   });
 
-  it("filters the catalog from the search side pane and restores all items", async () => {
+  it("REQ-LEY-P3-002 applies Rust-evaluated masks and preserves the last valid result", async () => {
     await registerTestLibrary([
       testEntry("book.cbz"),
       { relativePath: "cover.jpg" as never, kind: "page" },
@@ -2252,15 +2262,70 @@ describe("application shell", () => {
     const pane = openSearchPane();
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
 
-    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
-      target: { value: "*.cbz" },
+    catalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-mask-cbz" as never,
+      generation: 1 as never,
+      data: [true, false],
     });
-    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+      target: { value: "*.cbz;*.pdf" },
+    });
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
+    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    await waitFor(() => {
+      expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+    });
+    expect(catalogMaskMock).toHaveBeenCalledWith(
+      "*.cbz;*.pdf",
+      ["book.cbz", "cover.jpg"],
+      expect.any(Number),
+    );
     expect(screen.getByRole("button", { name: /book\.cbz/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /cover\.jpg/ })).not.toBeInTheDocument();
 
+    catalogMaskMock.mockResolvedValueOnce({
+      status: "error",
+      requestId: "catalog-mask-invalid" as never,
+      generation: 2 as never,
+      error: {
+        code: "INVALID_REQUEST",
+        message: "backend parser detail",
+        retryable: false,
+      },
+    });
+    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+      target: { value: "*.cbz AND" },
+    });
+    fireEvent.submit(within(pane).getByRole("form", { name: "ファイルマスクフォーム" }));
+    const alert = await within(pane).findByRole("alert");
+    expect(alert).toHaveTextContent("(*.cbz OR *.pdf) AND NOT sample*");
+    expect(alert).not.toHaveTextContent("backend parser detail");
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
+
     fireEvent.click(within(pane).getByRole("button", { name: "全件" }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
+
+    let resolveStale:
+      | ((value: Awaited<ReturnType<typeof evaluateCatalogMask>>) => void)
+      | undefined;
+    catalogMaskMock.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveStale = resolve;
+    }));
+    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+      target: { value: "*.jpg" },
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    expect(await within(pane).findByRole("status")).toHaveTextContent("評価しています");
+    fireEvent.click(within(pane).getByRole("button", { name: "全件" }));
+    await act(async () => resolveStale?.({
+      status: "ok",
+      requestId: "catalog-mask-stale" as never,
+      generation: 3 as never,
+      data: [false, true],
+    }));
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
+    expect(within(pane).queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("FT-B05-002 keeps mixed file and folder result kinds visible", async () => {

@@ -37,7 +37,9 @@ use crate::state::{
 use library_root::validate_library_root;
 #[cfg(test)]
 use search_query::normalize_search_text;
-use search_query::{SearchExpression, matches_search_query, parse_search_query};
+use search_query::{
+    SearchExpression, matches_search_query, parse_catalog_mask, parse_search_query,
+};
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
@@ -3004,6 +3006,53 @@ pub async fn search_library(
     Ok(port_response(context, result, is_current))
 }
 
+const MAX_CATALOG_MASK_BASENAMES: usize = 100_000;
+const MAX_CATALOG_MASK_BASENAME_CHARS: usize = 1_024;
+
+#[tauri::command]
+pub async fn evaluate_catalog_mask(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    mask: String,
+    basenames: Vec<String>,
+) -> Result<Response<Vec<bool>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let result =
+        tauri::async_runtime::spawn_blocking(move || evaluate_catalog_mask_port(&mask, &basenames))
+            .await
+            .map_err(|error| format!("catalog mask worker failed: {error}"))?;
+    Ok(port_response(context, result, true))
+}
+
+fn evaluate_catalog_mask_port(mask: &str, basenames: &[String]) -> Result<Vec<bool>, AppError> {
+    if basenames.len() > MAX_CATALOG_MASK_BASENAMES {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Catalog mask accepts at most 100000 basenames.",
+        ));
+    }
+    if basenames.iter().any(|basename| {
+        basename.chars().count() > MAX_CATALOG_MASK_BASENAME_CHARS
+            || basename.contains(['/', '\\', '\0'])
+    }) {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Catalog mask received an invalid basename.",
+        ));
+    }
+    let expression = parse_catalog_mask(mask)
+        .map_err(|error| request_error(ErrorCode::InvalidRequest, error.0))?;
+    Ok(match expression {
+        Some(expression) => basenames
+            .iter()
+            .map(|basename| matches_search_query(&expression, basename))
+            .collect(),
+        None => vec![true; basenames.len()],
+    })
+}
+
 /// Run the read-only FR-B09 scanner against the configured library root.
 ///
 /// The baseline stays in the caller so a diagnostic report never creates a
@@ -5390,6 +5439,41 @@ mod shutdown_tests {
             .unwrap_err();
         assert_eq!(invalid.code, ErrorCode::InvalidRequest);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_002_catalog_mask_port_is_bounded_and_evaluates_10000_basenames() {
+        let basenames = (0..10_000)
+            .map(|index| {
+                let extension = if index % 2 == 0 { "cbz" } else { "jpg" };
+                format!("volume-{index:05}.{extension}")
+            })
+            .collect::<Vec<_>>();
+        let started = std::time::Instant::now();
+        let matches = evaluate_catalog_mask_port("*.cbz;*.pdf", &basenames).unwrap();
+        let elapsed = started.elapsed();
+        eprintln!("REQ-LEY-P3-002 synthetic 10,000 basename evaluation: {elapsed:?}");
+        assert_eq!(matches.iter().filter(|matched| **matched).count(), 5_000);
+        assert!(
+            elapsed < std::time::Duration::from_secs(2),
+            "elapsed: {elapsed:?}"
+        );
+
+        assert!(evaluate_catalog_mask_port("*.cbz AND", &basenames).is_err());
+        assert!(
+            evaluate_catalog_mask_port("", &basenames)
+                .unwrap()
+                .into_iter()
+                .all(|matched| matched)
+        );
+        let too_many = vec!["x.cbz".to_owned(); MAX_CATALOG_MASK_BASENAMES + 1];
+        assert_eq!(
+            evaluate_catalog_mask_port("*.cbz", &too_many)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidRequest
+        );
+        assert!(evaluate_catalog_mask_port("*.cbz", &["dir/file.cbz".to_owned()]).is_err());
     }
 
     #[test]

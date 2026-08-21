@@ -185,6 +185,7 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | Requirement | Leeyes ID | 受入条件 |
 |---|---|---|
 | REQ-LEY-P3-001 | LEY-SEARCH-003 | 名前検索は従来の空白を含むplain文字列のcase・全半角英数非依存部分一致を維持しつつ、`*`（0文字以上）と`?`（任意1文字）のwildcard term、case-insensitiveな`AND`・`OR`・`NOT`、丸括弧を受理する。優先順位は括弧、NOT、AND、ORとし、論理演算子はtoken境界だけで認識する。quoted termは空白と演算子文字列をliteralとして部分一致し、backslashは次の特殊文字をescapeする。wildcard termはbasename全体へ、plain/quoted termはbasename内へ適用し、検索scope・kind・size・date・固定場所条件とはANDで組み合わせる。空式、dangling operator、unclosed quote/parenthesis、unexpected token、1024文字超、128 token超、16階層超をfilesystem走査前に`INVALID_REQUEST`として拒否し、UIは構文例と修正可能なerrorを表示する。評価は短絡し、termごとのregex engineやbacktrackingを使わず、basename長×式token数の有界な独自matcherとする。Leeyesの厳密な優先順位・escapeは未確認のため、この明示構文を安全で予測可能な現代化として採用し、原本、検索場所、index/cacheを変更しない。 |
+| REQ-LEY-P3-002 | LEY-CATALOG-006 | 現在catalogのファイルマスクは、入力中のdraftと適用済みmaskを分離し、Enterまたは明示適用でだけ表示集合を更新し、解除で全件へ戻す。構文はREQ-LEY-P3-001と同じRust parser・matcherを使い、既存のsemicolon区切り（例:`*.jpg;*.cbz`）はORの互換表記として維持する。basenameだけを評価し、folder・comic folderを含む現在catalogの全項目へ同じ規則を適用する。空maskは全件、invalid構文は`INVALID_REQUEST`として現在の適用済みmask・選択・表示集合を保持し、修正可能なerrorを表示する。frontendはmaskをparseせず、最大100,000 basenameをRustへ一括評価し、入力1024文字・128 token・16階層およびbasename 1024文字の上限を走査や追加native I/Oなしで検証する。応答generationが古い場合は破棄し、適用後は不可視になった選択だけを解除する。10,000 basenameの評価を2秒未満の自動gateで測定し、原本、catalog snapshot、sort、thumbnail cache、検索場所を変更しない。Leeyesのsemicolonと論理式併用時の厳密な優先順位は不明なため、semicolonを最外ORとして括弧相当へ変換する安全で明示的な互換規則を採用する。 |
 
 ## 非採用と将来候補の境界
 

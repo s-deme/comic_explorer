@@ -36,6 +36,7 @@ import {
   queryTags,
   setItemRating,
   searchLibrary,
+  evaluateCatalogMask,
   diagnoseLibrary,
   cancelLibraryDiagnostics,
   takeRecoveryNotice,
@@ -247,7 +248,6 @@ import {
 } from "./features/reading/collections";
 import {
   catalogCsv,
-  matchesMask,
   rangeSelection,
   selectEntriesByKind,
   toggleEntrySelection,
@@ -394,6 +394,7 @@ export function App({
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
   const diagnosticGeneration = useRef(0);
+  const fileMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -449,7 +450,12 @@ export function App({
   const rememberedCatalogSelections = useRef(new Map<string, string>());
   const selectionAnchor = useRef<string | null>(null);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [fileMaskDraft, setFileMaskDraft] = useState("");
   const [fileMask, setFileMask] = useState("");
+  const [fileMaskPaths, setFileMaskPaths] = useState<Set<string> | null>(null);
+  const [fileMaskBusy, setFileMaskBusy] = useState(false);
+  const [fileMaskError, setFileMaskError] = useState<string | null>(null);
+  const fileMaskEntries = useRef<CatalogEntry[] | null>(null);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [catalogContextMenu, setCatalogContextMenu] =
     useState<CatalogContextMenuState | null>(null);
@@ -1101,13 +1107,27 @@ export function App({
     [entries, sortDescending, sortField],
   );
   const visibleEntries = useMemo(
-    () => sortedEntries.filter((entry) => matchesMask(entry, fileMask)),
-    [fileMask, sortedEntries],
+    () => fileMask === "" || fileMaskPaths === null
+      ? sortedEntries
+      : sortedEntries.filter((entry) => fileMaskPaths.has(entry.relativePath)),
+    [fileMask, fileMaskPaths, sortedEntries],
   );
   const visibleEntryPaths = useMemo(
     () => new Set<string>(visibleEntries.map((entry) => entry.relativePath)),
     [visibleEntries],
   );
+
+  useEffect(() => {
+    if (fileMaskEntries.current === entries) return;
+    fileMaskGeneration.current += 1;
+    if (fileMask === "") {
+      fileMaskEntries.current = entries;
+      setFileMaskBusy(false);
+      setFileMaskPaths(null);
+      return;
+    }
+    void evaluateFileMask(fileMask, entries, false);
+  }, [entries, fileMask]);
 
   useEffect(() => {
     const next = selectedPaths.filter((path) => visibleEntryPaths.has(path));
@@ -1160,7 +1180,7 @@ export function App({
         setEntries(response.data);
         setLoadedCatalogPath(relativePath);
         const displayEntries = sortCatalogEntries(
-          response.data.filter((entry) => matchesMask(entry, fileMask)),
+          response.data,
           sortField,
           sortDescending ? "descending" : "ascending",
         );
@@ -2015,6 +2035,63 @@ export function App({
     generation.current += 1;
     setSearchQuery("");
     setSearchState({ status: "idle" });
+  }
+
+  async function evaluateFileMask(
+    mask: string,
+    candidates: CatalogEntry[],
+    activate: boolean,
+  ) {
+    const requestGeneration = ++fileMaskGeneration.current;
+    const basenames = candidates.map((entry) =>
+      entry.relativePath.split("/").at(-1) ?? entry.relativePath
+    );
+    setFileMaskBusy(true);
+    setFileMaskError(null);
+    try {
+      const response = await evaluateCatalogMask(mask, basenames, requestGeneration);
+      if (requestGeneration !== fileMaskGeneration.current) return;
+      if (response.status === "ok" && response.data.length === candidates.length) {
+        setFileMaskPaths(new Set(
+          candidates
+            .filter((_, index) => response.data[index])
+            .map((entry) => entry.relativePath),
+        ));
+        fileMaskEntries.current = candidates;
+        if (activate) setFileMask(mask);
+      } else if (response.status === "error") {
+        setFileMaskError("ファイルマスク式を確認してください。例: (*.cbz OR *.pdf) AND NOT sample*");
+      } else if (response.status === "ok") {
+        setFileMaskError("ファイルマスクの評価結果を確認できませんでした。もう一度適用してください。");
+      } else {
+        setFileMaskError("ファイルマスクの評価をキャンセルしました。");
+      }
+    } catch {
+      if (requestGeneration === fileMaskGeneration.current) {
+        setFileMaskError(presentUnexpectedError());
+      }
+    } finally {
+      if (requestGeneration === fileMaskGeneration.current) setFileMaskBusy(false);
+    }
+  }
+
+  function applyFileMask() {
+    const mask = fileMaskDraft.trim();
+    if (mask === "") {
+      clearFileMask();
+      return;
+    }
+    void evaluateFileMask(mask, entries, true);
+  }
+
+  function clearFileMask() {
+    fileMaskGeneration.current += 1;
+    fileMaskEntries.current = entries;
+    setFileMaskDraft("");
+    setFileMask("");
+    setFileMaskPaths(null);
+    setFileMaskBusy(false);
+    setFileMaskError(null);
   }
 
   async function refreshFavorites() {
@@ -4720,26 +4797,43 @@ export function App({
                 <form
                   className="search-pane-form"
                   aria-label="ファイルマスクフォーム"
-                  onSubmit={(event) => event.preventDefault()}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    applyFileMask();
+                  }}
                 >
                   <label htmlFor="file-mask">ファイルマスク</label>
                   <input
                     id="file-mask"
                     aria-label="ファイルマスク"
-                    value={fileMask}
-                    onChange={(event) => setFileMask(event.target.value)}
-                    placeholder="*.jpg;*.cbz"
+                    aria-describedby="file-mask-syntax"
+                    value={fileMaskDraft}
+                    onChange={(event) => setFileMaskDraft(event.target.value)}
+                    placeholder="*.jpg;*.cbz または AND / OR / NOT"
                   />
+                  <p id="file-mask-syntax" className="search-syntax-hint">
+                    検索式と同じ構文です。セミコロンはORとして使用できます。
+                  </p>
                   <div className="search-pane-actions">
+                    <button
+                      type="submit"
+                      aria-label="ファイルマスクを適用"
+                      title="ファイルマスクを適用"
+                      disabled={fileMaskBusy}
+                    >
+                      <span aria-hidden="true">✓</span>
+                    </button>
                     <button
                       type="button"
                       aria-label="全件"
                       title="ファイルマスクを解除して全件表示"
-                      onClick={() => setFileMask("")}
+                      onClick={clearFileMask}
                     >
                       <span aria-hidden="true">✕</span>
                     </button>
                   </div>
+                  {fileMaskBusy && <p role="status">ファイルマスクを評価しています…</p>}
+                  {fileMaskError !== null && <p role="alert">{fileMaskError}</p>}
                 </form>
                 <section className="search-options" aria-label="検索オプション">
                   <h3>オプション</h3>

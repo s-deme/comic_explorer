@@ -82,6 +82,7 @@ pub fn run() {
             application::file_operations::open_file_item_default,
             application::file_operations::open_file_item_with,
             application::search_library,
+            application::evaluate_catalog_mask,
             application::diagnose_library,
             application::get_thumbnail,
             application::list_tree_children,

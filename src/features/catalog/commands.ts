@@ -63,25 +63,3 @@ export function catalogCsv(entries: CatalogEntry[]): string {
   });
   return [header, ...rows].join("\n");
 }
-
-export function globMatch(value: string, mask: string): boolean {
-  const escaped = mask
-    .split("")
-    .map((character) => {
-      if (character === "*") return ".*";
-      if (character === "?") return ".";
-      return /[\\^$+.()[\]{}|]/.test(character) ? `\\${character}` : character;
-    })
-    .join("");
-  return new RegExp(`^${escaped}$`, "i").test(value);
-}
-
-export function matchesMask(entry: CatalogEntry, mask: string): boolean {
-  const normalized = mask.trim();
-  if (normalized === "") return true;
-  const name = entry.relativePath.split("/").at(-1) ?? entry.relativePath;
-  const patterns = normalized.split(";")
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-  return patterns.length === 0 || patterns.some((pattern) => globMatch(name, pattern));
-}

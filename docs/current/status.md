@@ -81,6 +81,8 @@ P2-PではLEY-VIEWER-030をPublishedとした。現在anchor pageへ時計回り
 
 P3-AではLEY-SEARCH-003をPublishedとした。従来の空白を含むplain部分一致を維持し、Rust search portへ`*`・`?`、quoted literal、backslash escape、NOT/AND/OR、括弧と明示的な優先順位を持つbounded parser・非regex matcherを追加した。1024文字・128 token・16階層を走査前に検証し、frontendは構文案内と修正可能なerrorだけを表示する。synthetic 10,000 basenameはdebug testで83.403ms、frontend 415件、Python 59件、Rust 185+1件、typecheck、build、Windows canonical全12 stageはPASSした。release filesystemの10,000実file、最大basename、worst-case wildcard、working setは未測定として残す。
 
+P3-BではLEY-CATALOG-006をPublishedとした。既存のTypeScript regex maskを撤去し、P3-Aと同じRust parser・matcherへ現在catalogのbasenameを一括送信する。semicolon最外OR互換、draft/適用分離、invalid時の最終valid表示保持、100,000件・basename 1024文字上限、stale generation破棄を接続した。synthetic 10,000 basenameは84.896ms、frontend 415件、Python 59件、Rust 187+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2 IPCの100,000件serialization/working set、最大basename、worst-case wildcardは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

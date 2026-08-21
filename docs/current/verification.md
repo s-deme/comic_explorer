@@ -302,6 +302,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | parserは1024文字・128 token・括弧16階層で拒否し、matcherはregex engineを使わず短絡評価する。synthetic 10,000 basenameをdebug testで83.403ms（gate 2秒未満）。release filesystemの10,000実file、最大basename、worst-case wildcard、wall-clock・working setは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2での日本語・全角・quoted/escaped入力、keyboard layout、検索cancel、removable/slow diskは未測定。 |
 
+## Leeyes P3-B Rust共通ファイルマスク
+
+対象はLEY-CATALOG-006の1件。現在catalogのbasenameだけをRustへbatch送信し、P3-Aと同じbounded parser・matcherの位置対応結果で表示集合を更新する。frontendの旧regex matcherは削除した。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | parser/semicolon互換1件、batch port・上限・性能1件、FAIL 0。論理式、quoted/escaped semicolon、空mask、invalid、100,000件上限、不正basenameを含む。 |
+| Focused frontend / typecheck | PASS | App 93件 + client contract 2件、FAIL 0。draft/適用、Rust batch payload、invalid時の最終valid表示保持、安全なerror、解除を含む。`tsc --noEmit` exit 0。 |
+| Windows tests / build | PASS | frontend 31 files / 415件とPython 59件、FAIL 0。typecheck exit 0。frontend 71 modules build、bundle 525.30kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 187件とshutdown process 1件、FAIL 0。共通parser、batch port、既存search・catalog・viewer・file操作境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは375.468秒で全12 stageがexit 0。Rust canonical 155.601秒、release executable 79.454秒、GUI権限付きshortcut product回帰11.791秒、cleanup audit、CoDD scan/check/verifyを含む。 |
+| 性能・上限 | PASS / 限定 | synthetic 10,000 basenameのRust batch評価84.896ms（gate 2秒未満）。100,000件・mask/basename 1024文字・128 token・16階層を自動検証。release WebView2 IPC、100,000件のserialization/working set、最大basename、worst-case wildcardは未測定。 |
+| 製品直接観測 | NOT RUN | release WebView2での入力、Enter/適用/解除、navigation中のstale応答、IME・keyboard layout、100,000件catalogは未測定。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

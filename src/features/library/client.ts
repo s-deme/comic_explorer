@@ -599,6 +599,18 @@ export async function searchLibrary(
   });
 }
 
+export async function evaluateCatalogMask(
+  mask: string,
+  basenames: string[],
+  generation: number,
+): Promise<ApiResponse<boolean[]>> {
+  return invoke("evaluate_catalog_mask", {
+    context: context(generation),
+    mask,
+    basenames,
+  });
+}
+
 export type DiagnosticStatus =
   | "added"
   | "changed"

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { CatalogEntry } from "../../types/domain";
 import {
   catalogCsv,
-  matchesMask,
   rangeSelection,
   selectEntriesByKind,
   toggleEntrySelection,
@@ -27,13 +26,6 @@ describe("catalog commands", () => {
     expect(rangeSelection(entries, "01.jpg", "volume.cbz")).toEqual(
       entries.map((entry) => entry.relativePath),
     );
-  });
-
-  it("FT-B16-001 matches case-insensitive masks, multiple patterns, and empty segments", () => {
-    expect(matchesMask(entries[2], "book ?")).toBe(true);
-    expect(matchesMask(entries[3], "*.jpg;*.cbz")).toBe(true);
-    expect(matchesMask(entries[0], "*.png")).toBe(false);
-    expect(matchesMask(entries[0], "; ;;; ")).toBe(true);
   });
 
   it("exports stable metadata columns with CSV escaping", () => {

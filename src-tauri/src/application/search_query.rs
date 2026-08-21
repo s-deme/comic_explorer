@@ -67,6 +67,78 @@ pub(super) fn parse_search_query(input: &str) -> Result<SearchExpression, Search
     Ok(expression)
 }
 
+pub(super) fn parse_catalog_mask(
+    input: &str,
+) -> Result<Option<SearchExpression>, SearchQueryError> {
+    if input.chars().count() > MAX_QUERY_CHARS {
+        return Err(SearchQueryError(
+            "Catalog mask is longer than 1024 characters.",
+        ));
+    }
+    if input.trim().is_empty() {
+        return Ok(None);
+    }
+
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut escaped = false;
+    for character in input.chars() {
+        if escaped {
+            current.push('\\');
+            current.push(character);
+            escaped = false;
+            continue;
+        }
+        match character {
+            '\\' => escaped = true,
+            '"' => {
+                quoted = !quoted;
+                current.push(character);
+            }
+            ';' if !quoted => {
+                if !current.trim().is_empty() {
+                    parts.push(current.trim().to_owned());
+                }
+                current.clear();
+            }
+            _ => current.push(character),
+        }
+    }
+    if escaped {
+        current.push('\\');
+    }
+    if !current.trim().is_empty() {
+        parts.push(current.trim().to_owned());
+    }
+    if parts.is_empty() {
+        return Ok(None);
+    }
+
+    let mut token_count = parts.len().saturating_sub(1);
+    for part in &parts {
+        let normalized = normalize_search_text(part);
+        token_count += if looks_like_expression(&normalized) {
+            tokenize(&normalized)?.len()
+        } else {
+            1
+        };
+        if token_count > MAX_TOKENS {
+            return Err(SearchQueryError(
+                "Catalog mask contains more than 128 tokens.",
+            ));
+        }
+    }
+
+    let mut expressions = parts.into_iter().map(|part| parse_search_query(&part));
+    let first = expressions.next().expect("non-empty catalog mask parts")?;
+    expressions
+        .try_fold(first, |left, right| {
+            right.map(|right| SearchExpression::Or(Box::new(left), Box::new(right)))
+        })
+        .map(Some)
+}
+
 pub(super) fn matches_search_query(expression: &SearchExpression, name: &str) -> bool {
     let normalized = normalize_search_text(name);
     let candidate: Vec<char> = normalized.chars().collect();
@@ -435,5 +507,24 @@ mod tests {
             elapsed < std::time::Duration::from_secs(2),
             "elapsed: {elapsed:?}"
         );
+    }
+
+    #[test]
+    fn req_ley_p3_002_catalog_mask_reuses_the_parser_and_semicolon_outer_or() {
+        let expression = parse_catalog_mask("*.jpg; (*.cbz OR *.pdf) AND NOT sample*")
+            .unwrap()
+            .unwrap();
+        assert!(matches_search_query(&expression, "cover.JPG"));
+        assert!(matches_search_query(&expression, "volume.cbz"));
+        assert!(!matches_search_query(&expression, "sample-volume.cbz"));
+        assert!(!matches_search_query(&expression, "notes.txt"));
+
+        let escaped = parse_catalog_mask(r"chapter\;one.cbz;*.pdf")
+            .unwrap()
+            .unwrap();
+        assert!(matches_search_query(&escaped, "chapter;one.cbz"));
+        assert!(parse_catalog_mask("; ;;; ").unwrap().is_none());
+        assert!(parse_catalog_mask("*.cbz AND").is_err());
+        assert!(parse_catalog_mask(&"*.cbz;".repeat(65)).is_err());
     }
 }

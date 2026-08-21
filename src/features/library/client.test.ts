@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { createDefaultSettingsProfile } from "../settings/profile";
-import { saveSettingsProfile } from "./client";
+import { evaluateCatalogMask, saveSettingsProfile } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -22,6 +22,19 @@ describe("library client settings contract", () => {
       "set_settings_profile",
       expect.objectContaining({
         profile: expect.objectContaining({ viewerCatalogSelectionSync: false }),
+      }),
+    );
+  });
+
+  it("REQ-LEY-P3-002 sends the mask and basename batch to the Rust matcher", async () => {
+    await evaluateCatalogMask("*.cbz;*.pdf", ["one.cbz", "two.jpg"], 23);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "evaluate_catalog_mask",
+      expect.objectContaining({
+        context: expect.objectContaining({ generation: 23 }),
+        mask: "*.cbz;*.pdf",
+        basenames: ["one.cbz", "two.jpg"],
       }),
     );
   });
