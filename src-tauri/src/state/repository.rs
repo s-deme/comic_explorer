@@ -10,9 +10,11 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 6;
+const SCHEMA_VERSION: i64 = 7;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
+const MAX_EXTERNAL_APPS: i64 = 16;
+const MAX_EXTERNAL_APP_HISTORY: i64 = 20;
 
 fn default_shortcut_bindings() -> BTreeMap<String, Vec<String>> {
     [
@@ -196,6 +198,25 @@ pub struct CatalogMaskRecord {
     pub modified_after_ms: Option<u64>,
     pub modified_before_ms: Option<u64>,
     pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalAppRecord {
+    pub id: i64,
+    pub display_name: String,
+    pub executable_path: String,
+    pub fixed_args: Vec<String>,
+    pub target_mode: String,
+    pub updated_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalAppHistoryRecord {
+    pub app_id: i64,
+    pub display_name: String,
+    pub target_mode: String,
+    pub target_count: u64,
+    pub launched_at_ms: u64,
 }
 
 impl Default for Settings {
@@ -935,6 +956,180 @@ impl StateStore {
         Ok(())
     }
 
+    pub fn list_external_apps(&self) -> Result<Vec<ExternalAppRecord>, AppError> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, display_name, executable_path, fixed_args_json, target_mode, updated_at_ms
+             FROM external_apps ORDER BY display_name COLLATE NOCASE ASC, id ASC LIMIT ?1",
+        ).map_err(database_error)?;
+        let rows = statement
+            .query_map([MAX_EXTERNAL_APPS], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                ))
+            })
+            .map_err(database_error)?;
+        rows.map(|row| {
+            let (id, display_name, executable_path, fixed_args_json, target_mode, updated_at_ms) =
+                row.map_err(database_error)?;
+            let fixed_args = serde_json::from_str::<Vec<String>>(&fixed_args_json)
+                .map_err(|_| invalid_stored_external_app())?;
+            Ok(ExternalAppRecord {
+                id,
+                display_name,
+                executable_path,
+                fixed_args,
+                target_mode,
+                updated_at_ms: updated_at_ms.max(0) as u64,
+            })
+        })
+        .collect()
+    }
+
+    pub fn external_app(&self, id: i64) -> Result<Option<ExternalAppRecord>, AppError> {
+        let row = self.connection.query_row(
+            "SELECT id, display_name, executable_path, fixed_args_json, target_mode, updated_at_ms
+             FROM external_apps WHERE id=?1",
+            [id],
+            |row| Ok((
+                row.get::<_, i64>(0)?, row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?, row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?, row.get::<_, i64>(5)?,
+            )),
+        ).optional().map_err(database_error)?;
+        row.map(
+            |(id, display_name, executable_path, fixed_args_json, target_mode, updated_at_ms)| {
+                let fixed_args = serde_json::from_str::<Vec<String>>(&fixed_args_json)
+                    .map_err(|_| invalid_stored_external_app())?;
+                Ok(ExternalAppRecord {
+                    id,
+                    display_name,
+                    executable_path,
+                    fixed_args,
+                    target_mode,
+                    updated_at_ms: updated_at_ms.max(0) as u64,
+                })
+            },
+        )
+        .transpose()
+    }
+
+    pub fn add_external_app(
+        &mut self,
+        app: &ExternalAppRecord,
+    ) -> Result<ExternalAppRecord, AppError> {
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        let duplicate = transaction
+            .query_row(
+                "SELECT 1 FROM external_apps WHERE executable_path=?1 COLLATE NOCASE",
+                [&app.executable_path],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(database_error)?
+            .is_some();
+        if duplicate {
+            return Err(AppError {
+                code: ErrorCode::Conflict,
+                message: "That external application is already registered.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        let count = transaction
+            .query_row("SELECT COUNT(*) FROM external_apps", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(database_error)?;
+        if count >= MAX_EXTERNAL_APPS {
+            return Err(AppError {
+                code: ErrorCode::ResourceLimit,
+                message: "External application limit reached.".into(),
+                target: None,
+                retryable: false,
+            });
+        }
+        let fixed_args_json =
+            serde_json::to_string(&app.fixed_args).map_err(|_| invalid_stored_external_app())?;
+        transaction.execute(
+            "INSERT INTO external_apps(display_name, executable_path, fixed_args_json, target_mode, updated_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![app.display_name, app.executable_path, fixed_args_json, app.target_mode,
+                i64::try_from(app.updated_at_ms).unwrap_or(i64::MAX)],
+        ).map_err(database_error)?;
+        let id = transaction.last_insert_rowid();
+        transaction.commit().map_err(database_error)?;
+        let mut stored = app.clone();
+        stored.id = id;
+        Ok(stored)
+    }
+
+    pub fn update_external_app(&self, app: &ExternalAppRecord) -> Result<bool, AppError> {
+        let fixed_args_json =
+            serde_json::to_string(&app.fixed_args).map_err(|_| invalid_stored_external_app())?;
+        self.connection.execute(
+            "UPDATE external_apps SET display_name=?2, fixed_args_json=?3, target_mode=?4, updated_at_ms=?5
+             WHERE id=?1",
+            params![app.id, app.display_name, fixed_args_json, app.target_mode,
+                i64::try_from(app.updated_at_ms).unwrap_or(i64::MAX)],
+        ).map(|count| count == 1).map_err(database_error)
+    }
+
+    pub fn delete_external_app(&self, id: i64) -> Result<bool, AppError> {
+        self.connection
+            .execute("DELETE FROM external_apps WHERE id=?1", [id])
+            .map(|count| count == 1)
+            .map_err(database_error)
+    }
+
+    pub fn list_external_app_history(&self) -> Result<Vec<ExternalAppHistoryRecord>, AppError> {
+        let mut statement = self
+            .connection
+            .prepare(
+                "SELECT app_id, display_name, target_mode, target_count, launched_at_ms
+             FROM external_app_history ORDER BY launched_at_ms DESC, id DESC LIMIT ?1",
+            )
+            .map_err(database_error)?;
+        let rows = statement
+            .query_map([MAX_EXTERNAL_APP_HISTORY], |row| {
+                Ok(ExternalAppHistoryRecord {
+                    app_id: row.get(0)?,
+                    display_name: row.get(1)?,
+                    target_mode: row.get(2)?,
+                    target_count: row.get::<_, i64>(3)?.max(0) as u64,
+                    launched_at_ms: row.get::<_, i64>(4)?.max(0) as u64,
+                })
+            })
+            .map_err(database_error)?;
+        rows.map(|row| row.map_err(database_error)).collect()
+    }
+
+    pub fn record_external_app_launch(
+        &mut self,
+        history: &ExternalAppHistoryRecord,
+    ) -> Result<(), AppError> {
+        let transaction = self.connection.transaction().map_err(database_error)?;
+        transaction.execute(
+            "INSERT INTO external_app_history(app_id, display_name, target_mode, target_count, launched_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?5)",
+            params![history.app_id, history.display_name, history.target_mode,
+                i64::try_from(history.target_count).unwrap_or(i64::MAX),
+                i64::try_from(history.launched_at_ms).unwrap_or(i64::MAX)],
+        ).map_err(database_error)?;
+        transaction
+            .execute(
+                "DELETE FROM external_app_history WHERE id NOT IN
+             (SELECT id FROM external_app_history ORDER BY launched_at_ms DESC, id DESC LIMIT ?1)",
+                [MAX_EXTERNAL_APP_HISTORY],
+            )
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)
+    }
+
     pub fn memo(&self, item_identity: &str) -> Result<Option<String>, AppError> {
         self.connection
             .query_row(
@@ -1549,7 +1744,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, "user_version", 5)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
@@ -1579,6 +1774,40 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
+            .pragma_update(None, "user_version", 6)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 7 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction.execute_batch(
+            "CREATE TABLE IF NOT EXISTS external_apps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 1 AND 64),
+                executable_path TEXT NOT NULL UNIQUE,
+                fixed_args_json TEXT NOT NULL,
+                target_mode TEXT NOT NULL CHECK(target_mode IN ('firstItem', 'allSelected', 'parentFolder')),
+                updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+             );
+             CREATE INDEX IF NOT EXISTS external_apps_name ON external_apps(display_name COLLATE NOCASE, id);
+             CREATE TABLE IF NOT EXISTS external_app_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                app_id INTEGER NOT NULL,
+                display_name TEXT NOT NULL,
+                target_mode TEXT NOT NULL,
+                target_count INTEGER NOT NULL CHECK(target_count BETWEEN 1 AND 64),
+                launched_at_ms INTEGER NOT NULL CHECK(launched_at_ms >= 0)
+             );
+             CREATE INDEX IF NOT EXISTS external_app_history_time
+               ON external_app_history(launched_at_ms DESC, id DESC);"
+        ).map_err(database_error)?;
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![7, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
             .pragma_update(None, "user_version", SCHEMA_VERSION)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
@@ -1596,6 +1825,15 @@ fn optional_nonnegative_integer(
     Ok(row
         .get::<_, Option<i64>>(index)?
         .map(|value| value.max(0) as u64))
+}
+
+fn invalid_stored_external_app() -> AppError {
+    AppError {
+        code: ErrorCode::Internal,
+        message: "Stored external application data is invalid.".into(),
+        target: None,
+        retryable: false,
+    }
 }
 
 fn favorite_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FavoriteRecord> {
@@ -1771,6 +2009,85 @@ mod tests {
             std::process::id(),
             unix_millis()
         )))
+    }
+
+    #[test]
+    fn req_ley_p3_017_external_apps_migrate_persist_bound_and_keep_private_history() {
+        let paths = temporary_paths("external-apps");
+        {
+            let (mut store, notice) = StateStore::open(&paths).unwrap();
+            assert!(notice.is_none());
+            assert_eq!(
+                store
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                SCHEMA_VERSION
+            );
+            for index in 0..16 {
+                store
+                    .add_external_app(&ExternalAppRecord {
+                        id: 0,
+                        display_name: format!("Viewer {index}"),
+                        executable_path: format!(r"C:\Apps\viewer-{index}.exe"),
+                        fixed_args: vec!["--read-only".into(), "literal argument".into()],
+                        target_mode: "allSelected".into(),
+                        updated_at_ms: index,
+                    })
+                    .unwrap();
+            }
+            assert_eq!(store.list_external_apps().unwrap().len(), 16);
+            assert_eq!(
+                store
+                    .add_external_app(&ExternalAppRecord {
+                        id: 0,
+                        display_name: "overflow".into(),
+                        executable_path: r"C:\Apps\overflow.exe".into(),
+                        fixed_args: Vec::new(),
+                        target_mode: "firstItem".into(),
+                        updated_at_ms: 17,
+                    })
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ResourceLimit
+            );
+
+            for index in 0..25 {
+                store
+                    .record_external_app_launch(&ExternalAppHistoryRecord {
+                        app_id: 1,
+                        display_name: "Viewer 0".into(),
+                        target_mode: "allSelected".into(),
+                        target_count: 2,
+                        launched_at_ms: index,
+                    })
+                    .unwrap();
+            }
+            let history = store.list_external_app_history().unwrap();
+            assert_eq!(history.len(), 20);
+            assert_eq!(history[0].launched_at_ms, 24);
+            let columns: Vec<String> = store
+                .connection()
+                .prepare("PRAGMA table_info(external_app_history)")
+                .unwrap()
+                .query_map([], |row| row.get(1))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            assert!(!columns.iter().any(|column| matches!(
+                column.as_str(),
+                "path" | "file_path" | "args" | "fixed_args"
+            )));
+        }
+        let (store, notice) = StateStore::open(&paths).unwrap();
+        assert!(notice.is_none());
+        assert_eq!(
+            store.external_app(1).unwrap().unwrap().fixed_args,
+            ["--read-only", "literal argument"]
+        );
+        assert_eq!(store.list_external_app_history().unwrap().len(), 20);
+        drop(store);
+        fs::remove_dir_all(paths.root).unwrap();
     }
 
     #[test]

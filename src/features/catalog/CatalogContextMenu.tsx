@@ -8,6 +8,7 @@ export type CatalogContextAction =
   | "openSlideshow"
   | "reveal"
   | "openWith"
+  | "registeredApp"
   | "openDefault"
   | "addBookshelf"
   | "cut"
@@ -151,6 +152,7 @@ export function CatalogContextMenu({
       <div className="menu-separator" role="separator" />
       {item("reveal", "エクスプローラーで開く", entry === null)}
       {item("openWith", "アプリケーションから開く…", entry === null)}
+      {item("registeredApp", "登録アプリで開く…", !hasSelection)}
       {item("openDefault", "動作中のアプリケーションで開く…", entry === null)}
       <div className="menu-separator" role="separator" />
       {item("addBookshelf", "本棚に追加", !bookshelfEligible(entry))}

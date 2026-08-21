@@ -511,6 +511,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能 | NOT APPLICABLE / 限定 | pointer moveは1矩形の固定個数stateだけを更新し、Rust計算は固定個数の比較・乗除算と1回のIPC。filesystem・画像decode・書庫・cache処理を追加しないため専用throughput測定対象外。releaseのinput/zoom latency、CPU、working setは未測定。 |
 | 製品直接観測 | NOT RUN | canonicalのproduct shortcut回帰はPASSしたが、P3-Q固有の実pointer capture、selection overlay、DPI、高倍率画像はrelease WebView2で直接操作・観測していない。Leeyes 2.6.1の現行起動gestureは監査資料上Unverifiedのままである。 |
 
+## Leeyes P3-R 外部アプリ登録・安全起動・履歴
+
+対象はLEY-FILE-005/006/007の3件。RustがWindows native picker由来`.exe`のallowlist、SQLite schema v7、canonical identity再検証、library containment、個別引数のlaunch plan、確認preview、path・引数を含まないbounded履歴を担当する。TypeScriptは登録・編集draft、catalog選択、確認dialog、Tauri orchestrationだけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-017の2件、FAIL 0。schema v7移行・再open、登録16件・履歴20件上限、履歴column privacy、canonical executable、root包含、literal個別引数、入力上限、opaque preview keyを含む。 |
+| Focused frontend | PASS | ExternalAppDialog、CatalogContextMenu、clientの3 files / 20件、FAIL 0。構造化IPC、登録draft、複数選択preview、二段階確認、既存Windows chooserのmenu併存を含む。 |
+| Windows tests / typecheck / build | PASS | frontend 35 files / 473件とPython 61件、FAIL 0。typecheck exit 0。frontend 76 modules build、CSS 44.14kB、JS 580.70kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 211件とshutdown process 1件、FAIL 0。`cargo fmt --check`、`cargo check --locked`、external app registry/plan/historyと既存filesystem・viewer・search・cache境界の全体回帰を含む。既存dead-code warning 2件をPASSへ加算しない。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後のIMP-004 canonicalは466.560秒で全12 stageがexit 0。Rust canonical 192.495秒、release executable 86.845秒、製品shortcut回帰12.127秒、CoDD verify 130.586秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T100823381Z`。SBOM 746 components、unknown/prohibited license 0。 |
+| 性能 | NOT APPLICABLE / 限定 | registry 16件、固定引数16件、対象64件、履歴20件へ固定上限を設け、preview計算は対象数に対して線形である。第三者appの起動時間、slow/removable executable、CPU・working setは未測定。 |
+| 製品直接観測 | NOT RUN | canonicalの製品shortcut回帰はPASSしたが、P3-R固有のnative `.exe` picker、第三者app/UAC、長いUnicode path、removable executable、履歴表示はrelease WebView2で直接操作・観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

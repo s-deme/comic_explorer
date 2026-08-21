@@ -766,6 +766,86 @@ export async function openFileItemWith(
   });
 }
 
+export type ExternalAppTargetMode = "firstItem" | "allSelected" | "parentFolder";
+
+export interface ExternalAppEntry {
+  id: number;
+  displayName: string;
+  executableName: string;
+  fixedArgs: string[];
+  targetMode: ExternalAppTargetMode;
+}
+
+export interface ExternalAppHistoryEntry {
+  appId: number;
+  displayName: string;
+  targetMode: ExternalAppTargetMode;
+  targetCount: number;
+  launchedAtMs: number;
+}
+
+export interface ExternalAppLaunchPreview {
+  appId: number;
+  displayName: string;
+  executableName: string;
+  targetMode: ExternalAppTargetMode;
+  targetCount: number;
+  fixedArgCount: number;
+  previewKey: string;
+}
+
+export async function listExternalApps(generation: number): Promise<ApiResponse<ExternalAppEntry[]>> {
+  return invoke("list_external_apps", { context: context(generation) });
+}
+
+export async function registerExternalApp(
+  displayName: string,
+  fixedArgs: string[],
+  targetMode: ExternalAppTargetMode,
+  generation: number,
+): Promise<ApiResponse<ExternalAppEntry>> {
+  return invoke("register_external_app", { context: context(generation), displayName, fixedArgs, targetMode });
+}
+
+export async function updateExternalApp(
+  appId: number,
+  displayName: string,
+  fixedArgs: string[],
+  targetMode: ExternalAppTargetMode,
+  generation: number,
+): Promise<ApiResponse<ExternalAppEntry>> {
+  return invoke("update_external_app", { context: context(generation), appId, displayName, fixedArgs, targetMode });
+}
+
+export async function deleteExternalApp(appId: number, generation: number): Promise<ApiResponse<boolean>> {
+  return invoke("delete_external_app", { context: context(generation), appId });
+}
+
+export async function previewExternalAppLaunch(
+  appId: number,
+  itemRelativePaths: string[],
+  generation: number,
+): Promise<ApiResponse<ExternalAppLaunchPreview>> {
+  return invoke("preview_external_app_launch", { context: context(generation), appId, itemRelativePaths });
+}
+
+export async function launchExternalApp(
+  appId: number,
+  itemRelativePaths: string[],
+  previewKey: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("launch_external_app", {
+    context: context(generation), appId, itemRelativePaths, previewKey, confirmed: true,
+  });
+}
+
+export async function listExternalAppHistory(
+  generation: number,
+): Promise<ApiResponse<ExternalAppHistoryEntry[]>> {
+  return invoke("list_external_app_history", { context: context(generation) });
+}
+
 export async function searchLibrary(
   query: string,
   generation: number,

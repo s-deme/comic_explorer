@@ -32,6 +32,7 @@ describe("CatalogContextMenu", () => {
     expect(screen.getByRole("menuitem", { name: /貼り付け（3件）.*Ctrl\+V/ })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "フォルダへコピー…" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "フォルダへ移動…" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "登録アプリで開く…" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "新しいフォルダ" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: /削除.*Del/ })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "名前の変更" })).toHaveAttribute("aria-disabled", "true");

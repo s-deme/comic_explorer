@@ -1080,6 +1080,48 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .dialog-backdrop > .file-operation-dialog {
   width: min(480px, calc(100vw - 32px));
 }
+
+.dialog-backdrop > .external-app-dialog {
+  width: min(860px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
+  overflow: auto;
+}
+
+.external-app-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+  gap: 18px;
+}
+
+.external-app-dialog label,
+.external-app-list li {
+  display: grid;
+  gap: 6px;
+  margin-block: 8px;
+}
+
+.external-app-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.external-app-list,
+.external-app-history {
+  padding-inline-start: 22px;
+}
+
+.external-app-preview {
+  margin-block: 14px;
+  padding: 12px;
+  border: 1px solid #8093aa;
+  border-radius: 8px;
+  background: #f4f7fb;
+}
+
+@media (max-width: 720px) {
+  .external-app-layout { grid-template-columns: 1fr; }
+}
 .file-operation-dialog > label {
   display: grid;
   gap: 6px;

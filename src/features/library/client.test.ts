@@ -22,6 +22,10 @@ import {
   previewNativeFileDrop,
   copyNativeFileDrop,
   startNativeFileDrag,
+  registerExternalApp,
+  previewExternalAppLaunch,
+  launchExternalApp,
+  listExternalAppHistory,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -206,6 +210,31 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenNthCalledWith(4, "start_native_file_drag", {
       context: expect.objectContaining({ generation: 34 }),
       itemRelativePaths: ["one.cbz"],
+    });
+  });
+
+  it("REQ-LEY-P3-017 sends structured external app data without command-line interpolation", async () => {
+    await registerExternalApp("Viewer", ["--read-only", "two words"], "allSelected", 40);
+    await previewExternalAppLaunch(7, ["one.cbz", "two.pdf"], 41);
+    await launchExternalApp(7, ["one.cbz", "two.pdf"], "preview-key", 42);
+    await listExternalAppHistory(43);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "register_external_app", {
+      context: expect.objectContaining({ generation: 40 }),
+      displayName: "Viewer",
+      fixedArgs: ["--read-only", "two words"],
+      targetMode: "allSelected",
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "preview_external_app_launch", {
+      context: expect.objectContaining({ generation: 41 }), appId: 7,
+      itemRelativePaths: ["one.cbz", "two.pdf"],
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "launch_external_app", {
+      context: expect.objectContaining({ generation: 42 }), appId: 7,
+      itemRelativePaths: ["one.cbz", "two.pdf"], previewKey: "preview-key", confirmed: true,
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "list_external_app_history", {
+      context: expect.objectContaining({ generation: 43 }),
     });
   });
 

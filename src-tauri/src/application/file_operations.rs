@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::{AppState, error_response, request_error, validate_request};
 use crate::api::{MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::domain::{AppError, ErrorCode, RelativePath};
+use crate::state::{ExternalAppHistoryRecord, ExternalAppRecord};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1137,6 +1139,471 @@ pub async fn open_file_item_with(
     .await
 }
 
+const MAX_EXTERNAL_APP_ARGS: usize = 16;
+const MAX_EXTERNAL_APP_ARG_CHARS: usize = 256;
+const MAX_EXTERNAL_APP_TARGETS: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExternalAppTargetMode {
+    FirstItem,
+    AllSelected,
+    ParentFolder,
+}
+
+impl ExternalAppTargetMode {
+    fn stored(self) -> &'static str {
+        match self {
+            Self::FirstItem => "firstItem",
+            Self::AllSelected => "allSelected",
+            Self::ParentFolder => "parentFolder",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self, AppError> {
+        match value {
+            "firstItem" => Ok(Self::FirstItem),
+            "allSelected" => Ok(Self::AllSelected),
+            "parentFolder" => Ok(Self::ParentFolder),
+            _ => Err(request_error(
+                ErrorCode::Internal,
+                "Stored external application mode is invalid.",
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalAppView {
+    pub id: i64,
+    pub display_name: String,
+    pub executable_name: String,
+    pub fixed_args: Vec<String>,
+    pub target_mode: ExternalAppTargetMode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalAppHistoryView {
+    pub app_id: i64,
+    pub display_name: String,
+    pub target_mode: ExternalAppTargetMode,
+    pub target_count: u64,
+    pub launched_at_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalAppLaunchPreview {
+    pub app_id: i64,
+    pub display_name: String,
+    pub executable_name: String,
+    pub target_mode: ExternalAppTargetMode,
+    pub target_count: usize,
+    pub fixed_arg_count: usize,
+    pub preview_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExternalLaunchPlan {
+    executable: PathBuf,
+    args: Vec<std::ffi::OsString>,
+    preview: ExternalAppLaunchPreview,
+}
+
+fn external_response<T>(context: RequestContext, result: Result<T, AppError>) -> Response<T> {
+    match result {
+        Ok(data) => Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        },
+        Err(error) if error.code == ErrorCode::Cancelled => Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        },
+        Err(error) => error_response(&context, error),
+    }
+}
+
+fn validate_external_app_fields(
+    display_name: String,
+    fixed_args: Vec<String>,
+    target_mode: ExternalAppTargetMode,
+) -> Result<(String, Vec<String>, ExternalAppTargetMode), AppError> {
+    let display_name = display_name.trim().to_owned();
+    if display_name.is_empty() || display_name.chars().count() > 64 || has_control(&display_name) {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Application name must contain 1 to 64 safe characters.",
+        ));
+    }
+    if fixed_args.len() > MAX_EXTERNAL_APP_ARGS {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "At most 16 fixed arguments can be registered.",
+        ));
+    }
+    if fixed_args
+        .iter()
+        .any(|arg| arg.chars().count() > MAX_EXTERNAL_APP_ARG_CHARS || has_control(arg))
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Fixed arguments must be at most 256 characters and contain no control characters.",
+        ));
+    }
+    Ok((display_name, fixed_args, target_mode))
+}
+
+fn has_control(value: &str) -> bool {
+    value.chars().any(char::is_control)
+}
+
+fn validate_executable(path: &Path) -> Result<PathBuf, AppError> {
+    if !path
+        .extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+    {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Select a Windows .exe application.",
+        ));
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|error| file_io_error(None, error))?;
+    if !metadata.is_file() || metadata_is_reparse_point(&metadata) {
+        return Err(request_error(
+            ErrorCode::InvalidPath,
+            "The selected application must be a regular non-reparse file.",
+        ));
+    }
+    path.canonicalize()
+        .map_err(|error| file_io_error(None, error))
+}
+
+fn external_app_view(record: ExternalAppRecord) -> Result<ExternalAppView, AppError> {
+    Ok(ExternalAppView {
+        id: record.id,
+        display_name: record.display_name,
+        executable_name: Path::new(&record.executable_path)
+            .file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or("application.exe")
+            .to_owned(),
+        fixed_args: record.fixed_args,
+        target_mode: ExternalAppTargetMode::parse(&record.target_mode)?,
+    })
+}
+
+#[tauri::command]
+pub fn list_external_apps(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<ExternalAppView>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let result = stores
+        .as_ref()
+        .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))
+        .and_then(|store| store.list_external_apps())
+        .and_then(|apps| apps.into_iter().map(external_app_view).collect());
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub async fn register_external_app(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    display_name: String,
+    fixed_args: Vec<String>,
+    target_mode: ExternalAppTargetMode,
+) -> Result<Response<ExternalAppView>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let fields = match validate_external_app_fields(display_name, fixed_args, target_mode) {
+        Ok(fields) => fields,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let picked = tauri::async_runtime::spawn_blocking(super::library_root::pick_executable_file)
+        .await
+        .map_err(|error| format!("executable picker worker failed: {error}"))?;
+    let result = picked
+        .and_then(|picked| picked.ok_or_else(AppError::cancelled))
+        .and_then(|path| {
+            let canonical = validate_executable(&path)?;
+            let record = ExternalAppRecord {
+                id: 0,
+                display_name: fields.0,
+                executable_path: super::library_root::display_path(&canonical),
+                fixed_args: fields.1,
+                target_mode: fields.2.stored().into(),
+                updated_at_ms: super::unix_millis().max(0) as u64,
+            };
+            let mut stores = state.store.lock().map_err(|_| {
+                request_error(ErrorCode::Internal, "Local metadata is unavailable.")
+            })?;
+            stores
+                .as_mut()
+                .ok_or_else(|| {
+                    request_error(ErrorCode::Internal, "Local metadata is unavailable.")
+                })?
+                .add_external_app(&record)
+                .and_then(external_app_view)
+        });
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub fn update_external_app(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    app_id: i64,
+    display_name: String,
+    fixed_args: Vec<String>,
+    target_mode: ExternalAppTargetMode,
+) -> Result<Response<ExternalAppView>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let result =
+        validate_external_app_fields(display_name, fixed_args, target_mode).and_then(|fields| {
+            let stores = state.store.lock().map_err(|_| {
+                request_error(ErrorCode::Internal, "Local metadata is unavailable.")
+            })?;
+            let store = stores.as_ref().ok_or_else(|| {
+                request_error(ErrorCode::Internal, "Local metadata is unavailable.")
+            })?;
+            let mut record = store.external_app(app_id)?.ok_or_else(|| {
+                request_error(ErrorCode::NotFound, "Registered application was not found.")
+            })?;
+            record.display_name = fields.0;
+            record.fixed_args = fields.1;
+            record.target_mode = fields.2.stored().into();
+            record.updated_at_ms = super::unix_millis().max(0) as u64;
+            if !store.update_external_app(&record)? {
+                return Err(request_error(
+                    ErrorCode::NotFound,
+                    "Registered application was not found.",
+                ));
+            }
+            external_app_view(record)
+        });
+    Ok(external_response(context, result))
+}
+
+#[tauri::command]
+pub fn delete_external_app(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    app_id: i64,
+) -> Result<Response<bool>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let result = stores
+        .as_ref()
+        .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))
+        .and_then(|store| store.delete_external_app(app_id));
+    Ok(external_response(context, result))
+}
+
+fn external_launch_plan(
+    root: &Path,
+    app: &ExternalAppRecord,
+    relative_paths: Vec<String>,
+) -> Result<ExternalLaunchPlan, AppError> {
+    if relative_paths.is_empty() || relative_paths.len() > MAX_EXTERNAL_APP_TARGETS {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Select between 1 and 64 items for an external application.",
+        ));
+    }
+    let selected = contained_sources(root, relative_paths)?;
+    let mode = ExternalAppTargetMode::parse(&app.target_mode)?;
+    let stored_executable = PathBuf::from(&app.executable_path);
+    let executable = validate_executable(&stored_executable)?;
+    if super::library_root::display_path(&executable).to_lowercase()
+        != app.executable_path.to_lowercase()
+    {
+        return Err(request_error(
+            ErrorCode::Conflict,
+            "The registered application identity changed; register it again.",
+        ));
+    }
+    validate_external_app_fields(app.display_name.clone(), app.fixed_args.clone(), mode)?;
+    let targets: Vec<PathBuf> = match mode {
+        ExternalAppTargetMode::FirstItem => vec![selected[0].1.clone()],
+        ExternalAppTargetMode::AllSelected => selected.into_iter().map(|(_, path)| path).collect(),
+        ExternalAppTargetMode::ParentFolder => {
+            vec![selected[0].1.parent().unwrap_or(root).to_path_buf()]
+        }
+    };
+    let mut args: Vec<std::ffi::OsString> = app
+        .fixed_args
+        .iter()
+        .map(std::ffi::OsString::from)
+        .collect();
+    args.extend(targets.iter().map(|path| path.as_os_str().to_owned()));
+    let mut preview_hasher = std::collections::hash_map::DefaultHasher::new();
+    app.id.hash(&mut preview_hasher);
+    mode.stored().hash(&mut preview_hasher);
+    for target in &targets {
+        super::library_root::display_path(target)
+            .to_lowercase()
+            .hash(&mut preview_hasher);
+    }
+    let preview_key = format!("{:016x}", preview_hasher.finish());
+    Ok(ExternalLaunchPlan {
+        executable,
+        args,
+        preview: ExternalAppLaunchPreview {
+            app_id: app.id,
+            display_name: app.display_name.clone(),
+            executable_name: stored_executable
+                .file_name()
+                .and_then(OsStr::to_str)
+                .unwrap_or("application.exe")
+                .to_owned(),
+            target_mode: mode,
+            target_count: targets.len(),
+            fixed_arg_count: app.fixed_args.len(),
+            preview_key,
+        },
+    })
+}
+
+fn load_external_launch_plan(
+    state: &AppState,
+    app_id: i64,
+    relative_paths: Vec<String>,
+) -> Result<ExternalLaunchPlan, AppError> {
+    let root = configured_root(state)?;
+    let stores = state
+        .store
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Local metadata is unavailable."))?;
+    let app = stores
+        .as_ref()
+        .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))?
+        .external_app(app_id)?
+        .ok_or_else(|| {
+            request_error(ErrorCode::NotFound, "Registered application was not found.")
+        })?;
+    external_launch_plan(&root, &app, relative_paths)
+}
+
+#[tauri::command]
+pub fn preview_external_app_launch(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    app_id: i64,
+    item_relative_paths: Vec<String>,
+) -> Result<Response<ExternalAppLaunchPreview>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    Ok(external_response(
+        context,
+        load_external_launch_plan(&state, app_id, item_relative_paths).map(|plan| plan.preview),
+    ))
+}
+
+#[tauri::command]
+pub async fn launch_external_app(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    app_id: i64,
+    item_relative_paths: Vec<String>,
+    preview_key: String,
+    confirmed: bool,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if !confirmed {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::InvalidRequest,
+                "Explicit launch confirmation is required.",
+            ),
+        ));
+    }
+    let plan = match load_external_launch_plan(&state, app_id, item_relative_paths) {
+        Ok(plan) => plan,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if preview_key != plan.preview.preview_key {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::Conflict,
+                "The application or selection changed; preview it again.",
+            ),
+        ));
+    }
+    let preview = plan.preview.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        Command::new(&plan.executable)
+            .args(&plan.args)
+            .spawn()
+            .map_err(|error| file_io_error(None, error))?;
+        Ok(FileOperationResult {
+            operation: FileOperationKind::OpenWith,
+            affected: preview.target_count,
+        })
+    })
+    .await
+    .map_err(|error| format!("external application worker failed: {error}"))?;
+    if result.is_ok() {
+        if let Some(store) = state.store.lock().map_err(|_| "state poisoned")?.as_mut() {
+            let _ = store.record_external_app_launch(&ExternalAppHistoryRecord {
+                app_id,
+                display_name: preview.display_name,
+                target_mode: preview.target_mode.stored().into(),
+                target_count: preview.target_count as u64,
+                launched_at_ms: super::unix_millis().max(0) as u64,
+            });
+        }
+    }
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
+pub fn list_external_app_history(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+) -> Result<Response<Vec<ExternalAppHistoryView>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let result = stores
+        .as_ref()
+        .ok_or_else(|| request_error(ErrorCode::Internal, "Local metadata is unavailable."))
+        .and_then(|store| store.list_external_app_history())
+        .and_then(|rows| {
+            rows.into_iter()
+                .map(|row| {
+                    Ok(ExternalAppHistoryView {
+                        app_id: row.app_id,
+                        display_name: row.display_name,
+                        target_mode: ExternalAppTargetMode::parse(&row.target_mode)?,
+                        target_count: row.target_count,
+                        launched_at_ms: row.launched_at_ms,
+                    })
+                })
+                .collect()
+        });
+    Ok(external_response(context, result))
+}
+
 #[cfg(target_os = "windows")]
 fn launch_shell_item(path: &Path, operation: FileOperationKind) -> Result<(), AppError> {
     let mut command = match operation {
@@ -1689,6 +2156,61 @@ mod tests {
             std::process::id(),
             super::super::unix_millis()
         ))
+    }
+
+    #[test]
+    fn req_ley_p3_017_external_launch_plan_uses_literal_args_and_contained_targets() {
+        let root = fixture("external-launch-plan");
+        fs::create_dir_all(root.join("Series")).unwrap();
+        fs::write(root.join("Series/01.cbz"), b"book").unwrap();
+        let executable = std::env::current_exe().unwrap();
+        let app = ExternalAppRecord {
+            id: 7,
+            display_name: "Safe viewer".into(),
+            executable_path: super::super::library_root::display_path(&executable),
+            fixed_args: vec!["--literal=$FILE".into(), "two words".into()],
+            target_mode: "allSelected".into(),
+            updated_at_ms: 1,
+        };
+        let plan = external_launch_plan(&root, &app, vec!["Series/01.cbz".into()]).unwrap();
+        assert_eq!(plan.executable, executable.canonicalize().unwrap());
+        assert_eq!(plan.args[0], "--literal=$FILE");
+        assert_eq!(plan.args[1], "two words");
+        assert_eq!(
+            plan.args[2],
+            root.join("Series/01.cbz").canonicalize().unwrap()
+        );
+        assert_eq!(plan.preview.target_count, 1);
+        assert_eq!(plan.preview.fixed_arg_count, 2);
+        assert_eq!(plan.preview.preview_key.len(), 16);
+
+        assert_eq!(
+            external_launch_plan(&root, &app, vec!["../outside.cbz".into()])
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
+        assert_eq!(
+            validate_external_app_fields(
+                "bad\nname".into(),
+                Vec::new(),
+                ExternalAppTargetMode::FirstItem
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidRequest
+        );
+        assert_eq!(
+            validate_external_app_fields(
+                "ok".into(),
+                vec!["x".repeat(257)],
+                ExternalAppTargetMode::FirstItem
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidRequest
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

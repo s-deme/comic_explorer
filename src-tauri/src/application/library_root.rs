@@ -246,6 +246,62 @@ pub fn pick_supported_file() -> Result<Option<PathBuf>, AppError> {
 }
 
 #[cfg(target_os = "windows")]
+pub fn pick_executable_file() -> Result<Option<PathBuf>, AppError> {
+    use windows::Win32::System::Com::{
+        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
+        CoTaskMemFree, CoUninitialize,
+    };
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+    use windows::Win32::UI::Shell::{
+        FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_PATHMUSTEXIST, FileOpenDialog, IFileOpenDialog,
+        SIGDN_FILESYSPATH,
+    };
+    use windows::core::{HRESULT, PCWSTR};
+
+    const CANCELLED: HRESULT = HRESULT(0x800704C7_u32 as i32);
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+            .ok()
+            .map_err(picker_error)?;
+        let result = (|| {
+            let dialog: IFileOpenDialog =
+                CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
+                    .map_err(picker_error)?;
+            let options = dialog.GetOptions().map_err(picker_error)?;
+            dialog
+                .SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST)
+                .map_err(picker_error)?;
+            let label: Vec<u16> = "Windowsアプリケーション\0".encode_utf16().collect();
+            let pattern: Vec<u16> = "*.exe\0".encode_utf16().collect();
+            let filters = [COMDLG_FILTERSPEC {
+                pszName: PCWSTR(label.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            }];
+            dialog.SetFileTypes(&filters).map_err(picker_error)?;
+            if let Err(error) = dialog.Show(None) {
+                return if error.code() == CANCELLED {
+                    Ok(None)
+                } else {
+                    Err(picker_error(error))
+                };
+            }
+            let item = dialog.GetResult().map_err(picker_error)?;
+            let display_name = item
+                .GetDisplayName(SIGDN_FILESYSPATH)
+                .map_err(picker_error)?;
+            let path = display_name
+                .to_string()
+                .map(PathBuf::from)
+                .map_err(picker_error);
+            CoTaskMemFree(Some(display_name.0.cast()));
+            path.map(Some)
+        })();
+        CoUninitialize();
+        result
+    }
+}
+
+#[cfg(target_os = "windows")]
 pub fn windows_known_folders() -> Vec<(&'static str, &'static str, PathBuf)> {
     use windows::Win32::System::Com::CoTaskMemFree;
     use windows::Win32::UI::Shell::{

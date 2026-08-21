@@ -32,10 +32,10 @@ codd:
 |---|---:|---:|---:|
 | P1 即効改善 | 21 | 21 | 0 |
 | P2 閲覧中核 | 16 | 16 | 0 |
-| P3 操作・検索 | 31 | 10 | 21 |
+| P3 操作・検索 | 31 | 20 | 11 |
 | P4 大型基盤 | 12 | 0 | 12 |
 | P5 専門機能 | 23 | 0 | 23 |
-| **合計** | **103** | **47** | **56** |
+| **合計** | **103** | **57** | **46** |
 
 マニフェストは各tier内のrankを依存基盤、PartialExisting、利用頻度とリスク、規模の順で固定する。
 対象外のNoAction、ReviewAlternative、DeclinedSafety、Rejected、Alternativeは依存を理由に採用状態や
@@ -110,6 +110,8 @@ P3-OではLEY-INPUT-008をPublishedとした。Viewer stageを4象限に分け�
 P3-PではLEY-INPUT-009をPublishedとした。Viewer stageのmodifierなしright clickへ安全な既知Viewer commandを割り当て、既定`none`で現行操作を保った。Rustが単1 action registryをstrict profile v26とSQLiteで検証・atomic保存し、TypeScriptはWebView pointer event、4px移動判定、right-wheel取消、既存handlerへのdispatchに限定した。right-wheel、touch・pen・modifier・pointer cancel・blurを保護し、catalogとfolder treeのcontext menuは変更していない。frontend 34 files / 466件、Python 61件、Rust 208+1件、typecheck、75 modules build、最終Windows canonical全12 stageはPASSした。初回canonicalの最終CoDD test commandだけの一時失敗は単独full test、CoDD verify、source変更なしの全stage再実行でPASSを確認した。実right-click順序、touchpad、多ボタンmouse、DPI、input latency、CPU・working setは未測定として残す。
 
 P3-QではLEY-INPUT-013をPublishedとした。paged Viewer toolbarから明示的に1回だけ矩形ズームをarmedにし、12px以上のmouse drag範囲を中央に保って1〜800%の範囲で拡大できる。Rust commandがviewport・selection・scroll・現在倍率を検証して倍率とscroll planを計算し、TypeScriptはpointer capture、stage clamp、一時overlay、DOM適用に限定した。pan・4象限・right click・middle/side・wheel・touch・pen・modifierを分離し、Escape・cancel・blur・layout/session変更で安全に解除する。frontend 34 files / 470件、Python 61件、Rust 209+1件、typecheck、75 modules build、SBOM 746 components・禁止license 0、再実行したWindows canonical全12 stageはPASSした。初回canonicalの既存folder thumbnail待機testだけの一時timeoutは単独product shortcutとsource変更なしの全stage再実行でPASSし、原本差分0を確認した。Leeyes 2.6.1の現行起動gesture、実pointer capture、DPI、高倍率画像、input・zoom latency、CPU・working setは未測定として残す。
+
+P3-RではLEY-FILE-005/006/007をPublishedとした。Windows native pickerで明示選択した`.exe`だけを最大16件登録し、Rustがcanonical executable、固定引数、対象mode、library containment、最大64対象、preview keyを再検証して`Command::new`へ引数を個別に渡す。起動前の確認を必須とし、成功履歴はapp名・mode・件数・時刻だけをSQLite schema v7へ最大20件保存してpathと引数を残さない。TypeScriptは登録draft、選択収集、確認dialog、Tauri orchestrationだけを担当し、既存Windows「アプリケーションから開く…」も維持した。release製品でのnative picker、第三者app/UAC、長いUnicode path、removable executable、起動時間は未測定として残す。
 
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|

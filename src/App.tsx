@@ -102,6 +102,7 @@ import {
   CatalogContextMenu,
   type CatalogContextAction,
 } from "./features/catalog/CatalogContextMenu";
+import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
 import {
   previousComicEntry,
   sortCatalogEntries,
@@ -664,6 +665,7 @@ export function App({
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [catalogContextMenu, setCatalogContextMenu] =
     useState<CatalogContextMenuState | null>(null);
+  const [externalAppPaths, setExternalAppPaths] = useState<string[] | null>(null);
   const [fileClipboard, setFileClipboardStatus] = useState<FileClipboardStatus>({
     available: false,
     cut: false,
@@ -2280,6 +2282,9 @@ export function App({
             { refresh: false },
           );
         }
+        return;
+      case "registeredApp":
+        if (paths.length > 0) setExternalAppPaths(paths.slice(0, 64));
         return;
       case "openDefault":
         if (entry !== null) {
@@ -6283,6 +6288,14 @@ export function App({
           busy={fileOperationBusy}
           onAction={(action) => void handleCatalogContextAction(action)}
           onClose={() => setCatalogContextMenu(null)}
+        />
+      )}
+      {externalAppPaths !== null && (
+        <ExternalAppDialog
+          generation={generation.current}
+          paths={externalAppPaths}
+          onNotice={setSelectionNotice}
+          onClose={() => setExternalAppPaths(null)}
         />
       )}
       {nativeFileDropDialog !== null && (
