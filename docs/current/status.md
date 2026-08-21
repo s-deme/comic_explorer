@@ -97,6 +97,8 @@ P3-IではLEY-FILER-019をPublishedとした。詳細一覧へ区切りなし・
 
 P3-JではLEY-CATALOG-016をPublishedとした。サムネイル管理から現在folder以下またはlibrary全体を選び、Rustがhidden、containment、symlink/reparse、深さ64、走査50,000、候補10,000の境界で自然順列挙してから、既存2-worker queueと`ThumbnailPipeline`へbackground priorityで1件ずつ投入する。独立generationで新規実行、root変更、cancel、shutdownを停止し、進捗と新規/cache hit/失敗件数を表示する。10,000候補列挙は2.276秒、共有pipelineの実folder・画像・書庫3件生成は104.668ms。frontend 437件、Python 61件、Rust 203+1件、typecheck、build、Windows canonical全12 stageはPASSした。releaseの10,000実画像、巨大画像、書庫/PDF混在、slow/removable drive、CPU・working set・cache eviction時間は未測定として残す。
 
+P3-KではLEY-FILE-020をPublishedとした。library内dragは同一driveの明示folder targetへ既定move、Ctrlでcopyとし、Explorerからのnative dropはRustが最大256件の絶対pathをpreview・実行直前に再検証して、確認後もcopyだけを行う。Alt+dragの外向き操作はRustがWindows Shell `IDataObject`を構築し、copy effectだけで`SHDoDragDrop`を開始する。TypeScriptは座標・修飾key・確認UIの調整だけを担当する。frontend 32 files / 442件、Python 61件、Rust 207+1件、typecheck、build、Windows canonical全12 stageはPASSした。最初のcanonicalで既存FT-B14-001の1秒待機flakeを検出し、10秒の明示待機へ安定化して単独10/10 PASS後に全体を再実行した。実Explorerとのdrag in/out、100/150/200% DPI、network/removable drive、大量・大容量copyの時間・CPU・working setは未測定として残す。
+
 | 実装状態 | 検証状態 | 件数 |
 |---|---|---:|
 | Implemented | PASS | 73 |

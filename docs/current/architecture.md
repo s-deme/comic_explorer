@@ -175,6 +175,8 @@ DB破損または非対応schemaは元DBをapp-local `recovery`へ隔離して�
 - 通常deleteはcanonical containmentの確認後、Windows Shellが受理する表示path形式でごみ箱へ送る。完全deleteはUIが対象名と復元不能性を確認した後だけ実行する。
 - clipboard cut/copyはCF_HDROPとPreferred DropEffectを設定してWindows Explorerと相互運用し、paste成功後だけcut clipboardを消費する。
 - catalogとfolder treeのfolder context pasteとdrag/dropはcatalogの現在位置ではなく操作対象のfolderをdestinationとする。tree folder自身も同一drive内のdrag sourceとし、treeのごみ箱deleteはcatalogと同じ確認dialogへ集約する。変更成功後はcatalogと展開済みfolder-tree branchを再列挙する。
+- native ExplorerからのdropはRustが最大256件の絶対pathをcanonicalizeし、通常file/folder、重複、reparse point、衝突、source自身・子孫をpreview時と実行直前の両方で検証する。利用者が確認した後もcopyだけを許可し、外部sourceのmove、上書き、暗黙のopen・library登録は行わない。
+- Explorerへのdrag-outはRustが検証済みlibrary内pathからWindows Shell `IDataObject`を構築し、`SHDoDragDrop`へcopy effectだけを渡す。TypeScriptはphysical座標から明示的なdrop targetを特定し、修飾keyと確認dialogを調整するだけで、path検証、file I/O、Shell payload構築を担当しない。
 - archive entry名をlibrary側host pathへ結合せず、暗号化、未対応compression、traversal、再帰深度・個数・size上限超過を読む前またはstream境界で拒否する。
 - cache、DB、profile、export、temp、recovery、logはlibrary root外だけに置く。
 - CSVへはlibrary-root相対pathだけを出し、CSV formula-leading cellを無害化する。明示的なpath copyだけはOS操作用の絶対pathをclipboardへ出す。

@@ -468,13 +468,14 @@ describe("CatalogGrid", () => {
     );
   });
 
-  it("starts a move drag with the current selection and accepts folder drops", () => {
+  it("REQ-LEY-P3-010 transfers the current selection with modifier-safe drag semantics", () => {
     const folder: CatalogEntry = {
       relativePath: "Target" as never,
       kind: "folder",
     };
     const onFileDragStart = vi.fn();
-    const onMoveItems = vi.fn();
+    const onTransferItems = vi.fn();
+    const onNativeFileDragStart = vi.fn();
     render(
       <CatalogGrid
         entries={[...entries(2), folder]}
@@ -485,7 +486,8 @@ describe("CatalogGrid", () => {
         onRead={() => undefined}
         onFileDragStart={onFileDragStart}
         canDropFiles
-        onMoveItems={onMoveItems}
+        onTransferItems={onTransferItems}
+        onNativeFileDragStart={onNativeFileDragStart}
       />,
     );
     const dataTransfer = {
@@ -496,13 +498,26 @@ describe("CatalogGrid", () => {
 
     fireEvent.dragStart(screen.getByRole("button", { name: /book-0/ }), { dataTransfer });
     expect(onFileDragStart).toHaveBeenCalledWith(["book-0", "book-1"]);
+    expect(dataTransfer.effectAllowed).toBe("copyMove");
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "book-0\nbook-1");
 
     const target = screen.getByRole("button", { name: /^Target、フォルダ/ });
+    expect(target).toHaveAttribute("data-native-drop-path", "Target");
     fireEvent.dragEnter(target, { dataTransfer });
     expect(target).toHaveAttribute("data-file-drop-active", "true");
     fireEvent.drop(target, { dataTransfer });
-    expect(onMoveItems).toHaveBeenCalledWith("Target");
+    expect(onTransferItems).toHaveBeenNthCalledWith(1, "Target", "move");
+    dataTransfer.dropEffect = "copy";
+    fireEvent.drop(target, { dataTransfer, ctrlKey: true });
+    expect(onTransferItems).toHaveBeenNthCalledWith(2, "Target", "copy");
+
+    const altDrag = new Event("dragstart", { bubbles: true, cancelable: true });
+    Object.defineProperties(altDrag, {
+      dataTransfer: { value: dataTransfer },
+      altKey: { value: true },
+    });
+    fireEvent(screen.getByRole("button", { name: /book-0/ }), altDrag);
+    expect(onNativeFileDragStart).toHaveBeenCalledWith(["book-0", "book-1"]);
   });
 
   it("moves into folders and opens only files from the card without duplicate read buttons", () => {

@@ -526,6 +526,7 @@ export type FileOperationKind =
   | "clipboardCopy"
   | "pasteCopy"
   | "pasteMove"
+  | "dragCopy"
   | "reveal"
   | "openDefault"
   | "openWith";
@@ -539,6 +540,18 @@ export interface FileClipboardStatus {
   available: boolean;
   cut: boolean;
   items: number;
+}
+
+export interface NativeFileDropItem {
+  name: string;
+  kind: "file" | "folder";
+}
+
+export interface NativeFileDropPreview {
+  destinationRelativePath: string;
+  items: NativeFileDropItem[];
+  fileCount: number;
+  folderCount: number;
 }
 
 export async function renameFileItem(
@@ -594,6 +607,52 @@ export async function moveFileItemsToDestination(
     context: context(generation),
     itemRelativePaths,
     destinationRelativePath,
+  });
+}
+
+export async function copyFileItemsToDestination(
+  itemRelativePaths: string[],
+  destinationRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("copy_file_items_to_destination", {
+    context: context(generation),
+    itemRelativePaths,
+    destinationRelativePath,
+  });
+}
+
+export async function previewNativeFileDrop(
+  absolutePaths: string[],
+  destinationRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<NativeFileDropPreview>> {
+  return invoke("preview_native_file_drop", {
+    context: context(generation),
+    absolutePaths,
+    destinationRelativePath,
+  });
+}
+
+export async function copyNativeFileDrop(
+  absolutePaths: string[],
+  destinationRelativePath: string,
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("copy_native_file_drop", {
+    context: context(generation),
+    absolutePaths,
+    destinationRelativePath,
+  });
+}
+
+export async function startNativeFileDrag(
+  itemRelativePaths: string[],
+  generation: number,
+): Promise<ApiResponse<FileOperationResult>> {
+  return invoke("start_native_file_drag", {
+    context: context(generation),
+    itemRelativePaths,
   });
 }
 

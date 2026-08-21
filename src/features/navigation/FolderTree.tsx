@@ -39,8 +39,9 @@ interface FolderTreeProps {
   onRefreshFileClipboard?: () => void;
   refreshToken?: number;
   canDropFiles?: boolean;
-  onMoveItems?: (target: TreeFileTarget) => void;
+  onTransferItems?: (target: TreeFileTarget, operation: "copy" | "move") => void;
   onFileDragStart?: (paths: string[]) => void;
+  onNativeFileDragStart?: (paths: string[]) => void;
   onFileDragEnd?: () => void;
 }
 
@@ -92,8 +93,9 @@ export function FolderTree({
   onRefreshFileClipboard = () => undefined,
   refreshToken = 0,
   canDropFiles = false,
-  onMoveItems = () => undefined,
+  onTransferItems = () => undefined,
   onFileDragStart = () => undefined,
+  onNativeFileDragStart = () => undefined,
   onFileDragEnd = () => undefined,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -379,13 +381,21 @@ export function FolderTree({
                     : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
                   className="tree-node"
                   title={node.name}
+                  data-native-drop-path={nodeDrive === activeDrive && fileTarget(node) !== null
+                    ? node.path
+                    : undefined}
                   draggable={node.kind === "folder" && nodeDrive === activeDrive}
                   onDragStart={(event) => {
                     if (node.kind !== "folder" || nodeDrive !== activeDrive) {
                       event.preventDefault();
                       return;
                     }
-                    event.dataTransfer.effectAllowed = "move";
+                    if (event.altKey) {
+                      event.preventDefault();
+                      onNativeFileDragStart([node.path]);
+                      return;
+                    }
+                    event.dataTransfer.effectAllowed = "copyMove";
                     event.dataTransfer.setData("text/plain", node.path);
                     onFileDragStart([node.path]);
                   }}
@@ -404,7 +414,7 @@ export function FolderTree({
                   onDragOver={(event) => {
                     if (fileTarget(node) === null || !canDropFiles || nodeDrive !== activeDrive) return;
                     event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
+                    event.dataTransfer.dropEffect = event.ctrlKey ? "copy" : "move";
                   }}
                   onDrop={(event) => {
                     delete event.currentTarget.dataset.fileDropActive;
@@ -412,7 +422,10 @@ export function FolderTree({
                     if (target === null || !canDropFiles || nodeDrive !== activeDrive) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    onMoveItems(target);
+                    onTransferItems(
+                      target,
+                      event.ctrlKey || event.dataTransfer.dropEffect === "copy" ? "copy" : "move",
+                    );
                   }}
                   onContextMenu={(event) => {
                     const target = fileTarget(node);

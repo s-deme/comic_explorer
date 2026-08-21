@@ -413,6 +413,20 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | 性能・上限 | PASS / 限定 | Windows実filesystem上で5,000 folderと各1画像から10,000候補を2.2759029秒で列挙し、10,001候補を`RESOURCE_LIMIT`で拒否した。既存共有pipelineによる実folder・画像・CBZの3件生成は104.6683ms。focused 5件全体はfixture作成・列挙・上限再走査・削除を含め14.01秒。releaseの10,000実画像、巨大画像、書庫/PDF混在、slow/removable drive、CPU、peak working set、cache eviction時間は未測定でありPASSとしない。 |
 | 製品直接観測 | NOT RUN | product shortcutは全体回帰としてPASSしたが、P3-J固有のrelease WebView2範囲選択、長時間progress、実cancel、root変更、cache再利用は直接観測していない。 |
 
+## Leeyes P3-K ドラッグ＆ドロップ
+
+対象はLEY-FILE-020の1件。library内では明示folder targetへの既定move・Ctrl copyを既存Rust file-operation境界へ渡す。ExplorerからのdropはRustが最大256件をpreview・再検証して確認後にcopyし、Alt+dragの外向き操作はRustがWindows Shell `IDataObject`を構築してcopy effectだけで開始する。TypeScriptはphysical座標からCSS targetへの変換、修飾key、確認dialog、root変更時のstale preview破棄だけを担当する。
+
+| Gate | 結果 | 2026-08-21の実測 |
+|---|---|---|
+| Focused Rust | PASS | REQ-LEY-P3-010の4件、FAIL 0。file/folder preview・copyと原本保持、相対path・重複・257件・上限・stale missing・reparse拒否、実Shell data objectのCF_HDROP公開を含む。 |
+| Focused frontend | PASS | native座標、client、CatalogGrid、FolderTree、Appで既定move、Ctrl copy、Alt drag-out、inbound preview・確認、cancel、root変更時無効化を検証し、FAIL 0。 |
+| Windows tests / typecheck / build | PASS | frontend 32 files / 442件とPython 61件、FAIL 0。typecheck exit 0。frontend 73 modules build、CSS 42.82kB、JS 558.25kB。Viteの500kB advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | lib 207件とshutdown process 1件、FAIL 0。Shell payload、file操作と既存catalog・viewer・search・watch・tree・SQLite/cache境界の全体回帰を含む。 |
+| Formal canonical / release / CoDD | PASS | 最終source変更後の`IMP-004` canonicalは310.966秒で全12 stageがexit 0。Rust canonical 69.270秒、release executable 83.971秒、GUI権限付きshortcut product回帰12.182秒、CoDD verify 103.587秒を含む。log rootは`src-tauri/target/verification/imp-004-20260821T055624203Z`。初回は既存FT-B14-001の1秒待機flakeを検出し、10秒待機へ安定化して単独10/10 PASS後に最終全体を再実行した。 |
+| 性能・上限 | PASS / 限定 | 256 source上限と257件拒否は自動検証した。実Explorer、network/removable drive、大量・大容量copyの時間、CPU、peak working setは未測定でありPASSとしない。 |
+| 製品直接観測 | NOT RUN | Explorerとの実drag in/out、100/150/200% DPI、Shell cursor/effect表示、長時間copy中の製品UIは直接観測していない。 |
+
 ## FR-B23 Leeyes viewer操作・外観
 
 対象は利用者が明示的に選択したLEY-VIEWER-004、LEY-VIEWER-025、LEY-VIEWER-028だけである。192機能の採否・進捗・証拠は`leeyes-feature-tracker.csv`を正本とし、未選択IDを実装済みへ変更しない。

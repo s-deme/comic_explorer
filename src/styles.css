@@ -1085,6 +1085,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 6px;
   margin: 16px 0;
 }
+.file-drop-preview-list {
+  max-height: 10rem;
+  margin: 0;
+  padding-inline-start: 1.4rem;
+  overflow: auto;
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

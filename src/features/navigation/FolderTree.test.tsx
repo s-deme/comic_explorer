@@ -380,9 +380,10 @@ describe("FolderTree", () => {
       .toEqual(["cut", "copy", "paste", "recycle"]);
   });
 
-  it("accepts dragged catalog items on same-drive folders", async () => {
-    const onMoveItems = vi.fn();
+  it("REQ-LEY-P3-010 accepts move/copy and native drag on same-drive folders", async () => {
+    const onTransferItems = vi.fn();
     const onFileDragStart = vi.fn();
+    const onNativeFileDragStart = vi.fn();
     render(
       <FolderTree
         libraryRoot="C:\\"
@@ -390,8 +391,9 @@ describe("FolderTree", () => {
         onNavigate={() => undefined}
         onSelectDrive={() => undefined}
         canDropFiles
-        onMoveItems={onMoveItems}
+        onTransferItems={onTransferItems}
         onFileDragStart={onFileDragStart}
+        onNativeFileDragStart={onNativeFileDragStart}
       />,
     );
     const source = await screen.findByRole("treeitem", { name: "Selected" });
@@ -403,6 +405,7 @@ describe("FolderTree", () => {
     };
 
     expect(source).toHaveAttribute("draggable", "true");
+    expect(folder).toHaveAttribute("data-native-drop-path", "Other");
     fireEvent.dragStart(source, { dataTransfer });
     expect(onFileDragStart).toHaveBeenCalledWith(["Selected"]);
     expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "Selected");
@@ -411,12 +414,25 @@ describe("FolderTree", () => {
     fireEvent.dragOver(folder, { dataTransfer });
     fireEvent.drop(folder, { dataTransfer });
 
-    expect(onMoveItems).toHaveBeenCalledWith({
+    expect(onTransferItems).toHaveBeenNthCalledWith(1, {
       driveRoot: "C:\\",
       relativePath: "Other",
       kind: "folder",
       name: "Other",
+    }, "move");
+    dataTransfer.dropEffect = "copy";
+    fireEvent.drop(folder, { dataTransfer, ctrlKey: true });
+    expect(onTransferItems).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      relativePath: "Other",
+    }), "copy");
+
+    const altDrag = new Event("dragstart", { bubbles: true, cancelable: true });
+    Object.defineProperties(altDrag, {
+      dataTransfer: { value: dataTransfer },
+      altKey: { value: true },
     });
+    fireEvent(source, altDrag);
+    expect(onNativeFileDragStart).toHaveBeenCalledWith(["Selected"]);
   });
 
   it("allows paste but not cut or copy on drive nodes", async () => {

@@ -63,6 +63,10 @@ import {
   copyFileItemsToFolder,
   moveFileItemsToFolder,
   moveFileItemsToDestination,
+  copyFileItemsToDestination,
+  previewNativeFileDrop,
+  copyNativeFileDrop,
+  startNativeFileDrag,
   deleteFileItems,
   deletePageBookmark,
   setFileClipboard,
@@ -77,6 +81,7 @@ import {
   type FavoriteEntry,
   type FileClipboardStatus,
   type FileOperationResult,
+  type NativeFileDropPreview,
   type CatalogMaskOptions,
   type SavedCatalogMask,
   type SearchResultEntry,
@@ -89,6 +94,10 @@ import {
   type ViewerSession,
   type WindowsKnownFolder,
 } from "./features/library/client";
+import {
+  listenNativeFileDrops,
+  nativeDropTargetAt,
+} from "./features/library/native-file-drop";
 import {
   CatalogContextMenu,
   type CatalogContextAction,
@@ -455,6 +464,13 @@ interface FileDeleteDialogState {
   returnPath?: string;
 }
 
+interface NativeFileDropDialogState {
+  absolutePaths: string[];
+  destinationRelativePath: string;
+  libraryRoot: string;
+  preview: NativeFileDropPreview;
+}
+
 const MENU_ORDER: MenuId[] = ["file", "edit", "view", "options", "help"];
 const MAX_LEGACY_BOOKMARK_MIGRATION = 1_000;
 const MENU_MNEMONICS: Record<string, MenuId> = {
@@ -547,6 +563,7 @@ export function App({
   const fileMaskGeneration = useRef(0);
   const savedCatalogMaskGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
+  const nativeFileDropGeneration = useRef(0);
   const thumbnailRequests = useRef(new Set<string>());
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -637,6 +654,8 @@ export function App({
   const [fileOperationBusy, setFileOperationBusy] = useState(false);
   const [fileTreeRevision, setFileTreeRevision] = useState(0);
   const [draggedFilePaths, setDraggedFilePaths] = useState<string[]>([]);
+  const [nativeFileDropDialog, setNativeFileDropDialog] =
+    useState<NativeFileDropDialogState | null>(null);
   const [fileNameDialog, setFileNameDialog] = useState<FileNameDialogState | null>(null);
   const [fileDeleteDialog, setFileDeleteDialog] = useState<FileDeleteDialogState | null>(null);
   const [recentEntries, setRecentEntries] = useState<CatalogEntry[]>([]);
@@ -1514,6 +1533,60 @@ export function App({
     };
   }, []);
 
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenNativeFileDrops((event) => {
+      if (event.type !== "drop") return;
+      const target = nativeDropTargetAt(event.position);
+      if (target === null || libraryRoot === null) {
+        setSelectionNotice("外部ファイルはライブラリ内のフォルダーへドロップしてください。");
+        return;
+      }
+      if (fileOperationBusy) {
+        setSelectionNotice("別のファイル操作が完了してからドロップしてください。");
+        return;
+      }
+      const rootAtDrop = libraryRoot;
+      const requestGeneration = ++nativeFileDropGeneration.current;
+      setSelectionNotice("外部ファイルの安全性とコピー先を確認しています…");
+      void previewNativeFileDrop(
+        event.paths,
+        target.relativePath,
+        generation.current,
+      ).then((response) => {
+        if (disposed || requestGeneration !== nativeFileDropGeneration.current) return;
+        if (response.status === "ok") {
+          setNativeFileDropDialog({
+            absolutePaths: [...event.paths],
+            destinationRelativePath: target.relativePath,
+            libraryRoot: rootAtDrop,
+            preview: response.data,
+          });
+          setSelectionNotice(null);
+        } else if (response.status === "error") {
+          setSelectionNotice(presentError(response.error));
+        } else {
+          setSelectionNotice("外部ファイルのドロップをキャンセルしました。");
+        }
+      }).catch(() => {
+        if (!disposed && requestGeneration === nativeFileDropGeneration.current) {
+          setSelectionNotice(presentUnexpectedError());
+        }
+      });
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    }).catch(() => {
+      if (!disposed) setSelectionNotice("Windowsのファイルドロップを受信できません。");
+    });
+    return () => {
+      disposed = true;
+      nativeFileDropGeneration.current += 1;
+      unlisten?.();
+    };
+  }, [fileOperationBusy, libraryRoot]);
+
   async function selectDrive(
     absolutePath: string,
     relativePath = "",
@@ -1984,8 +2057,9 @@ export function App({
     }
   }
 
-  async function moveDraggedItems(
+  async function transferDraggedItems(
     destinationRelativePath: string,
+    operation: "copy" | "move",
     destinationDriveRoot = libraryRoot,
   ) {
     const paths = draggedFilePaths;
@@ -2000,12 +2074,44 @@ export function App({
       return;
     }
     await runFileOperation(
-      (requestGeneration) => moveFileItemsToDestination(
-        paths,
-        destinationRelativePath,
+      (requestGeneration) => operation === "copy"
+        ? copyFileItemsToDestination(paths, destinationRelativePath, requestGeneration)
+        : moveFileItemsToDestination(paths, destinationRelativePath, requestGeneration),
+      (result) => `${result.affected}件を「${destinationRelativePath || "ドライブのルート"}」へ${operation === "copy" ? "コピー" : "移動"}しました。`,
+    );
+  }
+
+  async function startDraggedItemsNative(paths: string[]) {
+    setDraggedFilePaths([]);
+    await runFileOperation(
+      (requestGeneration) => startNativeFileDrag(paths, requestGeneration),
+      (result) => result.affected === 0
+        ? "Explorerへのドラッグをキャンセルしました。"
+        : `${result.affected}件をExplorerへコピーするドラッグを完了しました。`,
+      { refresh: false, refreshTree: false },
+    );
+  }
+
+  async function confirmNativeFileDrop() {
+    const dialog = nativeFileDropDialog;
+    if (dialog === null) return;
+    if (
+      libraryRoot === null
+      || normalizeWindowsDisplayPath(dialog.libraryRoot).toLocaleLowerCase("en-US")
+        !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+    ) {
+      setNativeFileDropDialog(null);
+      setSelectionNotice("ライブラリが変わったため外部ファイルのコピーを中止しました。");
+      return;
+    }
+    setNativeFileDropDialog(null);
+    await runFileOperation(
+      (requestGeneration) => copyNativeFileDrop(
+        dialog.absolutePaths,
+        dialog.destinationRelativePath,
         requestGeneration,
       ),
-      (result) => `${result.affected}件を「${destinationRelativePath || "ドライブのルート"}」へ移動しました。`,
+      (result) => `${result.affected}件を「${dialog.destinationRelativePath || "ドライブのルート"}」へコピーしました。`,
     );
   }
 
@@ -5298,8 +5404,13 @@ export function App({
           onRefreshFileClipboard={() => void refreshFileClipboardStatus()}
           refreshToken={fileTreeRevision}
           canDropFiles={draggedFilePaths.length > 0}
-          onMoveItems={(target) => void moveDraggedItems(target.relativePath, target.driveRoot)}
+          onTransferItems={(target, operation) => void transferDraggedItems(
+            target.relativePath,
+            operation,
+            target.driveRoot,
+          )}
           onFileDragStart={setDraggedFilePaths}
+          onNativeFileDragStart={(paths) => void startDraggedItemsNative(paths)}
           onFileDragEnd={() => setDraggedFilePaths([])}
         />
         {sidePaneVisible && (
@@ -6013,9 +6124,13 @@ export function App({
               onActivate={(entry, trigger) => void handleCatalogActivation(entry, trigger)}
               onContextMenu={openCatalogContextMenu}
               onFileDragStart={setDraggedFilePaths}
+              onNativeFileDragStart={(paths) => void startDraggedItemsNative(paths)}
               onFileDragEnd={() => setDraggedFilePaths([])}
               canDropFiles={draggedFilePaths.length > 0}
-              onMoveItems={(destination) => void moveDraggedItems(destination)}
+              onTransferItems={(destination, operation) => void transferDraggedItems(
+                destination,
+                operation,
+              )}
               thumbnailFor={(entry) => {
                 const managed = entry.kind === "archive"
                   ? managedThumbnailFor(managedThumbnails, entry.relativePath)
@@ -6064,6 +6179,55 @@ export function App({
           onAction={(action) => void handleCatalogContextAction(action)}
           onClose={() => setCatalogContextMenu(null)}
         />
+      )}
+      {nativeFileDropDialog !== null && (
+        <div className="dialog-backdrop">
+          <section
+            className="file-operation-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="外部ファイルをコピー"
+          >
+            <header className="dialog-heading">
+              <p className="dialog-kicker">ドラッグ＆ドロップ</p>
+              <h2>外部ファイルをコピー</h2>
+              <p className="dialog-description">
+                コピー先: {nativeFileDropDialog.preview.destinationRelativePath || "ドライブのルート"}
+              </p>
+            </header>
+            <p>
+              ファイル {nativeFileDropDialog.preview.fileCount}件、フォルダー {nativeFileDropDialog.preview.folderCount}件をコピーします。
+              外部の原本は移動・削除しません。
+            </p>
+            <ul className="file-drop-preview-list" aria-label="コピーする項目">
+              {nativeFileDropDialog.preview.items.slice(0, 8).map((item, index) => (
+                <li key={`${item.kind}:${item.name}:${index}`}>{item.name}</li>
+              ))}
+              {nativeFileDropDialog.preview.items.length > 8 && (
+                <li>ほか {nativeFileDropDialog.preview.items.length - 8}件</li>
+              )}
+            </ul>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                disabled={fileOperationBusy}
+                onClick={() => {
+                  nativeFileDropGeneration.current += 1;
+                  setNativeFileDropDialog(null);
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={fileOperationBusy}
+                onClick={() => void confirmNativeFileDrop()}
+              >
+                {fileOperationBusy ? "処理中…" : "コピー"}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
       {fileNameDialog !== null && (
         <div className="dialog-backdrop">

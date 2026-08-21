@@ -24,6 +24,7 @@ pub enum FileOperationKind {
     ClipboardCopy,
     PasteCopy,
     PasteMove,
+    DragCopy,
     Reveal,
     OpenDefault,
     OpenWith,
@@ -44,6 +45,29 @@ pub struct FileClipboardStatus {
     pub items: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeFileDropItem {
+    pub name: String,
+    pub kind: NativeFileDropItemKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NativeFileDropItemKind {
+    File,
+    Folder,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeFileDropPreview {
+    pub destination_relative_path: String,
+    pub items: Vec<NativeFileDropItem>,
+    pub file_count: usize,
+    pub folder_count: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TransferKind {
     Copy,
@@ -51,6 +75,7 @@ enum TransferKind {
 }
 
 const MAX_FILE_OPERATION_ITEMS: usize = 10_000;
+const MAX_NATIVE_FILE_DROP_ITEMS: usize = 256;
 const MAX_FILE_NAME_UTF16: usize = 255;
 const MAX_CLIPBOARD_PATH_UTF16: usize = 32_767;
 const MAX_CLIPBOARD_TOTAL_UTF16: usize = 16 * 1024 * 1024;
@@ -77,6 +102,20 @@ fn clipboard_response(
     context: RequestContext,
     result: Result<FileClipboardStatus, AppError>,
 ) -> Response<FileClipboardStatus> {
+    match result {
+        Ok(data) => Response::Ok {
+            request_id: context.request_id,
+            generation: context.generation,
+            data,
+        },
+        Err(error) => error_response(&context, error),
+    }
+}
+
+fn native_drop_response(
+    context: RequestContext,
+    result: Result<NativeFileDropPreview, AppError>,
+) -> Response<NativeFileDropPreview> {
     match result {
         Ok(data) => Response::Ok {
             request_id: context.request_id,
@@ -193,6 +232,98 @@ fn contained_sources(
         sources.push((relative, path));
     }
     Ok(sources)
+}
+
+fn native_drop_sources(paths: Vec<String>) -> Result<Vec<PathBuf>, AppError> {
+    if paths.is_empty() {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Drop at least one file or folder.",
+        ));
+    }
+    if paths.len() > MAX_NATIVE_FILE_DROP_ITEMS {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "A native file drop can contain at most 256 items.",
+        ));
+    }
+    let mut seen = HashSet::new();
+    let mut sources = Vec::with_capacity(paths.len());
+    for value in paths {
+        let source = PathBuf::from(value);
+        if !source.is_absolute() {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                "A native file drop path must be absolute.",
+            ));
+        }
+        let metadata = fs::symlink_metadata(&source).map_err(|error| file_io_error(None, error))?;
+        if metadata_is_reparse_point(&metadata) {
+            return Err(request_error(
+                ErrorCode::OutsideLibraryRoot,
+                "Symbolic links and reparse-point items cannot be imported.",
+            ));
+        }
+        if !metadata.is_file() && !metadata.is_dir() {
+            return Err(request_error(
+                ErrorCode::UnsupportedFormat,
+                "Only files and folders can be imported.",
+            ));
+        }
+        let canonical = source
+            .canonicalize()
+            .map_err(|error| file_io_error(None, error))?;
+        let key = canonical.to_string_lossy().to_lowercase();
+        if !seen.insert(key) {
+            return Err(request_error(
+                ErrorCode::Conflict,
+                "The same native file-drop source was selected more than once.",
+            ));
+        }
+        sources.push(canonical);
+    }
+    Ok(sources)
+}
+
+fn preview_native_drop(
+    root: &Path,
+    paths: Vec<String>,
+    destination_relative_path: String,
+) -> Result<(NativeFileDropPreview, Vec<PathBuf>, PathBuf), AppError> {
+    let sources = native_drop_sources(paths)?;
+    let destination_relative = parse_relative(destination_relative_path)?;
+    let destination = contained_directory(root, &destination_relative)?;
+    validate_transfer(&sources, &destination)?;
+
+    let mut file_count = 0;
+    let mut folder_count = 0;
+    let mut items = Vec::with_capacity(sources.len());
+    for source in &sources {
+        let metadata = fs::symlink_metadata(source).map_err(|error| file_io_error(None, error))?;
+        let kind = if metadata.is_dir() {
+            folder_count += 1;
+            NativeFileDropItemKind::Folder
+        } else {
+            file_count += 1;
+            NativeFileDropItemKind::File
+        };
+        let name = source
+            .file_name()
+            .ok_or_else(|| request_error(ErrorCode::InvalidPath, "A dropped item has no name."))?
+            .to_string_lossy()
+            .into_owned();
+        items.push(NativeFileDropItem { name, kind });
+    }
+    Ok((
+        NativeFileDropPreview {
+            destination_relative_path: destination_relative.as_str().to_owned(),
+            items,
+            file_count,
+            folder_count,
+        },
+        sources,
+        destination,
+    ))
 }
 
 fn validate_item_name(value: &str) -> Result<&str, AppError> {
@@ -637,6 +768,157 @@ pub async fn move_file_items_to_destination(
 }
 
 #[tauri::command]
+pub async fn copy_file_items_to_destination(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_paths: Vec<String>,
+    destination_relative_path: String,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let sources: Vec<PathBuf> = match contained_sources(&root, item_relative_paths) {
+        Ok(sources) => sources.into_iter().map(|(_, path)| path).collect(),
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let destination = match parse_relative(destination_relative_path)
+        .and_then(|relative| contained_directory(&root, &relative))
+    {
+        Ok(destination) => destination,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let lock = state.file_operations.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        transfer_items(sources, destination, TransferKind::Copy)
+    })
+    .await
+    .map_err(|error| format!("file drag-and-drop copy worker failed: {error}"))?;
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
+pub async fn preview_native_file_drop(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    absolute_paths: Vec<String>,
+    destination_relative_path: String,
+) -> Result<Response<NativeFileDropPreview>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        preview_native_drop(&root, absolute_paths, destination_relative_path)
+            .map(|(preview, _, _)| preview)
+    })
+    .await
+    .map_err(|error| format!("native file-drop preview worker failed: {error}"))?;
+    Ok(native_drop_response(context, result))
+}
+
+#[tauri::command]
+pub async fn copy_native_file_drop(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    absolute_paths: Vec<String>,
+    destination_relative_path: String,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let lock = state.file_operations.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lock.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "File operation state is unavailable.")
+        })?;
+        let (_, sources, destination) =
+            preview_native_drop(&root, absolute_paths, destination_relative_path)?;
+        transfer_items(sources, destination, TransferKind::Copy)
+    })
+    .await
+    .map_err(|error| format!("native file-drop copy worker failed: {error}"))?;
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
+pub async fn start_native_file_drag(
+    window: tauri::Window,
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    item_relative_paths: Vec<String>,
+) -> Result<Response<FileOperationResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let root = match configured_root(&state) {
+        Ok(root) => root,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let sources: Vec<PathBuf> = match contained_sources(&root, item_relative_paths) {
+        Ok(sources) if sources.len() <= MAX_NATIVE_FILE_DROP_ITEMS => {
+            sources.into_iter().map(|(_, path)| path).collect()
+        }
+        Ok(_) => {
+            return Ok(error_response(
+                &context,
+                request_error(
+                    ErrorCode::ResourceLimit,
+                    "A native file drag can contain at most 256 items.",
+                ),
+            ));
+        }
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    #[cfg(target_os = "windows")]
+    let result = {
+        let hwnd = window
+            .hwnd()
+            .map_err(|error| format!("native window handle is unavailable: {error}"))?;
+        let hwnd_value = hwnd.0 as isize;
+        let affected = sources.len();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        window
+            .run_on_main_thread(move || {
+                let shell_hwnd = windows::Win32::Foundation::HWND(hwnd_value as *mut _);
+                let result = start_windows_shell_drag(shell_hwnd, &sources).map(|dropped| {
+                    FileOperationResult {
+                        operation: FileOperationKind::DragCopy,
+                        affected: if dropped { affected } else { 0 },
+                    }
+                });
+                let _ = sender.send(result);
+            })
+            .map_err(|error| format!("cannot start native file drag: {error}"))?;
+        receiver
+            .await
+            .map_err(|_| "native file drag did not return a result".to_string())?
+    };
+    #[cfg(not(target_os = "windows"))]
+    let result = {
+        let _ = (window, sources);
+        Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "Native file drag is available only on Windows.",
+        ))
+    };
+    Ok(operation_response(context, result))
+}
+
+#[tauri::command]
 pub async fn delete_file_items(
     state: tauri::State<'_, AppState>,
     context: RequestContext,
@@ -958,6 +1240,75 @@ fn wide_multi_string<'a>(paths: impl Iterator<Item = &'a Path>) -> Result<Vec<u1
     }
     result.push(0);
     Ok(result)
+}
+
+#[cfg(target_os = "windows")]
+fn start_windows_shell_drag(
+    hwnd: windows::Win32::Foundation::HWND,
+    sources: &[PathBuf],
+) -> Result<bool, AppError> {
+    use windows::Win32::System::Ole::{DROPEFFECT_COPY, IDropSource};
+    use windows::Win32::UI::Shell::SHDoDragDrop;
+
+    let data = windows_shell_data_object(sources)?;
+    let effect = unsafe { SHDoDragDrop(Some(hwnd), &data, None::<&IDropSource>, DROPEFFECT_COPY) }
+        .map_err(clipboard_error)?;
+    Ok(effect.0 & DROPEFFECT_COPY.0 != 0)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_shell_data_object(
+    sources: &[PathBuf],
+) -> Result<windows::Win32::System::Com::IDataObject, AppError> {
+    use std::os::windows::ffi::OsStrExt;
+
+    use windows::Win32::System::Com::{IBindCtx, IDataObject};
+    use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+    use windows::Win32::UI::Shell::{
+        BHID_DataObject, ILCreateFromPathW, ILFree, SHCreateShellItemArrayFromIDLists,
+    };
+    use windows::core::PCWSTR;
+
+    struct PidlList(Vec<*mut ITEMIDLIST>);
+
+    impl Drop for PidlList {
+        fn drop(&mut self) {
+            for pidl in self.0.drain(..) {
+                unsafe { ILFree(Some(pidl)) };
+            }
+        }
+    }
+
+    let mut pidls = PidlList(Vec::with_capacity(sources.len()));
+    for source in sources {
+        let display = PathBuf::from(super::library_root::display_path(source));
+        let mut wide: Vec<u16> = display.as_os_str().encode_wide().collect();
+        if wide.contains(&0) {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                "A path contains NUL.",
+            ));
+        }
+        wide.push(0);
+        let pidl = unsafe { ILCreateFromPathW(PCWSTR(wide.as_ptr())) };
+        if pidl.is_null() {
+            return Err(request_error(
+                ErrorCode::InvalidPath,
+                "Windows Shell could not resolve a dragged item.",
+            ));
+        }
+        pidls.0.push(pidl);
+    }
+    let raw_pidls: Vec<*const ITEMIDLIST> = pidls
+        .0
+        .iter()
+        .map(|pidl| *pidl as *const ITEMIDLIST)
+        .collect();
+    let items =
+        unsafe { SHCreateShellItemArrayFromIDLists(&raw_pidls) }.map_err(clipboard_error)?;
+    let data: IDataObject = unsafe { items.BindToHandler(None::<&IBindCtx>, &BHID_DataObject) }
+        .map_err(clipboard_error)?;
+    Ok(data)
 }
 
 #[cfg(target_os = "windows")]
@@ -1420,6 +1771,147 @@ mod tests {
             ErrorCode::Conflict
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_010_previews_and_copies_native_drop_with_rust_validation() {
+        let fixture_root = fixture("native-drop-copy");
+        let library = fixture_root.join("library");
+        let destination = library.join("imports");
+        let external = fixture_root.join("external");
+        let external_folder = external.join("volume");
+        fs::create_dir_all(&destination).unwrap();
+        fs::create_dir_all(&external_folder).unwrap();
+        fs::write(external.join("cover.png"), b"image").unwrap();
+        fs::write(external_folder.join("page.jpg"), b"page").unwrap();
+
+        let paths = vec![
+            external.join("cover.png").to_string_lossy().into_owned(),
+            external_folder.to_string_lossy().into_owned(),
+        ];
+        let (preview, sources, target) =
+            preview_native_drop(&library, paths.clone(), "imports".into()).unwrap();
+        assert_eq!(preview.destination_relative_path, "imports");
+        assert_eq!(preview.file_count, 1);
+        assert_eq!(preview.folder_count, 1);
+        assert_eq!(
+            preview
+                .items
+                .iter()
+                .map(|item| item.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["cover.png", "volume"]
+        );
+        transfer_items(sources, target, TransferKind::Copy).unwrap();
+        assert_eq!(fs::read(destination.join("cover.png")).unwrap(), b"image");
+        assert_eq!(
+            fs::read(destination.join("volume/page.jpg")).unwrap(),
+            b"page"
+        );
+        assert!(external.join("cover.png").is_file());
+        assert!(external_folder.is_dir());
+
+        assert_eq!(
+            preview_native_drop(&library, paths, "imports".into())
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
+        fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[test]
+    fn req_ley_p3_010_rejects_untrusted_or_changed_native_drop_payloads() {
+        let fixture_root = fixture("native-drop-reject");
+        let library = fixture_root.join("library");
+        let external = fixture_root.join("external");
+        fs::create_dir_all(&library).unwrap();
+        fs::create_dir_all(&external).unwrap();
+        let source = external.join("book.cbz");
+        fs::write(&source, b"book").unwrap();
+
+        assert_eq!(
+            native_drop_sources(vec!["relative/book.cbz".into()])
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
+        assert_eq!(
+            native_drop_sources(vec![source.to_string_lossy().into_owned(); 2])
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
+        assert_eq!(
+            native_drop_sources(vec![source.to_string_lossy().into_owned(); 257])
+                .unwrap_err()
+                .code,
+            ErrorCode::ResourceLimit
+        );
+
+        let payload = vec![source.to_string_lossy().into_owned()];
+        preview_native_drop(&library, payload.clone(), String::new()).unwrap();
+        fs::remove_file(source).unwrap();
+        assert_eq!(
+            preview_native_drop(&library, payload, String::new())
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+        fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p3_010_rejects_reparse_point_native_drop_source() {
+        let fixture_root = fixture("native-drop-reparse");
+        let library = fixture_root.join("library");
+        let external = fixture_root.join("external");
+        fs::create_dir_all(&library).unwrap();
+        fs::create_dir_all(&external).unwrap();
+        let target = external.join("target.cbz");
+        let link = external.join("link.cbz");
+        fs::write(&target, b"book").unwrap();
+        if std::os::windows::fs::symlink_file(&target, &link).is_ok() {
+            assert_eq!(
+                native_drop_sources(vec![link.to_string_lossy().into_owned()])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::OutsideLibraryRoot
+            );
+        }
+        fs::remove_dir_all(fixture_root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p3_010_shell_drag_payload_exposes_copyable_files() {
+        use windows::Win32::System::Com::{
+            COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize, DVASPECT_CONTENT, FORMATETC,
+            TYMED_HGLOBAL,
+        };
+        use windows::Win32::System::Ole::CF_HDROP;
+
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }
+            .ok()
+            .unwrap();
+        let root = fixture("native-drag-payload");
+        fs::create_dir_all(&root).unwrap();
+        let source = root.join("volume.cbz");
+        fs::write(&source, b"book").unwrap();
+
+        let data = windows_shell_data_object(std::slice::from_ref(&source)).unwrap();
+        let format = FORMATETC {
+            cfFormat: CF_HDROP.0,
+            dwAspect: DVASPECT_CONTENT.0,
+            lindex: -1,
+            tymed: TYMED_HGLOBAL.0 as u32,
+            ..Default::default()
+        };
+        assert!(unsafe { data.QueryGetData(&format) }.is_ok());
+        drop(data);
+        fs::remove_dir_all(root).unwrap();
+        unsafe { CoUninitialize() };
     }
 
     #[test]

@@ -17,6 +17,10 @@ import {
   cancelRecursiveThumbnailGeneration,
   generateRecursiveThumbnails,
   listenRecursiveThumbnailProgress,
+  copyFileItemsToDestination,
+  previewNativeFileDrop,
+  copyNativeFileDrop,
+  startNativeFileDrag,
 } from "./client";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -116,6 +120,33 @@ describe("library client settings contract", () => {
         }),
       }),
     );
+  });
+
+  it("REQ-LEY-P3-010 sends only typed drag/drop commands to Rust", async () => {
+    await copyFileItemsToDestination(["one.cbz", "two.pdf"], "Target", 31);
+    await previewNativeFileDrop(["D:\\Incoming\\one.cbz"], "Target", 32);
+    await copyNativeFileDrop(["D:\\Incoming\\one.cbz"], "Target", 33);
+    await startNativeFileDrag(["one.cbz"], 34);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "copy_file_items_to_destination", {
+      context: expect.objectContaining({ generation: 31 }),
+      itemRelativePaths: ["one.cbz", "two.pdf"],
+      destinationRelativePath: "Target",
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "preview_native_file_drop", {
+      context: expect.objectContaining({ generation: 32 }),
+      absolutePaths: ["D:\\Incoming\\one.cbz"],
+      destinationRelativePath: "Target",
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "copy_native_file_drop", {
+      context: expect.objectContaining({ generation: 33 }),
+      absolutePaths: ["D:\\Incoming\\one.cbz"],
+      destinationRelativePath: "Target",
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "start_native_file_drag", {
+      context: expect.objectContaining({ generation: 34 }),
+      itemRelativePaths: ["one.cbz"],
+    });
   });
 
   it("REQ-LEY-P3-009 connects recursive generation, progress, and cancellation", async () => {

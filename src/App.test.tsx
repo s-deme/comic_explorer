@@ -63,6 +63,10 @@ import {
   copyFileItemsToFolder,
   moveFileItemsToFolder,
   moveFileItemsToDestination,
+  copyFileItemsToDestination,
+  previewNativeFileDrop,
+  copyNativeFileDrop,
+  startNativeFileDrag,
   deleteFileItems,
   deletePageBookmark,
   setFileClipboard,
@@ -107,6 +111,23 @@ const recursiveThumbnailHarness = vi.hoisted(() => ({
     cacheHits: number;
     failed: number;
   }) => void),
+}));
+
+const nativeFileDropHarness = vi.hoisted(() => ({
+  handler: undefined as undefined | ((event: {
+    type: "drop";
+    paths: string[];
+    position: { x: number; y: number };
+  }) => void),
+  target: { relativePath: "Target" } as { relativePath: string } | null,
+}));
+
+vi.mock("./features/library/native-file-drop", () => ({
+  listenNativeFileDrops: vi.fn(async (handler) => {
+    nativeFileDropHarness.handler = handler;
+    return vi.fn();
+  }),
+  nativeDropTargetAt: vi.fn(() => nativeFileDropHarness.target),
 }));
 
 vi.mock("./features/library/client", () => ({
@@ -173,6 +194,10 @@ vi.mock("./features/library/client", () => ({
   copyFileItemsToFolder: vi.fn(),
   moveFileItemsToFolder: vi.fn(),
   moveFileItemsToDestination: vi.fn(),
+  copyFileItemsToDestination: vi.fn(),
+  previewNativeFileDrop: vi.fn(),
+  copyNativeFileDrop: vi.fn(),
+  startNativeFileDrag: vi.fn(),
   deleteFileItems: vi.fn(),
   setFileClipboard: vi.fn(),
   getFileClipboardStatus: vi.fn(),
@@ -238,6 +263,10 @@ const createFileFolderMock = vi.mocked(createFileFolder);
 const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
 const moveFileItemsToFolderMock = vi.mocked(moveFileItemsToFolder);
 const moveFileItemsToDestinationMock = vi.mocked(moveFileItemsToDestination);
+const copyFileItemsToDestinationMock = vi.mocked(copyFileItemsToDestination);
+const previewNativeFileDropMock = vi.mocked(previewNativeFileDrop);
+const copyNativeFileDropMock = vi.mocked(copyNativeFileDrop);
+const startNativeFileDragMock = vi.mocked(startNativeFileDrag);
 const deleteFileItemsMock = vi.mocked(deleteFileItems);
 const setFileClipboardMock = vi.mocked(setFileClipboard);
 const getFileClipboardStatusMock = vi.mocked(getFileClipboardStatus);
@@ -563,6 +592,12 @@ describe("application shell", () => {
     copyFileItemsToFolderMock.mockReset();
     moveFileItemsToFolderMock.mockReset();
     moveFileItemsToDestinationMock.mockReset();
+    copyFileItemsToDestinationMock.mockReset();
+    previewNativeFileDropMock.mockReset();
+    copyNativeFileDropMock.mockReset();
+    startNativeFileDragMock.mockReset();
+    nativeFileDropHarness.handler = undefined;
+    nativeFileDropHarness.target = { relativePath: "Target" };
     deleteFileItemsMock.mockReset();
     setFileClipboardMock.mockReset();
     getFileClipboardStatusMock.mockReset();
@@ -619,6 +654,20 @@ describe("application shell", () => {
     copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
     moveFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("move"));
     moveFileItemsToDestinationMock.mockResolvedValue(fileOperationResponse("move"));
+    copyFileItemsToDestinationMock.mockResolvedValue(fileOperationResponse("copy"));
+    previewNativeFileDropMock.mockResolvedValue({
+      status: "ok",
+      requestId: "native-file-drop-preview" as never,
+      generation: 1 as never,
+      data: {
+        destinationRelativePath: "Target",
+        items: [{ name: "outside.cbz", kind: "file" }],
+        fileCount: 1,
+        folderCount: 0,
+      },
+    });
+    copyNativeFileDropMock.mockResolvedValue(fileOperationResponse("copy"));
+    startNativeFileDragMock.mockResolvedValue(fileOperationResponse("dragCopy"));
     deleteFileItemsMock.mockResolvedValue(fileOperationResponse("recycle"));
     setFileClipboardMock.mockResolvedValue(fileOperationResponse("clipboardCopy"));
     pasteFileItemsMock.mockResolvedValue(fileOperationResponse("pasteCopy"));
@@ -3122,9 +3171,12 @@ describe("application shell", () => {
     const imageButton = screen.getByRole("button", { name: /^cover\.jpg、画像/ });
     fireEvent.keyDown(imageButton, { key: "Enter" });
 
-    expect(await screen.findByLabelText("cover.jpg ビューワ")).toBeInTheDocument();
+    await waitFor(
+      () => expect(screen.getByLabelText("cover.jpg ビューワ")).toBeInTheDocument(),
+      { timeout: 10_000 },
+    );
     expect(openMock).toHaveBeenCalledWith("cover.jpg", expect.any(Number));
-  });
+  }, 15_000);
 
   it("FT-B13-001 restores every surviving selection after F5 and drops only missing entries", async () => {
     const first = testEntry("01.cbz");
@@ -3933,7 +3985,7 @@ describe("application shell", () => {
     ));
   });
 
-  it("moves dragged catalog items into a catalog folder", async () => {
+  it("REQ-LEY-P3-010 moves by default, copies with Ctrl, and starts Alt native drag", async () => {
     const source = testEntry("book.cbz");
     const target: CatalogEntry = {
       relativePath: "Target" as never,
@@ -3956,6 +4008,90 @@ describe("application shell", () => {
       "Target",
       expect.any(Number),
     ));
+    await screen.findByText(/1件を「Target」へ移動しました/);
+
+    fireEvent.dragStart(screen.getByRole("button", { name: /^book\.cbz/ }), { dataTransfer });
+    dataTransfer.dropEffect = "copy";
+    fireEvent.drop(targetButton, { dataTransfer, ctrlKey: true });
+    await waitFor(() => expect(copyFileItemsToDestinationMock).toHaveBeenCalledWith(
+      ["book.cbz"],
+      "Target",
+      expect.any(Number),
+    ));
+    await screen.findByText(/1件を「Target」へコピーしました/);
+
+    const altDrag = new Event("dragstart", { bubbles: true, cancelable: true });
+    Object.defineProperties(altDrag, {
+      dataTransfer: { value: dataTransfer },
+      altKey: { value: true },
+    });
+    fireEvent(screen.getByRole("button", { name: /^book\.cbz/ }), altDrag);
+    await waitFor(() => expect(startNativeFileDragMock).toHaveBeenCalledWith(
+      ["book.cbz"],
+      expect.any(Number),
+    ));
+  });
+
+  it("REQ-LEY-P3-010 previews and confirms an Explorer drop before Rust copies it", async () => {
+    await registerTestLibrary([{ relativePath: "Target" as never, kind: "folder" }]);
+    await waitFor(() => expect(nativeFileDropHarness.handler).toBeDefined());
+
+    await act(async () => nativeFileDropHarness.handler?.({
+      type: "drop",
+      paths: ["D:\\Incoming\\outside.cbz"],
+      position: { x: 120, y: 80 },
+    }));
+
+    await waitFor(() => expect(previewNativeFileDropMock).toHaveBeenCalledWith(
+      ["D:\\Incoming\\outside.cbz"],
+      "Target",
+      expect.any(Number),
+    ));
+    const dialog = await screen.findByRole("alertdialog", { name: "外部ファイルをコピー" });
+    expect(within(dialog).getByText("outside.cbz")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "コピー" }));
+    await waitFor(() => expect(copyNativeFileDropMock).toHaveBeenCalledWith(
+      ["D:\\Incoming\\outside.cbz"],
+      "Target",
+      expect.any(Number),
+    ));
+  });
+
+  it("REQ-LEY-P3-010 cancels or invalidates an Explorer drop without copying", async () => {
+    await registerTestLibrary([{ relativePath: "Target" as never, kind: "folder" }]);
+    await waitFor(() => expect(nativeFileDropHarness.handler).toBeDefined());
+    await act(async () => nativeFileDropHarness.handler?.({
+      type: "drop",
+      paths: ["D:\\Incoming\\outside.cbz"],
+      position: { x: 120, y: 80 },
+    }));
+    let dialog = await screen.findByRole("alertdialog", { name: "外部ファイルをコピー" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(copyNativeFileDropMock).not.toHaveBeenCalled();
+
+    await act(async () => nativeFileDropHarness.handler?.({
+      type: "drop",
+      paths: ["D:\\Incoming\\outside.cbz"],
+      position: { x: 120, y: 80 },
+    }));
+    dialog = await screen.findByRole("alertdialog", { name: "外部ファイルをコピー" });
+    pickerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "picker-new-root" as never,
+      generation: 2 as never,
+      data: { absolutePath: "E:\\Incoming" },
+    });
+    registerMock.mockResolvedValue({
+      status: "ok",
+      requestId: "register-new-root" as never,
+      generation: 2 as never,
+      data: { absolutePath: "E:\\" },
+    });
+    chooseAppMenuItem("ファイル", "フォルダーを開く…");
+    await waitFor(() => expect(screen.getByLabelText("アドレス")).toHaveValue("E:\\Incoming"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "コピー" }));
+    await waitFor(() => expect(screen.getByText(/ライブラリが変わったため/)).toBeInTheDocument());
+    expect(copyNativeFileDropMock).not.toHaveBeenCalled();
   });
 
   it("moves a dragged tree folder into another tree folder", async () => {

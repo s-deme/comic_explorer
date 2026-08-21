@@ -47,9 +47,13 @@ interface CatalogGridProps {
     position: { x: number; y: number },
   ) => void;
   onFileDragStart?: (paths: string[]) => void;
+  onNativeFileDragStart?: (paths: string[]) => void;
   onFileDragEnd?: () => void;
   canDropFiles?: boolean;
-  onMoveItems?: (destinationRelativePath: string) => void;
+  onTransferItems?: (
+    destinationRelativePath: string,
+    operation: "copy" | "move",
+  ) => void;
 }
 
 export type ThumbnailViewState =
@@ -207,9 +211,10 @@ export function CatalogGrid({
   onToggleFavorite = () => undefined,
   onContextMenu = () => undefined,
   onFileDragStart = () => undefined,
+  onNativeFileDragStart = () => undefined,
   onFileDragEnd = () => undefined,
   canDropFiles = false,
-  onMoveItems = () => undefined,
+  onTransferItems = () => undefined,
 }: CatalogGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -361,6 +366,7 @@ export function CatalogGrid({
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
       data-catalog-palette={palette}
+      data-native-drop-path={currentFolderPath}
       data-detail-grid-lines={detailGridLines}
       data-detail-row-density={detailRowDensity}
       data-detail-columns={[
@@ -461,6 +467,7 @@ export function CatalogGrid({
                         data-modified-ms={entry.modifiedMs ?? "missing"}
                         data-byte-size={entry.byteSize ?? "missing"}
                         data-view-mode={viewMode}
+                        data-native-drop-path={canNavigate ? entry.relativePath : undefined}
                         aria-label={`${name}、${kind}、サイズ ${size}、更新日時 ${modified}`}
                         title={`${name} — ${kind}`}
                         draggable
@@ -486,7 +493,12 @@ export function CatalogGrid({
                             ? selectedPaths
                             : [entry.relativePath];
                           if (!selectedPaths?.includes(entry.relativePath)) onSelect(entry);
-                          event.dataTransfer.effectAllowed = "move";
+                          if (event.altKey) {
+                            event.preventDefault();
+                            onNativeFileDragStart(paths);
+                            return;
+                          }
+                          event.dataTransfer.effectAllowed = "copyMove";
                           event.dataTransfer.setData("text/plain", paths.join("\n"));
                           onFileDragStart(paths);
                         }}
@@ -504,14 +516,19 @@ export function CatalogGrid({
                         onDragOver={(event) => {
                           if (!canNavigate || !canDropFiles) return;
                           event.preventDefault();
-                          event.dataTransfer.dropEffect = "move";
+                          event.dataTransfer.dropEffect = event.ctrlKey ? "copy" : "move";
                         }}
                         onDrop={(event) => {
                           delete event.currentTarget.dataset.fileDropActive;
                           if (!canNavigate || !canDropFiles) return;
                           event.preventDefault();
                           event.stopPropagation();
-                          onMoveItems(entry.relativePath);
+                          onTransferItems(
+                            entry.relativePath,
+                            event.ctrlKey || event.dataTransfer.dropEffect === "copy"
+                              ? "copy"
+                              : "move",
+                          );
                         }}
                         onContextMenu={(event) => {
                           event.preventDefault();
