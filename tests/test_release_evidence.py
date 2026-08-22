@@ -16,6 +16,29 @@ SPEC.loader.exec_module(generate_sbom)
 
 
 class ReleaseEvidenceTests(unittest.TestCase):
+    def test_github_actions_use_node24_runtime_releases(self) -> None:
+        workflows = {
+            path.name: path.read_text(encoding="utf-8")
+            for path in (ROOT / ".github" / "workflows").glob("*.yml")
+        }
+
+        self.assertIn("actions/checkout@v5", workflows["architecture-spike.yml"])
+        self.assertIn("actions/setup-python@v6", workflows["architecture-spike.yml"])
+        self.assertIn("actions/checkout@v5", workflows["product-quality.yml"])
+        self.assertIn("actions/setup-node@v5", workflows["product-quality.yml"])
+        self.assertIn("actions/checkout@v5", workflows["windows-build.yml"])
+        self.assertIn("actions/setup-node@v5", workflows["windows-build.yml"])
+        self.assertIn("actions/upload-artifact@v6", workflows["windows-build.yml"])
+
+        combined = "\n".join(workflows.values())
+        for node20_release in (
+            "actions/checkout@v4",
+            "actions/setup-node@v4",
+            "actions/setup-python@v5",
+            "actions/upload-artifact@v4",
+        ):
+            self.assertNotIn(node20_release, combined)
+
     def test_release_entry_uses_the_windows_gui_subsystem_only_outside_debug(self) -> None:
         source = (ROOT / "src-tauri" / "src" / "main.rs").read_text(
             encoding="utf-8"
