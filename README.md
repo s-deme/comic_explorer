@@ -5,6 +5,15 @@ Comic Explorerは、PCに保存している漫画や画像を、Windowsのエク
 
 > 現在のバージョンは0.1.0（開発版）です。一般配布に向けた実機確認を継続しています。
 
+## ダウンロード
+
+GitHub Actionsの最新の「Windows packages」runから、用途に合わせて次のartifactを取得できます。
+
+- `comic-explorer-windows-installer-<commit>`: Windows installer
+- `comic-explorer-windows-portable-<commit>`: 展開して`comic-explorer.exe`を直接起動するZIP版
+
+ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
+
 ## できること
 
 - PC内のドライブとフォルダーをツリーからたどる

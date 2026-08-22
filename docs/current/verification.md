@@ -25,6 +25,15 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## Windows portable ZIP artifact
+
+NFR-MVP-005の配布workflowは、NSIS build後の同一release executableを`dist/portable`へcopyし、
+`THIRD-PARTY-NOTICES.md`と生成済み`SBOM.json`を同梱してinstallerとは別の
+`comic-explorer-windows-portable-<commit>` artifactとしてuploadする。Python release evidence 6件は、
+build、portable staging、installer upload、portable uploadの順序と3つの必須fileを検証してPASSした。
+workflow YAML parseとCoDD scan/checkもPASSした。GitHub Actions上のartifact生成・downloadおよびclean VMでの
+portable executable直接起動は、この変更をpushしたworkflowで直接観測するまで未測定とする。
+
 ## Leeyes P1〜P5実装マニフェスト
 
 2026-08-21の一括承認対象を`leeyes-implementation-manifest.csv`へ固定した。自動検査は103件の一意性、

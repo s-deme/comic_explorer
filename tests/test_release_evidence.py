@@ -37,6 +37,24 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.assertLess(metadata, sbom)
         self.assertLess(sbom, cargo_check)
 
+    def test_windows_workflow_publishes_installer_and_portable_zip_artifacts(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "windows-build.yml").read_text(
+            encoding="utf-8"
+        )
+        build = workflow.index("npm run tauri -- build --bundles nsis")
+        portable = workflow.index("Prepare portable package")
+        installer_upload = workflow.index("Upload installer artifact")
+        portable_upload = workflow.index("Upload portable ZIP artifact")
+
+        self.assertLess(build, portable)
+        self.assertLess(portable, installer_upload)
+        self.assertLess(installer_upload, portable_upload)
+        self.assertIn('"src-tauri\\target\\release\\comic-explorer.exe"', workflow)
+        self.assertIn('"THIRD-PARTY-NOTICES.md"', workflow)
+        self.assertIn('"dist\\SBOM.json"', workflow)
+        self.assertIn("name: comic-explorer-windows-portable-${{ github.sha }}", workflow)
+        self.assertIn("path: dist/portable/", workflow)
+
     def test_license_audit_accepts_allowlisted_spdx_expressions(self) -> None:
         self.assertEqual(
             generate_sbom.validate_license(

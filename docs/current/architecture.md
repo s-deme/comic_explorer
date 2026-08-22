@@ -16,7 +16,7 @@ codd:
 
 | 層 | 現行構成 |
 |---|---|
-| desktop shell | Tauri 2、Windows WebView2、NSIS |
+| desktop shell | Tauri 2、Windows WebView2、NSIS installer、portable ZIP artifact |
 | frontend | React 19、TypeScript、Vite、TanStack Virtual、HTML/CSS |
 | backend | Rust 2024 edition、Tokio、typed Tauri commands |
 | catalog/archive | read-only filesystem adapter、`zip`（Stored/Deflate）、`unrar`（RAR4/RAR5）、`sevenz-rust`（Copy/LZMA/LZMA2）、`delharc`（LHA/LZH）、上限付き多重圧縮、自然順 |
@@ -28,6 +28,10 @@ native entry pointは`src-tauri/src/main.rs`、Tauri composition rootは`src-tau
 UI entry pointは`src/main.tsx`、root componentは`src/App.tsx`である。
 Windows release buildのnative entry pointはGUI subsystemを指定してconsole/terminalを生成せず、
 debug buildでは診断出力のためconsole subsystemを維持する。
+Windows配布workflowは1回のTauri release buildからNSIS installerとportable artifactを分岐する。
+portable artifactはrelease executable、THIRD-PARTY-NOTICES、生成済みSBOMだけを平坦な専用folderへ
+copyし、GitHub Actionsのartifact downloadがZIPとして提供する。installer生成と別のnative buildを行わず、
+両形式の実行fileが同じrelease outputを正本とする。
 
 ## frontend/backend境界
 
