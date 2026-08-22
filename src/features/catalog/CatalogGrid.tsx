@@ -230,6 +230,7 @@ export function CatalogGrid({
   const folderScrollPositions = useRef(new Map<string, number>());
   const previousFolderPath = useRef(currentFolderPath);
   const pendingScrollRestoration = useRef<{ path: string; scrollTop: number } | null>(null);
+  const suppressSelectionScroll = useRef(false);
   const incrementalSearch = useRef({ value: "", updatedAt: 0 });
   const primaryActionTimer = useRef<number | null>(null);
   const [scrollWidth, setScrollWidth] = useState<number | null>(null);
@@ -361,6 +362,7 @@ export function CatalogGrid({
 
     folderScrollPositions.current.set(previous, element.scrollTop);
     const movingToAncestor = isAncestorFolder(currentFolderPath, previous);
+    suppressSelectionScroll.current = movingToAncestor;
     pendingScrollRestoration.current = {
       path: currentFolderPath,
       scrollTop: movingToAncestor
@@ -384,6 +386,7 @@ export function CatalogGrid({
 
     element.scrollTop = pending.scrollTop;
     pendingScrollRestoration.current = null;
+    requestAnimationFrame(() => { suppressSelectionScroll.current = false; });
   }, [currentFolderPath, entries, loadedFolderPath]);
 
   function moveFocus(
@@ -404,7 +407,7 @@ export function CatalogGrid({
   }
 
   useEffect(() => {
-    if (selectedPath === null) return;
+    if (selectedPath === null || suppressSelectionScroll.current) return;
     const index = entries.findIndex(
       (entry) => entry.relativePath === selectedPath,
     );

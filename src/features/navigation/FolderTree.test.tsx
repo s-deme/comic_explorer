@@ -172,6 +172,10 @@ describe("FolderTree", () => {
     expect(screen.getByRole("button", { name: /ローカル ディスク.*を展開する/ }))
       .toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("treeitem", { name: "PC" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "現在位置へ移動" }));
+    expect(await screen.findByRole("treeitem", { name: "Selected" }))
+      .toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps loaded branches open when switching away from and back to a drive", async () => {
@@ -458,7 +462,7 @@ describe("FolderTree", () => {
     );
 
     const archive = await screen.findByRole("treeitem", { name: "book.cbz" });
-    expect(archive).toHaveAttribute("aria-haspopup", "dialog");
+    expect(archive).not.toHaveAttribute("aria-haspopup");
     expect(archive).toHaveAttribute("draggable", "false");
     fireEvent.click(archive);
     expect(onOpenArchive).toHaveBeenCalledWith("book.cbz");

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listArchiveVirtualTree } from "../library/client";
-import { ArchiveExplorerDialog } from "./ArchiveExplorerDialog";
+import { ArchiveExplorerPane } from "./ArchiveExplorerDialog";
 
 vi.mock("../library/client", () => ({ listArchiveVirtualTree: vi.fn() }));
 
@@ -17,7 +17,7 @@ const snapshot = {
   ],
 } as const;
 
-describe("ArchiveExplorerDialog", () => {
+describe("ArchiveExplorerPane", () => {
   beforeEach(() => {
     vi.mocked(listArchiveVirtualTree).mockResolvedValue({
       status: "ok",
@@ -29,28 +29,29 @@ describe("ArchiveExplorerDialog", () => {
 
   afterEach(cleanup);
 
-  it("REQ-LEY-P4-002 synchronizes virtual tree and direct-child list and opens opaque page keys", async () => {
+  it("REQ-LEY-P4-002 navigates direct children in the catalog pane and opens opaque page keys", async () => {
     const onOpenPage = vi.fn();
     render(
-      <ArchiveExplorerDialog
+      <ArchiveExplorerPane
         archiveRelativePath="book.cbz"
         onOpenPage={onOpenPage}
         onClose={vi.fn()}
       />,
     );
-    const list = await screen.findByRole("region", { name: "書庫内一覧" });
-    expect(within(list).getByRole("button", { name: /chapter/ })).toBeInTheDocument();
-    fireEvent.click(within(list).getByRole("button", { name: /chapter/ }));
-    fireEvent.click(await within(list).findByRole("button", { name: "2.pngを開く" }));
+    const pane = await screen.findByRole("region", { name: "書庫の内容" });
+    expect(within(pane).getByRole("button", { name: /chapter/ })).toBeInTheDocument();
+    fireEvent.click(within(pane).getByRole("button", { name: /chapter/ }));
+    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png.*開く/ }));
     expect(onOpenPage).toHaveBeenCalledWith("chapter/2.png");
 
-    fireEvent.click(screen.getByRole("treeitem", { name: /inner\.cbz/ }));
-    fireEvent.click(await within(list).findByRole("button", { name: "1.pngを開く" }));
+    fireEvent.click(within(pane).getByRole("button", { name: "親へ" }));
+    fireEvent.click(await within(pane).findByRole("button", { name: /inner\.cbz/ }));
+    fireEvent.click(await within(pane).findByRole("button", { name: /1\.png.*開く/ }));
     expect(onOpenPage).toHaveBeenCalledWith("@comic-explorer-nested-v1/aa/bb");
     expect(screen.queryByText(/削除|名前変更|貼り付け/)).not.toBeInTheDocument();
   });
 
-  it("REQ-LEY-P4-002 keeps the dialog recoverable on a Rust archive error", async () => {
+  it("REQ-LEY-P4-002 keeps the catalog pane recoverable on a Rust archive error", async () => {
     vi.mocked(listArchiveVirtualTree).mockResolvedValue({
       status: "error",
       requestId: "archive-error" as never,
@@ -62,9 +63,9 @@ describe("ArchiveExplorerDialog", () => {
       },
     });
     const onClose = vi.fn();
-    render(<ArchiveExplorerDialog archiveRelativePath="bad.cbz" onOpenPage={vi.fn()} onClose={onClose} />);
+    render(<ArchiveExplorerPane archiveRelativePath="bad.cbz" onOpenPage={vi.fn()} onClose={onClose} />);
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    fireEvent.click(screen.getByRole("button", { name: "フォルダー一覧へ戻る" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });

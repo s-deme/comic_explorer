@@ -44,6 +44,7 @@ interface FolderTreeProps {
   onNativeFileDragStart?: (paths: string[]) => void;
   onFileDragEnd?: () => void;
   onOpenArchive?: (relativePath: string) => void;
+  activeArchivePath?: string | null;
 }
 
 interface TreeMenuState {
@@ -99,6 +100,7 @@ export function FolderTree({
   onNativeFileDragStart = () => undefined,
   onFileDragEnd = () => undefined,
   onOpenArchive = () => undefined,
+  activeArchivePath = null,
 }: FolderTreeProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const generation = useRef(0);
@@ -110,6 +112,7 @@ export function FolderTree({
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
   const [loading, setLoading] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<TreeMenuState | null>(null);
+  const [revealRequest, setRevealRequest] = useState(0);
   const activeDrive = normalizedDrive(libraryRoot);
 
   async function loadChildren(path: string, driveAtRequest = activeDrive) {
@@ -276,6 +279,35 @@ export function FolderTree({
     },
   });
 
+  useEffect(() => {
+    if (libraryRoot === null || hidden) return;
+    const key = currentPath === ""
+      ? `drive:${activeDrive}`
+      : folderExpansionKey(activeDrive, currentPath);
+    const index = nodes.findIndex((node) => node.key === key);
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [activeDrive, currentPath, hidden, nodes, revealRequest, virtualizer]);
+
+  function revealCurrentFolder() {
+    if (libraryRoot === null) return;
+    const segments = currentPath.split("/").filter(Boolean);
+    const ancestors = [""];
+    for (let index = 0; index < segments.length; index += 1) {
+      ancestors.push(segments.slice(0, index + 1).join("/"));
+    }
+    setExpanded((previous) => new Set([
+      ...previous,
+      "pc",
+      `drive:${activeDrive}`,
+      ...ancestors.map((path) => folderExpansionKey(activeDrive, path)),
+    ]));
+    for (const ancestor of ancestors) {
+      const pathKey = drivePathKey(activeDrive, ancestor);
+      if (!children.has(pathKey) && !loading.has(pathKey)) void loadChildren(ancestor);
+    }
+    setRevealRequest((current) => current + 1);
+  }
+
   const folderAddress = currentFolderAddress(libraryRoot, currentPath);
 
   function fileTarget(node: TreeNode): TreeFileTarget | null {
@@ -309,14 +341,14 @@ export function FolderTree({
           <span>現在のフォルダー</span>
           <strong title={folderAddress}>{folderAddress}</strong>
         </p>
-        <button
-          type="button"
-          aria-label="ツリーをすべて閉じる"
-          title="開いているドライブとフォルダーをすべて閉じる"
-          onClick={() => setExpanded(new Set(["pc"]))}
-        >
-          <span aria-hidden="true">⊟</span>
-        </button>
+        <div className="folder-tree-header-actions">
+          <button type="button" aria-label="現在位置へ移動" title="現在のフォルダーをツリー内に表示" disabled={libraryRoot === null} onClick={revealCurrentFolder}>
+            <span aria-hidden="true">⌖</span>
+          </button>
+          <button type="button" aria-label="ツリーをすべて閉じる" title="開いているドライブとフォルダーをすべて閉じる" onClick={() => setExpanded(new Set(["pc"]))}>
+            <span aria-hidden="true">⊟</span>
+          </button>
+        </div>
       </header>
       <div className="tree-scroll" ref={scrollRef}>
         <div
@@ -339,7 +371,9 @@ export function FolderTree({
               ? libraryRoot === null
               : node.kind === "drive"
                 ? normalizedDrive(node.driveRoot ?? null) === activeDrive && currentPath === ""
-                : nodeDrive === activeDrive && currentPath === node.path;
+                : node.kind === "archive"
+                  ? nodeDrive === activeDrive && activeArchivePath === node.path
+                  : nodeDrive === activeDrive && currentPath === node.path && activeArchivePath === null;
             return (
               <div
                 className="tree-row"
@@ -387,7 +421,6 @@ export function FolderTree({
                   aria-keyshortcuts={node.kind === "folder"
                     ? "Shift+F10 Control+X Control+C Control+V Delete"
                     : node.kind === "drive" ? "Shift+F10 Control+V" : undefined}
-                  aria-haspopup={node.kind === "archive" ? "dialog" : undefined}
                   className="tree-node"
                   title={node.name}
                   data-native-drop-path={nodeDrive === activeDrive && fileTarget(node) !== null

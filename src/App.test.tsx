@@ -1052,11 +1052,12 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("book.cbz")]);
 
     fireEvent.click(await screen.findByRole("treeitem", { name: "book.cbz" }));
-    const dialog = await screen.findByRole("dialog", { name: "書庫エクスプローラー" });
-    fireEvent.click(await within(dialog).findByRole("button", { name: "2.pngを開く" }));
+    const pane = await screen.findByRole("region", { name: "書庫の内容" });
+    expect(screen.queryByRole("dialog", { name: "書庫エクスプローラー" })).not.toBeInTheDocument();
+    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png.*開く/ }));
 
     expect(await screen.findByText("2 / 2")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "書庫エクスプローラー" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "書庫の内容" })).not.toBeInTheDocument();
     expect(openMock).toHaveBeenCalledWith("book.cbz", expect.any(Number));
   });
 
@@ -1739,9 +1740,11 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
 
     const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
-    const secondButton = within(grid).getAllByRole("button")
-      .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
-    await waitFor(() => expect(secondButton).toHaveAttribute("data-selected", "true"));
+    await waitFor(() => {
+      const secondButton = within(grid).getAllByRole("button")
+        .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
+      expect(secondButton).toHaveAttribute("data-selected", "true");
+    }, { timeout: 5_000 });
     expect(screen.getByText("現在位置: 2/2")).toBeInTheDocument();
   });
 
@@ -3095,7 +3098,18 @@ describe("application shell", () => {
     expect(alert).not.toHaveTextContent("backend parser detail");
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
 
-    fireEvent.click(within(pane).getByRole("button", { name: "全件" }));
+    catalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-mask-empty" as never,
+      generation: 3 as never,
+      data: [false, false],
+    });
+    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+      target: { value: "*.rar" },
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    expect(await screen.findByText("ファイルマスクで2項目が非表示です")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "マスクを解除して表示" }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
 
     let resolveStale:
@@ -3113,7 +3127,7 @@ describe("application shell", () => {
     await act(async () => resolveStale?.({
       status: "ok",
       requestId: "catalog-mask-stale" as never,
-      generation: 3 as never,
+      generation: 4 as never,
       data: [false, true],
     }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");

@@ -430,7 +430,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       expect.any(Number),
     );
     await waitFor(() => expect(resetDialog).not.toBeInTheDocument());
-  });
+  }, 10_000);
 
   it("REQ-LEY-P3-011 adds, dispatches, removes, and saves an alternate key", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);

@@ -149,7 +149,7 @@ describe("ShelfDialog", () => {
       <ShelfDialog selectedPaths={[]} draggedPaths={[]} onOpenPlan={onOpenPlan} onClose={vi.fn()} />,
     );
     fireEvent.click(await screen.findByRole("button", { name: /one\.cbz$/ }));
-    fireEvent.change(screen.getByLabelText("名前"), { target: { value: "renamed.cbz" } });
+    fireEvent.change(await screen.findByLabelText("名前"), { target: { value: "renamed.cbz" } });
     fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
     await waitFor(() => expect(updateShelfNode).toHaveBeenCalledWith(
       11, 10, "renamed.cbz", "archive", expect.any(Number),

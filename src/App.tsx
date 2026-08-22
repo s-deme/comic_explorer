@@ -124,7 +124,7 @@ import {
 import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
 import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
 import { CsvExportDialog } from "./features/catalog/CsvExportDialog";
-import { ArchiveExplorerDialog } from "./features/archive/ArchiveExplorerDialog";
+import { ArchiveExplorerPane } from "./features/archive/ArchiveExplorerDialog";
 import {
   previousComicEntry,
   sortCatalogEntries,
@@ -5893,6 +5893,7 @@ export function App({
           onNativeFileDragStart={(paths) => void startDraggedItemsNative(paths)}
           onFileDragEnd={() => setDraggedFilePaths([])}
           onOpenArchive={setArchiveExplorerPath}
+          activeArchivePath={archiveExplorerPath}
         />
         {sidePaneVisible && (
           <>
@@ -6528,7 +6529,31 @@ export function App({
             />
           </>
         )}
-        <section className="catalog-pane" aria-busy={loadState.status === "loading"}>
+        <section
+          className={`catalog-pane${archiveExplorerPath !== null ? " catalog-pane--archive" : ""}${archiveExplorerPath === null && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 ? " catalog-pane--filter-empty" : ""}`}
+          aria-busy={loadState.status === "loading"}
+        >
+          {archiveExplorerPath !== null && (
+            <ArchiveExplorerPane
+              archiveRelativePath={archiveExplorerPath}
+              onOpenPage={async (pageKey) => {
+                const opened = await openComicEntry({
+                  relativePath: archiveExplorerPath as CatalogEntry["relativePath"],
+                  kind: "archive",
+                  archiveKind: archiveKindFromPath(archiveExplorerPath),
+                }, "normal", "restored", false, pageKey);
+                if (opened) setArchiveExplorerPath(null);
+              }}
+              onClose={() => setArchiveExplorerPath(null)}
+            />
+          )}
+          {archiveExplorerPath === null && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 && (
+            <div className="catalog-filter-empty" role="status">
+              <h2>ファイルマスクで{entries.length}項目が非表示です</h2>
+              <p>適用中: {fileMask || "オプション指定"}</p>
+              <button type="button" onClick={clearFileMask}>マスクを解除して表示</button>
+            </div>
+          )}
           {searchState.status === "loading" && (
             <p className="loading-state" role="status">
               検索中: {searchState.query}
@@ -7256,20 +7281,6 @@ export function App({
             await applyLaunchPlan(plan);
           }}
           onClose={() => setMediaCatalogOpen(false)}
-        />
-      )}
-      {archiveExplorerPath !== null && (
-        <ArchiveExplorerDialog
-          archiveRelativePath={archiveExplorerPath}
-          onOpenPage={async (pageKey) => {
-            const opened = await openComicEntry({
-              relativePath: archiveExplorerPath as CatalogEntry["relativePath"],
-              kind: "archive",
-              archiveKind: archiveKindFromPath(archiveExplorerPath),
-            }, "normal", "restored", false, pageKey);
-            if (opened) setArchiveExplorerPath(null);
-          }}
-          onClose={() => setArchiveExplorerPath(null)}
         />
       )}
       {historyOpen && (

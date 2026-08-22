@@ -623,13 +623,13 @@ LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択
 
 ## Leeyes P4-B 書庫仮想ツリー・階層閲覧・入れ子書庫
 
-対象はLEY-FILER-002/003/004の3件。Rustがroot-contained regular archiveの再検証、既存ZIP/RAR/7z/LZH adapter、safe entry path、nested archive上限、opaque node/page key、natural order、temp cleanupを担当する。TypeScriptはfilesystem treeの書庫入口、virtualized tree/list、選択pageの既存Viewer適用だけを担当する。
+対象はLEY-FILER-002/003/004の3件。Rustがroot-contained regular archiveの再検証、既存ZIP/RAR/7z/LZH adapter、safe entry path、nested archive上限、opaque node/page key、natural order、temp cleanupを担当する。TypeScriptはfilesystem treeの書庫入口、通常catalog area内のvirtualized direct-child一覧、選択pageの既存Viewer適用だけを担当する。2026-08-22更新で別modalを廃止し、親階層移動と通常folder復帰を同じ右ペインへ統合した。
 
 | 検証 | 結果 | 証拠 |
 |---|---|---|
 | Focused Rust | PASS | REQ-LEY-P4-002の4件、FAIL 0。contained regular archive、folder推論、natural order、dot/unsupported非表示、nested archive、opaque page read、原本差分0、ZIP/RAR/7z/LZH adapterを含む。 |
 | 性能・上限 | PASS / 限定 | debug Rustで20,000 direct ZIP entryを625.062ms、50,000 synthetic virtual nodeを116.589msで構築した。50,001 node、既存depth/count/byte/entry上限はfail closed。実大規模RAR/7z/LZH、IPC、React FPS、CPU、peak working set/tempは未測定。 |
-| Frontend focused | PASS | FolderTree、ArchiveExplorerDialog、App、clientの4 files / 5件、FAIL 0。書庫入口、tree/list同期、nested container、opaque page選択、error回復、file-operation非表示、IPCを含む。 |
+| Frontend focused | PASS | FolderTree、ArchiveExplorerPane、Appの関連test、FAIL 0。書庫入口、右ペイン切替、modal非表示、direct-child移動、nested container、opaque page選択、error回復、file-operation非表示を含む。 |
 | Typecheck | PASS | Windows-native typecheck exit 0。 |
 | Windows tests / canonical / build / CoDD | PASS | frontend 39 files / 494件、Python 61件、Rust 237件とshutdown process 1件、typecheck、80 modules build、SBOM 783 components・unknown/prohibited license 0。最終source変更後のformal canonicalは全12 stage PASS、536.254秒。logは`src-tauri/target/verification/imp-004-20260821T144314621Z`。 |
 | 製品直接観測 | NOT RUN | release WebView2の50,000 node FPS/working set、実大規模RAR/7z/LZH、slow/removable drive、temp peak、Viewer遷移時間を直接観測していない。 |
@@ -653,7 +653,7 @@ LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択
 | gate | 結果 | 証拠・未測定 |
 |---|---|---|
 | Focused Rust | PASS | REQ-LEY-P4-004の2件、FAIL 0。DB round-trip・不正値回復、profile値・旧named profile補完・未知field拒否を含む。 |
-| Focused frontend | PASS | workspace helper 7件、profile 102件、client 23件、App 110件の関連suiteをPASS。4方向area、上限、profile v26移行、Rust payload、下配置・横separator・選択保持を含む。 |
+| Focused frontend | PASS | workspace helper 7件、profile 102件、client 25件、App 110件とCatalogGrid 46件の関連suiteをPASS。4方向area、上限、profile v26移行、Rust payload、下配置・横separator・選択保持に加え、親folderの正確なscroll復元を選択focus追従より優先する回帰を含む。 |
 | 性能・上限 | PASS / 限定 | jsdomで4方向それぞれ10,000回、合計40,000回のlayout helper呼出しは6.391ms。release WebView2の10,000 item FPS・reflow、DPI別pointer、最小window、CPU、peak working setは未測定。 |
 | Windows tests / build | PASS | frontend 39 files / 502件、Python 61件、typecheck、80 modules build。minified JS 623.13kBの既存chunk advisoryあり。 |
 | Windows canonical / CoDD | PASS | Rust 244件とshutdown process 1件、SBOM 783 components・unknown/prohibited license 0、release build・freshness・product shortcut・cleanup、CoDD scan/check/verifyを含む最終sourceのformal canonical全12 stage PASS、388.385秒。logは`src-tauri/target/verification/imp-004-20260821T164707662Z`。初回canonicalは追加test内のmove後参照をcompile時に検出してrust-canonicalでFAILし、cloneへ修正後にfocused Rustを再実行した。その後の全stage PASS後にenum重複をtype-only共有へ整理したため、最終sourceでも全stageを再実行してPASSした。 |

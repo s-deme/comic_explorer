@@ -60,10 +60,10 @@ Explorer型の操作を提供しつつ、検索、thumbnail、viewer、metadata�
 comic folder、画像、`pdf`、ZIP/CBZ/EPUB/RAR/CBR/7z/CB7/LZH、unsupported fileをtyped kindとして列挙し、自然順と選択中sortを
 適用する。tree、address、catalogは同じcurrent folderを指し、back/forward/up/history jumpと
 明示refreshは同じnavigation stateを更新する。catalogのscroll位置はdriveごとのmount内でfolder別に保持し、親から子への移動では
-子catalogを先頭表示し、子から祖先へ戻る場合は対象folderの一覧取得完了後に保存位置を復元する。treeの展開集合と取得済み子nodeはdrive identityを含むkeyで保持し、
+子catalogを先頭表示し、子から祖先へ戻る場合は対象folderの一覧取得完了後に保存位置を復元する。この復元中は選択項目のfocus追従によるscrollを抑止する。treeの展開集合と取得済み子nodeはdrive identityを含むkeyで保持し、
 drive切替時にも別driveの展開を破棄しない。検索paneまたはtree表示設定で隠す場合もtree componentはmountを維持し、
 復帰時に利用者が開いたbranchを再表示する。treeは24pxのvirtual row、16px単位の階層indent兼展開記号列、
-左paddingなしで続く14pxの種類icon列、約11pxのlabelを使って密に配置する。tree headerは現在folderのExplorer形式absolute pathと、PC直下を残して
+左paddingなしで続く14pxの種類icon列、約11pxのlabelを使って密に配置する。current folder変更時はancestorを遅延取得・展開してcurrent nodeをvirtual viewportへscrollする。tree headerは現在folderのExplorer形式absolute pathと、同じ展開・scrollを再実行する現在位置操作、PC直下を残して
 全drive・folderを折りたたむ明示操作を提供する。addressのWindows絶対pathは外側の引用符を除去し、
 separatorとcaseを比較用に正規化してからdriveとpath segment境界を検証し、安全なdrive相対pathへ変換する。
 Rustのcanonical pathが持つ拡張長接頭辞`\\?\` / `\\?\UNC\`はfilesystem内部だけで使い、API responseと
@@ -72,7 +72,7 @@ address表示ではExplorerと同じ通常pathへ変換する。
 treeのleaf/branch判定はRustのroot-contained `list_tree_children`で行い、下位確認を有効にした場合だけ各direct child folderを非再帰・先頭一致で調べてnullable `hasChildren`を返す。frontendはleafのexpanderを無効化し、自動折畳み設定ではPC、active drive、current ancestor chainだけを展開集合へ残す。tree幅は180〜480pxへpointer/keyboard共通でclampし、これら3値をprofile v19とSQLiteへ保存する。対応書庫は同じfilesystem treeでread-onlyの書庫nodeとして区別し、展開時はRustの`application::archive_browser`だけがroot containment、regular non-reparse file、対応kindを再検証して仮想snapshotを返す。
 catalogとnavigation/searchのworkspace配置はRust settingsの`catalogPanePosition`、`treeWidth`、`treeHeight`を正本とする。strict profile v27とapp-local SQLiteは右・左・上・下の4値、横配置180〜480px、縦配置120〜480pxだけを受理し、旧profile・欠落keyには右・240pxを補う。frontendの`workspaceGridLayout`は検証済み値を3つの固定CSS Grid areaへ写像し、DOMを複製せず、separatorのorientationとpointer/keyboard座標だけを配置に合わせる。folder、選択、scroll、tree展開、検索stateは配置stateから独立させる。
 
-書庫仮想snapshotは既存のZIP/RAR/7z/LZH adapterと多重圧縮readerを共有し、safe entry pathからfolderを推論して画像・入れ子書庫とともにopaque node/parent IDへ写像する。画像の既存opaque page keyだけをViewerへ戻し、TypeScriptはentry path、nested chain、書庫形式を解釈しない。tree/listは50,000 nodeでもDOM全件化せずvirtualizeし、session限定の選択だけを持つ。深さ3、最大64 nested archive、累積temp 512 MiB、entry 256 MiB、書庫100,000 entry・展開量1 GiBの既存上限を迂回しない。dot entry、空folder、unsupported/PDF entryは表示せず、仮想nodeへfile操作、外部app、drop、書込み、全体展開を接続しない。一時書庫はreader境界のRAII cleanupで破棄する。
+書庫仮想snapshotは既存のZIP/RAR/7z/LZH adapterと多重圧縮readerを共有し、safe entry pathからfolderを推論して画像・入れ子書庫とともにopaque node/parent IDへ写像する。画像の既存opaque page keyだけをViewerへ戻し、TypeScriptはentry path、nested chain、書庫形式を解釈しない。書庫nodeの選択はmodalを作らずcatalog areaをread-onlyのdirect-child一覧へ切り替え、書庫名・現在階層・親移動・通常folder復帰を同じpane内に置く。filesystem address/historyは維持する。一覧は50,000 nodeでもDOM全件化せずvirtualizeし、session限定の選択だけを持つ。深さ3、最大64 nested archive、累積temp 512 MiB、entry 256 MiB、書庫100,000 entry・展開量1 GiBの既存上限を迂回しない。dot entry、空folder、unsupported/PDF entryは表示せず、仮想nodeへfile操作、外部app、drop、書込み、全体展開を接続しない。一時書庫はreader境界のRAII cleanupで破棄する。
 
 catalogはvirtualizeし、表示範囲外のthumbnail処理を遅延する。folder移動は先に古いgenerationをcancelして
 metadata一覧を返し、placeholderを表示した後でthumbnail要求を非同期に投入する。navigation時のpin解除は

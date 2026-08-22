@@ -327,7 +327,7 @@ describe("CatalogGrid", () => {
         entries={rootEntries}
         currentFolderPath=""
         loadedFolderPath=""
-        selectedPath={null}
+        selectedPath={"book-0" as never}
         {...callbacks}
       />,
     );
@@ -373,7 +373,7 @@ describe("CatalogGrid", () => {
         entries={rootEntries}
         currentFolderPath=""
         loadedFolderPath=""
-        selectedPath={null}
+        selectedPath={"book-0" as never}
         {...callbacks}
       />,
     );
