@@ -1325,8 +1325,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 0;
   overflow: auto;
   padding: 14px 10px;
-  background: #202a38;
-  scrollbar-color: #607087 transparent;
+  border-right: 1px solid #d5dde8;
+  background: #f1f5f9;
+  scrollbar-color: #9aa8ba transparent;
   scrollbar-width: thin;
 }
 .settings-navigation button {
@@ -1340,29 +1341,29 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 8px 10px;
   border: 0;
   border-radius: 6px;
-  color: #d8e0ec;
+  color: #334155;
   background: transparent;
   text-align: left;
 }
 .settings-navigation button:hover,
-.settings-navigation button:focus-visible { color: #fff; background: #2d3b4e; }
+.settings-navigation button:focus-visible { color: #172033; background: #e3ebf4; }
 .settings-navigation button[aria-current="page"] {
-  color: #fff;
-  background: #1769c2;
-  box-shadow: inset 3px 0 #82c2ff;
+  color: #0b579f;
+  background: #dcecff;
+  box-shadow: inset 3px 0 #1769c2;
 }
-.settings-navigation-icon { color: #a9bdd5; font-size: 1.2rem; text-align: center; }
-.settings-navigation button[aria-current="page"] .settings-navigation-icon { color: #fff; }
+.settings-navigation-icon { color: #60758d; font-size: 1.2rem; text-align: center; }
+.settings-navigation button[aria-current="page"] .settings-navigation-icon { color: #1769c2; }
 .settings-navigation button > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
 .settings-navigation strong { font-size: .9rem; font-weight: 650; }
-.settings-navigation small { overflow: hidden; color: #9fb0c4; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
-.settings-navigation button[aria-current="page"] small { color: #e5f2ff; }
+.settings-navigation small { overflow: hidden; color: #68778a; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.settings-navigation button[aria-current="page"] small { color: #486984; }
 .settings-match-count {
   min-width: 24px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: #121a25;
-  color: #dce9f8;
+  background: #d9e3ef;
+  color: #40536b;
   font-size: .72rem;
   text-align: center;
 }
@@ -1576,8 +1577,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 0;
   overflow: auto;
   padding: 12px 9px;
-  background: #202a38;
-  scrollbar-color: #607087 transparent;
+  border-right: 1px solid #d5dde8;
+  background: #f1f5f9;
+  scrollbar-color: #9aa8ba transparent;
   scrollbar-width: thin;
 }
 .help-navigation button {
@@ -1591,29 +1593,29 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 7px 9px;
   border: 0;
   border-radius: 6px;
-  color: #d8e0ec;
+  color: #334155;
   background: transparent;
   text-align: left;
 }
 .help-navigation button:hover,
-.help-navigation button:focus-visible { color: #fff; background: #2d3b4e; }
+.help-navigation button:focus-visible { color: #172033; background: #e3ebf4; }
 .help-navigation button[aria-current="page"] {
-  color: #fff;
-  background: #1769c2;
-  box-shadow: inset 3px 0 #82c2ff;
+  color: #0b579f;
+  background: #dcecff;
+  box-shadow: inset 3px 0 #1769c2;
 }
-.help-navigation-icon { color: #a9bdd5; font-size: 1.15rem; text-align: center; }
-.help-navigation button[aria-current="page"] .help-navigation-icon { color: #fff; }
+.help-navigation-icon { color: #60758d; font-size: 1.15rem; text-align: center; }
+.help-navigation button[aria-current="page"] .help-navigation-icon { color: #1769c2; }
 .help-navigation button > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
 .help-navigation strong { font-size: .88rem; font-weight: 650; }
 .help-navigation small {
   overflow: hidden;
-  color: #9fb0c4;
+  color: #68778a;
   font-size: .7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.help-navigation button[aria-current="page"] small { color: #e5f2ff; }
+.help-navigation button[aria-current="page"] small { color: #486984; }
 .help-match-dot {
   width: 7px;
   height: 7px;
@@ -1624,8 +1626,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-width: 22px;
   padding: 2px 6px;
   border-radius: 999px;
-  color: #dce9f8;
-  background: #121a25;
+  color: #40536b;
+  background: #d9e3ef;
   font-size: .7rem;
   text-align: center;
 }
@@ -1978,7 +1980,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .settings-dialog-header { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px 16px; }
   .settings-search { width: 100%; min-width: 0; }
   .settings-dialog-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .settings-navigation { display: flex; gap: 4px; overflow-x: auto; padding: 7px; }
+  .settings-navigation { display: flex; gap: 4px; overflow-x: auto; padding: 7px; border-right: 0; border-bottom: 1px solid #d5dde8; }
   .settings-navigation button { min-width: 116px; min-height: 48px; grid-template-columns: 22px minmax(0, 1fr); padding: 6px 8px; }
   .settings-navigation small,
   .settings-match-count { display: none; }
@@ -1997,7 +1999,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .help-search { grid-column: 1 / -1; grid-row: 2; }
   .help-close-icon { grid-column: 2; grid-row: 1; }
   .help-dialog-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .help-navigation { display: flex; gap: 4px; overflow-x: auto; padding: 7px; }
+  .help-navigation { display: flex; gap: 4px; overflow-x: auto; padding: 7px; border-right: 0; border-bottom: 1px solid #d5dde8; }
   .help-navigation button { min-width: 132px; min-height: 46px; grid-template-columns: 22px minmax(0, 1fr); padding: 6px 8px; }
   .help-navigation small,
   .help-match-dot,

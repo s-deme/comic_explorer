@@ -197,7 +197,7 @@ toolbarの検索buttonはfolder treeと、名前検索・basename maskをまと�
 rename/create/delete確認dialog、file-operation結果を区別する。
 viewerはsingle/spread、direction、scale、loading/page error/end stateを区別する。page layoutの横幅フィットはpage-spreadをstage全幅・全高へ広げ、単pageは全幅、見開きはpage間gapを除く左右半分ずつを使う。画像のblock方向auto marginにより、stageより低い画像は上下中央へ置き、高い画像はauto marginを0として上端から下端まで余計な末尾余白なしでscrollさせる。全体フィットは読込み済みpageのnatural寸法とResizeObserverで得たstage寸法から純粋関数で共通倍率を求める。見開き全体基準はpage幅合計とgapを領域へ収め、page単位基準は最大page幅・高さを領域へ合わせて横overflowをpan対象として残す。page余白の算入有無と小画像の拡大許可を同じ計算へ渡し、縮小のみは100%、拡大許可は既存上限800%で制限する。寸法未確定・0・非有限なら従来CSS fitへfallbackする。任意倍率のUIは1〜800%の整数を内部scaleへ換算して表示・保存し、原寸寸法から表示幅または高さを1〜32768pxで指定して同じcustom scaleへ変換できる。fit系表示中の`+`/`-`は先頭pageの実表示倍率を取得してcustom scaleへ引き継ぐため、逆方向の連続操作で直前の大きさへ戻る。settings、quick access、
 bookmark/bookshelf、tag、metadata、thumbnail maintenance、help/aboutは共通の余白、control、action、scroll表現を持つ
-dialogまたはmenuから開き、settingsはcatalog、viewer、interface、入力、profileのカテゴリnavigationと、
+dialogまたはmenuから開く。settingsとhelpのnavigationは共通のlight neutral背景と本文側border、neutral text・icon、light blueのhover/current面、blue accentを使い、dark sidebarを独立したsurfaceとして持たない。settingsはcatalog、viewer、interface、入力、profileのカテゴリnavigationと、
 名前・説明・現在値を対象にした検索で意味単位のsectionを切り替える。各設定は説明付きのrowとして表示し、
 狭幅時はnavigationと内容を1列layoutにする。既定値復元、profile import、個別編集は同じdraftを更新し、
 明示的な適用時だけ既存のatomic profile保存へ渡す。

@@ -337,7 +337,22 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(
             ".settings-dialog-body", "grid-template-columns: 242px minmax(0, 1fr)"
         )
-        self.assert_rule_contains(".settings-navigation", "background: #202a38")
+        self.assert_rule_contains(".settings-navigation", "background: #f1f5f9")
+        self.assert_rule_contains(
+            ".settings-navigation", "border-right: 1px solid #d5dde8"
+        )
+        self.assert_rule_contains(
+            '.settings-navigation button[aria-current="page"]',
+            "background: #dcecff",
+        )
+        self.assert_rule_contains(".help-navigation", "background: #f1f5f9")
+        self.assert_rule_contains(
+            ".help-navigation", "border-right: 1px solid #d5dde8"
+        )
+        self.assert_rule_contains(
+            '.help-navigation button[aria-current="page"]',
+            "background: #dcecff",
+        )
         self.assert_rule_contains(
             ".settings-row", "grid-template-columns: minmax(260px, 1fr) minmax(180px, 310px)"
         )

@@ -81,6 +81,18 @@ LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択
 | CoDD | PASS（red 0） | scan/check/verify exit 0。verifyはDAG red 3 PASS / 0 FAIL、project testとtypecheckを再実行。SKIP 3、VACUOUS 1、amber WARN 1を機能PASSへ合算しない。 |
 | 製品直接観測 | NOT RUN | release WebView2での2ペインvisual、keyboard巡回、狭幅、DPI、screen readerは未測定。 |
 
+### 2026-08-22 設定・ヘルプnavigationライト配色
+
+統合設定と一般ヘルプのnavigationからdark surfaceを除去し、共通の`#f1f5f9`背景、本文側の`#d5dde8`境界、neutral text/icon、`#dcecff`のcurrent面と青い左accentへ変更した。狭幅の横navigationでは右境界を除去して下境界へ置換する。
+
+| Gate | 結果 | 実測 |
+|---|---|---|
+| Python style contract | PASS | `test_ui_styles` 20件、FAIL 0。settings/help双方のlight背景、本文側border、current面を直接検証。 |
+| Windows tests | PASS | Python 61件、frontend 41 files / 512件、FAIL 0。設定カテゴリ切替、検索、help章切替と検索を含む。 |
+| TypeScript / build | PASS | typecheck exit 0。Windows frontend buildは82 modules、exit 0。 |
+| CoDD | PASS（red 0） | scan/check/verify exit 0。DAG red 3 PASS / 0 FAIL。SKIP 3、VACUOUS 1、amber WARN 1を機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での実配色、high contrast、DPI、display差、screen readerは未測定。 |
+
 ## Leeyes P1-C 独立S機能
 
 対象はLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件。Windows known folder移動、隠し項目表示、incremental search、catalog配色preset、random page、opt-inの前回viewer復元をprofile v7とapp-local SQLiteへ接続した。
