@@ -66,6 +66,7 @@ vi.mock("./features/library/client", () => ({
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   listArchiveVirtualTree: vi.fn(async () => ({ status: "ok", data: { archiveRelativePath: "book.cbz", entries: [] } })),
+  getArchiveThumbnail: vi.fn(async () => ({ status: "cancelled" })),
   getFileUndoStatus: vi.fn(async () => ({ status: "ok", data: { available: false, operation: null, affected: 0 } })),
   undoLastFileOperation: vi.fn(),
   openComic: vi.fn(),

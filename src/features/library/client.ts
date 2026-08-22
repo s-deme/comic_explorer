@@ -1715,6 +1715,28 @@ export async function listArchiveVirtualTree(
   });
 }
 
+export interface ArchiveThumbnailData {
+  archiveRelativePath: RelativePath;
+  pageKey: RelativePath;
+  contentHash: string;
+  mediaUri: string;
+  cacheHit: boolean;
+}
+
+export async function getArchiveThumbnail(
+  archiveRelativePath: string,
+  pageKey: string,
+  generation: number,
+  priority: "visible" | "near" | "background" = "visible",
+): Promise<ApiResponse<ArchiveThumbnailData>> {
+  return invoke("get_archive_thumbnail", {
+    context: context(generation),
+    archiveRelativePath,
+    pageKey,
+    priority,
+  });
+}
+
 export async function listTreeChildren(
   relativePath: string,
   generation: number,

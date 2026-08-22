@@ -6544,6 +6544,7 @@ export function App({
               detailShowKind={detailShowKind}
               detailShowSize={detailShowSize}
               detailShowModified={detailShowModified}
+              requestGeneration={generation.current}
               onOpenPage={async (pageKey) => {
                 const opened = await openComicEntry({
                   relativePath: archiveExplorerPath as CatalogEntry["relativePath"],

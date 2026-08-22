@@ -42,20 +42,48 @@ pub fn read_cover(root: &Path, item: &RelativePath) -> Result<CoverBytes, AppErr
             let cover = pages.first().ok_or_else(|| {
                 thumbnail_error(ErrorCode::NotFound, "Archive has no supported cover.")
             })?;
-            let entry = super::read_archive_entry(&item_path, cover.as_str(), MAX_IMAGE_BYTES)?;
-            let bytes = entry.bytes;
-            validate_cover_format(cover, &bytes)?;
-            Ok(CoverBytes {
-                bytes,
-                source_key: format!("archive:{}#{}", item.as_str(), cover.as_str()),
-                fingerprint_detail: entry.fingerprint_detail,
-            })
+            read_archive_page_cover_from_path(&item_path, item, cover)
         }
         FileKind::Image => {
             read_image_thumbnail(&item_path, item, format!("image:{}", item.as_str()))
         }
         FileKind::Unsupported => read_folder_cover(&root, item, &item_path),
     }
+}
+
+pub fn read_archive_page_cover(
+    root: &Path,
+    archive: &RelativePath,
+    page: &RelativePath,
+) -> Result<CoverBytes, AppError> {
+    let (_, archive_path) = contained_thumbnail_item(root, archive)?;
+    if classify_file_name(archive.as_str()) != FileKind::Archive {
+        return Err(thumbnail_error(
+            ErrorCode::UnsupportedFormat,
+            "Thumbnail source is not a supported archive.",
+        ));
+    }
+    read_archive_page_cover_from_path(&archive_path, archive, page)
+}
+
+fn read_archive_page_cover_from_path(
+    archive_path: &Path,
+    archive: &RelativePath,
+    page: &RelativePath,
+) -> Result<CoverBytes, AppError> {
+    let entry = super::read_archive_entry(archive_path, page.as_str(), MAX_IMAGE_BYTES)?;
+    validate_cover_format(page, &entry.bytes)?;
+    let metadata = archive_path.metadata().map_err(thumbnail_io_error)?;
+    Ok(CoverBytes {
+        bytes: entry.bytes,
+        source_key: format!("archive-page:{}#{}", archive.as_str(), page.as_str()),
+        fingerprint_detail: format!(
+            "archive-size:{}:archive-modified:{:?}:{}",
+            metadata.len(),
+            metadata.modified().ok(),
+            entry.fingerprint_detail,
+        ),
+    })
 }
 
 fn read_folder_cover(
@@ -948,6 +976,34 @@ mod tests {
 
         assert_eq!(image.source_key, "image:comic-folder/1.png");
         assert!(!image.bytes.is_empty());
+    }
+
+    #[test]
+    fn req_mvp_006_reads_the_requested_archive_page_for_a_thumbnail() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-LIBRARY-001");
+        let archive = RelativePath::parse("same-a.cbz").unwrap();
+        let pages = super::super::enumerate_archive_pages(&root.join(archive.as_str())).unwrap();
+        let requested = pages.last().unwrap();
+
+        let cover = read_archive_page_cover(&root, &archive, requested).unwrap();
+
+        assert_eq!(
+            cover.source_key,
+            format!("archive-page:same-a.cbz#{}", requested.as_str())
+        );
+        assert!(!cover.bytes.is_empty());
+        assert!(cover.fingerprint_detail.contains("archive-size:"));
+        assert_eq!(
+            read_archive_page_cover(
+                &root,
+                &RelativePath::parse("comic-folder/1.png").unwrap(),
+                requested,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::UnsupportedFormat
+        );
     }
 
     #[test]

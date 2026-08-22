@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use crate::catalog::read_cover;
+use crate::catalog::{CoverBytes, read_cover};
 use crate::domain::{AppError, ErrorCode, RelativePath};
 
 use super::{AppPaths, CACHE_HARD_CAP_BYTES, StateStore, ThumbnailCache, ThumbnailPins};
@@ -51,39 +51,7 @@ impl ThumbnailPipeline {
 
         let result = (|| {
             let cover = read_cover(root, item)?;
-            let content_hash =
-                stable_digest(&(cover.source_key.as_str(), cover.fingerprint_detail.as_str()));
-            if let Some(path) = self.cache.lookup(store, &content_hash, now_ms)? {
-                self.cache.pin(&content_hash)?;
-                return Ok(ThumbnailResult {
-                    content_hash,
-                    path,
-                    cache_hit: true,
-                });
-            }
-
-            let temporary = self.temp.join(format!(
-                "thumb-{}-{}-{}.jpg",
-                std::process::id(),
-                now_ms,
-                &content_hash[..16]
-            ));
-            let generated: Result<ThumbnailResult, AppError> = (|| {
-                let (width, height) = crate::catalog::encode_wic_jpeg(&cover.bytes, &temporary)?;
-                let jpeg = std::fs::read(&temporary).map_err(pipeline_io_error)?;
-                let path =
-                    self.cache
-                        .write_atomic(store, &content_hash, &jpeg, width, height, now_ms)?;
-                self.cache.pin(&content_hash)?;
-                self.cache.evict_to_limit(store, CACHE_HARD_CAP_BYTES)?;
-                Ok(ThumbnailResult {
-                    content_hash,
-                    path,
-                    cache_hit: false,
-                })
-            })();
-            let _ = std::fs::remove_file(&temporary);
-            generated
+            self.resolve_cover(store, cover, now_ms)
         })();
 
         if let Err(error) = &result {
@@ -96,6 +64,48 @@ impl ThumbnailPipeline {
             );
         }
         result
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn resolve_cover(
+        &mut self,
+        store: &StateStore,
+        cover: CoverBytes,
+        now_ms: i64,
+    ) -> Result<ThumbnailResult, AppError> {
+        let content_hash =
+            stable_digest(&(cover.source_key.as_str(), cover.fingerprint_detail.as_str()));
+        if let Some(path) = self.cache.lookup(store, &content_hash, now_ms)? {
+            self.cache.pin(&content_hash)?;
+            return Ok(ThumbnailResult {
+                content_hash,
+                path,
+                cache_hit: true,
+            });
+        }
+
+        let temporary = self.temp.join(format!(
+            "thumb-{}-{}-{}.jpg",
+            std::process::id(),
+            now_ms,
+            &content_hash[..16]
+        ));
+        let generated: Result<ThumbnailResult, AppError> = (|| {
+            let (width, height) = crate::catalog::encode_wic_jpeg(&cover.bytes, &temporary)?;
+            let jpeg = std::fs::read(&temporary).map_err(pipeline_io_error)?;
+            let path =
+                self.cache
+                    .write_atomic(store, &content_hash, &jpeg, width, height, now_ms)?;
+            self.cache.pin(&content_hash)?;
+            self.cache.evict_to_limit(store, CACHE_HARD_CAP_BYTES)?;
+            Ok(ThumbnailResult {
+                content_hash,
+                path,
+                cache_hit: false,
+            })
+        })();
+        let _ = std::fs::remove_file(&temporary);
+        generated
     }
 
     pub fn replace_pins(&mut self, content_hashes: &[String]) -> Result<(), AppError> {

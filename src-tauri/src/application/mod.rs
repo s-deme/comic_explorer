@@ -32,9 +32,9 @@ use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 #[cfg(test)]
 use crate::catalog::enumerate_folder_pages;
 use crate::catalog::{
-    CatalogEntry, enumerate_archive_pages, enumerate_folder, enumerate_folder_pages_with_hidden,
-    enumerate_folder_with_hidden, enumerate_pdf_pages, has_child_folder_with_hidden,
-    render_pdf_page,
+    CatalogEntry, CoverBytes, enumerate_archive_pages, enumerate_folder,
+    enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden, enumerate_pdf_pages,
+    has_child_folder_with_hidden, render_pdf_page,
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
@@ -4781,6 +4781,44 @@ fn resolve_thumbnail(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (store, root, now_ms);
+        Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "WIC thumbnail generation requires Windows.",
+        ))
+    }
+}
+
+fn resolve_thumbnail_cover(
+    pipelines: &Mutex<Option<ThumbnailPipeline>>,
+    stores: &Mutex<Option<StateStore>>,
+    cover: CoverBytes,
+    now_ms: i64,
+) -> Result<crate::state::ThumbnailResult, AppError> {
+    let mut pipelines = pipelines
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail pipeline state is poisoned."))?;
+    let Some(pipeline) = pipelines.as_mut() else {
+        return Err(request_error(
+            ErrorCode::UnsupportedFormat,
+            "Thumbnail generation is unavailable on this platform.",
+        ));
+    };
+    let stores = stores
+        .lock()
+        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail cache state is poisoned."))?;
+    let Some(store) = stores.as_ref() else {
+        return Err(request_error(
+            ErrorCode::Internal,
+            "Thumbnail cache is unavailable.",
+        ));
+    };
+    #[cfg(target_os = "windows")]
+    {
+        pipeline.resolve_cover(store, cover, now_ms)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (pipeline, store, cover, now_ms);
         Err(request_error(
             ErrorCode::UnsupportedFormat,
             "WIC thumbnail generation requires Windows.",

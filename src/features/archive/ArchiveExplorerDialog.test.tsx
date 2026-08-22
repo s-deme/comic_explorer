@@ -2,11 +2,14 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listArchiveVirtualTree } from "../library/client";
+import { getArchiveThumbnail, listArchiveVirtualTree } from "../library/client";
 import { ArchiveExplorerPane } from "./ArchiveExplorerDialog";
 import { DEFAULT_CATALOG_THUMBNAIL_SIZES } from "../catalog/view-mode";
 
-vi.mock("../library/client", () => ({ listArchiveVirtualTree: vi.fn() }));
+vi.mock("../library/client", () => ({
+  getArchiveThumbnail: vi.fn(),
+  listArchiveVirtualTree: vi.fn(),
+}));
 
 const snapshot = {
   archiveRelativePath: "book.cbz",
@@ -27,6 +30,7 @@ const displayProps = {
   detailShowKind: true,
   detailShowSize: true,
   detailShowModified: true,
+  requestGeneration: 7,
 };
 
 describe("ArchiveExplorerPane", () => {
@@ -37,6 +41,40 @@ describe("ArchiveExplorerPane", () => {
       generation: 1 as never,
       data: snapshot as never,
     });
+    vi.mocked(getArchiveThumbnail).mockResolvedValue({
+      status: "ok",
+      requestId: "archive-thumbnail" as never,
+      generation: 7 as never,
+      data: {
+        archiveRelativePath: "book.cbz",
+        pageKey: "chapter/2.png",
+        contentHash: "thumbnail-hash",
+        mediaUri: "comic://media/archive-thumbnail",
+        cacheHit: false,
+      } as never,
+    });
+  });
+
+  it("REQ-MVP-006 lazily displays thumbnails for visible archive images", async () => {
+    render(
+      <ArchiveExplorerPane
+        {...displayProps}
+        archiveRelativePath="book.cbz"
+        onOpenPage={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const pane = await screen.findByRole("region", { name: "書庫の内容" });
+    fireEvent.click(within(pane).getByRole("button", { name: /chapter/ }));
+
+    await waitFor(() => expect(getArchiveThumbnail).toHaveBeenCalledWith(
+      "book.cbz",
+      "chapter/2.png",
+      7,
+      "visible",
+    ));
+    await waitFor(() => expect(pane.querySelector(".thumbnail img"))
+      .toHaveAttribute("src", "comic://media/archive-thumbnail"));
   });
 
   afterEach(cleanup);

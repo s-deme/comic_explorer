@@ -640,6 +640,8 @@ LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択
 
 対象はLEY-FILER-002/003/004の3件。Rustがroot-contained regular archiveの再検証、既存ZIP/RAR/7z/LZH adapter、safe entry path、nested archive上限、opaque node/page key、natural order、temp cleanupを担当する。TypeScriptはfilesystem treeの書庫入口、通常catalog area内のvirtualized direct-child一覧、選択pageの既存Viewer適用だけを担当する。2026-08-22更新で別modalを廃止し、親階層移動と通常folder復帰を同じ右ペインへ統合した。
 
+2026-08-23更新で、virtualized grid上に描画された書庫内画像だけをvisible priorityで既存thumbnail workerへ送り、指定opaque pageの必要entryだけをWIC JPEGへ変換してatomic cacheとopaque media URLから表示する境界を追加した。REQ-MVP-006のfocused frontend 1件、client IPC 1件、Rust requested-page 1件はPASSした。Windows全体回帰はfrontend 41 files / 515件、Python 63件、Rust 256件とshutdown process 1件、typecheckをPASSした。初回frontend全体runは新APIのApp mockが未応答で1件FAILし、既知のshortcut testが並列負荷中に1件timeoutした。mock修正後は該当2件を単独PASSし、続くWindows全体runで515件すべてPASSした。最終Windows release buildはfrontend 82 modules、SBOM 783 components・unknown/prohibited license 0、release executable freshnessをPASSし、SHA-256は`4c4376c998f2aa8a0684481f24326a931a66f8f0706d95d72714b512415d36f3`。release WebView2での実書庫thumbnail表示、cache hit、長時間scroll、CPU・working setは未測定とする。
+
 | 検証 | 結果 | 証拠 |
 |---|---|---|
 | Focused Rust | PASS | REQ-LEY-P4-002の4件、FAIL 0。contained regular archive、folder推論、natural order、dot/unsupported非表示、nested archive、opaque page read、原本差分0、ZIP/RAR/7z/LZH adapterを含む。 |

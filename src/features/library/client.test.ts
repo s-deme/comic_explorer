@@ -46,6 +46,7 @@ import {
   previewShelvesImport,
   migrateLegacyShelf,
   listArchiveVirtualTree,
+  getArchiveThumbnail,
   getFileUndoStatus,
   undoLastFileOperation,
   cancelOfflineMediaRegistration,
@@ -120,6 +121,16 @@ describe("library client settings contract", () => {
     expect(invokeMock).toHaveBeenCalledWith("list_archive_virtual_tree", {
       context: expect.objectContaining({ generation: 85 }),
       archiveRelativePath: "Series/book.cbz",
+    });
+  });
+
+  it("REQ-MVP-006 requests one archive page thumbnail through structured IPC", async () => {
+    await getArchiveThumbnail("Series/book.cbz", "chapter/2.png", 86, "visible");
+    expect(invokeMock).toHaveBeenCalledWith("get_archive_thumbnail", {
+      context: expect.objectContaining({ generation: 86 }),
+      archiveRelativePath: "Series/book.cbz",
+      pageKey: "chapter/2.png",
+      priority: "visible",
     });
   });
 

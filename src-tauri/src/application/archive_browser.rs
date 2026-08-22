@@ -2,13 +2,16 @@ use std::fs;
 
 use serde::Serialize;
 
-use crate::api::{RequestContext, Response};
-use crate::catalog::{ArchiveVirtualEntry, enumerate_archive_virtual_tree};
-use crate::domain::{AppError, ErrorCode, RelativePath};
+use crate::api::{MAX_IMAGE_BYTES, RequestContext, Response};
+use crate::catalog::{
+    ArchiveVirtualEntry, enumerate_archive_virtual_tree, read_archive_page_cover,
+};
+use crate::domain::{AppError, ErrorCode, PageId, RelativePath};
+use crate::media::{MediaGrant, PageSource, media_uri};
 
 use super::{
-    AppState, OpenItemKind, contained_library_path, error_response, open_item_kind, request_error,
-    validate_request,
+    AppState, OpenItemKind, ThumbnailPriority, contained_library_path, error_response,
+    open_item_kind, request_error, resolve_thumbnail_cover, unix_millis, validate_request,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -16,6 +19,16 @@ use super::{
 pub struct ArchiveVirtualTreeSnapshot {
     pub archive_relative_path: RelativePath,
     pub entries: Vec<ArchiveVirtualEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveThumbnailResponse {
+    pub archive_relative_path: RelativePath,
+    pub page_key: RelativePath,
+    pub content_hash: String,
+    pub media_uri: String,
+    pub cache_hit: bool,
 }
 
 fn metadata_is_reparse_point(metadata: &fs::Metadata) -> bool {
@@ -119,6 +132,139 @@ pub async fn list_archive_virtual_tree(
             data,
         },
         Err(error) => error_response(&context, error),
+    })
+}
+
+#[tauri::command]
+pub async fn get_archive_thumbnail(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    archive_relative_path: String,
+    page_key: String,
+    priority: ThumbnailPriority,
+) -> Result<Response<ArchiveThumbnailResponse>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let archive_relative = match RelativePath::parse(archive_relative_path) {
+        Ok(value) if !value.as_str().is_empty() => value,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Archive path is invalid."),
+            ));
+        }
+    };
+    let page = match RelativePath::parse(page_key) {
+        Ok(value) if !value.as_str().is_empty() => value,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Archive page key is invalid."),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(value) => value,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    if let Err(error) = validate_archive_target(&root, &archive_relative) {
+        return Ok(error_response(&context, error));
+    }
+
+    let cancellation = state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .cancellation_for(context.generation);
+    let pipelines = state.thumbnails.clone();
+    let stores = state.store.clone();
+    let thumbnail_pins = state.thumbnail_pins.clone();
+    let worker_root = root.clone();
+    let worker_archive = archive_relative.clone();
+    let worker_page = page.clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    if state
+        .thumbnail_workers
+        .submit(priority.into(), cancellation.clone(), move || {
+            let result = read_archive_page_cover(&worker_root, &worker_archive, &worker_page)
+                .and_then(|cover| {
+                    resolve_thumbnail_cover(&pipelines, &stores, cover, unix_millis())
+                });
+            if cancellation.is_cancelled() {
+                if let Ok(thumbnail) = &result {
+                    thumbnail_pins.unpin(&thumbnail.content_hash);
+                }
+            } else {
+                let _ = sender.send(result);
+            }
+        })
+        .is_err()
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let result = match receiver.await {
+        Ok(result) => result,
+        Err(_) => {
+            return Ok(Response::Cancelled {
+                request_id: context.request_id,
+                generation: context.generation,
+            });
+        }
+    };
+    if !state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        if let Ok(thumbnail) = &result {
+            state.thumbnail_pins.unpin(&thumbnail.content_hash);
+        }
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let thumbnail = match result {
+        Ok(value) => value,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    let page_id = PageId::parse(format!("archive-thumbnail-{}", thumbnail.content_hash))
+        .map_err(str::to_string)?;
+    let token = state
+        .media
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .issue(MediaGrant {
+            page_id,
+            mime_type: "image/jpeg",
+            max_bytes: MAX_IMAGE_BYTES,
+            source: PageSource::File(thumbnail.path),
+        });
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: ArchiveThumbnailResponse {
+            archive_relative_path: archive_relative,
+            page_key: page,
+            content_hash: thumbnail.content_hash,
+            media_uri: media_uri(&token),
+            cache_hit: thumbnail.cache_hit,
+        },
     })
 }
 

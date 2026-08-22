@@ -19,7 +19,7 @@ pub(crate) use image_render::{raster_delivery_png, render_svg_png};
 pub use pdf::{enumerate_pdf_pages, pdf_page_index, render_pdf_page};
 pub use thumbnail::{
     CoverBytes, THUMBNAIL_JPEG_QUALITY, THUMBNAIL_LONG_EDGE, exif_orientation, output_dimensions,
-    read_cover,
+    read_archive_page_cover, read_cover,
 };
 #[cfg(target_os = "windows")]
 pub use thumbnail::{decode_wic_bgra, encode_wic_jpeg};

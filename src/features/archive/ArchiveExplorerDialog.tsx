@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CatalogEntry, RelativePath } from "../../types/domain";
 import { CatalogGrid } from "../catalog/CatalogGrid";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
-import { listArchiveVirtualTree, type ArchiveVirtualEntry, type ArchiveVirtualTreeSnapshot } from "../library/client";
+import {
+  getArchiveThumbnail,
+  listArchiveVirtualTree,
+  type ArchiveVirtualEntry,
+  type ArchiveVirtualTreeSnapshot,
+} from "../library/client";
+import type { ThumbnailViewState } from "../catalog/CatalogGrid";
 import { presentError } from "../errors/presentation";
 import type { CatalogPalette, DetailGridLineMode, DetailRowDensity } from "../settings/profile";
 
@@ -19,6 +25,7 @@ interface ArchiveExplorerPaneProps {
   detailShowKind: boolean;
   detailShowSize: boolean;
   detailShowModified: boolean;
+  requestGeneration: number;
 }
 
 function leafName(path: string): string {
@@ -37,6 +44,7 @@ export function ArchiveExplorerPane({
   detailShowKind,
   detailShowSize,
   detailShowModified,
+  requestGeneration,
 }: ArchiveExplorerPaneProps) {
   const generation = useRef(0);
   const [snapshot, setSnapshot] = useState<ArchiveVirtualTreeSnapshot | null>(null);
@@ -44,6 +52,11 @@ export function ArchiveExplorerPane({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
+  const thumbnailRequests = useRef(new Map<string, number>());
+  const thumbnailRequestSequence = useRef(0);
+  const requestGenerationRef = useRef(requestGeneration);
+  requestGenerationRef.current = requestGeneration;
 
   useEffect(() => {
     const requestGeneration = ++generation.current;
@@ -52,6 +65,8 @@ export function ArchiveExplorerPane({
     setSelectedEntryId(null);
     setLoading(true);
     setError(null);
+    setThumbnails({});
+    thumbnailRequests.current.clear();
     void listArchiveVirtualTree(archiveRelativePath, requestGeneration)
       .then((response) => {
         if (requestGeneration !== generation.current) return;
@@ -66,6 +81,62 @@ export function ArchiveExplorerPane({
       });
     return () => { generation.current += 1; };
   }, [archiveRelativePath]);
+
+  useEffect(() => {
+    setThumbnails({});
+    thumbnailRequests.current.clear();
+  }, [requestGeneration]);
+
+  const queueThumbnail = useCallback((entry: CatalogEntry) => {
+    const virtualEntry = snapshot?.entries.find((candidate) => candidate.id === entry.relativePath);
+    if (virtualEntry?.kind !== "image" || virtualEntry.pageKey === null) return;
+    if (thumbnailRequests.current.has(virtualEntry.id)) return;
+    const requestToken = ++thumbnailRequestSequence.current;
+    thumbnailRequests.current.set(virtualEntry.id, requestToken);
+    const requestEpoch = generation.current;
+    setThumbnails((current) => ({
+      ...current,
+      [virtualEntry.id]: { status: "loading" },
+    }));
+    void getArchiveThumbnail(
+      archiveRelativePath,
+      virtualEntry.pageKey,
+      requestGeneration,
+      "visible",
+    )
+      .then((response) => {
+        if (
+          requestEpoch !== generation.current
+          || requestGeneration !== requestGenerationRef.current
+        ) return;
+        setThumbnails((current) => ({
+          ...current,
+          [virtualEntry.id]: response.status === "ok"
+            ? {
+                status: "ready",
+                mediaUri: response.data.mediaUri,
+                cacheHit: response.data.cacheHit,
+              }
+            : { status: "error" },
+        }));
+      })
+      .catch(() => {
+        if (
+          requestEpoch === generation.current
+          && requestGeneration === requestGenerationRef.current
+        ) {
+          setThumbnails((current) => ({
+            ...current,
+            [virtualEntry.id]: { status: "error" },
+          }));
+        }
+      })
+      .finally(() => {
+        if (thumbnailRequests.current.get(virtualEntry.id) === requestToken) {
+          thumbnailRequests.current.delete(virtualEntry.id);
+        }
+      });
+  }, [archiveRelativePath, requestGeneration, snapshot]);
 
   const children = useMemo(() => {
     const result = new Map<string | null, ArchiveVirtualEntry[]>();
@@ -139,7 +210,12 @@ export function ArchiveExplorerPane({
             displayNameFor={(entry) => entriesById.get(entry.relativePath)?.name ?? entry.relativePath}
             readOnly
             singleClickActivate
-            thumbnailFor={() => ({ status: "error" })}
+            thumbnailFor={(entry) => thumbnails[entry.relativePath] ?? (
+              entriesById.get(entry.relativePath)?.kind === "image"
+                ? { status: "loading" }
+                : { status: "error" }
+            )}
+            onThumbnailNeeded={queueThumbnail}
             onSelect={(entry) => setSelectedEntryId(entry.relativePath)}
             onNavigate={activateEntry}
             onRead={activateEntry}
