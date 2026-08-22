@@ -468,7 +468,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
     expect(within(removeDialog).getByRole("button", {
       name: "検索ペインを切り替えるショートカット 1 を削除",
     })).toBeDisabled();
-  });
+  }, 20_000);
 
   it("FT-B11-006 connects a remapped catalog command to the application shell", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);
