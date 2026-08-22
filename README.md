@@ -13,6 +13,8 @@ GitHub Actionsの最新の「Windows packages」runから、用途に合わせ�
 - `comic-explorer-windows-portable-<commit>`: 展開して`comic-explorer.exe`を直接起動するZIP版
 
 ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
+どちらの配布形式にもWebView2 Runtimeは同梱されず、インストーラからの取得も行いません。
+起動には端末へ導入済みのMicrosoft Edge WebView2 Runtimeが必要です。
 
 ## できること
 

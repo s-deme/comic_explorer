@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -54,6 +55,16 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.assertIn('"dist\\SBOM.json"', workflow)
         self.assertIn("name: comic-explorer-windows-portable-${{ github.sha }}", workflow)
         self.assertIn("path: dist/portable/", workflow)
+
+    def test_windows_packages_require_preinstalled_webview2(self) -> None:
+        tauri_config = json.loads(
+            (ROOT / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(
+            tauri_config["bundle"]["windows"]["webviewInstallMode"],
+            {"type": "skip"},
+        )
 
     def test_license_audit_accepts_allowlisted_spdx_expressions(self) -> None:
         self.assertEqual(

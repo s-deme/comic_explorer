@@ -17,7 +17,7 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-21 JST
+- 最終更新日: 2026-08-22 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
@@ -33,6 +33,12 @@ NFR-MVP-005の配布workflowは、NSIS build後の同一release executableを`di
 build、portable staging、installer upload、portable uploadの順序と3つの必須fileを検証してPASSした。
 workflow YAML parseとCoDD scan/checkもPASSした。GitHub Actions上のartifact生成・downloadおよびclean VMでの
 portable executable直接起動は、この変更をpushしたworkflowで直接観測するまで未測定とする。
+
+2026-08-22にNSISの`webviewInstallMode`を`skip`へ変更し、WebView2 Runtimeとinstaller/bootstrapperを
+installerから除外した。release evidence 7件はこの設定の完全一致を含めてPASSした。Windows上の実NSIS buildは
+PASSし、生成物は5,495,669 bytes（5.24 MiB、SHA-256
+`0F49C5589CAA42CD13A0C9B12DB6E1220BAC469286A3E15905A4118487A4CC58`）、同じbuildのapplication executableは
+20,847,104 bytesだった。WebView2導入済み/未導入clean VMでの起動結果は未測定とする。
 
 ## Leeyes P1〜P5実装マニフェスト
 

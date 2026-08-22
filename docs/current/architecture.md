@@ -31,7 +31,8 @@ debug buildでは診断出力のためconsole subsystemを維持する。
 Windows配布workflowは1回のTauri release buildからNSIS installerとportable artifactを分岐する。
 portable artifactはrelease executable、THIRD-PARTY-NOTICES、生成済みSBOMだけを平坦な専用folderへ
 copyし、GitHub Actionsのartifact downloadがZIPとして提供する。installer生成と別のnative buildを行わず、
-両形式の実行fileが同じrelease outputを正本とする。
+両形式の実行fileが同じrelease outputを正本とする。NSISのWebView2 install modeは`skip`へ固定し、
+WebView2 Runtime本体、offline installer、bootstrapperを配布物へ含めず、端末へ導入済みのruntimeを利用する。
 
 ## frontend/backend境界
 

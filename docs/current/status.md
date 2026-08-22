@@ -198,7 +198,7 @@ P5-BではLEY-FILTER-001〜016の16件をPublishedとし、P1〜P5の全103件�
 
 ## 未完了release gate
 
-- Windows 10 22H2 / Windows 11 clean VMのinstall、offline WebView2、launch、uninstall、user-data保持/削除。
+- Windows 10 22H2 / Windows 11のWebView2導入済みclean VMにおけるinstall、launch、uninstall、user-data保持/削除と、WebView2未導入時の失敗表示。
 - VM外部からのDNS/TCP/UDP監視による外部通信0の確認。
 - 基準PCでのcold TTI、10,000項目、scroll/FPS、input/page latency、working set、cache測定。
 - Windows UIA、Narrator/NVDA、high contrast、100/150/200% DPI。
