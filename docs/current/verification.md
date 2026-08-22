@@ -69,6 +69,18 @@ Windows test runnerがPowerShell 7環境で存在しない`$PSHOME\powershell.ex
 | CoDD | PASS（red 0） | 最終文書・tracker同期後のscan/check/verifyはexit 0。scan 5 documents / 63 nodes / 139 edges、check red failure 0。advisory、SKIP、VACUOUSを機能PASSへ合算しない。 |
 | 性能・製品直接観測 | PARTIAL / NOT RUN | 自動testで50 archiveに対する表示中scope 25要求とhistory 25件から20件への上限を直接観測。基準PC時間・memoryは未測定。release WebView2のnative picker操作、欠落recent file、help visual/DPIは未測定。 |
 
+### 2026-08-22 一般ヘルプ2ペイン更新
+
+LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択記事からなる2ペインへ更新した。日本語の利用者向け手順へ本文を再構成し、topic本文・操作名・説明・現在のshortcut割り当てを横断検索する。shortcutはread-onlyのまま一覧操作とビューワに分け、狭幅ではnavigationを横方向へ並べた1列layoutへ縮退する。
+
+| Gate | 結果 | 実測 |
+|---|---|---|
+| Focused frontend | PASS | helpとFR-B11の2 files / 8件、FAIL 0。単一記事切替、topic・説明・現在binding検索、0件・clear、read-only、Esc終了、保存済みalternate表示を含む。 |
+| Windows tests | PASS | Python 61件、frontend 41 files / 512件、FAIL 0。AppのHelp menu接続、focus復元、version dialog分離を含む。 |
+| TypeScript / build | PASS | typecheck exit 0。Windows frontend buildは82 modules、exit 0。`dist/`は生成物としてcommitしない。 |
+| CoDD | PASS（red 0） | scan/check/verify exit 0。verifyはDAG red 3 PASS / 0 FAIL、project testとtypecheckを再実行。SKIP 3、VACUOUS 1、amber WARN 1を機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での2ペインvisual、keyboard巡回、狭幅、DPI、screen readerは未測定。 |
+
 ## Leeyes P1-C 独立S機能
 
 対象はLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件。Windows known folder移動、隠し項目表示、incremental search、catalog配色preset、random page、opt-inの前回viewer復元をprofile v7とapp-local SQLiteへ接続した。

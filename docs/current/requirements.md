@@ -146,7 +146,7 @@ app-local SQLiteとstrict profileへ保存し、library原本を変更しない�
 | REQ-LEY-P1-012 | LEY-FILE-001 | Windows標準file dialogを対応画像・書庫・PDFのfilter付きで開き、cancelを正常終了として扱う。選択fileをcanonicalizeし、対応形式・通常fileであることをbackendで検証してから、そのdriveを安全境界として登録し直接viewerへ開く。root外path文字列を既存rootへ注入せず、失敗時は現在画面を保持する。 |
 | REQ-LEY-P1-013 | LEY-FILE-009 | 成功して開いた最近の作品を新しい順・重複なし・最大20件で表示し、項目から再度開ける。missing・access拒否は局所errorとして履歴画面を維持し、全履歴を明示的に消去できる。cancel・失敗openは追加しない。 |
 | REQ-LEY-P1-014 | LEY-SETTING-005 | 起動場所を「前回のfolder」「前回driveのroot」から選び、存在しない・読めない保存pathではshellを維持して安全にdrive選択へ戻す。初期選択はREQ-LEY-P1-010のpolicyを共有し、設定をstrict profileとapp-local SQLiteへ保存する。 |
-| REQ-LEY-P1-015 | LEY-HELP-001 | 同梱dataだけで閲覧できる利用者向けoffline helpへ、開始、folder/list、viewer、検索、file操作、設定、privacy・安全上の制約、現在のshortcutを章立てして収録する。topic検索とkeyboard操作を提供し、外部URLやnetworkを要求しない。 |
+| REQ-LEY-P1-015 | LEY-HELP-001 | 同梱dataだけで閲覧できる利用者向けoffline helpへ、開始、folder/list、viewer、検索、file操作、設定、privacy・安全上の制約、現在のshortcutを章立てして収録する。helpはheader、章navigation、選択中の記事、固定footerからなる2 pane構成とし、章を選ぶと対応する記事だけを表示する。検索は章title・本文・操作名・現在のshortcut割り当てを横断し、一致する章とshortcutを結果として示す。狭いwindowでは1 columnへ縮退し、現在地、検索結果0件、検索clear、閉じる操作をkeyboardと支援技術から識別できる。shortcutはread-only表示とし、外部URLやnetworkを要求しない。 |
 
 ## Leeyes P1-C 独立S機能の受入条件
 

@@ -560,8 +560,9 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       ),
     );
     openGeneralHelp();
-    const help = screen.getByRole("dialog", { name: "キー操作とショートカット" });
-    expect(within(help).getByRole("heading", { name: "現在のショートカット" }))
+    const help = screen.getByRole("dialog", { name: "Comic Explorer ヘルプ" });
+    fireEvent.click(within(help).getByRole("button", { name: /キー操作/ }));
+    expect(within(help).getByRole("heading", { name: "現在のキー操作" }))
       .toBeInTheDocument();
     expect(
       within(help).queryByRole("button", { name: "ショートカット設定を開く" }),

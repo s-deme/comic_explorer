@@ -43,7 +43,7 @@ Leeyes互換方式へ変更しない。
 
 P1-AではLEY-SHELL-012/013、LEY-VIEWER-020/021/022/031、LEY-INPUT-004/010/012の9件をPublishedとした。shell 5面の独立表示、常に手前、1〜800%倍率、pixel寸法指定、倍率保持scope、非破壊grid、設定/shortcut reset、pan係数、wheel不感帯をprofile v5とSQLiteへ接続した。Windows自動gateはPASS。release WebView2でのtopmost、grid目視、実mouse/trackpad差は未測定であり、性能値や製品直接観測のPASSへ合算しない。
 
-P1-BではLEY-FILER-016、LEY-CATALOG-010、LEY-FILE-001/009、LEY-SETTING-005、LEY-HELP-001の6件をPublishedとした。移動後初期選択、bounded thumbnail生成範囲、native file picker、永続recent 20件と消去、起動場所、検索可能な同梱helpをprofile v6・SQLite・Windows shell境界へ接続した。Windows自動gateはPASS。native pickerのrelease製品直接操作、実disk上のrecent欠落file回復、helpのDPI/visualは未測定として残す。
+P1-BではLEY-FILER-016、LEY-CATALOG-010、LEY-FILE-001/009、LEY-SETTING-005、LEY-HELP-001の6件をPublishedとした。移動後初期選択、bounded thumbnail生成範囲、native file picker、永続recent 20件と消去、起動場所、検索可能な同梱helpをprofile v6・SQLite・Windows shell境界へ接続した。2026-08-22にhelpをheader/body/footerと章navigation・選択記事の2ペインへ更新し、日本語の利用手順、topic・操作説明・現在shortcutの横断検索、狭幅1列縮退を追加した。Windows自動gateはPASS。native pickerのrelease製品直接操作、実disk上のrecent欠落file回復、helpのDPI/visualは未測定として残す。
 
 P1-CではLEY-FILER-007/011/014/018、LEY-VIEWER-006、LEY-SETTING-006の6件をPublishedとした。Windows known folder移動、dot/hidden属性の表示切替、NFKC前方一致incremental search、安全なcatalog配色preset、現在pageを除くrandom移動、opt-inの前回viewer復元をprofile v7・SQLite・Windows shell境界へ接続した。Windows自動gateとformal canonicalはPASS。特殊folder全種類、各配色のrelease目視、IME実入力、random統計、removable drive欠落時の製品直接操作は未測定として残す。
 

@@ -4370,11 +4370,13 @@ describe("application shell", () => {
     await registerTestLibrary([]);
     chooseAppMenuItem("ヘルプ", "一般ヘルプ…");
 
-    const help = screen.getByRole("dialog", { name: "キー操作とショートカット" });
-    expect(within(help).getByRole("region", { name: "一般ヘルプ" })).toHaveTextContent(
-      "フォルダ・漫画・単独画像をEnterで開きます",
+    const help = screen.getByRole("dialog", { name: "Comic Explorer ヘルプ" });
+    expect(within(help).getByRole("article", { name: "はじめに" })).toHaveTextContent(
+      "Enterキーを押すか、項目をダブルクリックして開きます",
     );
-    expect(within(help).getByText(/Esc: アドレス編集を戻す/)).toBeInTheDocument();
+    fireEvent.click(within(help).getByRole("button", { name: /フォルダーと作品一覧/ }));
+    expect(within(help).getByRole("article", { name: "フォルダーと作品一覧" }))
+      .toHaveTextContent("アドレスの編集中にEscキーを押す");
     expect(within(help).queryByText(new RegExp(`バージョン ${APP_VERSION}`))).not.toBeInTheDocument();
   });
 
