@@ -1962,11 +1962,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .archive-pane-actions { display: flex; flex: none; gap: 6px; }
 .archive-pane-body { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .archive-pane-summary { margin: 0; padding: 7px 12px; border-bottom: 1px solid #e2e7ed; color: #59636f; }
-.archive-virtual-scroll { min-height: 0; overflow: auto; }
-.archive-list-row { position: absolute; inset-inline: 0; height: 36px; }
-.archive-list-row > button { width: 100%; height: 36px; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-inline: 12px; border: 0; border-bottom: 1px solid #edf0f4; text-align: start; background: #fff; }
-.archive-list-row > button:hover { background: #eef6ff; }
-.archive-list-row > button > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-pane-body > .catalog-scroll { min-height: 0; }
 .catalog-filter-empty { position: absolute; z-index: 4; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 24px; text-align: center; background: #fff; }
 .catalog-filter-empty h2, .catalog-filter-empty p { margin: 0; }
 

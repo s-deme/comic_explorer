@@ -6536,6 +6536,14 @@ export function App({
           {archiveExplorerPath !== null && (
             <ArchiveExplorerPane
               archiveRelativePath={archiveExplorerPath}
+              viewMode={catalogViewMode}
+              thumbnailSizes={catalogThumbnailSizes}
+              palette={catalogPalette}
+              detailGridLines={detailGridLines}
+              detailRowDensity={detailRowDensity}
+              detailShowKind={detailShowKind}
+              detailShowSize={detailShowSize}
+              detailShowModified={detailShowModified}
               onOpenPage={async (pageKey) => {
                 const opened = await openComicEntry({
                   relativePath: archiveExplorerPath as CatalogEntry["relativePath"],

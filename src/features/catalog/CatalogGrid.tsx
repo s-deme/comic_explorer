@@ -45,6 +45,9 @@ interface CatalogGridProps {
   detailShowKind?: boolean;
   detailShowSize?: boolean;
   detailShowModified?: boolean;
+  displayNameFor?: (entry: CatalogEntry) => string;
+  readOnly?: boolean;
+  singleClickActivate?: boolean;
   thumbnailFor?: (entry: CatalogEntry) => ThumbnailViewState;
   onThumbnailNeeded?: (entry: CatalogEntry) => void;
   isFavorite?: (entry: CatalogEntry) => boolean;
@@ -214,6 +217,9 @@ export function CatalogGrid({
   detailShowKind = true,
   detailShowSize = true,
   detailShowModified = true,
+  displayNameFor = displayName,
+  readOnly = false,
+  singleClickActivate = false,
   thumbnailFor = () => ({ status: "loading" }),
   onThumbnailNeeded = () => undefined,
   isFavorite = () => false,
@@ -428,7 +434,7 @@ export function CatalogGrid({
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
       data-catalog-palette={palette}
-      data-native-drop-path={currentFolderPath}
+      data-native-drop-path={readOnly ? undefined : currentFolderPath}
       data-detail-grid-lines={detailGridLines}
       data-detail-row-density={detailRowDensity}
       data-detail-columns={[
@@ -486,7 +492,7 @@ export function CatalogGrid({
                 {rows[virtualRow.index].map((entry, columnIndex) => {
                   const itemIndex =
                     virtualRow.index * columnCount + columnIndex;
-                  const name = displayName(entry);
+                  const name = displayNameFor(entry);
                   const kind = kindLabel(entry);
                   const size = formatSize(entry.byteSize);
                   const modified = formatModified(entry.modifiedMs);
@@ -495,9 +501,10 @@ export function CatalogGrid({
                   const canRead =
                     entry.kind === "archive" || entry.kind === "pdf"
                     || entry.kind === "page";
-                  const canFavorite =
+                  const canFavorite = !readOnly && (
                     entry.kind === "folder" || entry.kind === "comicFolder"
-                    || entry.kind === "archive" || entry.kind === "pdf";
+                    || entry.kind === "archive" || entry.kind === "pdf"
+                  );
                   const favorite = canFavorite && isFavorite(entry);
                   const hasActions = canFavorite;
                   const thumbnail = (
@@ -529,10 +536,10 @@ export function CatalogGrid({
                         data-modified-ms={entry.modifiedMs ?? "missing"}
                         data-byte-size={entry.byteSize ?? "missing"}
                         data-view-mode={viewMode}
-                        data-native-drop-path={canNavigate ? entry.relativePath : undefined}
+                        data-native-drop-path={!readOnly && canNavigate ? entry.relativePath : undefined}
                         aria-label={`${name}、${kind}、サイズ ${size}、更新日時 ${modified}`}
                         title={`${name} — ${kind}`}
-                        draggable
+                        draggable={!readOnly}
                         tabIndex={
                           selectedPath === entry.relativePath ||
                           (selectedPath === null && itemIndex === 0)
@@ -544,11 +551,14 @@ export function CatalogGrid({
                           else if (event.ctrlKey || event.metaKey) onSelect(entry, "toggle");
                           else {
                             onSelect(entry);
-                            if (event.detail === 1) schedulePrimaryAction(entry);
+                            if (singleClickActivate && event.detail <= 1) {
+                              dispatchMouseAction("openSelected", entry);
+                            } else if (event.detail === 1) schedulePrimaryAction(entry);
                           }
                         }}
                         onDoubleClick={(event) => {
                           clearPrimaryAction();
+                          if (singleClickActivate) return;
                           if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                           dispatchMouseAction(mouseBindings.doubleClick, entry, "doubleClick");
                         }}
@@ -615,11 +625,13 @@ export function CatalogGrid({
                           clearPrimaryAction();
                           event.preventDefault();
                           event.stopPropagation();
+                          if (readOnly) return;
                           onContextMenu(entry, { x: event.clientX, y: event.clientY });
                         }}
                         onKeyDown={(event) => {
                           if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                             event.preventDefault();
+                            if (readOnly) return;
                             const bounds = event.currentTarget.getBoundingClientRect();
                             onContextMenu(entry, { x: bounds.left + 24, y: bounds.top + 24 });
                             return;
@@ -661,7 +673,7 @@ export function CatalogGrid({
                             incrementalSearch.current = { value: query, updatedAt: now };
                             const match = Array.from({ length: entries.length }, (_, offsetIndex) =>
                               (itemIndex + 1 + offsetIndex) % entries.length)
-                              .find((candidateIndex) => displayName(entries[candidateIndex])
+                              .find((candidateIndex) => displayNameFor(entries[candidateIndex])
                                 .normalize("NFKC")
                                 .toLocaleLowerCase("ja")
                                 .startsWith(query));

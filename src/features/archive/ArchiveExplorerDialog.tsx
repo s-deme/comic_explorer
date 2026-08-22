@@ -1,30 +1,47 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { CatalogEntry, RelativePath } from "../../types/domain";
+import { CatalogGrid } from "../catalog/CatalogGrid";
+import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import { listArchiveVirtualTree, type ArchiveVirtualEntry, type ArchiveVirtualTreeSnapshot } from "../library/client";
 import { presentError } from "../errors/presentation";
+import type { CatalogPalette, DetailGridLineMode, DetailRowDensity } from "../settings/profile";
 
 interface ArchiveExplorerPaneProps {
   archiveRelativePath: string;
   onOpenPage: (pageKey: string) => void | Promise<void>;
   onClose: () => void;
+  viewMode: CatalogViewMode;
+  thumbnailSizes: CatalogThumbnailSizes;
+  palette: CatalogPalette;
+  detailGridLines: DetailGridLineMode;
+  detailRowDensity: DetailRowDensity;
+  detailShowKind: boolean;
+  detailShowSize: boolean;
+  detailShowModified: boolean;
 }
 
 function leafName(path: string): string {
   return path.split(/[\\/]/).at(-1) ?? path;
 }
 
-function entryGlyph(entry: ArchiveVirtualEntry): string {
-  if (entry.kind === "folder") return "▱";
-  if (entry.kind === "archive") return "▤";
-  return "▧";
-}
-
-export function ArchiveExplorerPane({ archiveRelativePath, onOpenPage, onClose }: ArchiveExplorerPaneProps) {
+export function ArchiveExplorerPane({
+  archiveRelativePath,
+  onOpenPage,
+  onClose,
+  viewMode,
+  thumbnailSizes,
+  palette,
+  detailGridLines,
+  detailRowDensity,
+  detailShowKind,
+  detailShowSize,
+  detailShowModified,
+}: ArchiveExplorerPaneProps) {
   const generation = useRef(0);
-  const listScroll = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState<ArchiveVirtualTreeSnapshot | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +49,7 @@ export function ArchiveExplorerPane({ archiveRelativePath, onOpenPage, onClose }
     const requestGeneration = ++generation.current;
     setSnapshot(null);
     setSelectedContainerId(null);
+    setSelectedEntryId(null);
     setLoading(true);
     setError(null);
     void listArchiveVirtualTree(archiveRelativePath, requestGeneration)
@@ -63,26 +81,25 @@ export function ArchiveExplorerPane({ archiveRelativePath, onOpenPage, onClose }
     ? null
     : snapshot?.entries.find((entry) => entry.id === selectedContainerId) ?? null;
   const directChildren = children.get(selectedContainerId) ?? [];
-  const virtualizer = useVirtualizer({
-    count: directChildren.length,
-    getScrollElement: () => listScroll.current,
-    estimateSize: () => 36,
-    overscan: 12,
-    initialRect: { width: 720, height: 520 },
-    observeElementRect: (instance, callback) => {
-      const element = instance.scrollElement;
-      if (!element) return undefined;
-      const report = () => callback({
-        width: element.clientWidth || 720,
-        height: element.clientHeight || 520,
-      });
-      report();
-      if (typeof ResizeObserver === "undefined") return undefined;
-      const observer = new ResizeObserver(report);
-      observer.observe(element);
-      return () => observer.disconnect();
-    },
-  });
+  const entriesById = useMemo(
+    () => new Map(directChildren.map((entry) => [entry.id, entry])),
+    [directChildren],
+  );
+  const catalogEntries = useMemo<CatalogEntry[]>(() => directChildren.map((entry) => ({
+    relativePath: entry.id as RelativePath,
+    kind: entry.kind === "image" ? "page" : entry.kind,
+  })), [directChildren]);
+
+  function activateEntry(entry: CatalogEntry) {
+    const virtualEntry = entriesById.get(entry.relativePath);
+    if (virtualEntry === undefined) return;
+    if (virtualEntry.kind === "image" && virtualEntry.pageKey !== null) {
+      void onOpenPage(virtualEntry.pageKey);
+      return;
+    }
+    setSelectedContainerId(virtualEntry.id);
+    setSelectedEntryId(null);
+  }
 
   return (
     <section className="archive-explorer-pane" aria-label="書庫の内容">
@@ -94,7 +111,10 @@ export function ArchiveExplorerPane({ archiveRelativePath, onOpenPage, onClose }
           </p>
         </div>
         <div className="archive-pane-actions">
-          <button type="button" disabled={selectedContainerId === null} onClick={() => setSelectedContainerId(selectedContainer?.parentId ?? null)}>親へ</button>
+          <button type="button" disabled={selectedContainerId === null} onClick={() => {
+            setSelectedContainerId(selectedContainer?.parentId ?? null);
+            setSelectedEntryId(null);
+          }}>親へ</button>
           <button type="button" onClick={onClose}>フォルダー一覧へ戻る</button>
         </div>
       </header>
@@ -103,23 +123,28 @@ export function ArchiveExplorerPane({ archiveRelativePath, onOpenPage, onClose }
       {!loading && error === null && snapshot !== null && (
         <div className="archive-pane-body">
           <p className="archive-pane-summary">{directChildren.length}項目</p>
-          <div className="archive-virtual-scroll" ref={listScroll}>
-            <div role="list" style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-              {virtualizer.getVirtualItems().map((virtualRow) => {
-                const entry = directChildren[virtualRow.index];
-                return (
-                  <div className="archive-list-row" role="listitem" key={entry.id} style={{ transform: `translateY(${virtualRow.start}px)` }}>
-                    <button type="button" onClick={() => {
-                      if (entry.kind === "image" && entry.pageKey !== null) void onOpenPage(entry.pageKey);
-                      else if (entry.kind !== "image") setSelectedContainerId(entry.id);
-                    }}>
-                      <span aria-hidden="true">{entryGlyph(entry)}</span><span>{entry.name}</span><span>{entry.kind === "image" ? "開く" : "›"}</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <CatalogGrid
+            entries={catalogEntries}
+            currentFolderPath={selectedContainerId ?? "@archive-root"}
+            loadedFolderPath={selectedContainerId ?? "@archive-root"}
+            selectedPath={selectedEntryId}
+            viewMode={viewMode}
+            thumbnailSizes={thumbnailSizes}
+            palette={palette}
+            detailGridLines={detailGridLines}
+            detailRowDensity={detailRowDensity}
+            detailShowKind={detailShowKind}
+            detailShowSize={detailShowSize}
+            detailShowModified={detailShowModified}
+            displayNameFor={(entry) => entriesById.get(entry.relativePath)?.name ?? entry.relativePath}
+            readOnly
+            singleClickActivate
+            thumbnailFor={() => ({ status: "error" })}
+            onSelect={(entry) => setSelectedEntryId(entry.relativePath)}
+            onNavigate={activateEntry}
+            onRead={activateEntry}
+            onActivate={activateEntry}
+          />
         </div>
       )}
     </section>

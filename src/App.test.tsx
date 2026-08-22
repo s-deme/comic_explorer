@@ -1054,7 +1054,7 @@ describe("application shell", () => {
     fireEvent.click(await screen.findByRole("treeitem", { name: "book.cbz" }));
     const pane = await screen.findByRole("region", { name: "書庫の内容" });
     expect(screen.queryByRole("dialog", { name: "書庫エクスプローラー" })).not.toBeInTheDocument();
-    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png.*開く/ }));
+    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png/ }));
 
     expect(await screen.findByText("2 / 2")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "書庫の内容" })).not.toBeInTheDocument();
