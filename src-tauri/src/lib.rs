@@ -173,6 +173,7 @@ pub fn run() {
             application::list_tree_children,
             application::archive_browser::list_archive_virtual_tree,
             application::archive_browser::get_archive_thumbnail,
+            application::archive_browser::copy_archive_page_to_clipboard,
             application::resolve_catalog_activation,
             application::resolve_viewer_rectangle_zoom,
             application::cancel_navigation,

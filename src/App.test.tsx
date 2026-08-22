@@ -178,6 +178,7 @@ vi.mock("./features/library/client", () => ({
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
   listArchiveVirtualTree: vi.fn(async () => ({ status: "ok", data: { archiveRelativePath: "book.cbz", entries: [] } })),
   getArchiveThumbnail: vi.fn(async () => ({ status: "cancelled" })),
+  copyArchivePageToClipboard: vi.fn(async () => ({ status: "cancelled" })),
   openComic: vi.fn(),
   resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
   resolveViewerRectangleZoom: vi.fn(),
@@ -1055,7 +1056,10 @@ describe("application shell", () => {
     fireEvent.click(await screen.findByRole("treeitem", { name: "book.cbz" }));
     const pane = await screen.findByRole("region", { name: "書庫の内容" });
     expect(screen.queryByRole("dialog", { name: "書庫エクスプローラー" })).not.toBeInTheDocument();
-    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png/ }));
+    const archivePage = await within(pane).findByRole("button", { name: /2\.png/ });
+    fireEvent.click(archivePage);
+    expect(screen.queryByText("2 / 2")).not.toBeInTheDocument();
+    fireEvent.doubleClick(archivePage);
 
     expect(await screen.findByText("2 / 2")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "書庫の内容" })).not.toBeInTheDocument();

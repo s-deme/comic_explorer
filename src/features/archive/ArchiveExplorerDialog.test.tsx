@@ -2,11 +2,16 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getArchiveThumbnail, listArchiveVirtualTree } from "../library/client";
+import {
+  copyArchivePageToClipboard,
+  getArchiveThumbnail,
+  listArchiveVirtualTree,
+} from "../library/client";
 import { ArchiveExplorerPane } from "./ArchiveExplorerDialog";
 import { DEFAULT_CATALOG_THUMBNAIL_SIZES } from "../catalog/view-mode";
 
 vi.mock("../library/client", () => ({
+  copyArchivePageToClipboard: vi.fn(),
   getArchiveThumbnail: vi.fn(),
   listArchiveVirtualTree: vi.fn(),
 }));
@@ -53,6 +58,17 @@ describe("ArchiveExplorerPane", () => {
         cacheHit: false,
       } as never,
     });
+    vi.mocked(copyArchivePageToClipboard).mockResolvedValue({
+      status: "ok",
+      requestId: "archive-clipboard" as never,
+      generation: 7 as never,
+      data: {
+        pageRelativePath: "chapter/2.png",
+        width: 800,
+        height: 1000,
+        payloadBytes: 3_200_124,
+      },
+    });
   });
 
   it("REQ-MVP-006 lazily displays thumbnails for visible archive images", async () => {
@@ -65,7 +81,7 @@ describe("ArchiveExplorerPane", () => {
       />,
     );
     const pane = await screen.findByRole("region", { name: "書庫の内容" });
-    fireEvent.click(within(pane).getByRole("button", { name: /chapter/ }));
+    fireEvent.doubleClick(within(pane).getByRole("button", { name: /chapter/ }));
 
     await waitFor(() => expect(getArchiveThumbnail).toHaveBeenCalledWith(
       "book.cbz",
@@ -93,13 +109,19 @@ describe("ArchiveExplorerPane", () => {
     expect(within(pane).getByRole("button", { name: /chapter/ })).toBeInTheDocument();
     expect(within(pane).getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveAttribute("data-catalog-view-mode", "cover_list");
-    fireEvent.click(within(pane).getByRole("button", { name: /chapter/ }));
-    fireEvent.click(await within(pane).findByRole("button", { name: /2\.png/ }));
+    const chapter = within(pane).getByRole("button", { name: /chapter/ });
+    fireEvent.click(chapter);
+    expect(within(pane).queryByRole("button", { name: /2\.png/ })).not.toBeInTheDocument();
+    fireEvent.doubleClick(chapter);
+    const page = await within(pane).findByRole("button", { name: /2\.png/ });
+    fireEvent.click(page);
+    expect(onOpenPage).not.toHaveBeenCalled();
+    fireEvent.doubleClick(page);
     expect(onOpenPage).toHaveBeenCalledWith("chapter/2.png");
 
     fireEvent.click(within(pane).getByRole("button", { name: "親へ" }));
-    fireEvent.click(await within(pane).findByRole("button", { name: /inner\.cbz/ }));
-    fireEvent.click(await within(pane).findByRole("button", { name: /1\.png/ }));
+    fireEvent.doubleClick(await within(pane).findByRole("button", { name: /inner\.cbz/ }));
+    fireEvent.doubleClick(await within(pane).findByRole("button", { name: /1\.png/ }));
     expect(onOpenPage).toHaveBeenCalledWith("@comic-explorer-nested-v1/aa/bb");
     expect(screen.queryByText(/削除|名前変更|貼り付け/)).not.toBeInTheDocument();
   });
@@ -139,10 +161,42 @@ describe("ArchiveExplorerPane", () => {
     const chapter = within(grid).getByRole("button", { name: /chapter/ });
     expect(chapter).toHaveClass("catalog-item--detail_list");
     expect(chapter).not.toHaveAttribute("draggable", "true");
-    fireEvent.click(chapter);
+    fireEvent.doubleClick(chapter);
     const page = await screen.findByRole("button", { name: /2\.png/ });
     fireEvent.click(page);
     expect(page).toHaveAttribute("data-selected", "true");
     expect(within(grid).queryByRole("button", { name: /お気に入り/ })).not.toBeInTheDocument();
+  });
+
+  it("REQ-LEY-P4-002 copies only the selected archive image as clipboard pixels", async () => {
+    render(
+      <ArchiveExplorerPane
+        {...displayProps}
+        archiveRelativePath="book.cbz"
+        onOpenPage={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const pane = await screen.findByRole("region", { name: "書庫の内容" });
+    const copyButton = within(pane).getByRole("button", { name: "画像をコピー" });
+    expect(copyButton).toBeDisabled();
+    expect(copyButton).toHaveAttribute("aria-keyshortcuts", "Control+C");
+
+    fireEvent.doubleClick(within(pane).getByRole("button", { name: /chapter/ }));
+    const page = await within(pane).findByRole("button", { name: /2\.png/ });
+    fireEvent.click(page);
+    expect(copyButton).toBeEnabled();
+    fireEvent.click(copyButton);
+
+    await waitFor(() => expect(copyArchivePageToClipboard).toHaveBeenCalledWith(
+      "book.cbz",
+      "chapter/2.png",
+      7,
+    ));
+    expect(await within(pane).findByText("2.png を 800×1000px の画像としてコピーしました。"))
+      .toBeInTheDocument();
+
+    fireEvent.keyDown(page, { key: "c", ctrlKey: true });
+    await waitFor(() => expect(copyArchivePageToClipboard).toHaveBeenCalledTimes(2));
   });
 });

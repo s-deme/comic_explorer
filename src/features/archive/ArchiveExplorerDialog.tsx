@@ -4,6 +4,7 @@ import type { CatalogEntry, RelativePath } from "../../types/domain";
 import { CatalogGrid } from "../catalog/CatalogGrid";
 import type { CatalogThumbnailSizes, CatalogViewMode } from "../catalog/view-mode";
 import {
+  copyArchivePageToClipboard,
   getArchiveThumbnail,
   listArchiveVirtualTree,
   type ArchiveVirtualEntry,
@@ -52,9 +53,12 @@ export function ArchiveExplorerPane({
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
+  const [clipboardCopying, setClipboardCopying] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
   const thumbnailRequests = useRef(new Map<string, number>());
   const thumbnailRequestSequence = useRef(0);
+  const clipboardRequestSequence = useRef(0);
   const requestGenerationRef = useRef(requestGeneration);
   requestGenerationRef.current = requestGeneration;
 
@@ -65,6 +69,9 @@ export function ArchiveExplorerPane({
     setSelectedEntryId(null);
     setLoading(true);
     setError(null);
+    setClipboardNotice(null);
+    setClipboardCopying(false);
+    clipboardRequestSequence.current += 1;
     setThumbnails({});
     thumbnailRequests.current.clear();
     void listArchiveVirtualTree(archiveRelativePath, requestGeneration)
@@ -85,6 +92,9 @@ export function ArchiveExplorerPane({
   useEffect(() => {
     setThumbnails({});
     thumbnailRequests.current.clear();
+    clipboardRequestSequence.current += 1;
+    setClipboardNotice(null);
+    setClipboardCopying(false);
   }, [requestGeneration]);
 
   const queueThumbnail = useCallback((entry: CatalogEntry) => {
@@ -151,6 +161,9 @@ export function ArchiveExplorerPane({
   const selectedContainer = selectedContainerId === null
     ? null
     : snapshot?.entries.find((entry) => entry.id === selectedContainerId) ?? null;
+  const selectedEntry = selectedEntryId === null
+    ? null
+    : snapshot?.entries.find((entry) => entry.id === selectedEntryId) ?? null;
   const directChildren = children.get(selectedContainerId) ?? [];
   const entriesById = useMemo(
     () => new Map(directChildren.map((entry) => [entry.id, entry])),
@@ -164,6 +177,9 @@ export function ArchiveExplorerPane({
   function activateEntry(entry: CatalogEntry) {
     const virtualEntry = entriesById.get(entry.relativePath);
     if (virtualEntry === undefined) return;
+    clipboardRequestSequence.current += 1;
+    setClipboardNotice(null);
+    setClipboardCopying(false);
     if (virtualEntry.kind === "image" && virtualEntry.pageKey !== null) {
       void onOpenPage(virtualEntry.pageKey);
       return;
@@ -172,8 +188,55 @@ export function ArchiveExplorerPane({
     setSelectedEntryId(null);
   }
 
+  async function copySelectedImage() {
+    if (selectedEntry?.kind !== "image" || selectedEntry.pageKey === null || clipboardCopying) return;
+    const requestToken = ++clipboardRequestSequence.current;
+    const requestEpoch = generation.current;
+    setClipboardCopying(true);
+    setClipboardNotice(`${selectedEntry.name} を画像としてコピーしています。`);
+    try {
+      const response = await copyArchivePageToClipboard(
+        archiveRelativePath,
+        selectedEntry.pageKey,
+        requestGeneration,
+      );
+      if (requestToken !== clipboardRequestSequence.current || requestEpoch !== generation.current) return;
+      if (response.status === "ok") {
+        setClipboardNotice(
+          `${selectedEntry.name} を ${response.data.width}×${response.data.height}px の画像としてコピーしました。`,
+        );
+      } else if (response.status === "error") {
+        setClipboardNotice(`画像をコピーできませんでした。${presentError(response.error)}`);
+      } else {
+        setClipboardNotice("画像のコピーはキャンセルされました。もう一度お試しください。");
+      }
+    } catch {
+      if (requestToken === clipboardRequestSequence.current && requestEpoch === generation.current) {
+        setClipboardNotice("画像をコピーできませんでした。もう一度お試しください。");
+      }
+    } finally {
+      if (requestToken === clipboardRequestSequence.current && requestEpoch === generation.current) {
+        setClipboardCopying(false);
+      }
+    }
+  }
+
   return (
-    <section className="archive-explorer-pane" aria-label="書庫の内容">
+    <section
+      className="archive-explorer-pane"
+      aria-label="書庫の内容"
+      onKeyDown={(event) => {
+        if (
+          (event.ctrlKey || event.metaKey)
+          && !event.altKey
+          && event.key.toLowerCase() === "c"
+          && selectedEntry?.kind === "image"
+        ) {
+          event.preventDefault();
+          void copySelectedImage();
+        }
+      }}
+    >
       <header className="archive-pane-header">
         <div>
           <h2>書庫の内容</h2>
@@ -182,9 +245,18 @@ export function ArchiveExplorerPane({
           </p>
         </div>
         <div className="archive-pane-actions">
+          <button
+            type="button"
+            aria-keyshortcuts="Control+C"
+            disabled={selectedEntry?.kind !== "image" || clipboardCopying}
+            onClick={() => void copySelectedImage()}
+          >{clipboardCopying ? "コピー中…" : "画像をコピー"}</button>
           <button type="button" disabled={selectedContainerId === null} onClick={() => {
+            clipboardRequestSequence.current += 1;
             setSelectedContainerId(selectedContainer?.parentId ?? null);
             setSelectedEntryId(null);
+            setClipboardNotice(null);
+            setClipboardCopying(false);
           }}>親へ</button>
           <button type="button" onClick={onClose}>フォルダー一覧へ戻る</button>
         </div>
@@ -193,7 +265,10 @@ export function ArchiveExplorerPane({
       {error !== null && <div className="catalog-state" role="alert"><p>{error}</p></div>}
       {!loading && error === null && snapshot !== null && (
         <div className="archive-pane-body">
-          <p className="archive-pane-summary">{directChildren.length}項目</p>
+          <div className="archive-pane-meta">
+            <p className="archive-pane-summary">{directChildren.length}項目</p>
+            {clipboardNotice !== null && <p className="archive-pane-notice" role="status">{clipboardNotice}</p>}
+          </div>
           <CatalogGrid
             entries={catalogEntries}
             currentFolderPath={selectedContainerId ?? "@archive-root"}
@@ -209,14 +284,20 @@ export function ArchiveExplorerPane({
             detailShowModified={detailShowModified}
             displayNameFor={(entry) => entriesById.get(entry.relativePath)?.name ?? entry.relativePath}
             readOnly
-            singleClickActivate
             thumbnailFor={(entry) => thumbnails[entry.relativePath] ?? (
               entriesById.get(entry.relativePath)?.kind === "image"
                 ? { status: "loading" }
                 : { status: "error" }
             )}
             onThumbnailNeeded={queueThumbnail}
-            onSelect={(entry) => setSelectedEntryId(entry.relativePath)}
+            onSelect={(entry) => {
+              if (selectedEntryId !== entry.relativePath) {
+                clipboardRequestSequence.current += 1;
+                setClipboardNotice(null);
+                setClipboardCopying(false);
+              }
+              setSelectedEntryId(entry.relativePath);
+            }}
             onNavigate={activateEntry}
             onRead={activateEntry}
             onActivate={activateEntry}

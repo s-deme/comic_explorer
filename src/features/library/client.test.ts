@@ -47,6 +47,7 @@ import {
   migrateLegacyShelf,
   listArchiveVirtualTree,
   getArchiveThumbnail,
+  copyArchivePageToClipboard,
   getFileUndoStatus,
   undoLastFileOperation,
   cancelOfflineMediaRegistration,
@@ -131,6 +132,15 @@ describe("library client settings contract", () => {
       archiveRelativePath: "Series/book.cbz",
       pageKey: "chapter/2.png",
       priority: "visible",
+    });
+  });
+
+  it("REQ-LEY-P4-002 copies one opaque archive page through structured IPC", async () => {
+    await copyArchivePageToClipboard("Series/book.cbz", "chapter/2.png", 87);
+    expect(invokeMock).toHaveBeenCalledWith("copy_archive_page_to_clipboard", {
+      context: expect.objectContaining({ generation: 87 }),
+      archiveRelativePath: "Series/book.cbz",
+      pageKey: "chapter/2.png",
     });
   });
 

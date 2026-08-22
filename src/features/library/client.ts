@@ -1737,6 +1737,18 @@ export async function getArchiveThumbnail(
   });
 }
 
+export async function copyArchivePageToClipboard(
+  archiveRelativePath: string,
+  pageKey: string,
+  generation: number,
+): Promise<ApiResponse<ClipboardImageResult>> {
+  return invoke("copy_archive_page_to_clipboard", {
+    context: context(generation),
+    archiveRelativePath,
+    pageKey,
+  });
+}
+
 export async function listTreeChildren(
   relativePath: string,
   generation: number,

@@ -10,8 +10,9 @@ use crate::domain::{AppError, ErrorCode, PageId, RelativePath};
 use crate::media::{MediaGrant, PageSource, media_uri};
 
 use super::{
-    AppState, OpenItemKind, ThumbnailPriority, contained_library_path, error_response,
-    open_item_kind, request_error, resolve_thumbnail_cover, unix_millis, validate_request,
+    AppState, ClipboardImageResult, OpenItemKind, ThumbnailPriority, contained_library_path,
+    decode_clipboard_bgra, error_response, file_operations, open_item_kind, read_page_bytes,
+    request_error, resolve_thumbnail_cover, unix_millis, validate_request, viewer_page_grant,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -79,6 +80,17 @@ fn validate_archive_target(
         });
     }
     Ok(canonical)
+}
+
+fn decode_archive_page_clipboard(
+    root: &std::path::Path,
+    archive_relative: &RelativePath,
+    page: &RelativePath,
+) -> Result<(u32, u32, Vec<u8>), AppError> {
+    validate_archive_target(root, archive_relative)?;
+    let grant = viewer_page_grant(root, archive_relative, page)?;
+    let (_, bytes) = read_page_bytes(&grant, page)?;
+    decode_clipboard_bgra(&bytes)
 }
 
 #[tauri::command]
@@ -268,10 +280,95 @@ pub async fn get_archive_thumbnail(
     })
 }
 
+#[tauri::command]
+pub async fn copy_archive_page_to_clipboard(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    archive_relative_path: String,
+    page_key: String,
+) -> Result<Response<ClipboardImageResult>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let archive_relative = match RelativePath::parse(archive_relative_path) {
+        Ok(value) if !value.as_str().is_empty() => value,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Archive path is invalid."),
+            ));
+        }
+    };
+    let page = match RelativePath::parse(page_key) {
+        Ok(value) if !value.as_str().is_empty() => value,
+        _ => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidPath, "Archive page key is invalid."),
+            ));
+        }
+    };
+    let root = match state
+        .library_root
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .clone()
+    {
+        Some(value) => value,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let worker_archive = archive_relative.clone();
+    let worker_page = page.clone();
+    let decoded = tauri::async_runtime::spawn_blocking(move || {
+        decode_archive_page_clipboard(&root, &worker_archive, &worker_page)
+    })
+    .await
+    .map_err(|error| format!("archive image clipboard decode worker failed: {error}"))?;
+    let (width, height, bgra) = match decoded {
+        Ok(decoded) => decoded,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    if !state
+        .navigation
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .is_current(context.generation)
+    {
+        return Ok(Response::Cancelled {
+            request_id: context.request_id,
+            generation: context.generation,
+        });
+    }
+    let payload_bytes = match tauri::async_runtime::spawn_blocking(move || {
+        file_operations::write_image_clipboard(width, height, &bgra)
+    })
+    .await
+    .map_err(|error| format!("archive image clipboard worker failed: {error}"))?
+    {
+        Ok(bytes) => bytes,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    Ok(Response::Ok {
+        request_id: context.request_id,
+        generation: context.generation,
+        data: ClipboardImageResult {
+            page_relative_path: page,
+            width,
+            height,
+            payload_bytes,
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use zip::ZipWriter;
@@ -310,6 +407,54 @@ mod tests {
         fs::write(temporary.join("note.txt"), b"text").unwrap();
         assert!(
             validate_archive_target(&temporary, &RelativePath::parse("note.txt").unwrap()).is_err()
+        );
+        fs::remove_dir_all(temporary).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn req_ley_p4_002_decodes_one_archive_page_for_the_image_clipboard() {
+        use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temporary = std::env::temp_dir().join(format!(
+            "comic-explorer-archive-clipboard-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&temporary).unwrap();
+        let archive = temporary.join("book.cbz");
+        let image =
+            DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([10, 20, 30, 200])));
+        let mut png = Cursor::new(Vec::new());
+        image.write_to(&mut png, ImageFormat::Png).unwrap();
+        let mut writer = ZipWriter::new(fs::File::create(&archive).unwrap());
+        writer
+            .start_file("chapter/1.png", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(&png.into_inner()).unwrap();
+        writer.finish().unwrap();
+        let original = fs::read(&archive).unwrap();
+
+        let (width, height, bgra) = decode_archive_page_clipboard(
+            &temporary,
+            &RelativePath::parse("book.cbz").unwrap(),
+            &RelativePath::parse("chapter/1.png").unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!((width, height), (3, 2));
+        assert_eq!(bgra.len(), 3 * 2 * 4);
+        assert_eq!(fs::read(&archive).unwrap(), original);
+        assert!(
+            decode_archive_page_clipboard(
+                &temporary,
+                &RelativePath::parse("book.cbz").unwrap(),
+                &RelativePath::parse("chapter/missing.png").unwrap(),
+            )
+            .is_err()
         );
         fs::remove_dir_all(temporary).unwrap();
     }
