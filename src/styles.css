@@ -1519,6 +1519,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .bookmark-dialog li { display: flex; gap: 6px; align-items: center; }
 .bookmark-dialog li button { max-width: 100%; overflow-wrap: anywhere; text-align: left; }
 .dialog-backdrop > .end-of-volume-dialog { width: min(520px, calc(100vw - 32px)); }
+.dialog-backdrop > .version-dialog { width: min(440px, calc(100vw - 32px)); }
+.version-dialog h2 { margin-bottom: 10px; }
+.version-dialog p { margin: 0; }
+.version-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
 .dialog-backdrop > .help-dialog {
   display: grid;
   width: min(980px, calc(100vw - 32px));

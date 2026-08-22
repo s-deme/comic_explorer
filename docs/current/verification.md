@@ -102,6 +102,13 @@ LEY-HELP-001の一般ヘルプを、固定header/footer、章navigation、選択
 | CoDD | PASS（red 0） | scan/check/verify exit 0。verifyはDAG red 3 PASS / 0 FAIL、project testとtypecheckを再実行。SKIP 3、VACUOUS 1、amber WARN 1を機能PASSへ合算しない。 |
 | 製品直接観測 | NOT RUN | release WebView2での2ペインvisual、keyboard巡回、狭幅、DPI、screen readerは未測定。 |
 
+### 2026-08-23 バージョン情報dialogのcompact化
+
+一般ヘルプ用の最大980×760px layoutをバージョン情報から分離し、製品version・runtime・license notice導線だけを
+最大幅440pxの専用dialogへ配置した。focused frontend 1件、Python style contract、Windows testsのPython 64件と
+frontend 41 files / 515件、TypeScript typecheck、最終CoDD scan/check/verifyはPASSした。release WebView2での
+visualとDPIは未測定とする。
+
 ### 2026-08-22 設定・ヘルプnavigationライト配色
 
 統合設定と一般ヘルプのnavigationからdark surfaceを除去し、共通の`#f1f5f9`背景、本文側の`#d5dde8`境界、neutral text/icon、`#dcecff`のcurrent面と青い左accentへ変更した。狭幅の横navigationでは右境界を除去して下境界へ置換する。

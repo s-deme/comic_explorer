@@ -53,6 +53,10 @@ root/path認可、列挙、archive、MIME/metadata、generation、queue、cache�
 frontendへ任意のhost path、SQL、archive entry accessを渡さない。成功、分類済みerror、cancel、
 stale responseを構造的に区別する。
 
+一般ヘルプは検索・章navigation・本文を収める大形の`.help-dialog`を使うが、バージョン情報は
+製品version、runtime、third-party noticeへの導線だけを持つ最大幅440pxの`.version-dialog`へ分離する。
+license本文は従来どおり独立したscroll可能なdialogで表示し、短いバージョン情報へ大形help layoutを適用しない。
+
 ## catalogとnavigation
 
 起動時はlibrary root登録画面を介さず、Windowsの論理ドライブbitmaskをbackendで列挙して、frontendの

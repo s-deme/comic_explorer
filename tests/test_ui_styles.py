@@ -365,6 +365,13 @@ class UiStyleContractTests(unittest.TestCase):
         )
         self.assert_rule_contains(".settings-actions", "background: #fff")
 
+    def test_version_information_uses_a_compact_dedicated_dialog(self) -> None:
+        self.assert_rule_contains(
+            ".dialog-backdrop > .version-dialog",
+            "width: min(440px, calc(100vw - 32px))",
+        )
+        self.assert_rule_contains(".version-dialog-actions", "justify-content: flex-end")
+
 
 if __name__ == "__main__":
     unittest.main()

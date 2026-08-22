@@ -4473,6 +4473,8 @@ describe("application shell", () => {
     fireEvent.click(within(helpMenu).getByRole("menuitem", { name: "バージョン情報…" }));
 
     const version = await screen.findByRole("dialog", { name: "バージョン情報" });
+    expect(version).toHaveClass("version-dialog");
+    expect(version).not.toHaveClass("help-dialog");
     await waitFor(() => expect(within(version).getByText(
       `バージョン ${APP_VERSION} / runtime: Tauri WebView2`,
     )).toBeInTheDocument());

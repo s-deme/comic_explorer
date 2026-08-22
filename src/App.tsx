@@ -7092,17 +7092,19 @@ export function App({
             role="dialog"
             aria-modal="true"
             aria-labelledby="version-title"
-            className="help-dialog"
+            className="version-dialog"
             onKeyDown={(event) => {
               if (event.key === "Escape") closeVersion();
             }}
           >
             <h2 id="version-title">バージョン情報</h2>
             <p data-product-id="version-info">バージョン {APP_VERSION} / runtime: {runtimeLabel}</p>
-            <button type="button" onClick={() => setLicenseOpen(true)}>
-              third-party license noticeを開く
-            </button>
-            <button autoFocus type="button" onClick={closeVersion}>閉じる</button>
+            <div className="version-dialog-actions">
+              <button type="button" onClick={() => setLicenseOpen(true)}>
+                third-party license noticeを開く
+              </button>
+              <button autoFocus type="button" onClick={closeVersion}>閉じる</button>
+            </div>
           </div>
         </div>
       )}
