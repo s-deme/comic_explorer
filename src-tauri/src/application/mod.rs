@@ -5210,6 +5210,12 @@ fn search_library_with_options_port(
     options: &SearchOptions,
     cancellation: &CancellationToken,
 ) -> Result<Vec<CatalogEntry>, AppError> {
+    if !options.include_folders && !options.include_files {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Search must include folders, files, or both.",
+        ));
+    }
     let expression = parse_search_query(query)
         .map_err(|error| request_error(ErrorCode::InvalidRequest, error.0))?;
     if cancellation.is_cancelled() {
@@ -8141,6 +8147,19 @@ mod shutdown_tests {
         assert_eq!(direct.len(), 1);
         assert_eq!(direct[0].relative_path.as_str(), "root-volume.cbz");
 
+        options.include_folders = false;
+        options.include_files = false;
+        assert!(
+            search_library_with_options_port(
+                &root,
+                &normalize_search_text("volume"),
+                &options,
+                &cancellation,
+            )
+            .is_err()
+        );
+
+        options.include_folders = true;
         options.include_subfolders = true;
         options.include_files = false;
         assert!(

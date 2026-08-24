@@ -1873,16 +1873,16 @@ describe("application shell", () => {
     expect(screen.queryByLabelText("名前検索")).not.toBeInTheDocument();
     const searchToggle = screen.getByRole("button", { name: "検索ペインを表示" });
     expect(searchToggle).toHaveTextContent("⌕");
-    expect(searchToggle).toHaveAttribute("title", "検索とフィルタを表示");
+    expect(searchToggle).toHaveAttribute("title", "検索を表示");
     const searchPane = openSearchPane();
     const search = within(searchPane).getByRole("button", { name: "検索" });
     expect(search).toHaveTextContent("⌕");
     expect(search).not.toHaveTextContent("検索");
     expect(search).toHaveAttribute("title", "名前で検索");
-    const showAll = within(searchPane).getByRole("button", { name: "全件" });
-    expect(showAll).toHaveTextContent("✕");
-    expect(showAll).not.toHaveTextContent("全件");
-    expect(showAll).toHaveAttribute("title", "ファイルマスクを解除して全件表示");
+    expect(within(searchPane).queryByLabelText("一覧の絞り込み")).not.toBeInTheDocument();
+    const filterBar = screen.getByRole("region", { name: "現在の一覧を絞り込む" });
+    expect(within(filterBar).getByRole("button", { name: "絞り込みを解除" }))
+      .toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" }))
       .not.toBeInTheDocument();
     fireEvent.click(within(searchPane).getByRole("button", { name: "検索ペインを閉じる" }));
@@ -2915,7 +2915,8 @@ describe("application shell", () => {
         includeSubfolders: true,
         includeFolders: true,
         includeFiles: true,
-        fixedLocation: null,
+        fixedLocation: "",
+        sourceRoots: ["C:\\"],
       }),
     );
   });
@@ -2964,9 +2965,9 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("root.cbz")]);
     const pane = openSearchPane();
 
+    fireEvent.click(within(pane).getByLabelText("指定した複数の場所"));
     fireEvent.click(within(pane).getByRole("button", { name: "検索場所を追加" }));
     await within(pane).findByText("D:\\Comics");
-    expect(within(pane).getByLabelText("検索場所を固定する")).toBeDisabled();
     fireEvent.change(within(pane).getByLabelText("名前検索"), {
       target: { value: "volume" },
     });
@@ -3014,10 +3015,10 @@ describe("application shell", () => {
     await registerTestLibrary([testEntry("root.cbz")]);
     const pane = openSearchPane();
 
-    fireEvent.click(within(pane).getByLabelText("サブフォルダも検索する"));
-    fireEvent.click(within(pane).getByLabelText("フォルダは検索対象にしない"));
-    fireEvent.click(within(pane).getByLabelText("検索結果を破棄しない"));
-    fireEvent.click(within(pane).getByLabelText("検索場所を固定する"));
+    fireEvent.click(within(pane).getByLabelText("サブフォルダーの中も検索する"));
+    fireEvent.click(within(pane).getByLabelText("結果にフォルダーを含める"));
+    fireEvent.click(within(pane).getByText("詳細条件"));
+    fireEvent.click(within(pane).getByLabelText("項目を開いた後も検索結果を表示する"));
     fireEvent.click(within(pane).getByLabelText("サイズ指定を有効にする"));
     fireEvent.change(within(pane).getByLabelText("サイズ (KB)"), {
       target: { value: "128" },
@@ -3055,7 +3056,7 @@ describe("application shell", () => {
       testEntry("book.cbz"),
       { relativePath: "cover.jpg" as never, kind: "page" },
     ]);
-    const pane = openSearchPane();
+    const filterBar = screen.getByRole("region", { name: "現在の一覧を絞り込む" });
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
 
     catalogMaskMock.mockResolvedValueOnce({
@@ -3064,11 +3065,11 @@ describe("application shell", () => {
       generation: 1 as never,
       data: [true, false],
     });
-    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+    fireEvent.change(within(filterBar).getByLabelText("一覧の絞り込み"), {
       target: { value: "*.cbz;*.pdf" },
     });
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
-    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    fireEvent.click(within(filterBar).getByRole("button", { name: "適用" }));
     await waitFor(() => {
       expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
     });
@@ -3094,11 +3095,11 @@ describe("application shell", () => {
         retryable: false,
       },
     });
-    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+    fireEvent.change(within(filterBar).getByLabelText("一覧の絞り込み"), {
       target: { value: "*.cbz AND" },
     });
-    fireEvent.submit(within(pane).getByRole("form", { name: "ファイルマスクフォーム" }));
-    const alert = await within(pane).findByRole("alert");
+    fireEvent.submit(within(filterBar).getByRole("form", { name: "一覧の絞り込みフォーム" }));
+    const alert = await within(filterBar).findByRole("alert");
     expect(alert).toHaveTextContent("(*.cbz OR *.pdf) AND NOT sample*");
     expect(alert).not.toHaveTextContent("backend parser detail");
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
@@ -3109,12 +3110,12 @@ describe("application shell", () => {
       generation: 3 as never,
       data: [false, false],
     });
-    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+    fireEvent.change(within(filterBar).getByLabelText("一覧の絞り込み"), {
       target: { value: "*.rar" },
     });
-    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
-    expect(await screen.findByText("ファイルマスクで2項目が非表示です")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "マスクを解除して表示" }));
+    fireEvent.click(within(filterBar).getByRole("button", { name: "適用" }));
+    expect(await screen.findByText("一覧の絞り込みで2項目が非表示です")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "絞り込みを解除して表示" }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
 
     let resolveStale:
@@ -3123,12 +3124,12 @@ describe("application shell", () => {
     catalogMaskMock.mockImplementationOnce(() => new Promise((resolve) => {
       resolveStale = resolve;
     }));
-    fireEvent.change(within(pane).getByLabelText("ファイルマスク"), {
+    fireEvent.change(within(filterBar).getByLabelText("一覧の絞り込み"), {
       target: { value: "*.jpg" },
     });
-    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
-    expect(await within(pane).findByRole("status")).toHaveTextContent("評価しています");
-    fireEvent.click(within(pane).getByRole("button", { name: "全件" }));
+    fireEvent.click(within(filterBar).getByRole("button", { name: "適用" }));
+    expect(await within(filterBar).findByRole("status")).toHaveTextContent("絞り込んでいます");
+    fireEvent.click(within(filterBar).getByRole("button", { name: "絞り込みを解除" }));
     await act(async () => resolveStale?.({
       status: "ok",
       requestId: "catalog-mask-stale" as never,
@@ -3136,7 +3137,7 @@ describe("application shell", () => {
       data: [false, true],
     }));
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "2");
-    expect(within(pane).queryByRole("status")).not.toBeInTheDocument();
+    expect(within(filterBar).queryByText("一覧を絞り込んでいます…")).not.toBeInTheDocument();
   });
 
   it("REQ-LEY-P3-003 restores, applies, replaces, and confirms deletion of detailed masks", async () => {
@@ -3166,15 +3167,16 @@ describe("application shell", () => {
       { relativePath: "small.cbz" as never, kind: "archive", byteSize: 10 * 1024, modifiedMs: modifiedAfterMs + 1 },
       { relativePath: "large.cbz" as never, kind: "archive", byteSize: 200 * 1024, modifiedMs: modifiedAfterMs + 1 },
     ]);
-    const pane = openSearchPane();
-    const savedSection = await within(pane).findByRole("region", { name: "保存済みファイルマスク" });
+    const filterBar = screen.getByRole("region", { name: "現在の一覧を絞り込む" });
+    fireEvent.click(within(filterBar).getByText("詳細条件と保存済み条件"));
+    const savedSection = await within(filterBar).findByRole("region", { name: "保存済み一覧フィルター" });
     fireEvent.change(within(savedSection).getByLabelText("保存済み条件"), {
       target: { value: "large recent" },
     });
-    expect(within(pane).getByLabelText("ファイルマスク")).toHaveValue("*.cbz");
-    expect(within(pane).getByLabelText("最小サイズ (KiB)")).toHaveValue(100);
-    expect(within(pane).getByLabelText("最大サイズ (KiB)")).toHaveValue(500);
-    expect(within(pane).getByLabelText("フォルダを含む")).not.toBeChecked();
+    expect(within(filterBar).getByLabelText("一覧の絞り込み")).toHaveValue("*.cbz");
+    expect(within(filterBar).getByLabelText("最小サイズ (KiB)")).toHaveValue(100);
+    expect(within(filterBar).getByLabelText("最大サイズ (KiB)")).toHaveValue(500);
+    expect(within(filterBar).getByLabelText("結果にフォルダーを含める")).not.toBeChecked();
     expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "3");
 
     catalogMaskMock.mockResolvedValueOnce({
@@ -3183,7 +3185,7 @@ describe("application shell", () => {
       generation: 2 as never,
       data: [false, false, true],
     });
-    fireEvent.click(within(pane).getByRole("button", { name: "ファイルマスクを適用" }));
+    fireEvent.click(within(filterBar).getByRole("button", { name: "適用" }));
     await waitFor(() => {
       expect(screen.getByRole("grid")).toHaveAttribute("data-entry-count", "1");
     });
@@ -3224,6 +3226,43 @@ describe("application shell", () => {
       "large recent",
       expect.any(Number),
     ));
+  });
+
+  it("keeps catalog filtering independent from name-search results and reports search counts", async () => {
+    await registerTestLibrary([
+      testEntry("book.cbz"),
+      { relativePath: "cover.jpg" as never, kind: "page" },
+    ]);
+    const filterBar = screen.getByRole("region", { name: "現在の一覧を絞り込む" });
+    catalogMaskMock.mockResolvedValueOnce({
+      status: "ok",
+      requestId: "catalog-filter-independent" as never,
+      generation: 1 as never,
+      data: [true, false],
+    });
+    fireEvent.change(within(filterBar).getByLabelText("一覧の絞り込み"), {
+      target: { value: "*.cbz" },
+    });
+    fireEvent.click(within(filterBar).getByRole("button", { name: "適用" }));
+    await waitFor(() => expect(screen.getByRole("grid"))
+      .toHaveAttribute("data-entry-count", "1"));
+
+    searchMock.mockResolvedValueOnce(searchResponse([
+      testEntry("Series/one.cbz"),
+      testEntry("Series/two.cbz"),
+    ]));
+    const pane = openSearchPane();
+    fireEvent.change(within(pane).getByLabelText("名前検索"), {
+      target: { value: "series" },
+    });
+    fireEvent.click(within(pane).getByRole("button", { name: "検索" }));
+
+    expect(await screen.findByRole("region", { name: "名前検索結果" }))
+      .toHaveAttribute("data-search-result-count", "2");
+    expect(within(filterBar).getByText("名前検索結果には適用されません。"))
+      .toBeInTheDocument();
+    expect(screen.getByText("検索結果: 2件")).toBeInTheDocument();
+    expect(screen.getByText("検索結果を表示中")).toBeInTheDocument();
   });
 
   it("FT-B05-002 keeps mixed file and folder result kinds visible", async () => {
@@ -4086,7 +4125,7 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
-  }, 40_000);
+  }, 60_000);
 
   it("REQ-LEY-P1-017 and P1-019 persist hidden visibility and a safe catalog palette", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);

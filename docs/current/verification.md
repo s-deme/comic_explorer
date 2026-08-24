@@ -396,6 +396,19 @@ visualとDPIは未測定とする。
 | 性能・上限 | PASS / 限定 | 最大8 sourceと合計50,000結果をRust境界で自動検証。複数source走査の基準PC時間、slow/removable drive、50,000実fileのwall-clockとworking setは未測定。 |
 | 製品直接観測 | NOT RUN | release WebView2のfolder picker、cancel、network/removable folder、access変化、結果source表示と移動は未測定。 |
 
+## 検索UIの責務分離
+
+対象はFR-B05、LEY-SEARCH-001/002/004/005/006/007/010/011、LEY-CATALOG-006/007。名前検索をfilesystem走査、一覧filterを列挙済みcatalogの絞り込みとして画面上でも分離し、検索範囲3択、肯定形の共通種別selector、size metadata欠落案内、検索結果件数、独立条件表示を接続した。Rust command境界でもfolder/file両方無効を拒否する。
+
+| Gate | 結果 | 2026-08-24の実測 |
+|---|---|---|
+| Focused frontend / Rust | PASS | 検索範囲、複数source、active option、一覧filter、保存条件、検索結果との独立性、共通種別selectorを含むfrontend 8件と、検索種別validationを含むRust focused 1件がFAIL 0。 |
+| Windows tests | PASS | `run-tests-windows.ps1`でCoDD依存整合、Python 65件、frontend 42 files / 519件、FAIL 0。初回全件の既存timing依存1件は単独PASSし、最終全件でもPASSした。 |
+| TypeScript / build / SBOM | PASS | Windows typecheck exit 0。Vite 84 modules、bundle 653.17kB、SBOM 783 components・unknown/prohibited license 0。500kB chunk advisoryを機能PASSへ読み替えない。 |
+| Rust canonical | PASS | `invoke-windows-toolchain.ps1 -Task RustCanonical`で`cargo fmt --check`、`cargo check --locked`、lib 257件とshutdown process 1件、doc testがFAIL 0。既存dead-code warning 2件はFAILへ読み替えない。 |
+| CoDD | PASS | 最終source変更後のscan/check/verifyは赤ゲート0。DAG amberと既存unresolved import residueを含むadvisory 11件は残るが、今回の検索契約に対応するfailureはない。 |
+| 製品直接観測 | NOT RUN | release WebView2での横・縦pane配置、狭幅、DPI、実folder picker、IME、長いpath、filter詳細展開時の高さ・scrollは未測定。 |
+
 ## Leeyes P3-F 現在folder自動更新
 
 対象はLEY-FILER-010の1件。Rust OS watcherを表示中folderへ1件だけ設定し、bounded coalescing後の一致eventを既存catalog再走査へ接続する。設定はstrict profile v18とapp-local SQLiteへ保存する。

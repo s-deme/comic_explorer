@@ -269,6 +269,11 @@ import {
 } from "./features/catalog/thumbnail-maintenance";
 import { QuickAccess } from "./features/catalog/QuickAccess";
 import {
+  CatalogFilterBar,
+  type CatalogFilterDraft,
+} from "./features/catalog/CatalogFilterBar";
+import { ItemKindSelector } from "./features/catalog/ItemKindSelector";
+import {
   restoreWorkspaceDisplay,
   shellGridRows,
   trayStatusAvailable,
@@ -359,14 +364,8 @@ type SearchState =
   | { status: "ready"; query: string; results: SearchResultEntry[] }
   | { status: "error"; query: string; message: string };
 
-interface CatalogMaskOptionsDraft {
-  includeFolders: boolean;
-  includeFiles: boolean;
-  minSizeKiB: string;
-  maxSizeKiB: string;
-  dateStart: string;
-  dateEnd: string;
-}
+type CatalogMaskOptionsDraft = CatalogFilterDraft;
+type SearchScope = "current" | "library" | "multiple";
 
 const DEFAULT_CATALOG_MASK_OPTIONS: CatalogMaskOptions = {
   includeFolders: true,
@@ -881,6 +880,7 @@ export function App({
   const [recoveryNotice, setRecoveryNotice] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPaneOpen, setSearchPaneOpen] = useState(false);
+  const [searchScope, setSearchScope] = useState<SearchScope>("current");
   const [searchOptions, setSearchOptions] = useState<SearchOptions>(defaultSearchOptions);
   const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
   const [searchSourceRoots, setSearchSourceRoots] = useState<string[]>([]);
@@ -998,6 +998,7 @@ export function App({
     setViewerSession(null);
     setArchiveExplorerPath(null);
     setLibraryRoot(root);
+    setSearchScope("current");
     setSearchSourceRoots([root]);
     setSearchSourceNotice(null);
     setLoadedCatalogPath(null);
@@ -3399,6 +3400,14 @@ export function App({
       clearSearch();
       return;
     }
+    if (!searchOptions.includeFolders && !searchOptions.includeFiles) {
+      setSearchState({
+        status: "error",
+        query,
+        message: "検索結果に含める種類を1つ以上選択してください。",
+      });
+      return;
+    }
     generation.current += 1;
     const requestGeneration = generation.current;
     setSearchState({ status: "loading", query });
@@ -3409,8 +3418,10 @@ export function App({
     thumbnailRequests.current.clear();
     try {
       const requestOptions = toSearchRequestOptions(searchOptions);
-      requestOptions.sourceRoots = [...searchSourceRoots];
-      if (searchSourceRoots.length > 1) requestOptions.fixedLocation = null;
+      requestOptions.fixedLocation = searchScope === "current" ? navigation.current : null;
+      requestOptions.sourceRoots = searchScope === "multiple"
+        ? [...searchSourceRoots]
+        : libraryRoot === null ? [] : [libraryRoot];
       const response = await searchLibrary(
         query,
         requestGeneration,
@@ -5588,7 +5599,7 @@ export function App({
           <button
             type="button"
             aria-label={searchPaneOpen ? "検索ペインを閉じる" : "検索ペインを表示"}
-            title={searchPaneOpen ? "検索ペインを閉じる" : "検索とフィルタを表示"}
+            title={searchPaneOpen ? "検索ペインを閉じる" : "検索を表示"}
             aria-pressed={searchPaneOpen}
             data-product-id="toolbar-search"
             onClick={() => {
@@ -5915,7 +5926,7 @@ export function App({
                   aria-label="名前検索フォーム"
                   onSubmit={submitSearch}
                 >
-                  <label htmlFor="catalog-search">ファイル名・フォルダ名</label>
+                  <label htmlFor="catalog-search">ファイル名・フォルダー名</label>
                   <input
                     ref={searchInputRef}
                     id="catalog-search"
@@ -5944,175 +5955,76 @@ export function App({
                     )}
                   </div>
                 </form>
-                <form
-                  className="search-pane-form"
-                  aria-label="ファイルマスクフォーム"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    applyFileMask();
-                  }}
-                >
-                  <label htmlFor="file-mask">ファイルマスク</label>
-                  <input
-                    id="file-mask"
-                    aria-label="ファイルマスク"
-                    aria-describedby="file-mask-syntax"
-                    value={fileMaskDraft}
-                    onChange={(event) => setFileMaskDraft(event.target.value)}
-                    placeholder="*.jpg;*.cbz または AND / OR / NOT"
-                  />
-                  <p id="file-mask-syntax" className="search-syntax-hint">
-                    検索式と同じ構文です。セミコロンはORとして使用できます。
-                  </p>
-                  <fieldset className="catalog-mask-details">
-                    <legend>詳細条件</legend>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={fileMaskOptionsDraft.includeFolders}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          includeFolders: event.target.checked,
-                        }))}
-                      />
-                      フォルダを含む
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={fileMaskOptionsDraft.includeFiles}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          includeFiles: event.target.checked,
-                        }))}
-                      />
-                      ファイルを含む
-                    </label>
-                    <label>
-                      最小サイズ (KiB)
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={fileMaskOptionsDraft.minSizeKiB}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          minSizeKiB: event.target.value,
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      最大サイズ (KiB)
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={fileMaskOptionsDraft.maxSizeKiB}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          maxSizeKiB: event.target.value,
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      更新日（開始）
-                      <input
-                        type="date"
-                        value={fileMaskOptionsDraft.dateStart}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          dateStart: event.target.value,
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      更新日（終了）
-                      <input
-                        type="date"
-                        value={fileMaskOptionsDraft.dateEnd}
-                        onChange={(event) => setFileMaskOptionsDraft((current) => ({
-                          ...current,
-                          dateEnd: event.target.value,
-                        }))}
-                      />
-                    </label>
-                  </fieldset>
-                  <div className="search-pane-actions">
-                    <button
-                      type="submit"
-                      aria-label="ファイルマスクを適用"
-                      title="ファイルマスクを適用"
-                      disabled={fileMaskBusy}
-                    >
-                      <span aria-hidden="true">✓</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="全件"
-                      title="ファイルマスクを解除して全件表示"
-                      onClick={clearFileMask}
-                    >
-                      <span aria-hidden="true">✕</span>
-                    </button>
-                  </div>
-                  {fileMaskBusy && <p role="status">ファイルマスクを評価しています…</p>}
-                  {fileMaskError !== null && <p role="alert">{fileMaskError}</p>}
-                  <section className="saved-catalog-masks" aria-label="保存済みファイルマスク">
-                    <label htmlFor="saved-catalog-mask">保存済み条件</label>
-                    <select
-                      id="saved-catalog-mask"
-                      value={selectedSavedCatalogMask}
-                      onChange={(event) => restoreSavedCatalogMask(event.target.value)}
-                    >
-                      <option value="">選択してください</option>
-                      {savedCatalogMasks.map((mask) => (
-                        <option key={mask.name} value={mask.name}>{mask.name}</option>
-                      ))}
-                    </select>
-                    <label htmlFor="saved-catalog-mask-name">条件名</label>
-                    <input
-                      id="saved-catalog-mask-name"
-                      value={savedCatalogMaskName}
-                      maxLength={64}
-                      onChange={(event) => setSavedCatalogMaskName(event.target.value)}
-                    />
-                    <div className="search-pane-actions">
-                      <button
-                        type="button"
-                        disabled={savedCatalogMaskBusy}
-                        onClick={() => void saveCurrentCatalogMask()}
-                      >
-                        保存・同名置換
-                      </button>
-                      {selectedSavedCatalogMask !== "" && (
-                        <button
-                          type="button"
-                          disabled={savedCatalogMaskBusy}
-                          onClick={() => setPendingCatalogMaskDelete(selectedSavedCatalogMask)}
-                        >
-                          削除
-                        </button>
-                      )}
-                    </div>
-                    {pendingCatalogMaskDelete !== null && (
-                      <div role="alertdialog" aria-label="保存済み条件の削除確認">
-                        <p>「{pendingCatalogMaskDelete}」を削除しますか？</p>
-                        <button
-                          type="button"
-                          onClick={() => void deleteSavedCatalogMask(pendingCatalogMaskDelete)}
-                        >
-                          削除を確定
-                        </button>
-                        <button type="button" onClick={() => setPendingCatalogMaskDelete(null)}>
-                          キャンセル
-                        </button>
-                      </div>
-                    )}
-                    {savedCatalogMaskNotice !== null && <p role="status">{savedCatalogMaskNotice}</p>}
-                  </section>
-                </form>
                 <section className="search-options" aria-label="検索オプション">
-                  <h3>オプション</h3>
+                  <h3>検索範囲</h3>
+                  <fieldset className="search-options-group search-scope-selector">
+                    <legend>検索する場所</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="search-scope"
+                        checked={searchScope === "current"}
+                        onChange={() => setSearchScope("current")}
+                      />
+                      現在のフォルダー
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="search-scope"
+                        checked={searchScope === "library"}
+                        onChange={() => setSearchScope("library")}
+                      />
+                      現在のライブラリ全体
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="search-scope"
+                        checked={searchScope === "multiple"}
+                        onChange={() => setSearchScope("multiple")}
+                      />
+                      指定した複数の場所
+                    </label>
+                    {searchScope === "current" && (
+                      <p className="search-options-note">対象: {absoluteAddress}</p>
+                    )}
+                    {searchScope === "multiple" && (
+                      <>
+                        <ul className="search-source-list" aria-label="横断検索の場所">
+                          {searchSourceRoots.map((source) => {
+                            const currentSource = libraryRoot !== null
+                              && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
+                                === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US");
+                            return (
+                              <li key={normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")}>
+                                <span title={source}>{source}</span>
+                                {currentSource ? (
+                                  <span className="search-source-current">現在</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    aria-label={`${source}を検索場所から外す`}
+                                    onClick={() => removeSearchSource(source)}
+                                  >
+                                    外す
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <button
+                          type="button"
+                          disabled={searchSourceBusy || searchSourceRoots.length >= 8}
+                          onClick={() => void addSearchSource()}
+                        >
+                          {searchSourceBusy ? "選択中…" : "検索場所を追加"}
+                        </button>
+                        {searchSourceNotice !== null && <p role="status">{searchSourceNotice}</p>}
+                      </>
+                    )}
+                  </fieldset>
                   <label>
                     <input
                       type="checkbox"
@@ -6124,109 +6036,28 @@ export function App({
                         }))
                       }
                     />
-                    サブフォルダも検索する
+                    サブフォルダーの中も検索する
                   </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={!searchOptions.includeFolders}
-                      onChange={(event) =>
-                        setSearchOptions((current) => ({
-                          ...current,
-                          includeFolders: !event.target.checked,
-                        }))
-                      }
-                    />
-                    フォルダは検索対象にしない
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={!searchOptions.includeFiles}
-                      onChange={(event) =>
-                        setSearchOptions((current) => ({
-                          ...current,
-                          includeFiles: !event.target.checked,
-                        }))
-                      }
-                    />
-                    ファイルは検索対象にしない
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={searchOptions.retainResults}
-                      onChange={(event) =>
-                        setSearchOptions((current) => ({
-                          ...current,
-                          retainResults: event.target.checked,
-                        }))
-                      }
-                    />
-                    検索結果を破棄しない
-                  </label>
-
-                  <fieldset className="search-options-group">
-                    <legend>検索場所</legend>
-                    <ul className="search-source-list" aria-label="横断検索の場所">
-                      {searchSourceRoots.map((source) => {
-                        const currentSource = libraryRoot !== null
-                          && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
-                            === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US");
-                        return (
-                          <li key={normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")}>
-                            <span title={source}>{source}</span>
-                            {currentSource ? (
-                              <span className="search-source-current">現在</span>
-                            ) : (
-                              <button
-                                type="button"
-                                aria-label={`${source}を検索場所から外す`}
-                                onClick={() => removeSearchSource(source)}
-                              >
-                                外す
-                              </button>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <button
-                      type="button"
-                      disabled={searchSourceBusy || searchSourceRoots.length >= 8}
-                      onClick={() => void addSearchSource()}
-                    >
-                      {searchSourceBusy ? "選択中…" : "検索場所を追加"}
-                    </button>
-                    {searchSourceNotice !== null && <p role="status">{searchSourceNotice}</p>}
+                  <ItemKindSelector
+                    includeFolders={searchOptions.includeFolders}
+                    includeFiles={searchOptions.includeFiles}
+                    onChange={(kind) => setSearchOptions((current) => ({ ...current, ...kind }))}
+                  />
+                  <details className="search-options-advanced">
+                    <summary>詳細条件</summary>
                     <label>
                       <input
                         type="checkbox"
-                        checked={searchOptions.fixedLocation !== null}
-                        disabled={searchSourceRoots.length > 1}
+                        checked={searchOptions.retainResults}
                         onChange={(event) =>
                           setSearchOptions((current) => ({
                             ...current,
-                            fixedLocation: event.target.checked ? navigation.current : null,
+                            retainResults: event.target.checked,
                           }))
                         }
                       />
-                      検索場所を固定する
+                      項目を開いた後も検索結果を表示する
                     </label>
-                    {searchSourceRoots.length > 1 && (
-                      <p className="search-options-note">
-                        複数の場所を横断する間は、現在フォルダーへの固定を使用しません。
-                      </p>
-                    )}
-                    {searchOptions.fixedLocation !== null && (
-                      <p className="search-options-note">
-                        {searchOptions.fixedLocation === ""
-                          ? "ライブラリのルート"
-                          : searchOptions.fixedLocation}
-                      </p>
-                    )}
-                  </fieldset>
-
                   <fieldset className="search-options-group">
                     <legend>
                       <label>
@@ -6293,6 +6124,11 @@ export function App({
                       </label>
                     </div>
                   </fieldset>
+                  {searchOptions.sizeEnabled && searchOptions.includeFolders && (
+                    <p className="search-options-note">
+                      サイズ情報のないフォルダーは、サイズ条件を指定している間は結果に含まれません。
+                    </p>
+                  )}
 
                   <fieldset className="search-options-group">
                     <legend>
@@ -6467,6 +6303,7 @@ export function App({
                       </label>
                     )}
                   </fieldset>
+                  </details>
                 </section>
               </aside>
             )}
@@ -6530,9 +6367,36 @@ export function App({
           </>
         )}
         <section
-          className={`catalog-pane${archiveExplorerPath !== null ? " catalog-pane--archive" : ""}${archiveExplorerPath === null && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 ? " catalog-pane--filter-empty" : ""}`}
+          className={`catalog-pane${archiveExplorerPath !== null ? " catalog-pane--archive" : ""}${archiveExplorerPath === null && searchState.status === "idle" && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 ? " catalog-pane--filter-empty" : ""}`}
           aria-busy={loadState.status === "loading"}
         >
+          {libraryRoot !== null && archiveExplorerPath === null && !settingsOpen && (
+            <CatalogFilterBar
+              expression={fileMaskDraft}
+              options={fileMaskOptionsDraft}
+              active={fileMaskActive}
+              activeExpression={fileMask}
+              searchResultsVisible={searchState.status === "ready"}
+              busy={fileMaskBusy}
+              error={fileMaskError}
+              savedMasks={savedCatalogMasks}
+              selectedSavedMask={selectedSavedCatalogMask}
+              savedMaskName={savedCatalogMaskName}
+              savedMaskBusy={savedCatalogMaskBusy}
+              savedMaskNotice={savedCatalogMaskNotice}
+              pendingDelete={pendingCatalogMaskDelete}
+              onExpressionChange={setFileMaskDraft}
+              onOptionsChange={setFileMaskOptionsDraft}
+              onApply={applyFileMask}
+              onClear={clearFileMask}
+              onRestoreSavedMask={restoreSavedCatalogMask}
+              onSavedMaskNameChange={setSavedCatalogMaskName}
+              onSave={() => void saveCurrentCatalogMask()}
+              onRequestDelete={setPendingCatalogMaskDelete}
+              onConfirmDelete={(name) => void deleteSavedCatalogMask(name)}
+              onCancelDelete={() => setPendingCatalogMaskDelete(null)}
+            />
+          )}
           {archiveExplorerPath !== null && (
             <ArchiveExplorerPane
               archiveRelativePath={archiveExplorerPath}
@@ -6556,11 +6420,11 @@ export function App({
               onClose={() => setArchiveExplorerPath(null)}
             />
           )}
-          {archiveExplorerPath === null && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 && (
+          {archiveExplorerPath === null && searchState.status === "idle" && fileMaskActive && entries.length > 0 && visibleEntries.length === 0 && (
             <div className="catalog-filter-empty" role="status">
-              <h2>ファイルマスクで{entries.length}項目が非表示です</h2>
-              <p>適用中: {fileMask || "オプション指定"}</p>
-              <button type="button" onClick={clearFileMask}>マスクを解除して表示</button>
+              <h2>一覧の絞り込みで{entries.length}項目が非表示です</h2>
+              <p>適用中: {fileMask || "詳細条件"}</p>
+              <button type="button" onClick={clearFileMask}>絞り込みを解除して表示</button>
             </div>
           )}
           {searchState.status === "loading" && (
@@ -6694,11 +6558,13 @@ export function App({
       </div>
       {statusBarVisible && <footer className="status-bar" aria-live="polite">
         <span>
-          現在位置: {selectedPath === null ? "—" : `${Math.max(1, visibleEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${visibleEntries.length}`}
+          {searchState.status === "ready"
+            ? `検索結果: ${searchState.results.length}件`
+            : `現在位置: ${selectedPath === null ? "—" : `${Math.max(1, visibleEntries.findIndex((entry) => entry.relativePath === selectedPath) + 1)}/${visibleEntries.length}`}`}
         </span>
-        <span>{visibleEntries.length}項目</span>
-        <span>{selectedPaths.length}件選択</span>
-        <span>{selected ? `選択: ${selected.relativePath}` : "選択なし"}</span>
+        <span>{searchState.status === "ready" ? searchState.results.length : visibleEntries.length}項目</span>
+        <span>{searchState.status === "ready" ? 0 : selectedPaths.length}件選択</span>
+        <span>{searchState.status === "ready" ? "検索結果を表示中" : selected ? `選択: ${selected.relativePath}` : "選択なし"}</span>
         <span>{loadState.status === "loading" ? "読み込み中" : "準備完了"}</span>
         {selectionNotice !== null && (
           <span

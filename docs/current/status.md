@@ -87,6 +87,8 @@ P3-CではLEY-CATALOG-007をPublishedとした。folder/file、最小/最大size
 
 P3-D/EではLEY-SEARCH-001/002をPublishedとした。Windows folder pickerで明示した最大8 sourceをRustのsession allowlistへ登録し、未承認pathを拒否して同じRust search portで順次横断する。重なるsourceのcanonical itemは先行sourceへ統合し、全体50,000件上限、missing/cancel、source別結果表示と結果sourceへの再登録・親folder移動を接続した。frontend 419件、Python 59件、Rust 191+1件、typecheck、build、Windows canonical全12 stageはPASSした。release folder pickerの直接操作、50,000実file、slow/removable driveの時間・working setは未測定として残す。
 
+2026-08-24に検索UIの責務を再整理した。名前検索は現在folder・library全体・複数場所の明示scopeを持つfilesystem走査へ限定し、catalog maskは一覧上部の「現在の一覧を絞り込む」へ移した。folder/fileは両機能で肯定形の共通selectorを使い最低1種を保証し、size metadata欠落、filterと検索結果の非合成、検索結果件数を画面へ明示した。Windows frontend 519件、Python 65件、Rust 257+1件、typecheck、build、SBOM、CoDD scan/check/verifyはPASSした。release WebView2の実layout・DPI・IME・folder pickerは未測定として残す。
+
 P3-FではLEY-FILER-010をPublishedとした。既定有効・profile v18/SQLite永続の設定で、Rust `notify` OS watcherを表示中canonical folderへ非再帰で最大1件だけ設定し、250ms windowでevent stormをcoalesceする。generation/root/pathが一致するeventだけを既存一覧再走査へ渡し、残存selectionを復元する。frontend 422件、Python 59件、Rust 193+1件、typecheck、build、Windows canonical全12 stageはPASSした。release WebView2、network/removable drive、10,000-event burstの反映時間・CPU・working setは未測定として残す。
 
 P3-GではLEY-FILER-015をPublishedとした。Rustのtree列挙へ非再帰のdirect-child確認とnullable `hasChildren`を追加し、leaf expander、自動折畳み、180〜480px幅をprofile v19・SQLite・設定dialogへ接続した。10,000直下folderの下位確認は2,900.692ms。初回product gateがdrive直下の確認不能folderで親tree全体を停止する不足を検出したため、そのnodeだけ未確認へfallbackして再実行し、frontend 427件、Python 59件、Rust 195+1件、typecheck、build、Windows canonical全12 stageをPASSした。書庫treeはP4へ分離し、remote/removable drive、DPI別drag、CPU・working setは未測定として残す。
