@@ -11,7 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { FullscreenAdapter } from "./features/viewer/fullscreen";
-import type { AlwaysOnTopAdapter } from "./features/workspace/window";
+import type { AlwaysOnTopAdapter, WindowThemeAdapter } from "./features/workspace/window";
 import {
   getCatalogSettings,
   getItemMetadata,
@@ -194,6 +194,14 @@ vi.mock("./features/library/client", () => ({
   saveReadingPosition: vi.fn(),
   saveSettingsProfile: vi.fn(),
   listNamedSettingsProfiles: vi.fn(),
+  listCustomThemes: vi.fn(async () => ({
+    status: "ok", data: { themes: [], invalidThemes: [], maximumThemes: 32 },
+  })),
+  saveCustomTheme: vi.fn(),
+  deleteCustomTheme: vi.fn(),
+  exportCustomTheme: vi.fn(),
+  previewCustomThemeImport: vi.fn(),
+  executeCustomThemeImport: vi.fn(),
   saveNamedSettingsProfile: vi.fn(),
   previewNamedSettingsProfileSwitch: vi.fn(),
   executeNamedSettingsProfileSwitch: vi.fn(),
@@ -385,6 +393,9 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   addressBarVisible: true,
   statusBarVisible: true,
   alwaysOnTop: false,
+  themeSelection: { kind: "system" },
+  customThemeSnapshot: null,
+  themeFallbackReason: null,
   navigationSelectionPolicy: "restore",
   thumbnailGenerationScope: "near",
   startupLocation: "last",
@@ -517,6 +528,7 @@ async function registerTestLibrary(
   entries: CatalogEntry[],
   fullscreenAdapter?: FullscreenAdapter,
   alwaysOnTopAdapter?: AlwaysOnTopAdapter,
+  windowThemeAdapter: WindowThemeAdapter = { setTheme: async () => undefined },
 ) {
   restoreMock.mockResolvedValue({
     status: "ok",
@@ -546,7 +558,13 @@ async function registerTestLibrary(
       retryable: true,
     },
   });
-  render(<App fullscreenAdapter={fullscreenAdapter} alwaysOnTopAdapter={alwaysOnTopAdapter} />);
+  render(
+    <App
+      fullscreenAdapter={fullscreenAdapter}
+      alwaysOnTopAdapter={alwaysOnTopAdapter}
+      windowThemeAdapter={windowThemeAdapter}
+    />,
+  );
   await screen.findByRole("grid", { name: "現在のフォルダの項目" });
 }
 
@@ -851,6 +869,7 @@ describe("application shell", () => {
       generation: 1 as never,
       data: {
         ...profile,
+        themeFallbackReason: null,
       },
     }));
     listNamedSettingsProfilesMock.mockResolvedValue({
@@ -1902,6 +1921,17 @@ describe("application shell", () => {
     expect(screen.queryByRole("menu", { name: "オプション" })).not.toBeInTheDocument();
   }, 10_000);
 
+  it("suppresses background menu mnemonics while integrated settings is open", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    expect(screen.getByRole("dialog", { name: "統合設定" })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "v", altKey: true });
+
+    expect(screen.queryByRole("menu", { name: "表示" })).not.toBeInTheDocument();
+    expect(saveSortMock).not.toHaveBeenCalled();
+  });
+
   it("REQ-LEY-P3-009 previews recursive scope, reports progress, prevents re-entry, and cancels", async () => {
     let finish: ((value: Awaited<ReturnType<typeof generateRecursiveThumbnails>>) => void) | undefined;
     generateRecursiveThumbnailsMock.mockImplementation(() => new Promise((resolve) => {
@@ -2277,10 +2307,13 @@ describe("application shell", () => {
     expect(await screen.findByLabelText(`${second.relativePath} ビューワ`)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "一覧へ戻る" }));
 
-    const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
-    const secondButton = within(grid).getAllByRole("button")
-      .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
-    await waitFor(() => expect(secondButton).toHaveAttribute("data-selected", "true"));
+    await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+    await waitFor(() => {
+      const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
+      const secondButton = within(grid).getAllByRole("button")
+        .find((button) => button.getAttribute("data-relative-path") === second.relativePath);
+      expect(secondButton).toHaveAttribute("data-selected", "true");
+    });
   });
 
   it("returns to the library from the Viewer end callback for return_library", async () => {
@@ -3965,6 +3998,120 @@ describe("application shell", () => {
     expect(await within(dialog).findByText(/常に手前を切り替えられません/)).toBeInTheDocument();
     expect(saveSettingsProfileMock).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "統合設定" })).toBeInTheDocument();
+  });
+
+  it("REQ-FR-B24-001 and 006 keep theme selection as a draft and apply native before persistence", async () => {
+    const calls: string[] = [];
+    const windowThemeAdapter = {
+      setTheme: vi.fn(async (theme) => {
+        calls.push(`native:${theme ?? "system"}`);
+      }),
+    };
+    saveSettingsProfileMock.mockImplementationOnce(async (profile) => {
+      calls.push("persist");
+      return {
+        status: "ok",
+        requestId: "save-theme-profile" as never,
+        generation: 1 as never,
+        data: { ...profile, themeFallbackReason: null },
+      };
+    });
+    await registerTestLibrary([], undefined, undefined, windowThemeAdapter);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+
+    expect(document.documentElement).toHaveAttribute("data-theme-id", "system");
+    expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(calls).toEqual(["native:system", "native:dark", "persist"]);
+    expect(saveSettingsProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        themeSelection: { kind: "builtin", themeId: "dark" },
+        customThemeSnapshot: null,
+      }),
+      expect.any(Number),
+    );
+    expect(document.documentElement).toHaveAttribute("data-theme-id", "dark");
+    expect(document.documentElement).toHaveAttribute("data-theme-scheme", "dark");
+  });
+
+  it("REQ-FR-B24-001 follows live system color-scheme changes only for system selection", async () => {
+    const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, "matchMedia");
+    let dark = false;
+    const listeners = new Set<() => void>();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => ({
+        get matches() { return dark; },
+        media: "(prefers-color-scheme: dark)",
+        onchange: null,
+        addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+        addListener: (listener: () => void) => listeners.add(listener),
+        removeListener: (listener: () => void) => listeners.delete(listener),
+        dispatchEvent: () => true,
+      })),
+    });
+    try {
+      await registerTestLibrary([]);
+      expect(document.documentElement).toHaveAttribute("data-theme-id", "system");
+      expect(document.documentElement).toHaveAttribute("data-theme-scheme", "light");
+
+      dark = true;
+      act(() => listeners.forEach((listener) => listener()));
+      await waitFor(() => expect(document.documentElement)
+        .toHaveAttribute("data-theme-scheme", "dark"));
+    } finally {
+      if (originalMatchMediaDescriptor === undefined) Reflect.deleteProperty(window, "matchMedia");
+      else Object.defineProperty(window, "matchMedia", originalMatchMediaDescriptor);
+    }
+    expect(Object.getOwnPropertyDescriptor(window, "matchMedia"))
+      .toEqual(originalMatchMediaDescriptor);
+  });
+
+  it("REQ-FR-B24-006 rolls native theme back when profile persistence fails", async () => {
+    const windowThemeAdapter = {
+      setTheme: vi.fn().mockResolvedValue(undefined),
+    };
+    saveSettingsProfileMock.mockRejectedValueOnce(new Error("database unavailable"));
+    await registerTestLibrary([], undefined, undefined, windowThemeAdapter);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    expect(await within(dialog).findByText(/設定を保存できませんでした/)).toBeInTheDocument();
+    expect(windowThemeAdapter.setTheme.mock.calls).toEqual([[null], ["dark"], [null]]);
+    expect(document.documentElement).toHaveAttribute("data-theme-id", "system");
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it("REQ-FR-B24-006 reports a native theme rollback failure explicitly", async () => {
+    const windowThemeAdapter = {
+      setTheme: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("native rollback unavailable")),
+    };
+    saveSettingsProfileMock.mockRejectedValueOnce(new Error("database unavailable"));
+    await registerTestLibrary([], undefined, undefined, windowThemeAdapter);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
+
+    expect(await within(dialog).findByText(/ウィンドウ外観も元に戻せませんでした/))
+      .toBeInTheDocument();
+    expect(windowThemeAdapter.setTheme.mock.calls).toEqual([[null], ["dark"], [null]]);
+    expect(document.documentElement).toHaveAttribute("data-theme-id", "system");
+    expect(dialog).toBeInTheDocument();
   });
 
   it("FT-B19-006 searches categorized settings and resets the whole draft", async () => {

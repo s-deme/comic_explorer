@@ -5,6 +5,7 @@ mod paths;
 mod reading_position;
 mod repository;
 mod shelf;
+mod theme;
 mod thumbnail;
 mod viewer_filter;
 
@@ -23,5 +24,6 @@ pub use repository::{
     RenamePreferencesRecord, Settings, StateStore,
 };
 pub use shelf::{NewShelfNodeRecord, ShelfNodeRecord, ShelfRecord, ShelfSnapshotRecord};
+pub use theme::{CustomThemeRecord, MAX_CUSTOM_THEMES, MAX_THEME_TRANSPORT_INTEGER};
 pub use thumbnail::{NegativeThumbnail, ThumbnailPipeline, ThumbnailResult};
 pub use viewer_filter::ViewerFilterSetRecord;

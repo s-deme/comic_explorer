@@ -96,6 +96,7 @@ Git履歴から参照する。
 | FR-B11 入力拡張 | REQ-FR-B11-001, REQ-FR-B11-002, REQ-FR-B11-003, REQ-FR-B11-004 | FUT-C-019, FUT-R-006, FUT-R-007 | catalogのopen・戻る・進む・上へ・更新・検索と、viewerのpage移動・表示・方向・倍率・ルーペ・全画面をkeyboard commandとしてremapし、command間および予約済みapp操作とのconflict拒否、個別/全体reset、focus fallback、再起動保存を保証する。viewerでは左右swipe、page layoutのwheel上下、右button+wheel上下、middle button、戻る/進むside buttonをcommandへ割り当て、double clickの全画面toggleは固定する。同じcommandへの複数mouse入力を許可し、旧keyboard/swipe設定を新しい既定値と統合して復元する。旧keyと新command既定値の衝突時は旧割り当てを優先し、新commandだけを未使用keyへ退避する。編集入口は統合設定だけに置き、group、command、keyboard、mouse、説明を同じcommand表で確認できるようにし、helpは現在のkeyboard割り当て表示だけを行う。原本変更・file削除・保存・印刷はglobal入力割り当てへ含めず、任意軌跡gesture、touch、gamepad、command parameterは候補のままとする。 |
 | FR-B22 file manager | REQ-MVP-021, REQ-FR-B22-001, REQ-FR-B22-002, REQ-FR-B22-003, REQ-FR-B22-004 | FUT-C-024〜029, FUT-C-053 | 右click/keyboard context menu、Windows shell連携、選択項目のrename/move/copy/delete、現在folderへのcreate/paste、安全境界、成功後refreshを一貫して扱う。通常deleteはごみ箱、完全deleteは対象名を示す確認後だけ実行する。 |
 | FR-B23 Leeyes viewer操作・外観 | REQ-FR-B23-001, REQ-FR-B23-002, REQ-FR-B23-003, REQ-FR-B23-004 | LEY-VIEWER-004, LEY-VIEWER-025, LEY-VIEWER-028 | page layoutの見開きを表示単位とは独立して1pageずつ前後へずらす。viewer背景、page周囲余白、見開き間隔、cursor自動非表示時間を統合設定、app-local設定、strict profileで検証・保存し、旧profileを安全な既定値へ移行する。 |
+| FR-B24 アプリテーマ | REQ-FR-B24-001, REQ-FR-B24-002, REQ-FR-B24-003, REQ-FR-B24-004, REQ-FR-B24-005, REQ-FR-B24-006 | — | system追従と7つの検証済み組込み配色をshell全体へ適用し、利用者が安全なsemantic colorだけから最大32件のカスタムテーマを作成・複製・編集・削除・入出力できる。任意CSS、外部resource、画像、font、layout変更を受理せず、contrast、schema、size、名前をfrontendとRustで検証し、app-local SQLite、strict profile、named profile、native title barへatomicに接続する。 |
 
 ## 採用済みP1〜P10
 
@@ -107,7 +108,7 @@ Git履歴から参照する。
 | P4 / FR-B16 | FUT-C-050, FUT-C-058 | 検索side paneのbasename maskと、absolute pathを含まずformulaを無害化するCSV出力。 |
 | P5 / FR-B17 | FUT-C-065, FUT-C-066, FUT-C-067 | 5分類menu、accessible icon toolbar、情報カードとして永続化する既存`reference_tile`と、表紙専用`card_grid`。 |
 | P6 / FR-B18 | FUT-C-060, FUT-C-061, FUT-C-062, FUT-C-063 | pane/bar可逆表示、viewer分離、native tray hide/showと終了の分離。 |
-| P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、左右swipe gesture、offline help、version/runtime/license表示。統合設定はcatalog、viewer、interface、入力、profileの意味単位で移動でき、名前・説明・現在値を対象とする検索で該当設定だけを絞り込む。各設定は効果を説明し、全設定の既定値復元を含む変更は適用まで下書きに留める。統合設定と一般ヘルプの左navigationは本文から分断して見える暗色面を使わず、共通の明るいneutral面、境界線、淡い青の現在地で階層と選択を示し、通常・hover・focus・selectedの文字とiconを識別可能にする。viewerのdouble clickは設定対象にせず全画面切替へ固定する。ヘルプmenuでは一般ヘルプとバージョン情報を別の項目・dialogとして開き、バージョン情報は製品version・runtime・third-party notice導線の内容量に合うcompactな専用dialogとして表示する。 |
+| P7 / FR-B19 | FUT-C-069, FUT-C-071, FUT-C-072, FUT-C-076, FUT-C-077 | atomic設定、strict profile、左右swipe gesture、offline help、version/runtime/license表示。統合設定はcatalog、viewer、interface、入力、profileの意味単位で移動でき、名前・説明・現在値を対象とする検索で該当設定だけを絞り込む。各設定は効果を説明し、全設定の既定値復元を含む変更は適用まで下書きに留める。統合設定と一般ヘルプの左navigationは選択中のアプリテーマに属する共通neutral面、本文側境界線、accentを薄く混ぜた現在地で階層と選択を示し、本文から独立した無関係な暗色sidebarを作らず、通常・hover・focus・selectedの文字とiconを識別可能にする。viewerのdouble clickは設定対象にせず全画面切替へ固定する。ヘルプmenuでは一般ヘルプとバージョン情報を別の項目・dialogとして開き、バージョン情報は製品version・runtime・third-party notice導線の内容量に合うcompactな専用dialogとして表示する。 |
 | P8 / FR-B08 | FUT-C-006, FUT-C-007, FUT-C-008 | GIFの安全な分類・metadata・MIME・製品decodeと、AVIFの安全な分類・metadata・MIME・corrupt境界。AVIFの製品decodeは未受入。 |
 | P9 / FR-B12 | FUT-C-001, FUT-C-002 | 単一volume・非暗号化RAR4/RAR5（RAR/CBR）、非暗号化7z（7z/CB7）、LHA/LZH（LZH）を安全に読み、分割RAR、暗号化書庫、未対応圧縮方式はunsupported分類する。一覧・検索結果・お気に入りでは、対応書庫の集合ではなく各項目の実際の形式（ZIP、CBZ、EPUB、RAR、CBR、7Z、CB7、LZH）を表示する。 |
 | P10 / FR-B20 | FUT-C-073, FUT-C-074, FUT-C-075 | app-local thumbnail管理、明示保存、検証済みJPEG import。製品file picker gateは未完了。 |
@@ -120,6 +121,7 @@ Git履歴から参照する。
 - E2E-MVP-004: network隔離状態で主要機能が動作し、外部DNS/TCP/UDP送信がないことを外部監視する。これは未完了gateである。
 - E2E-MVP-005: catalogの右clickまたはkeyboard context menuからrename、copy、move、create、delete、OS clipboard pasteを行い、folder treeのfolderまたはdrive nodeからcut/copy/pasteを行う。選択した対象だけが変更され、アプリとWindows Explorerの双方向pasteおよび成功後のcatalog反映を確認する。
 - E2E-MVP-006: 見開きを1pageずつ前後へずらし、背景・page周囲余白・見開き間隔・cursor自動非表示時間を変更して再起動およびprofile export/import後にも復元する。設定変更と閲覧の前後でlibrary原本を変更しない。
+- E2E-MVP-007: system、全組込みテーマ、利用者が複製・編集したカスタムテーマを統合設定から適用し、shell、dialog、help、viewer chrome、native title bar、再起動、named profile、profile export/importで同じ配色を復元する。一覧の局所配色とviewer背景は指定どおり独立し、invalid・低contrast・過大・未知fieldを含むテーマは保存・適用されない。
 
 ## Leeyes P1-A 即効改善の受入条件
 
@@ -247,6 +249,17 @@ FR-B04は現行の採用laneとして定義されていない。欠番を新機�
 | REQ-FR-B23-002 | LEY-VIEWER-025 | viewer設定で背景を市松模様・濃灰・黒・明色から選び、page周囲余白と見開き間隔をそれぞれ0〜64pxの整数で指定する。既定値は市松模様・0px・8pxとする。設定値はpage layoutの単page・見開きおよびscroll layoutへ適用し、見開き画像の利用可能幅計算にも同じ間隔を用いる。 |
 | REQ-FR-B23-003 | LEY-VIEWER-028 | viewer設定でcursor自動非表示を無効・1秒・2秒・3秒・5秒から選ぶ。有効時はpointerが画像stage内で指定時間操作されなければstage上のcursorだけを隠し、pointer移動・再入場・button操作で直ちに再表示する。pointer drag中およびルーペ有効時はcursorを隠さず、toolbar・page移動bar上のcursorへ影響させない。既定値は無効とする。 |
 | REQ-FR-B23-004 | LEY-VIEWER-025, LEY-VIEWER-028 | 背景、余白、間隔、自動非表示時間はapp-local SQLiteと設定profile v5へ保存し、再起動とexport/importで復元する。profile v1〜v4と既存SQLiteに値がない場合は安全な既定値へ移行する。frontendとbackendの両方でenum・整数範囲を検証し、不正値を適用・保存しない。 |
+
+## アプリテーマの受入条件
+
+| 要件ID | 受入条件 |
+|---|---|
+| REQ-FR-B24-001 | 統合設定の画面カテゴリで、Windowsのlight/dark変更へ実行中も追従するsystemと、stable ID `light`、`dark`、`paper`、`midnight`、`oled`、`forest`、`highContrast`の7組込みテーマ、および保存済みカスタムテーマから1件を選ぶ。新規利用と全設定resetの既定はsystemとし、固定テーマとカスタムテーマはOSのlight/dark変更で配色を変えない。組込みテーマは直接編集せず、複製してカスタムテーマにできる。設定選択は既存draftに留め、明示Apply成功後だけ現在のアプリへ反映する。 |
+| REQ-FR-B24-002 | 選択テーマはdocument rootのsemantic CSS custom propertyとしてshell、menu、toolbar、address/status bar、tree/search、catalog chrome、context menu、empty/error/status面、全dialog、settings/help/about/license、viewer toolbar/page navigator、form control、scrollbar、および通常・hover・focus・selected・disabled・danger状態へ適用する。fullscreenで画像上に重なるviewer controlは可読性のため固定半透明dark surfaceを許容する。`catalogPalette=system`はアプリテーマを継承し、既存`paper`、`midnight`、`highContrast`はcatalogだけを上書きする。viewer stageの`viewerBackground`、原画像、thumbnail、filter出力、gridは変更しない。 |
+| REQ-FR-B24-003 | カスタムテーマschema v1は名前1〜64 UTF-16 code unit、`baseScheme` light/dark、および`#RRGGBB`のcanvas、surface、surfaceMuted、surfaceRaised、text、textMuted、border、accent、onAccent、selection、onSelection、focus、danger、onDanger、warning、successの完全なsemantic color集合だけを持つ。統合設定内のeditorで新規作成、組込み・カスタムからの複製、名前変更、color input編集、代表的なshell・control・selection・状態の局所previewを行う。任意CSS、HTML、SVG、画像、font、path、URL、外部resource、script、layout、spacing、animationをthemeとして受理しない。 |
+| REQ-FR-B24-004 | Rustをcustom theme ID、Unicode full case-foldによるname一意性、最大32件、完全shape、unknown field拒否、1件64 KiB以下、色形式、contrast、CRUD、import preview、明示replace、export byteの正本とし、app-local SQLite schema v13へatomicに保存する。JSON import/exportはUTF-8、`schemaVersion: 1`、単一themeだけを扱い、importは保存前previewとopaque confirmation keyを必須とする。同名themeを暗黙上書きしない。現在適用中のcustom themeは別themeのApply成功前に更新・同名import置換・削除できず、複製して編集する。破損recordも32件上限へ算入して名前と理由を表示し、自動削除せず、実効themeが別themeである場合だけ二段階確認から明示削除できる。TypeScriptはvalidated DTOのeditor、preview、download/upload、Tauri orchestrationだけを担当する。 |
+| REQ-FR-B24-005 | theme selectionとcustom snapshot/revisionをapp-local settings、strict frontend profile v28、named profile、profile export/importへ含める。custom themeを使うexport/named snapshotには正規化済みdefinitionを埋め込み、別環境でthemeが欠落してもimport previewと明示Applyで安全なcopyとして復元できるようにする。既存DBとprofile v1〜v27、旧named snapshotには従来外観を維持するlightを補い、v27のpane配置、Viewer象限、右click設定を失わない。欠落・破損・削除済み参照はlightへ局所fallbackして通知し、破損recordを自動削除しない。 |
+| REQ-FR-B24-006 | 通常文字、補助文字、accent上文字、selection文字は使用surfaceに対して4.5:1以上、focusと主要境界は隣接surfaceに対して3:1以上をfrontend previewとRust保存境界の両方で検証する。Windows `forced-colors: active`ではOS色をthemeより優先し、app独自highContrastをOS high contrast対応の根拠にしない。resolved `color-scheme`をform/scrollbarへ渡し、native title barはsystemでnative追従、組込み・customでは`baseScheme`へ合わせる。native theme適用失敗時はsettingsを保存せず、backend保存失敗時はnative themeを旧値へrollbackし、DOMは成功したselectionだけを描画する。初回theme未取得時はsystemへ安全にfallbackし、既存の100ms起動待機上限を延ばさない。 |
 
 ## PDF対応の受入条件
 

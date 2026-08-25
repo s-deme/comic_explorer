@@ -44,6 +44,11 @@ import {
   StartupLocation,
   ThumbnailGenerationScope,
 } from "../settings/profile";
+import type {
+  CustomThemeSnapshot,
+  ThemeDefinitionV1,
+  ThemeSelection,
+} from "../settings/theme";
 
 let requestSequence = 0;
 
@@ -558,6 +563,9 @@ export interface CatalogSettings {
   addressBarVisible: boolean;
   statusBarVisible: boolean;
   alwaysOnTop: boolean;
+  themeSelection: ThemeSelection;
+  customThemeSnapshot: CustomThemeSnapshot | null;
+  themeFallbackReason: string | null;
   navigationSelectionPolicy: NavigationSelectionPolicy;
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
@@ -701,6 +709,8 @@ export async function saveSettingsProfile(
       addressBarVisible: profile.addressBarVisible,
       statusBarVisible: profile.statusBarVisible,
       alwaysOnTop: profile.alwaysOnTop,
+      themeSelection: profile.themeSelection,
+      customThemeSnapshot: profile.customThemeSnapshot,
       navigationSelectionPolicy: profile.navigationSelectionPolicy,
       thumbnailGenerationScope: profile.thumbnailGenerationScope,
       startupLocation: profile.startupLocation,
@@ -729,6 +739,112 @@ export interface NamedSettingsProfileSummary {
   name: string;
   updatedAtMs: number;
   active: boolean;
+}
+
+export interface CustomThemeRecord {
+  themeId: number;
+  revision: number;
+  definition: ThemeDefinitionV1;
+  createdAtMs: number;
+  updatedAtMs: number;
+  active: boolean;
+}
+
+export interface InvalidCustomThemeRecord {
+  themeId: number;
+  name: string;
+  reason: string;
+  active: boolean;
+}
+
+export interface CustomThemeCatalog {
+  themes: CustomThemeRecord[];
+  invalidThemes: InvalidCustomThemeRecord[];
+  maximumThemes: number;
+}
+
+export interface CustomThemeImportConflict {
+  themeId: number;
+  revision: number;
+  name: string;
+}
+
+export interface CustomThemeImportPreview {
+  definition: ThemeDefinitionV1;
+  conflict: CustomThemeImportConflict | null;
+  confirmationKey: string;
+  byteLength: number;
+}
+
+export interface CustomThemeExport {
+  fileName: string;
+  bytes: number[];
+}
+
+export async function listCustomThemes(
+  generation: number,
+): Promise<ApiResponse<CustomThemeCatalog>> {
+  return invoke("list_custom_themes", { context: context(generation) });
+}
+
+export async function saveCustomTheme(
+  request: {
+    themeId: number | null;
+    expectedRevision: number | null;
+    definition: ThemeDefinitionV1;
+  },
+  generation: number,
+): Promise<ApiResponse<CustomThemeCatalog>> {
+  return invoke("save_custom_theme", {
+    context: context(generation),
+    request,
+  });
+}
+
+export async function deleteCustomTheme(
+  themeId: number,
+  confirmed: boolean,
+  generation: number,
+): Promise<ApiResponse<CustomThemeCatalog>> {
+  return invoke("delete_custom_theme", {
+    context: context(generation),
+    themeId,
+    confirmed,
+  });
+}
+
+export async function exportCustomTheme(
+  themeId: number,
+  generation: number,
+): Promise<ApiResponse<CustomThemeExport>> {
+  return invoke("export_custom_theme", {
+    context: context(generation),
+    themeId,
+  });
+}
+
+export async function previewCustomThemeImport(
+  bytes: number[],
+  generation: number,
+): Promise<ApiResponse<CustomThemeImportPreview>> {
+  return invoke("preview_custom_theme_import", {
+    context: context(generation),
+    bytes,
+  });
+}
+
+export async function executeCustomThemeImport(
+  bytes: number[],
+  confirmationKey: string,
+  replaceExisting: boolean,
+  generation: number,
+): Promise<ApiResponse<CustomThemeCatalog>> {
+  return invoke("execute_custom_theme_import", {
+    context: context(generation),
+    bytes,
+    confirmationKey,
+    replaceExisting,
+  });
 }
 
 export interface SettingsProfileSwitchPreview {

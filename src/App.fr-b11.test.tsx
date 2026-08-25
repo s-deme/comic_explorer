@@ -99,6 +99,14 @@ vi.mock("./features/library/client", () => ({
   saveItemMemo: vi.fn(),
   saveSettingsProfile: vi.fn(),
   listNamedSettingsProfiles: vi.fn(async () => ({ status: "ok", data: [] })),
+  listCustomThemes: vi.fn(async () => ({
+    status: "ok", data: { themes: [], invalidThemes: [], maximumThemes: 32 },
+  })),
+  saveCustomTheme: vi.fn(),
+  deleteCustomTheme: vi.fn(),
+  exportCustomTheme: vi.fn(),
+  previewCustomThemeImport: vi.fn(),
+  executeCustomThemeImport: vi.fn(),
   saveNamedSettingsProfile: vi.fn(),
   previewNamedSettingsProfileSwitch: vi.fn(),
   executeNamedSettingsProfileSwitch: vi.fn(),
@@ -194,6 +202,9 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       addressBarVisible: true,
       statusBarVisible: true,
       alwaysOnTop: false,
+      themeSelection: { kind: "system" as const },
+      customThemeSnapshot: null,
+      themeFallbackReason: null,
       navigationSelectionPolicy: "restore" as const,
       thumbnailGenerationScope: "near" as const,
       startupLocation: "last" as const,
@@ -354,6 +365,7 @@ describe("FR-B11 keyboard shortcut partial batch", () => {
       generation: 1 as never,
       data: {
         ...profile,
+        themeFallbackReason: null,
       },
     }));
   });

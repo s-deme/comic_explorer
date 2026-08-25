@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from "react";
+import { ThemeManager, type ThemeManagerProps } from "./ThemeManager";
 import {
   END_OF_VOLUME_POLICY_LABELS,
   normalizeEndOfVolumePolicy,
@@ -170,7 +171,7 @@ interface SettingsCategoryDefinition {
 const SETTINGS_CATEGORIES: readonly SettingsCategoryDefinition[] = [
   { id: "catalog", label: "一覧表示", description: "並べ替えと表示形式", icon: "▦" },
   { id: "viewer", label: "ビューワ", description: "ページ表示と読み進め方", icon: "▣" },
-  { id: "interface", label: "画面", description: "ペインと操作バー", icon: "◫" },
+  { id: "interface", label: "画面", description: "配色、ペインと操作バー", icon: "◫" },
   { id: "commands", label: "操作", description: "キーとジェスチャー", icon: "⌨" },
   { id: "profile", label: "プロファイル", description: "設定の移行と復元", icon: "⇄" },
 ] as const;
@@ -283,6 +284,10 @@ export interface SettingsDialogProps {
   onConfirmNamedProfileSwitch: () => void;
   onCancelNamedProfileSwitch: () => void;
   onDeleteNamedProfile: (name: string) => void;
+  themeManager: Omit<
+    ThemeManagerProps,
+    "selection" | "snapshot" | "busy" | "onSelectionChange"
+  >;
 }
 
 function normalizedSearchText(value: string): string {
@@ -335,6 +340,7 @@ export function SettingsDialog({
   onConfirmNamedProfileSwitch,
   onCancelNamedProfileSwitch,
   onDeleteNamedProfile,
+  themeManager,
 }: SettingsDialogProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("catalog");
   const [query, setQuery] = useState("");
@@ -559,6 +565,11 @@ export function SettingsDialog({
       id: "viewer-catalog-selection-sync",
       category: "viewer",
       text: `一覧 選択 同期 Viewer 復帰 スクロール ${draft.viewerCatalogSelectionSync ? "有効" : "無効"}`,
+    },
+    {
+      id: "app-theme",
+      category: "interface",
+      text: "アプリ テーマ 配色 system Windows ライト ダーク ペーパー ミッドナイト OLED フォレスト 高コントラスト カスタム 作成 編集 複製 読み込み 書き出し",
     },
     {
       id: "tree-details",
@@ -1246,6 +1257,25 @@ export function SettingsDialog({
 
             <section className="settings-panel" aria-label="画面設定" hidden={panelHidden("interface")}>
               <h3>画面</h3>
+              {!panelHidden("interface") && !rowHidden("app-theme") && (
+                <SettingRow
+                  id="app-theme"
+                  title="アプリテーマ"
+                  description="画面全体の配色を選択します。カスタムテーマは検証済みの色だけを保存し、適用を押すまで現在の画面は変わりません。"
+                  hidden={false}
+                >
+                  <ThemeManager
+                    {...themeManager}
+                    busy={saving}
+                    selection={draft.themeSelection}
+                    snapshot={draft.customThemeSnapshot}
+                    onSelectionChange={(themeSelection, customThemeSnapshot) => update({
+                      themeSelection,
+                      customThemeSnapshot,
+                    })}
+                  />
+                </SettingRow>
+              )}
               {([
                 ["tree-visible", "treeVisible", "フォルダツリー", "ライブラリの階層を左側へ表示します。"],
                 ["menu-visible", "menuBarVisible", "メニューバー", "すべてのアプリメニューを画面上部へ表示します。"],

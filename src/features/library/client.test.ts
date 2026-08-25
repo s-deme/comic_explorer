@@ -34,6 +34,12 @@ import {
   previewNamedSettingsProfileSwitch,
   executeNamedSettingsProfileSwitch,
   deleteNamedSettingsProfile,
+  listCustomThemes,
+  saveCustomTheme,
+  deleteCustomTheme,
+  exportCustomTheme,
+  previewCustomThemeImport,
+  executeCustomThemeImport,
   listCsvExportPresets,
   saveCsvExportPreset,
   deleteCsvExportPreset,
@@ -63,6 +69,7 @@ import {
   listViewerFilterSets,
   saveViewerFilterSet,
 } from "./client";
+import { BUILTIN_THEMES } from "../settings/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -201,6 +208,61 @@ describe("library client settings contract", () => {
       "set_settings_profile",
       expect.objectContaining({
         profile: expect.objectContaining({ viewerCatalogSelectionSync: false }),
+      }),
+    );
+  });
+
+  it("REQ-FR-B24-004 keeps custom theme CRUD and confirmed import/export in Rust IPC", async () => {
+    const definition = {
+      ...BUILTIN_THEMES.light,
+      name: "Reading",
+      colors: { ...BUILTIN_THEMES.light.colors },
+    };
+    const bytes = [123, 125];
+    await listCustomThemes(80);
+    await saveCustomTheme({
+      themeId: null,
+      expectedRevision: null,
+      definition,
+    }, 81);
+    await deleteCustomTheme(7, true, 82);
+    await exportCustomTheme(7, 83);
+    await previewCustomThemeImport(bytes, 84);
+    await executeCustomThemeImport(bytes, "opaque-theme-key", true, 85);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "list_custom_themes", {
+      context: expect.objectContaining({ generation: 80 }),
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "save_custom_theme", expect.objectContaining({
+      request: { themeId: null, expectedRevision: null, definition },
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "delete_custom_theme", expect.objectContaining({
+      themeId: 7, confirmed: true,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "export_custom_theme", expect.objectContaining({
+      themeId: 7,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(5, "preview_custom_theme_import", expect.objectContaining({
+      bytes,
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(6, "execute_custom_theme_import", expect.objectContaining({
+      bytes, confirmationKey: "opaque-theme-key", replaceExisting: true,
+    }));
+  });
+
+  it("REQ-FR-B24-005 includes theme selection and snapshot in strict settings profile IPC", async () => {
+    const profile = createDefaultSettingsProfile();
+    profile.themeSelection = { kind: "builtin", themeId: "forest" };
+    profile.customThemeSnapshot = null;
+    await saveSettingsProfile(profile, 86);
+
+    expect(invokeMock).toHaveBeenCalledWith(
+      "set_settings_profile",
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          themeSelection: { kind: "builtin", themeId: "forest" },
+          customThemeSnapshot: null,
+        }),
       }),
     );
   });

@@ -6,6 +6,7 @@ import {
 } from "../input/shortcuts";
 import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import packageMetadata from "../../../package.json";
+import { BUILTIN_THEMES } from "./theme";
 import {
   APP_VERSION,
   createDefaultSettingsProfile,
@@ -78,6 +79,8 @@ function validProfile(): SettingsProfile {
     addressBarVisible: true,
     statusBarVisible: true,
     alwaysOnTop: false,
+    themeSelection: { kind: "builtin", themeId: "light" },
+    customThemeSnapshot: null,
     navigationSelectionPolicy: "restore",
     thumbnailGenerationScope: "near",
     startupLocation: "last",
@@ -121,11 +124,16 @@ describe("settings profile", () => {
   it("creates a complete independent default draft for the settings reset action", () => {
     const first = createDefaultSettingsProfile();
     const second = createDefaultSettingsProfile();
-    expect(first).toEqual(validProfile());
+    const expected = {
+      ...validProfile(),
+      themeSelection: { kind: "system" },
+      customThemeSnapshot: null,
+    };
+    expect(first).toEqual(expected);
     first.catalogThumbnailSizes.smallThumbnail = 200;
     first.shortcuts.nextPage = ["N"];
     first.mouseGestures.swipeLeft = "none";
-    expect(second).toEqual(validProfile());
+    expect(second).toEqual(expected);
   });
 
   it("imports a strict known-version profile and excludes unknown fields", () => {
@@ -149,12 +157,119 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 28, 99, "21", undefined])(
+  it.each([0, 29, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
     },
   );
+
+  it("REQ-FR-B24-005 validates system, built-in, and self-contained custom theme selections", () => {
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      themeSelection: { kind: "system" },
+      customThemeSnapshot: null,
+    })).toMatchObject({
+      themeSelection: { kind: "system" },
+      customThemeSnapshot: null,
+    });
+    expect(normalizeSettingsProfile({
+      ...validProfile(),
+      themeSelection: { kind: "builtin", themeId: "forest" },
+      customThemeSnapshot: null,
+    })).toMatchObject({
+      themeSelection: { kind: "builtin", themeId: "forest" },
+      customThemeSnapshot: null,
+    });
+    const customThemeSnapshot = {
+      themeId: 7,
+      revision: 4,
+      definition: {
+        schemaVersion: 1 as const,
+        name: "My Midnight",
+        baseScheme: "dark" as const,
+        colors: { ...BUILTIN_THEMES.midnight.colors },
+      },
+    };
+    const normalized = normalizeSettingsProfile({
+      ...validProfile(),
+      themeSelection: { kind: "custom", themeId: 7, revision: 4 },
+      customThemeSnapshot,
+    });
+    expect(normalized).toMatchObject({
+      themeSelection: { kind: "custom", themeId: 7, revision: 4 },
+      customThemeSnapshot,
+    });
+    expect(normalized?.customThemeSnapshot).not.toBe(customThemeSnapshot);
+    expect(normalized?.customThemeSnapshot?.definition.colors)
+      .not.toBe(customThemeSnapshot.definition.colors);
+  });
+
+  it.each([
+    { themeSelection: { kind: "system" }, customThemeSnapshot: undefined },
+    { themeSelection: { kind: "builtin", themeId: "system" }, customThemeSnapshot: null },
+    { themeSelection: { kind: "builtin", themeId: "dark" }, customThemeSnapshot: {
+      themeId: 7,
+      revision: 4,
+      definition: BUILTIN_THEMES.dark,
+    } },
+    { themeSelection: { kind: "custom", themeId: 7, revision: 4 }, customThemeSnapshot: null },
+    { themeSelection: { kind: "custom", themeId: 7, revision: 4 }, customThemeSnapshot: {
+      themeId: 7,
+      revision: 5,
+      definition: BUILTIN_THEMES.dark,
+    } },
+    { themeSelection: { kind: "custom", themeId: 7, revision: 4 }, customThemeSnapshot: {
+      themeId: 7,
+      revision: 4,
+      definition: {
+        ...BUILTIN_THEMES.dark,
+        colors: { ...BUILTIN_THEMES.dark.colors, text: "#181C22" },
+      },
+    } },
+  ])("REQ-FR-B24-005 rejects incomplete, stale, or invalid theme profile data", (themeData) => {
+    expect(normalizeSettingsProfile({ ...validProfile(), ...themeData })).toBeNull();
+  });
+
+  it.each(Array.from({ length: 27 }, (_, index) => index + 1))(
+    "REQ-FR-B24-005 migrates profile v%s to the legacy-compatible light theme",
+    (profileVersion) => {
+      const legacy = validProfile() as unknown as Record<string, unknown>;
+      legacy.profileVersion = profileVersion;
+      delete legacy.themeSelection;
+      delete legacy.customThemeSnapshot;
+      expect(normalizeSettingsProfile(legacy)).toMatchObject({
+        profileVersion: SETTINGS_PROFILE_VERSION,
+        themeSelection: { kind: "builtin", themeId: "light" },
+        customThemeSnapshot: null,
+      });
+    },
+  );
+
+  it("REQ-FR-B24-005 preserves the exact v27 pane and Viewer interaction values", () => {
+    const legacy = validProfile() as unknown as Record<string, unknown>;
+    legacy.profileVersion = 27;
+    legacy.treeHeight = 420;
+    legacy.catalogPanePosition = "bottom";
+    legacy.viewerQuadrantBindings = {
+      topLeft: "zoomIn",
+      topRight: "nextPage",
+      bottomLeft: "closeViewer",
+      bottomRight: "toggleFullscreen",
+    };
+    legacy.viewerRightClickAction = "zoomOut";
+    delete legacy.themeSelection;
+    delete legacy.customThemeSnapshot;
+    expect(normalizeSettingsProfile(legacy)).toMatchObject({
+      profileVersion: SETTINGS_PROFILE_VERSION,
+      treeHeight: 420,
+      catalogPanePosition: "bottom",
+      viewerQuadrantBindings: legacy.viewerQuadrantBindings,
+      viewerRightClickAction: "zoomOut",
+      themeSelection: { kind: "builtin", themeId: "light" },
+      customThemeSnapshot: null,
+    });
+  });
 
   it("migrates a v1 profile with the default thumbnail sizes", () => {
     const legacy = validProfile() as unknown as Record<string, unknown>;

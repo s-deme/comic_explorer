@@ -186,6 +186,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 |
 | cargo / iana-time-zone | 0.1.65 | MIT OR Apache-2.0 |
 | cargo / ico | 0.5.0 | MIT |
+| cargo / icu_casemap | 2.1.1 | Unicode-3.0 |
+| cargo / icu_casemap_data | 2.1.1 | Unicode-3.0 |
 | cargo / icu_collections | 2.1.1 | Unicode-3.0 |
 | cargo / icu_locale_core | 2.1.1 | Unicode-3.0 |
 | cargo / icu_normalizer | 2.1.1 | Unicode-3.0 |

@@ -17,7 +17,7 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-25 JST
+- 最終更新日: 2026-08-26 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
@@ -764,6 +764,19 @@ visualとDPIは未測定とする。
 
 Windows SDK x64 libraryが当初存在しなかったため、Microsoft公式component `Microsoft.VisualStudio.Component.Windows11SDK.26100`をVisual Studio Community 2026へ追加した。SDKは`E:\Windows Kits\10\Lib\10.0.26100.0`として解決され、追加後にRust focused/canonicalを実行した。
 
+## FR-B24 アプリテーマ
+
+システム連動とライト、ダーク、ペーパー、ミッドナイト、OLED、フォレスト、ハイコントラストの7組み込みテーマを追加した。利用者は16個のsemantic color tokenから最大32件のカスタムテーマを作成・複製・編集でき、64KiB以下のstrict JSONをpreview後にimport、またはexportできる。Rustをvalidation・Unicode完全casefold名一意性・SQLite schema v13・profile v28・named profile materializationの正本とし、React DOM、SQLite設定、Windows native title barを失敗時rollback付きで同期する。active custom themeの更新・置換・削除は、別テーマを適用するまで拒否する。
+
+| Gate | 結果 | 2026-08-26の実測 |
+|---|---|---|
+| Windows tests | PASS | `.\scripts\run-tests-windows.ps1`: CoDD依存整合、Python 74件、frontend 44 files / 600件、FAIL 0。テーマmodel/profile 155件、ThemeManager 19件、Appのdraft・system追従・native rollback・設定表示中の背面shortcut抑止、CSS semantic token/forced-colors contractを含む。 |
+| TypeScript / build | PASS | `.\scripts\run-typecheck-windows.ps1` exit 0。`.\scripts\run-build-windows.ps1`は85 modules、CSS 79.19kB、JS 676.27kB、exit 0。500kB超chunk warningは既知advisoryでFAILへ読み替えない。 |
+| SBOM | PASS | `.\scripts\invoke-windows-toolchain.ps1 -Task FrontendSbom`: 785 components、unknown/prohibited license 0。`icu_casemap`追加を`THIRD-PARTY-NOTICES.md`へ同期した。`dist/`は生成物としてcommitしない。 |
+| Rust canonical | PASS | `.\scripts\invoke-windows-toolchain.ps1 -Task RustCanonical`: `cargo fmt --check`、`cargo check --locked`、lib 271件、shutdown process 1件、doc test、FAIL 0。既存dead-code warning 2件はFAILへ読み替えない。最初のrunは生成前の`dist/SBOM.json`不足でcheckを開始できず、正規`FrontendSbom`実行後の同一sourceで再実行してPASSした。 |
+| CoDD | PASS（red 0） | 最終tracked artifact変更後のWindows-native scan/check/verifyがexit 0。最初のverify内full testは、theme testの`matchMedia` property descriptor復元漏れと、仮想化catalog再描画前の旧DOMを保持する既存test flakeを各1件検出した。descriptor完全復元と現行DOM再queryへ修正し、後者は修正前9/10から修正後10/10、App全114件PASSを確認してから最終verifyを再実行した。advisory、構造的SKIP/VACUOUSを機能PASSへ加算しない。 |
+| 製品直接観測 | NOT RUN | in-app Browser runtimeに利用可能なbrowser instanceがなく、release WebView2での全テーマ目視、100/150/200% DPI、Windows high contrast/forced-colors、長時間切替、native title barの直接操作は未測定。自動DOM/CSS/Rust contractのPASSから直接観測済みとは推定しない。 |
+
 ## 既存laneの受理済み結果
 
 | 領域 | 状態 | 実測内容または境界 |
@@ -798,7 +811,7 @@ Windows SDK x64 libraryが当初存在しなかったため、Microsoft公式com
 
 ## Feature受入要約
 
-- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、B21、B23、FR-B11のkeyboard・mouse範囲。
+- PASS: FR-B01、B02、B03、B05、B06、B07、static WebPのB08、B10、B12、B13〜B16、B19、B21、B23、B24、FR-B11のkeyboard・mouse範囲。
 - BLOCKED/PARTIAL: B08のanimated GIF製品観測とAVIF decode、B11の任意軌跡gesture/touch/gamepad、B17、B18、B20、B22の製品表示・native shell観測。
 - Windows release WebView2を直接観測したlaneと、Vitest/jsdom・Rust contractだけのlaneを区別する。
 - focused testのexcluded-by-pattern、構造的SKIP、vacuous check、advisoryをPASS件数へ加えない。

@@ -98,8 +98,17 @@ import {
 } from "../viewer/slideshow";
 import type { SortField } from "../catalog/sort";
 import packageMetadata from "../../../package.json";
+import {
+  DEFAULT_THEME_SELECTION,
+  LEGACY_THEME_SELECTION,
+  normalizeCustomThemeSnapshot,
+  normalizeThemeSelection,
+  themeSelectionMatchesSnapshot,
+  type CustomThemeSnapshot,
+  type ThemeSelection,
+} from "./theme";
 
-export const SETTINGS_PROFILE_VERSION = 27;
+export const SETTINGS_PROFILE_VERSION = 28;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -237,6 +246,8 @@ export interface SettingsProfile {
   addressBarVisible: boolean;
   statusBarVisible: boolean;
   alwaysOnTop: boolean;
+  themeSelection: ThemeSelection;
+  customThemeSnapshot: CustomThemeSnapshot | null;
   navigationSelectionPolicy: NavigationSelectionPolicy;
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
@@ -321,6 +332,8 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     addressBarVisible: true,
     statusBarVisible: true,
     alwaysOnTop: false,
+    themeSelection: { ...DEFAULT_THEME_SELECTION },
+    customThemeSnapshot: null,
     navigationSelectionPolicy: DEFAULT_NAVIGATION_SELECTION_POLICY,
     thumbnailGenerationScope: DEFAULT_THUMBNAIL_GENERATION_SCOPE,
     startupLocation: DEFAULT_STARTUP_LOCATION,
@@ -429,6 +442,14 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const addressBarVisible = legacyP1Preferences ? true : candidate.addressBarVisible;
   const statusBarVisible = legacyP1Preferences ? true : candidate.statusBarVisible;
   const alwaysOnTop = legacyP1Preferences ? false : candidate.alwaysOnTop;
+  const themeSelection = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+    ? normalizeThemeSelection(candidate.themeSelection)
+    : { ...LEGACY_THEME_SELECTION };
+  const customThemeSnapshot = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+    ? candidate.customThemeSnapshot === null
+      ? null
+      : normalizeCustomThemeSnapshot(candidate.customThemeSnapshot)
+    : null;
   const legacyP1BPreferences = legacyP1Preferences || candidate.profileVersion === 5;
   const navigationSelectionPolicy = legacyP1BPreferences
     ? DEFAULT_NAVIGATION_SELECTION_POLICY
@@ -534,7 +555,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const treeAutoCollapse = legacyTreePreferences ? false : candidate.treeAutoCollapse;
   const treeConfirmChildren = legacyTreePreferences ? true : candidate.treeConfirmChildren;
   const treeWidth = legacyTreePreferences ? DEFAULT_TREE_WIDTH : candidate.treeWidth;
-  const legacyCatalogPaneLayout = candidate.profileVersion !== SETTINGS_PROFILE_VERSION;
+  const legacyCatalogPaneLayout = typeof candidate.profileVersion === "number"
+    && candidate.profileVersion <= 26;
   const treeHeight = legacyCatalogPaneLayout ? DEFAULT_TREE_HEIGHT : candidate.treeHeight;
   const catalogPanePosition = legacyCatalogPaneLayout
     ? DEFAULT_CATALOG_PANE_POSITION
@@ -574,10 +596,12 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     : strictCatalogMouseBindings(candidate.catalogMouseBindings);
   const viewerQuadrantBindings = candidate.profileVersion === 25
     || candidate.profileVersion === 26
+    || candidate.profileVersion === 27
     || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerQuadrantBindings(candidate.viewerQuadrantBindings)
     : { ...DEFAULT_VIEWER_QUADRANT_BINDINGS };
   const viewerRightClickAction = candidate.profileVersion === 26
+    || candidate.profileVersion === 27
     || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerRightClickAction(candidate.viewerRightClickAction)
     : DEFAULT_VIEWER_RIGHT_CLICK_ACTION;
@@ -608,6 +632,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 24
       && candidate.profileVersion !== 25
       && candidate.profileVersion !== 26
+      && candidate.profileVersion !== 27
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -677,6 +702,11 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof addressBarVisible !== "boolean" ||
     typeof statusBarVisible !== "boolean" ||
     typeof alwaysOnTop !== "boolean" ||
+    themeSelection === null ||
+    (candidate.profileVersion === SETTINGS_PROFILE_VERSION
+      && candidate.customThemeSnapshot !== null
+      && customThemeSnapshot === null) ||
+    !themeSelectionMatchesSnapshot(themeSelection, customThemeSnapshot) ||
     navigationSelectionPolicy === null ||
     thumbnailGenerationScope === null ||
     startupLocation === null ||
@@ -761,6 +791,8 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     addressBarVisible,
     statusBarVisible,
     alwaysOnTop,
+    themeSelection,
+    customThemeSnapshot,
     navigationSelectionPolicy,
     thumbnailGenerationScope,
     startupLocation,

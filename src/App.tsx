@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CatalogGrid } from "./features/catalog/CatalogGrid";
 import {
   navigationReducer,
@@ -45,6 +45,12 @@ import {
   previewNamedSettingsProfileSwitch,
   executeNamedSettingsProfileSwitch,
   deleteNamedSettingsProfile,
+  listCustomThemes,
+  saveCustomTheme,
+  deleteCustomTheme,
+  exportCustomTheme,
+  previewCustomThemeImport,
+  executeCustomThemeImport,
   resolveCatalogActivation,
   saveViewerSettings,
   assignTag,
@@ -97,6 +103,7 @@ import {
   type RenamePreferences,
   type NamedSettingsProfileSummary,
   type SettingsProfileSwitchPreview,
+  type CustomThemeCatalog,
   type SearchResultEntry,
   type ItemMetadata,
   type TagEntry,
@@ -271,8 +278,12 @@ import {
 } from "./features/workspace/display";
 import {
   applyAlwaysOnTop,
+  applyWindowTheme,
   tauriAlwaysOnTopAdapter,
+  tauriWindowThemeAdapter,
   type AlwaysOnTopAdapter,
+  type NativeWindowTheme,
+  type WindowThemeAdapter,
 } from "./features/workspace/window";
 import {
   APP_VERSION,
@@ -310,6 +321,25 @@ import {
   type ThumbnailGenerationScope,
 } from "./features/settings/profile";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
+import type {
+  InvalidThemeRecordView,
+  ThemeImportPreviewView,
+  ThemeRecordView,
+} from "./features/settings/ThemeManager";
+import {
+  DEFAULT_THEME_SELECTION,
+  LEGACY_THEME_SELECTION,
+  applyThemeSelection,
+  normalizeCustomThemeSnapshot,
+  normalizeThemeDefinitionV1,
+  normalizeThemeSelection,
+  resolveTheme,
+  themeSelectionMatchesSnapshot,
+  type CustomThemeSnapshot,
+  type ThemeBaseScheme,
+  type ThemeDefinitionV1,
+  type ThemeSelection,
+} from "./features/settings/theme";
 import { OfflineHelp } from "./features/help/OfflineHelp";
 import {
   clearLegacyBookshelfResult,
@@ -359,6 +389,54 @@ type SearchScope = "current" | "library" | "multiple";
 interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
   alwaysOnTopAdapter?: AlwaysOnTopAdapter;
+  windowThemeAdapter?: WindowThemeAdapter;
+}
+
+function preferredSystemTheme(): ThemeBaseScheme {
+  return typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function nativeWindowThemeFor(
+  selection: ThemeSelection,
+  snapshot: CustomThemeSnapshot | null,
+  systemScheme: ThemeBaseScheme,
+): NativeWindowTheme {
+  return selection.kind === "system"
+    ? null
+    : resolveTheme(selection, snapshot, systemScheme).baseScheme;
+}
+
+function validThemeState(
+  selectionValue: unknown,
+  snapshotValue: unknown,
+): { selection: ThemeSelection; snapshot: CustomThemeSnapshot | null; fallback: boolean } {
+  const selection = normalizeThemeSelection(selectionValue);
+  const snapshot = snapshotValue === null ? null : normalizeCustomThemeSnapshot(snapshotValue);
+  if (selection !== null && themeSelectionMatchesSnapshot(selection, snapshot)) {
+    return { selection, snapshot, fallback: false };
+  }
+  return { selection: LEGACY_THEME_SELECTION, snapshot: null, fallback: true };
+}
+
+function themeRecordViews(catalog: CustomThemeCatalog): ThemeRecordView[] {
+  return catalog.themes.flatMap((theme) => {
+    const definition = normalizeThemeDefinitionV1(theme.definition);
+    return definition === null
+      || !Number.isSafeInteger(theme.themeId)
+      || theme.themeId <= 0
+      || !Number.isSafeInteger(theme.revision)
+      || theme.revision <= 0
+      ? []
+      : [{
+        id: theme.themeId,
+        revision: theme.revision,
+        definition,
+        updatedAtMs: theme.updatedAtMs,
+      }];
+  });
 }
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
@@ -472,10 +550,12 @@ function absoluteLoadTarget(libraryRoot: string | null, path: string): string {
 export function App({
   fullscreenAdapter,
   alwaysOnTopAdapter = tauriAlwaysOnTopAdapter,
+  windowThemeAdapter = tauriWindowThemeAdapter,
 }: AppProps = {}) {
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
+  const themeGeneration = useRef(0);
   const catalogActivationGeneration = useRef(0);
   const trayGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
@@ -697,6 +777,16 @@ export function App({
   const [addressBarVisible, setAddressBarVisible] = useState(true);
   const [statusBarVisible, setStatusBarVisible] = useState(true);
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [themeSelection, setThemeSelection] = useState<ThemeSelection>(DEFAULT_THEME_SELECTION);
+  const [customThemeSnapshot, setCustomThemeSnapshot] =
+    useState<CustomThemeSnapshot | null>(null);
+  const [systemThemeScheme, setSystemThemeScheme] =
+    useState<ThemeBaseScheme>(preferredSystemTheme);
+  const [customThemeCatalog, setCustomThemeCatalog] = useState<CustomThemeCatalog>({
+    themes: [],
+    invalidThemes: [],
+    maximumThemes: 32,
+  });
   const [navigationSelectionPolicy, setNavigationSelectionPolicy] =
     useState<NavigationSelectionPolicy>(DEFAULT_NAVIGATION_SELECTION_POLICY);
   const navigationSelectionPolicyRef = useRef<NavigationSelectionPolicy>(
@@ -773,6 +863,28 @@ export function App({
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
   const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
   const trayApiAvailable = trayStatusAvailable(trayStatus);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateScheme = () => setSystemThemeScheme(media.matches ? "dark" : "light");
+    updateScheme();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", updateScheme);
+      return () => media.removeEventListener("change", updateScheme);
+    }
+    media.addListener(updateScheme);
+    return () => media.removeListener(updateScheme);
+  }, []);
+
+  useLayoutEffect(() => {
+    applyThemeSelection(
+      document.documentElement,
+      themeSelection,
+      customThemeSnapshot,
+      systemThemeScheme,
+    );
+  }, [customThemeSnapshot, systemThemeScheme, themeSelection]);
 
   useEffect(() => {
     try {
@@ -1026,7 +1138,7 @@ export function App({
 
   useEffect(() => {
     function handleMnemonic(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || settingsOpen) return;
       const target = event.target;
       const editing = target instanceof HTMLInputElement
         || target instanceof HTMLTextAreaElement
@@ -1133,7 +1245,7 @@ export function App({
       window.removeEventListener("keydown", handleMnemonic);
       document.removeEventListener("pointerdown", handleOutsidePointer);
     };
-  }, [activeMenu, activeToolbarMenu, entries, fileOperationBusy, fileUndo.available, libraryRoot, navigation, selectedPath, selectedPaths, shortcuts, viewerSession]);
+  }, [activeMenu, activeToolbarMenu, entries, fileOperationBusy, fileUndo.available, libraryRoot, navigation, selectedPath, selectedPaths, settingsOpen, shortcuts, viewerSession]);
 
   useEffect(() => {
     settingsGeneration.current += 1;
@@ -1308,6 +1420,27 @@ export function App({
           if (!autoRefreshCurrentFolderRef.current) {
             void stopLibraryFolderWatch(generation.current);
           }
+          const restoredTheme = validThemeState(
+            response.data.themeSelection,
+            response.data.customThemeSnapshot,
+          );
+          const restoredNativeTheme = nativeWindowThemeFor(
+            restoredTheme.selection,
+            restoredTheme.snapshot,
+            systemThemeScheme,
+          );
+          void applyWindowTheme(windowThemeAdapter, restoredNativeTheme).then((applied) => {
+            if (settingsRequestGeneration !== settingsGeneration.current) return;
+            if (applied) {
+              setThemeSelection(restoredTheme.selection);
+              setCustomThemeSnapshot(restoredTheme.snapshot);
+              if (restoredTheme.fallback || response.data.themeFallbackReason !== null) {
+                setSelectionNotice("保存済みテーマを復元できないため、ライトテーマを使用します。");
+              }
+            } else {
+              setSelectionNotice("ウィンドウのテーマを復元できないため、システム設定を使用します。");
+            }
+          });
           const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
           void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
             if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
@@ -3255,6 +3388,8 @@ export function App({
       addressBarVisible,
       statusBarVisible,
       alwaysOnTop,
+      themeSelection,
+      customThemeSnapshot,
       navigationSelectionPolicy,
       thumbnailGenerationScope,
       startupLocation,
@@ -3278,6 +3413,295 @@ export function App({
     };
   }
 
+  function acceptCustomThemeCatalog(catalog: CustomThemeCatalog): ThemeRecordView[] {
+    setCustomThemeCatalog(catalog);
+    const themes = themeRecordViews(catalog);
+    const invalidCount = catalog.invalidThemes.length + catalog.themes.length - themes.length;
+    if (invalidCount > 0) {
+      setProfileNotice(
+        `読み込めないカスタムテーマが${invalidCount}件あります。記録は削除していません。`,
+      );
+    }
+    return themes;
+  }
+
+  function markCustomThemeCatalogActive(selection: ThemeSelection): void {
+    setCustomThemeCatalog((catalog) => ({
+      ...catalog,
+      themes: catalog.themes.map((theme) => ({
+        ...theme,
+        active: selection.kind === "custom" && selection.themeId === theme.themeId,
+      })),
+      invalidThemes: catalog.invalidThemes.map((theme) => ({
+        ...theme,
+        active: selection.kind === "custom" && selection.themeId === theme.themeId,
+      })),
+    }));
+  }
+
+  async function refreshCustomThemes(): Promise<void> {
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const response = await listCustomThemes(requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return;
+      if (response.status === "ok") acceptCustomThemeCatalog(response.data);
+      else if (response.status === "error") setProfileNotice(presentError(response.error));
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("カスタムテーマの一覧を読み込めませんでした。");
+      }
+    }
+  }
+
+  async function saveThemeDefinition(
+    definition: ThemeDefinitionV1,
+    themeId: number | null,
+    expectedRevision: number | null,
+  ): Promise<ThemeRecordView | null> {
+    if (settingsSaving) return null;
+    if (themeId !== null && themeSelection.kind === "custom" && themeSelection.themeId === themeId) {
+      setProfileNotice("現在適用中のテーマは直接編集できません。複製して編集してください。");
+      return null;
+    }
+    const validated = normalizeThemeDefinitionV1(definition);
+    if (validated === null) {
+      setProfileNotice("テーマの名前、色、コントラストを確認してください。");
+      return null;
+    }
+    const previousIds = new Set(customThemeCatalog.themes.map((theme) => theme.themeId));
+    setSettingsSaving(true);
+    setProfileNotice("カスタムテーマを検証して保存しています。");
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const response = await saveCustomTheme({
+        themeId,
+        expectedRevision,
+        definition: validated,
+      }, requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return null;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの保存をキャンセルしました。");
+        return null;
+      }
+      const themes = acceptCustomThemeCatalog(response.data);
+      const saved = themeId === null
+        ? themes.find((theme) => !previousIds.has(theme.id))
+          ?? themes.find((theme) => theme.definition.name === validated.name)
+        : themes.find((theme) => theme.id === themeId);
+      if (saved === undefined) {
+        setProfileNotice("テーマは保存されましたが、保存結果を確認できませんでした。");
+        return null;
+      }
+      setProfileNotice(`カスタムテーマ「${saved.definition.name}」を保存しました。適用を押すと画面へ反映します。`);
+      return saved;
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("カスタムテーマを保存できませんでした。");
+      }
+      return null;
+    } finally {
+      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function deleteThemeRecord(theme: ThemeRecordView): Promise<boolean> {
+    if (settingsSaving) return false;
+    if (themeSelection.kind === "custom" && themeSelection.themeId === theme.id) {
+      setProfileNotice("現在適用中のテーマは、別のテーマを適用してから削除してください。");
+      return false;
+    }
+    setSettingsSaving(true);
+    setProfileNotice(`カスタムテーマ「${theme.definition.name}」を削除しています。`);
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const response = await deleteCustomTheme(theme.id, true, requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return false;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの削除をキャンセルしました。");
+        return false;
+      }
+      acceptCustomThemeCatalog(response.data);
+      setProfileNotice(`カスタムテーマ「${theme.definition.name}」を削除しました。`);
+      return true;
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("カスタムテーマを削除できませんでした。");
+      }
+      return false;
+    } finally {
+      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function deleteInvalidThemeRecord(theme: InvalidThemeRecordView): Promise<boolean> {
+    if (settingsSaving) return false;
+    if (theme.active || (themeSelection.kind === "custom" && themeSelection.themeId === theme.id)) {
+      setProfileNotice("適用中の破損テーマは、別のテーマを適用してから削除してください。");
+      return false;
+    }
+    setSettingsSaving(true);
+    setProfileNotice(`読み込めないカスタムテーマ「${theme.name}」を削除しています。`);
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const response = await deleteCustomTheme(theme.id, true, requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return false;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの削除をキャンセルしました。");
+        return false;
+      }
+      acceptCustomThemeCatalog(response.data);
+      setProfileNotice(`読み込めないカスタムテーマ「${theme.name}」を削除しました。`);
+      return true;
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("読み込めないカスタムテーマを削除できませんでした。");
+      }
+      return false;
+    } finally {
+      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function previewThemeImport(file: File): Promise<ThemeImportPreviewView | null> {
+    if (settingsSaving) return null;
+    if (file.size === 0 || file.size > 65_536) {
+      setProfileNotice("テーマJSONは1 byte以上64 KiB以下にしてください。");
+      return null;
+    }
+    setSettingsSaving(true);
+    setProfileNotice("テーマJSONを検証しています。");
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+      const response = await previewCustomThemeImport(bytes, requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return null;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの読み込みをキャンセルしました。");
+        return null;
+      }
+      const definition = normalizeThemeDefinitionV1(response.data.definition);
+      if (definition === null || response.data.byteLength !== bytes.length) {
+        setProfileNotice("テーマJSONの検証結果が不正です。保存していません。");
+        return null;
+      }
+      setProfileNotice("検証に成功しました。内容を確認して保存してください。");
+      return {
+        confirmationKey: response.data.confirmationKey,
+        definition,
+        existingThemeId: response.data.conflict?.themeId ?? null,
+        bytes,
+      };
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("テーマJSONを読み込めませんでした。");
+      }
+      return null;
+    } finally {
+      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function confirmThemeImport(
+    preview: ThemeImportPreviewView,
+    replace: boolean,
+  ): Promise<ThemeRecordView | null> {
+    if (settingsSaving) return null;
+    if (
+      replace
+      && preview.existingThemeId !== null
+      && themeSelection.kind === "custom"
+      && themeSelection.themeId === preview.existingThemeId
+    ) {
+      setProfileNotice("現在適用中のテーマは置き換えられません。別のテーマを適用してください。");
+      return null;
+    }
+    const previousIds = new Set(customThemeCatalog.themes.map((theme) => theme.themeId));
+    setSettingsSaving(true);
+    setProfileNotice("カスタムテーマを保存しています。");
+    const requestGeneration = ++themeGeneration.current;
+    try {
+      const response = await executeCustomThemeImport(
+        preview.bytes,
+        preview.confirmationKey,
+        replace,
+        requestGeneration,
+      );
+      if (requestGeneration !== themeGeneration.current) return null;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの読み込みをキャンセルしました。");
+        return null;
+      }
+      const themes = acceptCustomThemeCatalog(response.data);
+      const saved = preview.existingThemeId === null
+        ? themes.find((theme) => !previousIds.has(theme.id))
+          ?? themes.find((theme) => theme.definition.name === preview.definition.name)
+        : themes.find((theme) => theme.id === preview.existingThemeId);
+      if (saved === undefined) {
+        setProfileNotice("テーマは保存されましたが、保存結果を確認できませんでした。");
+        return null;
+      }
+      setProfileNotice(`カスタムテーマ「${saved.definition.name}」を読み込みました。適用を押すと画面へ反映します。`);
+      return saved;
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("カスタムテーマを保存できませんでした。");
+      }
+      return null;
+    } finally {
+      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
+    }
+  }
+
+  async function downloadCustomTheme(theme: ThemeRecordView): Promise<void> {
+    const requestGeneration = ++themeGeneration.current;
+    let url: string | null = null;
+    try {
+      const response = await exportCustomTheme(theme.id, requestGeneration);
+      if (requestGeneration !== themeGeneration.current) return;
+      if (response.status !== "ok") {
+        setProfileNotice(response.status === "error"
+          ? presentError(response.error)
+          : "テーマの書き出しをキャンセルしました。");
+        return;
+      }
+      if (typeof URL.createObjectURL !== "function") throw new Error("download unavailable");
+      if (
+        response.data.bytes.length === 0
+        || response.data.bytes.length > 65_536
+        || response.data.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
+      ) throw new Error("invalid export bytes");
+      url = URL.createObjectURL(new Blob([new Uint8Array(response.data.bytes)], {
+        type: "application/json",
+      }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = /^[^\u0000-\u001F/\\]{1,128}\.json$/i.test(response.data.fileName)
+        ? response.data.fileName
+        : `comic-explorer-theme-${theme.id}.json`;
+      link.click();
+      setProfileNotice("テーマJSONのダウンロードを開始しました。");
+    } catch {
+      if (requestGeneration === themeGeneration.current) {
+        setProfileNotice("カスタムテーマを書き出せませんでした。");
+      }
+    } finally {
+      if (url !== null) {
+        const downloadUrl = url;
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      }
+    }
+  }
+
   async function refreshNamedSettingsProfiles(requestGeneration: number) {
     try {
       const response = await listNamedSettingsProfiles(requestGeneration);
@@ -3297,6 +3721,7 @@ export function App({
     setSettingsDraft(currentSettingsProfile());
     setSettingsOpen(true);
     void refreshNamedSettingsProfiles(settingsGeneration.current);
+    void refreshCustomThemes();
   }
 
   async function applySettingsProfile(
@@ -3313,14 +3738,58 @@ export function App({
     setProfileNotice("設定を保存しています。");
     const requestGeneration = ++settingsGeneration.current;
     const nativeTopmostChanged = normalized.alwaysOnTop !== alwaysOnTop;
+    const previousNativeTheme = nativeWindowThemeFor(
+      themeSelection,
+      customThemeSnapshot,
+      systemThemeScheme,
+    );
+    const requestedNativeTheme = nativeWindowThemeFor(
+      normalized.themeSelection,
+      normalized.customThemeSnapshot,
+      systemThemeScheme,
+    );
+    const nativeThemeChanged = requestedNativeTheme !== previousNativeTheme;
+    let nativeThemeApplied = false;
+    let nativeTopmostApplied = false;
+    const rollbackNativeChanges = async (): Promise<boolean> => {
+      const topmostRolledBack = !nativeTopmostApplied
+        || await applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
+      const themeRolledBack = !nativeThemeApplied
+        || await applyWindowTheme(windowThemeAdapter, previousNativeTheme);
+      const rolledBack = topmostRolledBack && themeRolledBack;
+      if (!rolledBack) {
+        setSelectionNotice(
+          "ウィンドウ外観を元に戻せませんでした。アプリを再起動して設定を再同期してください。",
+        );
+      }
+      return rolledBack;
+    };
+    const withRollbackFailure = (message: string, rolledBack: boolean): string => (
+      rolledBack
+        ? message
+        : `${message} ウィンドウ外観も元に戻せませんでした。アプリを再起動してください。`
+    );
     try {
+      if (
+        nativeThemeChanged
+        && !(await applyWindowTheme(windowThemeAdapter, requestedNativeTheme))
+      ) {
+        setProfileNotice("ウィンドウのテーマを切り替えられませんでした。設定は保存していません。");
+        return;
+      }
+      nativeThemeApplied = nativeThemeChanged;
       if (
         nativeTopmostChanged
         && !(await applyAlwaysOnTop(alwaysOnTopAdapter, normalized.alwaysOnTop))
       ) {
-        setProfileNotice("常に手前を切り替えられませんでした。設定は保存していません。");
+        const rolledBack = await rollbackNativeChanges();
+        setProfileNotice(withRollbackFailure(
+          "常に手前を切り替えられませんでした。設定は保存していません。",
+          rolledBack,
+        ));
         return;
       }
+      nativeTopmostApplied = nativeTopmostChanged;
       const response = namedSwitch === undefined
         ? await saveSettingsProfile(normalized, requestGeneration)
         : await executeNamedSettingsProfileSwitch(
@@ -3329,14 +3798,18 @@ export function App({
           true,
           requestGeneration,
         );
-      if (requestGeneration !== settingsGeneration.current) return;
+      if (requestGeneration !== settingsGeneration.current) {
+        await rollbackNativeChanges();
+        return;
+      }
       if (response.status !== "ok") {
-        if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
-        setProfileNotice(
+        const rolledBack = await rollbackNativeChanges();
+        setProfileNotice(withRollbackFailure(
           response.status === "error"
             ? presentError(response.error)
             : "設定の保存をキャンセルしました。",
-        );
+          rolledBack,
+        ));
         return;
       }
       setSortField(normalized.sortField);
@@ -3406,6 +3879,13 @@ export function App({
       setAddressBarVisible(normalized.addressBarVisible);
       setStatusBarVisible(normalized.statusBarVisible);
       setAlwaysOnTop(normalized.alwaysOnTop);
+      const savedTheme = validThemeState(
+        response.data.themeSelection,
+        response.data.customThemeSnapshot,
+      );
+      setThemeSelection(savedTheme.selection);
+      setCustomThemeSnapshot(savedTheme.snapshot);
+      markCustomThemeCatalogActive(savedTheme.selection);
       navigationSelectionPolicyRef.current = normalized.navigationSelectionPolicy;
       thumbnailGenerationScopeRef.current = normalized.thumbnailGenerationScope;
       setNavigationSelectionPolicy(normalized.navigationSelectionPolicy);
@@ -3445,9 +3925,11 @@ export function App({
       setSettingsOpen(false);
       setSettingsDraft(null);
       setSettingsProfileSwitchPreview(null);
-      setSelectionNotice(namedSwitch === undefined
-        ? "設定profileを適用しました。"
-        : `設定profile「${namedSwitch.name}」へ切り替えました。`);
+      setSelectionNotice(savedTheme.fallback || response.data.themeFallbackReason !== null
+        ? "テーマ参照を復元できないため、ライトテーマで設定を適用しました。"
+        : namedSwitch === undefined
+          ? "設定profileを適用しました。"
+          : `設定profile「${namedSwitch.name}」へ切り替えました。`);
       void refreshNamedSettingsProfiles(requestGeneration);
       if (hiddenVisibilityChanged && libraryRoot !== null) {
         void load(navigation.current, selectedPaths);
@@ -3460,8 +3942,11 @@ export function App({
       }
     } catch {
       if (requestGeneration === settingsGeneration.current) {
-        if (nativeTopmostChanged) void applyAlwaysOnTop(alwaysOnTopAdapter, alwaysOnTop);
-        setProfileNotice("設定を保存できませんでした。変更は適用していません。");
+        const rolledBack = await rollbackNativeChanges();
+        setProfileNotice(withRollbackFailure(
+          "設定を保存できませんでした。変更は適用していません。",
+          rolledBack,
+        ));
       }
     } finally {
       if (requestGeneration === settingsGeneration.current) setSettingsSaving(false);
@@ -3703,7 +4188,8 @@ export function App({
     wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
     treeAutoCollapse, treeConfirmChildren, treeWidth,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
-    alwaysOnTop, navigationSelectionPolicy, thumbnailGenerationScope,
+    alwaysOnTop, themeSelection, customThemeSnapshot,
+    navigationSelectionPolicy, thumbnailGenerationScope,
     startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
@@ -6046,6 +6532,7 @@ export function App({
         <section
           className={`catalog-pane${archiveExplorerPath !== null ? " catalog-pane--archive" : ""}`}
           aria-busy={loadState.status === "loading"}
+          data-catalog-palette={catalogPalette}
         >
           {archiveExplorerPath !== null && (
             <ArchiveExplorerPane
@@ -6455,6 +6942,23 @@ export function App({
           }}
           onCancelNamedProfileSwitch={() => setSettingsProfileSwitchPreview(null)}
           onDeleteNamedProfile={(name) => void deleteCurrentNamedSettingsProfile(name)}
+          themeManager={{
+            appliedSelection: themeSelection,
+            customThemes: themeRecordViews(customThemeCatalog),
+            invalidThemes: customThemeCatalog.invalidThemes.map((theme) => ({
+              id: theme.themeId,
+              name: theme.name,
+              reason: theme.reason,
+              active: theme.active,
+            })),
+            maximumThemes: customThemeCatalog.maximumThemes,
+            onSave: saveThemeDefinition,
+            onDelete: deleteThemeRecord,
+            onDeleteInvalid: deleteInvalidThemeRecord,
+            onPreviewImport: previewThemeImport,
+            onConfirmImport: confirmThemeImport,
+            onExport: (theme) => void downloadCustomTheme(theme),
+          }}
         />
       )}
       {thumbnailManagerOpen && (

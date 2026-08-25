@@ -1,6 +1,6 @@
 # 実装済み機能
 
-最終更新: 2026-08-22
+最終更新: 2026-08-26
 
 Comic Explorerで現在利用できる機能の一覧である。Leeyes互換機能台帳の
 `delivery_status=Existing` 61件と`Published` 106件、合計167件を分野別に掲載する。
@@ -29,6 +29,14 @@ Comic Explorerで現在利用できる機能の一覧である。Leeyes互換機
 | 入力 | 13 |
 | 本棚 | 9 |
 | **合計** | **167** |
+
+## アプリ固有機能（Leeyes台帳外）
+
+- `FR-B24` アプリテーマ: システム連動、ライト、ダーク、ペーパー、ミッドナイト、OLED、フォレスト、ハイコントラスト。
+- `FR-B24` カスタムテーマ: 16個のsemantic color tokenを用いた作成・複製・編集、preview付きJSON import/export、最大32件、設定profile・named profile・SQLiteへの永続化。
+
+この2項目はLeeyes互換167件の集計には加えない。検証状態と未測定の製品直接観測は
+[status.md](current/status.md)と[verification.md](current/verification.md)を正とする。
 
 ## Viewer（30件）
 

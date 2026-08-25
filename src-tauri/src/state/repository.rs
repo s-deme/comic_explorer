@@ -10,7 +10,7 @@ use crate::domain::{AppError, ErrorCode, ItemKind, RelativePath, item_id_for};
 use super::{AppPaths, ReadingPosition, SourceFingerprint};
 
 const INITIAL_SCHEMA_VERSION: i64 = 1;
-const SCHEMA_VERSION: i64 = 12;
+const SCHEMA_VERSION: i64 = 13;
 const MAX_BOOKMARKS_PER_ITEM: i64 = 10_000;
 const MAX_SAVED_CATALOG_MASKS: i64 = 32;
 const MAX_EXTERNAL_APPS: i64 = 16;
@@ -163,6 +163,8 @@ pub struct Settings {
     pub startup_location: String,
     pub show_hidden_files: bool,
     pub catalog_palette: String,
+    pub app_theme_selection_json: String,
+    pub custom_theme_snapshot_json: Option<String>,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcut_bindings: BTreeMap<String, Vec<String>>,
@@ -338,6 +340,8 @@ impl Default for Settings {
             startup_location: "last".into(),
             show_hidden_files: false,
             catalog_palette: "system".into(),
+            app_theme_selection_json: r#"{"kind":"system"}"#.into(),
+            custom_theme_snapshot_json: None,
             restore_last_viewer: false,
             auto_refresh_current_folder: true,
             shortcut_bindings: default_shortcut_bindings(),
@@ -508,6 +512,8 @@ impl StateStore {
                 "startupLocation" => settings.startup_location = value,
                 "showHiddenFiles" => settings.show_hidden_files = value == "true",
                 "catalogPalette" => settings.catalog_palette = value,
+                "appThemeSelection" => settings.app_theme_selection_json = value,
+                "customThemeSnapshot" => settings.custom_theme_snapshot_json = Some(value),
                 "restoreLastViewer" => settings.restore_last_viewer = value == "true",
                 "autoRefreshCurrentFolder" => {
                     settings.auto_refresh_current_folder = value == "true"
@@ -557,7 +563,25 @@ impl StateStore {
         settings: &Settings,
         active_profile: Option<&str>,
     ) -> Result<(), AppError> {
+        let mut settings = settings.clone();
+        self.save_settings_with_preparation(
+            &mut settings,
+            active_profile,
+            |_transaction, _settings| Ok(()),
+        )
+    }
+
+    pub(crate) fn save_settings_with_preparation<T, F>(
+        &mut self,
+        settings: &mut Settings,
+        active_profile: Option<&str>,
+        prepare: F,
+    ) -> Result<T, AppError>
+    where
+        F: FnOnce(&rusqlite::Transaction<'_>, &mut Settings) -> Result<T, AppError>,
+    {
         let transaction = self.connection.transaction().map_err(database_error)?;
+        let output = prepare(&transaction, settings)?;
         let shortcut_bindings =
             serde_json::to_string(&settings.shortcut_bindings).map_err(|error| AppError {
                 code: ErrorCode::Internal,
@@ -735,6 +759,10 @@ impl StateStore {
             ("showHiddenFiles", settings.show_hidden_files.to_string()),
             ("catalogPalette", settings.catalog_palette.clone()),
             (
+                "appThemeSelection",
+                settings.app_theme_selection_json.clone(),
+            ),
+            (
                 "restoreLastViewer",
                 settings.restore_last_viewer.to_string(),
             ),
@@ -768,6 +796,19 @@ impl StateStore {
                 .execute("DELETE FROM settings WHERE key='libraryRoot'", [])
                 .map_err(database_error)?;
         }
+        if let Some(snapshot) = &settings.custom_theme_snapshot_json {
+            transaction
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES('customThemeSnapshot', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    [snapshot],
+                )
+                .map_err(database_error)?;
+        } else {
+            transaction
+                .execute("DELETE FROM settings WHERE key='customThemeSnapshot'", [])
+                .map_err(database_error)?;
+        }
         if let Some(name) = active_profile {
             transaction
                 .execute(
@@ -781,7 +822,8 @@ impl StateStore {
                 .execute("DELETE FROM settings WHERE key='activeSettingsProfile'", [])
                 .map_err(database_error)?;
         }
-        transaction.commit().map_err(database_error)
+        transaction.commit().map_err(database_error)?;
+        Ok(output)
     }
 
     pub fn list_named_settings_profiles(
@@ -1985,6 +2027,10 @@ impl StateStore {
 }
 
 fn migrate(connection: &Connection) -> Result<(), AppError> {
+    migrate_through(connection, SCHEMA_VERSION)
+}
+
+fn migrate_through(connection: &Connection, target_version: i64) -> Result<(), AppError> {
     let version = connection
         .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
         .map_err(database_error)?;
@@ -1996,7 +2042,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             retryable: false,
         });
     }
-    if version == 0 {
+    if version == 0 && target_version >= INITIAL_SCHEMA_VERSION {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2036,12 +2082,21 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
                 params![INITIAL_SCHEMA_VERSION, unix_millis()],
             )
             .map_err(database_error)?;
+        // Persist fresh-install provenance before any later migration commit.
+        // If startup is interrupted between schema steps, v13's legacy-light
+        // compatibility insert remains an OR IGNORE and cannot replace this.
+        transaction
+            .execute(
+                "INSERT INTO settings(key,value) VALUES('appThemeSelection',?1)",
+                [r#"{"kind":"system"}"#],
+            )
+            .map_err(database_error)?;
         transaction
             .pragma_update(None, "user_version", INITIAL_SCHEMA_VERSION)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 2 {
+    if version < 2 && target_version >= 2 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2070,7 +2125,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 3 {
+    if version < 3 && target_version >= 3 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2103,7 +2158,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 4 {
+    if version < 4 && target_version >= 4 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2137,7 +2192,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 5 {
+    if version < 5 && target_version >= 5 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2166,7 +2221,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 6 {
+    if version < 6 && target_version >= 6 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2196,7 +2251,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 7 {
+    if version < 7 && target_version >= 7 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction.execute_batch(
             "CREATE TABLE IF NOT EXISTS external_apps (
@@ -2230,7 +2285,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 8 {
+    if version < 8 && target_version >= 8 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2255,7 +2310,7 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 9 {
+    if version < 9 && target_version >= 9 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2276,11 +2331,11 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, "user_version", 9)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 10 {
+    if version < 10 && target_version >= 10 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2331,11 +2386,11 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, "user_version", 10)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 11 {
+    if version < 11 && target_version >= 11 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2385,11 +2440,11 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             )
             .map_err(database_error)?;
         transaction
-            .pragma_update(None, "user_version", SCHEMA_VERSION)
+            .pragma_update(None, "user_version", 11)
             .map_err(database_error)?;
         transaction.commit().map_err(database_error)?;
     }
-    if version < 12 {
+    if version < 12 && target_version >= 12 {
         let transaction = connection.unchecked_transaction().map_err(database_error)?;
         transaction
             .execute_batch(
@@ -2410,6 +2465,48 @@ fn migrate(connection: &Connection) -> Result<(), AppError> {
             .execute(
                 "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
                 params![12, unix_millis()],
+            )
+            .map_err(database_error)?;
+        transaction
+            .pragma_update(None, "user_version", 12)
+            .map_err(database_error)?;
+        transaction.commit().map_err(database_error)?;
+    }
+    if version < 13 && target_version >= 13 {
+        let transaction = connection.unchecked_transaction().map_err(database_error)?;
+        transaction
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS custom_themes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL
+                      CHECK(length(name) BETWEEN 1 AND 64),
+                    name_key TEXT NOT NULL UNIQUE CHECK(length(name_key) >= 1),
+                    definition_json TEXT NOT NULL
+                      CHECK(length(CAST(definition_json AS BLOB)) BETWEEN 2 AND 65536),
+                    revision INTEGER NOT NULL CHECK(revision >= 1),
+                    created_at_ms INTEGER NOT NULL CHECK(created_at_ms >= 0),
+                    updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= 0)
+                 );
+                 CREATE INDEX IF NOT EXISTS custom_themes_updated
+                   ON custom_themes(updated_at_ms DESC,id DESC);",
+            )
+            .map_err(database_error)?;
+        // The initial `version` remains zero while a fresh database runs all
+        // migrations. Only pre-existing databases receive the compatibility
+        // value; a truly new database keeps Settings::default() == system.
+        if version > 0 {
+            transaction
+                .execute(
+                    "INSERT OR IGNORE INTO settings(key,value)
+                     VALUES('appThemeSelection',?1)",
+                    [r#"{"kind":"builtin","themeId":"light"}"#],
+                )
+                .map_err(database_error)?;
+        }
+        transaction
+            .execute(
+                "INSERT INTO schema_migrations(version, applied_at_ms) VALUES(?1, ?2)",
+                params![13, unix_millis()],
             )
             .map_err(database_error)?;
         transaction
@@ -3095,6 +3192,8 @@ mod tests {
                 startup_location: "driveRoot".into(),
                 show_hidden_files: true,
                 catalog_palette: "midnight".into(),
+                app_theme_selection_json: r#"{"kind":"builtin","themeId":"forest"}"#.into(),
+                custom_theme_snapshot_json: None,
                 restore_last_viewer: true,
                 auto_refresh_current_folder: false,
                 shortcut_bindings: [
@@ -4145,5 +4244,221 @@ mod tests {
         );
         drop(store);
         fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[test]
+    fn req_fr_b24_004_and_005_schema_v13_keeps_new_system_and_migrates_legacy_light() {
+        let fresh_paths = temporary_paths("theme-v13-fresh");
+        {
+            let store = StateStore::open(&fresh_paths).unwrap().0;
+            assert_eq!(
+                store.load_settings().unwrap().app_theme_selection_json,
+                r#"{"kind":"system"}"#
+            );
+            assert_eq!(
+                store
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                13
+            );
+            assert_eq!(
+                store
+                    .connection()
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master
+                         WHERE type='table' AND name='custom_themes'",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .unwrap(),
+                1
+            );
+        }
+        fs::remove_dir_all(fresh_paths.root).unwrap();
+
+        let legacy_paths = temporary_paths("theme-v13-legacy");
+        legacy_paths.create(None).unwrap();
+        {
+            let connection = Connection::open(&legacy_paths.database).unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE settings (
+                        key TEXT PRIMARY KEY NOT NULL,
+                        value TEXT NOT NULL
+                     );
+                     CREATE TABLE schema_migrations (
+                        version INTEGER PRIMARY KEY NOT NULL,
+                        applied_at_ms INTEGER NOT NULL
+                     );
+                     INSERT INTO schema_migrations(version,applied_at_ms) VALUES(12,1);
+                     PRAGMA user_version=12;",
+                )
+                .unwrap();
+        }
+        {
+            let store = StateStore::open(&legacy_paths).unwrap().0;
+            assert_eq!(
+                store.load_settings().unwrap().app_theme_selection_json,
+                r#"{"kind":"builtin","themeId":"light"}"#
+            );
+            assert_eq!(
+                store
+                    .connection()
+                    .query_row(
+                        "SELECT COUNT(*) FROM schema_migrations WHERE version=13",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .unwrap(),
+                1
+            );
+        }
+        let reopened = StateStore::open(&legacy_paths).unwrap().0;
+        assert_eq!(
+            reopened.load_settings().unwrap().app_theme_selection_json,
+            r#"{"kind":"builtin","themeId":"light"}"#
+        );
+        drop(reopened);
+        fs::remove_dir_all(legacy_paths.root).unwrap();
+    }
+
+    #[test]
+    fn req_fr_b24_004_schema_v13_resumes_legacy_after_each_committed_migration_step() {
+        for committed_version in 8..=12 {
+            let paths = temporary_paths(&format!("theme-v13-resume-{committed_version}"));
+            paths.create(None).unwrap();
+            {
+                let connection = Connection::open(&paths.database).unwrap();
+                connection
+                    .execute_batch(
+                        "CREATE TABLE settings (
+                            key TEXT PRIMARY KEY NOT NULL,
+                            value TEXT NOT NULL
+                         );
+                         CREATE TABLE schema_migrations (
+                            version INTEGER PRIMARY KEY NOT NULL,
+                            applied_at_ms INTEGER NOT NULL
+                         );
+                         INSERT INTO schema_migrations(version,applied_at_ms) VALUES(8,1);
+                         PRAGMA user_version=8;",
+                    )
+                    .unwrap();
+
+                // Stop immediately after a committed migration to model a
+                // process interruption between transaction boundaries.
+                migrate_through(&connection, committed_version).unwrap();
+                assert_eq!(
+                    connection
+                        .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                        .unwrap(),
+                    committed_version
+                );
+                assert_eq!(
+                    connection
+                        .query_row(
+                            "SELECT COUNT(*) FROM schema_migrations
+                             WHERE version BETWEEN 9 AND ?1",
+                            [committed_version],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .unwrap(),
+                    committed_version - 8
+                );
+                assert_eq!(
+                    connection
+                        .query_row(
+                            "SELECT COUNT(*) FROM sqlite_master
+                             WHERE type='table' AND name='custom_themes'",
+                            [],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .unwrap(),
+                    0
+                );
+            }
+
+            let resumed = StateStore::open(&paths).unwrap().0;
+            assert_eq!(
+                resumed
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                SCHEMA_VERSION
+            );
+            assert_eq!(
+                resumed
+                    .connection()
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master
+                         WHERE type='table' AND name='custom_themes'",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                resumed.load_settings().unwrap().app_theme_selection_json,
+                r#"{"kind":"builtin","themeId":"light"}"#
+            );
+            drop(resumed);
+            fs::remove_dir_all(paths.root).unwrap();
+        }
+    }
+
+    #[test]
+    fn req_fr_b24_004_schema_v13_preserves_fresh_system_across_interrupted_migrations() {
+        for committed_version in 8..=12 {
+            let paths = temporary_paths(&format!("theme-v13-fresh-resume-{committed_version}"));
+            paths.create(None).unwrap();
+            {
+                let connection = Connection::open(&paths.database).unwrap();
+                migrate_through(&connection, committed_version).unwrap();
+                assert_eq!(
+                    connection
+                        .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                        .unwrap(),
+                    committed_version
+                );
+                assert_eq!(
+                    connection
+                        .query_row(
+                            "SELECT value FROM settings WHERE key='appThemeSelection'",
+                            [],
+                            |row| row.get::<_, String>(0),
+                        )
+                        .unwrap(),
+                    r#"{"kind":"system"}"#
+                );
+            }
+
+            let resumed = StateStore::open(&paths).unwrap().0;
+            assert_eq!(
+                resumed.load_settings().unwrap().app_theme_selection_json,
+                r#"{"kind":"system"}"#
+            );
+            assert_eq!(
+                resumed
+                    .connection()
+                    .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+                    .unwrap(),
+                SCHEMA_VERSION
+            );
+            assert_eq!(
+                resumed
+                    .connection()
+                    .query_row(
+                        "SELECT COUNT(*) FROM sqlite_master
+                         WHERE type='table' AND name='custom_themes'",
+                        [],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .unwrap(),
+                1
+            );
+            drop(resumed);
+            fs::remove_dir_all(paths.root).unwrap();
+        }
     }
 }

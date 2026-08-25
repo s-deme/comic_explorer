@@ -11,6 +11,7 @@ mod recursive_thumbnails;
 mod scheduler;
 mod search_query;
 pub mod shelves;
+pub mod themes;
 pub mod viewer_filters;
 
 pub use coordinator::NavigationCoordinator;
@@ -53,6 +54,7 @@ use search_query::normalize_search_text;
 use search_query::{
     SearchExpression, matches_search_query, parse_catalog_mask, parse_search_query,
 };
+use themes::{CustomThemeSnapshot, ThemeSelection};
 
 pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
@@ -534,6 +536,9 @@ pub struct CatalogSettings {
     pub startup_location: String,
     pub show_hidden_files: bool,
     pub catalog_palette: String,
+    pub theme_selection: ThemeSelection,
+    pub custom_theme_snapshot: Option<CustomThemeSnapshot>,
+    pub theme_fallback_reason: Option<String>,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
@@ -650,6 +655,8 @@ pub struct SettingsProfileInput {
     pub startup_location: String,
     pub show_hidden_files: bool,
     pub catalog_palette: String,
+    pub theme_selection: ThemeSelection,
+    pub custom_theme_snapshot: Option<CustomThemeSnapshot>,
     pub restore_last_viewer: bool,
     pub auto_refresh_current_folder: bool,
     pub shortcuts: BTreeMap<String, Vec<String>>,
@@ -1375,6 +1382,14 @@ fn slideshow_order(settings: &crate::state::Settings) -> String {
 }
 
 fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
+    catalog_settings_resolved(settings, None)
+}
+
+fn catalog_settings_resolved(
+    settings: crate::state::Settings,
+    store: Option<&StateStore>,
+) -> CatalogSettings {
+    let normalized_theme = themes::normalize_stored_theme_settings(&settings, store);
     let scale = viewer_scale(&settings);
     let scale_mode = viewer_scale_mode(&settings);
     let end_of_volume_policy = end_of_volume_policy(&settings);
@@ -1540,6 +1555,9 @@ fn catalog_settings(settings: crate::state::Settings) -> CatalogSettings {
             "system" | "paper" | "midnight" | "highContrast" => settings.catalog_palette,
             _ => "system".into(),
         },
+        theme_selection: normalized_theme.selection,
+        custom_theme_snapshot: normalized_theme.snapshot,
+        theme_fallback_reason: normalized_theme.fallback_reason,
         restore_last_viewer: settings.restore_last_viewer,
         auto_refresh_current_folder: settings.auto_refresh_current_folder,
         shortcuts,
@@ -1756,19 +1774,18 @@ pub fn get_catalog_settings(
     if let Err(error) = validate_request(&state, &context) {
         return Ok(error_response(&context, error));
     }
-    let settings = state
-        .store
-        .lock()
-        .map_err(|_| "state poisoned")?
+    let stores = state.store.lock().map_err(|_| "state poisoned")?;
+    let settings = stores
         .as_ref()
         .map(|store| store.load_settings())
         .transpose()
         .map_err(|error| error.message)?
         .unwrap_or_default();
+    let data = catalog_settings_resolved(settings, stores.as_ref());
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -2599,7 +2616,7 @@ pub fn set_catalog_sort(
             request_error(ErrorCode::InvalidRequest, "Sort field is invalid."),
         ));
     }
-    let settings = {
+    let data = {
         let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
         let mut settings = stores
             .as_ref()
@@ -2614,12 +2631,12 @@ pub fn set_catalog_sort(
                 .save_settings(&settings)
                 .map_err(|error| error.message)?;
         }
-        settings
+        catalog_settings_resolved(settings, stores.as_ref())
     };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -2644,7 +2661,7 @@ pub fn set_end_of_volume_policy(
             ),
         ));
     }
-    let settings = {
+    let data = {
         let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
         let mut settings = stores
             .as_ref()
@@ -2658,12 +2675,12 @@ pub fn set_end_of_volume_policy(
                 .save_settings(&settings)
                 .map_err(|error| error.message)?;
         }
-        settings
+        catalog_settings_resolved(settings, stores.as_ref())
     };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -2685,7 +2702,7 @@ pub fn set_catalog_view_mode(
             request_error(ErrorCode::InvalidRequest, "Catalog view mode is invalid."),
         ));
     }
-    let settings = {
+    let data = {
         let mut stores = match state.store.lock() {
             Ok(stores) => stores,
             Err(_) => {
@@ -2715,12 +2732,12 @@ pub fn set_catalog_view_mode(
         if let Err(error) = store.save_settings(&settings) {
             return Ok(error_response(&context, error));
         }
-        settings
+        catalog_settings_resolved(settings, Some(store))
     };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -2838,7 +2855,7 @@ pub fn set_viewer_settings(
             request_error(ErrorCode::InvalidRequest, "Viewer settings are invalid."),
         ));
     }
-    let settings = {
+    let data = {
         let mut stores = state.store.lock().map_err(|_| "state poisoned")?;
         let mut settings = stores
             .as_ref()
@@ -2870,12 +2887,12 @@ pub fn set_viewer_settings(
                 .save_settings(&settings)
                 .map_err(|error| error.message)?;
         }
-        settings
+        catalog_settings_resolved(settings, stores.as_ref())
     };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -2890,6 +2907,10 @@ type NormalizedProfileBindings = (
 fn validate_settings_profile(
     profile: &SettingsProfileInput,
 ) -> Result<NormalizedProfileBindings, AppError> {
+    themes::normalize_theme_profile_fields(
+        profile.theme_selection.clone(),
+        profile.custom_theme_snapshot.clone(),
+    )?;
     let shortcuts = normalize_shortcuts(&profile.shortcuts).ok_or_else(|| {
         request_error(
             ErrorCode::InvalidRequest,
@@ -3064,7 +3085,7 @@ fn apply_settings_profile_to_settings(
     settings: &mut Settings,
     profile: SettingsProfileInput,
     bindings: NormalizedProfileBindings,
-) {
+) -> Result<(), AppError> {
     let (shortcuts, catalog_mouse, quadrants, right_click, gestures) = bindings;
     settings.sort_field = profile.sort_field;
     settings.sort_descending = profile.sort_descending;
@@ -3144,6 +3165,12 @@ fn apply_settings_profile_to_settings(
     settings.startup_location = profile.startup_location;
     settings.show_hidden_files = profile.show_hidden_files;
     settings.catalog_palette = profile.catalog_palette;
+    let (theme_selection_json, custom_theme_snapshot_json) = themes::encode_theme_settings(
+        &profile.theme_selection,
+        profile.custom_theme_snapshot.as_ref(),
+    )?;
+    settings.app_theme_selection_json = theme_selection_json;
+    settings.custom_theme_snapshot_json = custom_theme_snapshot_json;
     settings.restore_last_viewer = profile.restore_last_viewer;
     settings.auto_refresh_current_folder = profile.auto_refresh_current_folder;
     settings.shortcut_bindings = shortcuts;
@@ -3151,6 +3178,7 @@ fn apply_settings_profile_to_settings(
     settings.viewer_quadrant_bindings = quadrants;
     settings.viewer_right_click_action = right_click;
     settings.mouse_gesture_bindings = gestures;
+    Ok(())
 }
 
 fn normalize_settings_profile_input(
@@ -3163,6 +3191,12 @@ fn normalize_settings_profile_input(
     profile.viewer_quadrant_bindings = quadrants;
     profile.viewer_right_click_action = right_click;
     profile.mouse_gestures = gestures;
+    let (theme_selection, custom_theme_snapshot) = themes::normalize_theme_profile_fields(
+        profile.theme_selection,
+        profile.custom_theme_snapshot,
+    )?;
+    profile.theme_selection = theme_selection;
+    profile.custom_theme_snapshot = custom_theme_snapshot;
     Ok(profile)
 }
 
@@ -3183,6 +3217,38 @@ fn decode_stored_settings_profile(profile_json: &str) -> Result<SettingsProfileI
     object
         .entry("catalogPanePosition")
         .or_insert(serde_json::json!("right"));
+    object.entry("themeSelection").or_insert(serde_json::json!({
+        "kind": "builtin",
+        "themeId": "light"
+    }));
+    object
+        .entry("customThemeSnapshot")
+        .or_insert(serde_json::Value::Null);
+    let stored_theme_selection = object
+        .get("themeSelection")
+        .cloned()
+        .ok_or(())
+        .and_then(|value| serde_json::from_value::<ThemeSelection>(value).map_err(|_| ()));
+    let stored_theme_snapshot = object
+        .get("customThemeSnapshot")
+        .cloned()
+        .ok_or(())
+        .and_then(|value| {
+            serde_json::from_value::<Option<CustomThemeSnapshot>>(value).map_err(|_| ())
+        });
+    let stored_theme_valid = match (stored_theme_selection, stored_theme_snapshot) {
+        (Ok(selection), Ok(snapshot)) => {
+            themes::normalize_theme_profile_fields(selection, snapshot).is_ok()
+        }
+        _ => false,
+    };
+    if !stored_theme_valid {
+        object.insert(
+            "themeSelection".into(),
+            serde_json::json!({"kind": "builtin", "themeId": "light"}),
+        );
+        object.insert("customThemeSnapshot".into(), serde_json::Value::Null);
+    }
     serde_json::from_value::<SettingsProfileInput>(value)
         .map_err(|_| {
             request_error(
@@ -3253,7 +3319,7 @@ pub fn set_settings_profile(
         Ok(bindings) => bindings,
         Err(error) => return Ok(error_response(&context, error)),
     };
-    let settings = {
+    let data = {
         let mut stores = match state.store.lock() {
             Ok(stores) => stores,
             Err(_) => {
@@ -3279,31 +3345,74 @@ pub fn set_settings_profile(
             Ok(settings) => settings,
             Err(error) => return Ok(error_response(&context, error)),
         };
-        apply_settings_profile_to_settings(
-            &mut settings,
-            profile,
-            (
-                shortcuts,
-                catalog_mouse_bindings,
-                viewer_quadrant_bindings,
-                viewer_right_click_action,
-                mouse_gestures,
-            ),
+        let mut profile = profile;
+        let materialization = match themes::plan_theme_profile_materialization(
+            store,
+            profile.theme_selection.clone(),
+            profile.custom_theme_snapshot.clone(),
+        ) {
+            Ok(value) => value,
+            Err(error) => return Ok(error_response(&context, error)),
+        };
+        let bindings = (
+            shortcuts,
+            catalog_mouse_bindings,
+            viewer_quadrant_bindings,
+            viewer_right_click_action,
+            mouse_gestures,
         );
-        if let Err(error) = store.save_settings(&settings) {
-            return Ok(error_response(&context, error));
+        match materialization {
+            themes::ThemeProfileMaterialization::Ready {
+                selection,
+                snapshot,
+            } => {
+                profile.theme_selection = selection;
+                profile.custom_theme_snapshot = snapshot;
+                if let Err(error) =
+                    apply_settings_profile_to_settings(&mut settings, profile, bindings)
+                {
+                    return Ok(error_response(&context, error));
+                }
+                if let Err(error) = store.save_settings(&settings) {
+                    return Ok(error_response(&context, error));
+                }
+            }
+            themes::ThemeProfileMaterialization::Create { definition } => {
+                if let Err(error) =
+                    apply_settings_profile_to_settings(&mut settings, profile, bindings)
+                {
+                    return Ok(error_response(&context, error));
+                }
+                let definition_json = match themes::canonical_definition_json(&definition) {
+                    Ok(value) => value,
+                    Err(error) => return Ok(error_response(&context, error)),
+                };
+                let name = definition.name.clone();
+                if let Err(error) = store.create_custom_theme_and_save_settings(
+                    &mut settings,
+                    None,
+                    &name,
+                    &definition_json,
+                    unix_millis().max(0) as u64,
+                    |settings, record| {
+                        themes::apply_theme_record_to_settings(settings, record, definition)
+                    },
+                ) {
+                    return Ok(error_response(&context, error));
+                }
+            }
         }
         tray_state.apply_preferences(
             settings.tray_store_on_minimize,
             &settings.tray_close_behavior,
             &settings.tray_restore_gesture,
         );
-        settings
+        catalog_settings_resolved(settings, Some(store))
     };
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -3541,7 +3650,7 @@ pub fn execute_named_settings_profile_switch(
             ),
         ));
     };
-    let (record, profile) = match stored_settings_profile(store, &name) {
+    let (record, mut profile) = match stored_settings_profile(store, &name) {
         Ok(value) => value,
         Err(error) => return Ok(error_response(&context, error)),
     };
@@ -3562,19 +3671,63 @@ pub fn execute_named_settings_profile_switch(
         Ok(settings) => settings,
         Err(error) => return Ok(error_response(&context, error)),
     };
-    apply_settings_profile_to_settings(&mut settings, profile, bindings);
-    if let Err(error) = store.activate_named_settings_profile(&record.name, &settings) {
-        return Ok(error_response(&context, error));
+    let materialization = match themes::plan_theme_profile_materialization(
+        store,
+        profile.theme_selection.clone(),
+        profile.custom_theme_snapshot.clone(),
+    ) {
+        Ok(value) => value,
+        Err(error) => return Ok(error_response(&context, error)),
+    };
+    match materialization {
+        themes::ThemeProfileMaterialization::Ready {
+            selection,
+            snapshot,
+        } => {
+            profile.theme_selection = selection;
+            profile.custom_theme_snapshot = snapshot;
+            if let Err(error) = apply_settings_profile_to_settings(&mut settings, profile, bindings)
+            {
+                return Ok(error_response(&context, error));
+            }
+            if let Err(error) = store.activate_named_settings_profile(&record.name, &settings) {
+                return Ok(error_response(&context, error));
+            }
+        }
+        themes::ThemeProfileMaterialization::Create { definition } => {
+            if let Err(error) = apply_settings_profile_to_settings(&mut settings, profile, bindings)
+            {
+                return Ok(error_response(&context, error));
+            }
+            let definition_json = match themes::canonical_definition_json(&definition) {
+                Ok(value) => value,
+                Err(error) => return Ok(error_response(&context, error)),
+            };
+            let name = definition.name.clone();
+            if let Err(error) = store.create_custom_theme_and_save_settings(
+                &mut settings,
+                Some(&record.name),
+                &name,
+                &definition_json,
+                unix_millis().max(0) as u64,
+                |settings, theme_record| {
+                    themes::apply_theme_record_to_settings(settings, theme_record, definition)
+                },
+            ) {
+                return Ok(error_response(&context, error));
+            }
+        }
     }
     tray_state.apply_preferences(
         settings.tray_store_on_minimize,
         &settings.tray_close_behavior,
         &settings.tray_restore_gesture,
     );
+    let data = catalog_settings_resolved(settings, Some(store));
     Ok(Response::Ok {
         request_id: context.request_id,
         generation: context.generation,
-        data: catalog_settings(settings),
+        data,
     })
 }
 
@@ -6776,6 +6929,8 @@ mod shutdown_tests {
             startup_location: "last".into(),
             show_hidden_files: false,
             catalog_palette: "system".into(),
+            theme_selection: ThemeSelection::System,
+            custom_theme_snapshot: None,
             restore_last_viewer: false,
             auto_refresh_current_folder: true,
             shortcuts: default_shortcuts(),
@@ -7042,9 +7197,41 @@ mod shutdown_tests {
             .as_object_mut()
             .unwrap()
             .remove("catalogPanePosition");
+        legacy_layout
+            .as_object_mut()
+            .unwrap()
+            .remove("themeSelection");
+        legacy_layout
+            .as_object_mut()
+            .unwrap()
+            .remove("customThemeSnapshot");
         let migrated = decode_stored_settings_profile(&legacy_layout.to_string()).unwrap();
         assert_eq!(migrated.tree_height, 240);
         assert_eq!(migrated.catalog_pane_position, "right");
+        assert_eq!(
+            migrated.theme_selection,
+            ThemeSelection::Builtin {
+                theme_id: themes::BuiltinThemeId::Light
+            }
+        );
+        assert!(migrated.custom_theme_snapshot.is_none());
+        let mut corrupt_theme = serde_json::to_value(&normalized).unwrap();
+        corrupt_theme.as_object_mut().unwrap().insert(
+            "themeSelection".into(),
+            serde_json::json!({"kind": "custom", "themeId": 99, "revision": 1}),
+        );
+        corrupt_theme
+            .as_object_mut()
+            .unwrap()
+            .insert("customThemeSnapshot".into(), serde_json::Value::Null);
+        let recovered_theme = decode_stored_settings_profile(&corrupt_theme.to_string()).unwrap();
+        assert_eq!(
+            recovered_theme.theme_selection,
+            ThemeSelection::Builtin {
+                theme_id: themes::BuiltinThemeId::Light
+            }
+        );
+        assert!(recovered_theme.custom_theme_snapshot.is_none());
         let mut unknown = serde_json::to_value(&normalized).unwrap();
         unknown
             .as_object_mut()
@@ -7084,7 +7271,7 @@ mod shutdown_tests {
         let bindings = validate_settings_profile(&normalized).unwrap();
         let mut settings = Settings::default();
         assert!(settings_profile_changed_fields(&normalized, settings.clone()) > 0);
-        apply_settings_profile_to_settings(&mut settings, normalized.clone(), bindings);
+        apply_settings_profile_to_settings(&mut settings, normalized.clone(), bindings).unwrap();
         assert_eq!(settings_profile_changed_fields(&normalized, settings), 0);
         let started = std::time::Instant::now();
         for _ in 0..16 {
@@ -7097,6 +7284,104 @@ mod shutdown_tests {
             elapsed.as_secs_f64() * 1000.0
         );
         assert!(elapsed < std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn req_fr_b24_005_system_and_builtin_named_profiles_round_trip_preview_and_switch() {
+        let root = std::env::temp_dir().join(format!(
+            "comic-explorer-theme-named-roundtrip-{}-{}",
+            std::process::id(),
+            unix_millis()
+        ));
+        let paths = AppPaths::under(root.clone());
+        let mut store = StateStore::open(&paths).unwrap().0;
+        let mut profile_value =
+            serde_json::to_value(catalog_settings(Settings::default())).unwrap();
+        profile_value
+            .as_object_mut()
+            .unwrap()
+            .remove("themeFallbackReason");
+        let base_profile = serde_json::from_value::<SettingsProfileInput>(profile_value).unwrap();
+
+        for (index, (name, expected_selection)) in [
+            ("System", ThemeSelection::System),
+            (
+                "Dark",
+                ThemeSelection::Builtin {
+                    theme_id: themes::BuiltinThemeId::Dark,
+                },
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut profile = base_profile.clone();
+            profile.theme_selection = expected_selection.clone();
+            profile.custom_theme_snapshot = None;
+            let profile = normalize_settings_profile_input(profile).unwrap();
+            let profile_json = serde_json::to_string(&profile).unwrap();
+            store
+                .save_named_settings_profile(
+                    &NamedSettingsProfileRecord {
+                        name: name.into(),
+                        profile_json: profile_json.clone(),
+                        updated_at_ms: index as u64 + 1,
+                        active: false,
+                    },
+                    false,
+                )
+                .unwrap();
+
+            let (record, preview_profile) = stored_settings_profile(&store, name).unwrap();
+            let preview = SettingsProfileSwitchPreview {
+                name: record.name.clone(),
+                changed_field_count: settings_profile_changed_fields(
+                    &preview_profile,
+                    store.load_settings().unwrap(),
+                ),
+                profile: preview_profile,
+                confirmation_key: settings_profile_confirmation_key(
+                    &record.name,
+                    &record.profile_json,
+                ),
+            };
+            assert_eq!(preview.profile.theme_selection, expected_selection);
+            assert!(preview.profile.custom_theme_snapshot.is_none());
+            assert_eq!(
+                preview.confirmation_key,
+                settings_profile_confirmation_key(name, &profile_json)
+            );
+
+            let bindings = validate_settings_profile(&preview.profile).unwrap();
+            let mut settings = store.load_settings().unwrap();
+            let themes::ThemeProfileMaterialization::Ready {
+                selection,
+                snapshot,
+            } = themes::plan_theme_profile_materialization(
+                &store,
+                preview.profile.theme_selection.clone(),
+                preview.profile.custom_theme_snapshot.clone(),
+            )
+            .unwrap()
+            else {
+                panic!("system and built-in profiles must not materialize a custom theme");
+            };
+            let mut switch_profile = preview.profile;
+            switch_profile.theme_selection = selection;
+            switch_profile.custom_theme_snapshot = snapshot;
+            apply_settings_profile_to_settings(&mut settings, switch_profile, bindings).unwrap();
+            store
+                .activate_named_settings_profile(name, &settings)
+                .unwrap();
+
+            let resolved = catalog_settings_resolved(store.load_settings().unwrap(), Some(&store));
+            assert_eq!(resolved.theme_selection, expected_selection);
+            assert!(resolved.custom_theme_snapshot.is_none());
+            assert!(store.named_settings_profile(name).unwrap().unwrap().active);
+        }
+
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

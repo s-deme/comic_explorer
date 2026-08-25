@@ -24,7 +24,7 @@ codd:
 
 ## 機能集計
 
-現行要件台帳はMVP 28件（REQ 22、NFR 6）とMVP後/将来75件の計103件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
+現行要件台帳はMVP 28件（REQ 22、NFR 6）とMVP後/将来76件の計104件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
 
 Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低頻度操作を展開式secondary rowへ集約した。横scrollbarは撤去し、狭幅では段階zoomと作品名を順に縮退する。Windows自動gateはPASSし、release WebView2のDPI別目視は未測定として残す。
 
@@ -188,6 +188,7 @@ P5-BではLEY-FILTER-001〜016の16件をPublishedとし、P1〜P5の全103件�
 | FR-B21 | standalone PDF | Implemented / PASS | Windows.Data.Pdfの実render、canonical path正規化、上限・分類・root containmentに加え、release WebView2のviewer・thumbnail実decodeを日本語名PDFで直接観測済み。 |
 | FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、Shell delete path正規化、catalog/tree context menu・keyboard操作・右click宛先paste・catalog/tree双方を起点とするdrag move・tree folder削除後の安全な親folder遷移・操作後tree再列挙・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorerとの実paste、アプリ選択の製品直接観測は未測定。 |
 | FR-B23 | Leeyes viewer操作・外観 | Implemented / PASS | 既存3件にP1-Aのviewer/input 6件を加え、1〜800%倍率、pixel寸法、倍率scope、grid、pan係数、wheel不感帯、profile v5・SQLite保存、v1〜v4移行、不正値拒否をWindows frontend 316件、Python 59件、Rust canonical、typecheck、buildで検証済み。release WebView2上の目視・実device操作は未測定。 |
+| FR-B24 | アプリテーマ | Implemented / PASS | システム連動と7組み込みテーマ、16 semantic tokenのカスタムテーマ作成・複製・編集・JSON入出力、最大32件、SQLite schema v13、profile v28、native title bar同期、旧設定移行と原子的rollbackをWindows frontend 600件、Python 74件、Rust canonical 271+1件、typecheck、build、SBOM、CoDDで検証済み。release WebView2の色・DPI・Windows high contrast/forced-colors直接観測は未測定。 |
 
 ## CandidateとRejected
 
