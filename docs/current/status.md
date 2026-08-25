@@ -24,7 +24,9 @@ codd:
 
 ## 機能集計
 
-現行要件台帳はMVP 27件（REQ 21、NFR 6）とMVP後/将来75件の計102件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
+現行要件台帳はMVP 28件（REQ 22、NFR 6）とMVP後/将来75件の計103件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
+
+Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低頻度操作を展開式secondary rowへ集約した。横scrollbarは撤去し、狭幅では段階zoomと作品名を順に縮退する。Windows自動gateはPASSし、release WebView2のDPI別目視は未測定として残す。
 
 ## Leeyes P1〜P5進捗
 

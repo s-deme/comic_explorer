@@ -131,9 +131,12 @@ describe("Viewer settings", () => {
       />,
     );
     expect(screen.getByRole("combobox", { name: "表示枚数" })).toHaveValue("spread");
-    expect(screen.getByText("左開き")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "読み方向" }))
+      .toHaveAttribute("title", "読み方向を右開きへ切り替え");
 
-    fireEvent.click(screen.getByRole("button", { name: "単ページへ" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "表示枚数" }), {
+      target: { value: "single" },
+    });
     expect(onSettingsChange).toHaveBeenCalledWith("single", "leftToRight");
     fireEvent.click(screen.getByRole("button", { name: "読み方向" }));
     expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
@@ -268,9 +271,14 @@ describe("Viewer settings", () => {
       expect(button.getAttribute("title")).not.toBe("");
     });
 
-    const spread = within(toolbar!).getByRole("button", { name: "見開きへ" });
-    expect(spread).toHaveTextContent("▯▯");
-    expect(spread).not.toHaveTextContent("見開きへ");
+    expect(within(toolbar!).queryByRole("button", { name: "見開きへ" }))
+      .not.toBeInTheDocument();
+    const more = within(toolbar!).getByRole("button", { name: "その他の操作" });
+    expect(toolbar).toHaveAttribute("data-more-open", "false");
+    fireEvent.click(more);
+    expect(toolbar).toHaveAttribute("data-more-open", "true");
+    expect(within(toolbar!).getByRole("button", { name: "その他の操作を閉じる" }))
+      .toHaveAttribute("aria-expanded", "true");
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
     expect(close).toHaveTextContent("↩");
     expect(close).not.toHaveTextContent("一覧へ戻る");
@@ -540,6 +548,7 @@ describe("Viewer settings", () => {
 
     const navigator = screen.getByRole("navigation", { name: "ページ移動" });
     const slider = within(navigator).getByRole("slider", { name: "ページ移動" });
+    expect(slider).toHaveAttribute("dir", "rtl");
     expect(slider).toHaveValue("0");
     expect(slider).toHaveAttribute("aria-valuetext", "1 / 2");
     expect(within(navigator).getByText("1 / 2")).toBeInTheDocument();
@@ -1369,9 +1378,11 @@ describe("Viewer settings", () => {
       />,
     );
 
-    expect(screen.getByText("左開き")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-direction", "leftToRight");
     fireEvent.keyDown(window, { key: "r" });
-    expect(screen.getByText("右開き")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-direction", "rightToLeft");
     expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
 
     fireEvent.keyDown(window, { key: "ArrowLeft" });
@@ -2078,7 +2089,8 @@ describe("Viewer settings", () => {
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
     fireEvent.pointerDown(stage!, { button: 1 });
-    expect(screen.getByText("左開き")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-direction", "leftToRight");
 
     fireEvent.pointerDown(stage!, { button: 2 });
     fireEvent.wheel(stage!, { deltaY: -120, buttons: 2 });
@@ -2121,7 +2133,8 @@ describe("Viewer settings", () => {
     click(30, 40, 2);
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
     click(30, 80, 3);
-    expect(screen.getByText("左開き")).toBeInTheDocument();
+    expect(document.querySelector(".page-spread"))
+      .toHaveAttribute("data-direction", "leftToRight");
     click(60, 60, 4);
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
   });

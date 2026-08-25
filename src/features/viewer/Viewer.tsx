@@ -384,6 +384,7 @@ export function Viewer({
   const [imageTransformNotice, setImageTransformNotice] = useState<string | null>(null);
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
   const [slideshowRunning, setSlideshowRunning] = useState(
     (initialSlideshow ?? slideshowIntervalMs !== undefined) && session.pages.length > 1,
   );
@@ -1612,6 +1613,7 @@ export function Viewer({
     >
       <header
         className="viewer-toolbar"
+        data-more-open={toolbarMoreOpen}
         onPointerLeave={(event) => {
           if (
             fullscreen
@@ -1622,11 +1624,9 @@ export function Viewer({
           }
         }}
       >
-        <strong>{session.displayName}</strong>
-        <span>{VIEW_MODE_LABELS[state.mode]}</span>
-        <span>{state.direction === "rightToLeft" ? "右開き" : "左開き"}</span>
-        <label className="viewer-layout-control">
-          表示枚数
+        <strong title={session.displayName}>{session.displayName}</strong>
+        <label className="viewer-layout-control viewer-toolbar-primary viewer-toolbar-view-mode">
+          <span className="visually-hidden">表示枚数</span>
           <select
             aria-label="表示枚数"
             value={state.mode}
@@ -1637,7 +1637,7 @@ export function Viewer({
             ))}
           </select>
         </label>
-        <label className="viewer-layout-control">
+        <label className="viewer-layout-control viewer-toolbar-secondary">
           レイアウト
           <select
             aria-label="閲覧レイアウト"
@@ -1654,7 +1654,7 @@ export function Viewer({
           </select>
         </label>
         {onEndOfVolumePolicyChange !== undefined && (
-          <label className="viewer-end-of-volume-control">
+          <label className="viewer-end-of-volume-control viewer-toolbar-secondary">
             巻末動作
             <select
               aria-label="巻末動作"
@@ -1673,8 +1673,8 @@ export function Viewer({
             </select>
           </label>
         )}
-        <label className="viewer-scale-control">
-          倍率
+        <label className="viewer-scale-control viewer-toolbar-primary">
+          <span className="visually-hidden">倍率</span>
           <select
             aria-label="倍率モード"
             value={scale.mode}
@@ -1689,6 +1689,7 @@ export function Viewer({
             <option value="custom">任意倍率</option>
           </select>
           <input
+            className="viewer-toolbar-secondary-control"
             aria-label="任意倍率（%）"
             type="number"
             min="1"
@@ -1703,7 +1704,7 @@ export function Viewer({
           />
           <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
         </label>
-        <label className="viewer-pixel-control">
+        <label className="viewer-pixel-control viewer-toolbar-secondary">
           幅px
           <input
             aria-label="表示幅（px）"
@@ -1725,7 +1726,7 @@ export function Viewer({
             onClick={() => applyPixelDimension("width", pixelWidthInput)}
           >適用</button>
         </label>
-        <label className="viewer-pixel-control">
+        <label className="viewer-pixel-control viewer-toolbar-secondary">
           高さpx
           <input
             aria-label="表示高さ（px）"
@@ -1749,7 +1750,7 @@ export function Viewer({
         </label>
         {pixelScaleError && <span className="viewer-control-error" role="alert">{pixelScaleError}</span>}
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-previous"
           aria-label="前ページ"
           title="前ページへ移動"
           onClick={() => previous()}
@@ -1757,7 +1758,7 @@ export function Viewer({
           <span aria-hidden="true">◀</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-next"
           aria-label="次ページ"
           title="次ページへ移動"
           onClick={() => next()}
@@ -1765,7 +1766,7 @@ export function Viewer({
           <span aria-hidden="true">▶</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="ランダムページ"
           title="現在以外のページへランダム移動"
           disabled={session.pages.length <= 1}
@@ -1774,7 +1775,7 @@ export function Viewer({
           <span aria-hidden="true">⤨</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
           title={slideshowRunning
             ? "スライドショーを停止"
@@ -1786,7 +1787,7 @@ export function Viewer({
           <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="見開きを1ページ戻す"
           title="見開きの開始位置を1ページ戻す"
           disabled={
@@ -1799,7 +1800,7 @@ export function Viewer({
           <span aria-hidden="true">1◀</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="見開きを1ページ進める"
           title="見開きの開始位置を1ページ進める"
           disabled={
@@ -1812,7 +1813,7 @@ export function Viewer({
           <span aria-hidden="true">▶1</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-out"
           aria-label="倍率を下げる"
           title="倍率を下げる"
           onClick={() => applyScale({ type: "zoomOut" })}
@@ -1820,7 +1821,7 @@ export function Viewer({
           <span aria-hidden="true">−</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-in"
           aria-label="倍率を上げる"
           title="倍率を上げる"
           onClick={() => applyScale({ type: "zoomIn" })}
@@ -1828,7 +1829,7 @@ export function Viewer({
           <span aria-hidden="true">＋</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="矩形ズーム"
           title={layoutMode === "paged"
             ? rectangleZoomArmed
@@ -1842,7 +1843,7 @@ export function Viewer({
           <span aria-hidden="true">▣＋</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="ルーペ"
           title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
           aria-pressed={scale.loupeEnabled}
@@ -1850,19 +1851,11 @@ export function Viewer({
         >
           <span aria-hidden="true">⌕</span>
         </button>
-        <button
-          className="viewer-icon-button"
-          aria-label={state.mode === "single" ? "見開きへ" : "単ページへ"}
-          title={state.mode === "single" ? "見開き表示へ切り替え" : "単ページ表示へ切り替え"}
-          onClick={() => changeMode(state.mode === "single" ? "spread" : "single")}
-        >
-          <span aria-hidden="true">{state.mode === "single" ? "▯▯" : "▯"}</span>
-        </button>
         {rectangleZoomError && (
           <span className="viewer-control-error" role="alert">{rectangleZoomError}</span>
         )}
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="読み方向"
           title={state.direction === "rightToLeft"
             ? "読み方向を左開きへ切り替え"
@@ -1872,7 +1865,7 @@ export function Viewer({
           <span aria-hidden="true">⇄</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-bookmark"
           type="button"
           aria-label="しおりを保存"
           title="現在のページをしおりに保存"
@@ -1881,7 +1874,7 @@ export function Viewer({
           <span aria-hidden="true">★</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="次のしおり"
           title="次のしおりへ移動"
@@ -1891,7 +1884,7 @@ export function Viewer({
           <span aria-hidden="true">★→</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="しおり一覧"
           title="しおり一覧を表示"
@@ -1901,7 +1894,7 @@ export function Viewer({
           <span aria-hidden="true">☷</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
           title={detached ? "画像表示をメイン画面へ統合" : "画像表示を別領域へ分離"}
@@ -1911,7 +1904,7 @@ export function Viewer({
           <span aria-hidden="true">{detached ? "↙" : "↗"}</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="現在ページの画像をコピー"
           title="現在ページを画像データとしてクリップボードへコピー"
@@ -1921,7 +1914,7 @@ export function Viewer({
           <span aria-hidden="true">▣</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="時計回りに90度回転"
           title="現在ページを時計回りに90度回転 (])"
@@ -1930,7 +1923,7 @@ export function Viewer({
           <span aria-hidden="true">↻</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="左右反転"
           title="現在ページを左右反転 (H)"
@@ -1939,7 +1932,7 @@ export function Viewer({
           <span aria-hidden="true">↔</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="上下反転"
           title="現在ページを上下反転 (V)"
@@ -1948,7 +1941,7 @@ export function Viewer({
           <span aria-hidden="true">↕</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="回転・反転をリセット"
           title="現在ページの回転・反転をリセット (0)"
@@ -1958,7 +1951,7 @@ export function Viewer({
           <span aria-hidden="true">0°</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-secondary"
           type="button"
           aria-label="画像フィルター"
           title="非破壊画像フィルターを設定"
@@ -1967,8 +1960,18 @@ export function Viewer({
           <span aria-hidden="true">◐</span>
         </button>
         <button
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-more"
+          type="button"
+          aria-label={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作"}
+          title={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作を表示"}
+          aria-expanded={toolbarMoreOpen}
+          onClick={() => setToolbarMoreOpen((open) => !open)}
+        >
+          <span aria-hidden="true">⋯</span>
+        </button>
+        <button
           ref={fullscreenButtonRef}
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-fullscreen"
           aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
           title={fullscreen ? "全画面表示を終了" : "全画面表示へ切り替え"}
           aria-pressed={fullscreen}
@@ -1977,7 +1980,7 @@ export function Viewer({
           <span aria-hidden="true">{fullscreen ? "⊡" : "⛶"}</span>
         </button>
         <button
-          className="viewer-icon-button"
+          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-close"
           type="button"
           aria-label="一覧へ戻る"
           title="ビューワを閉じて一覧へ戻る"
@@ -2468,6 +2471,7 @@ export function Viewer({
       >
         <input
           type="range"
+          dir="rtl"
           aria-label="ページ移動"
           aria-valuetext={progress}
           min="0"

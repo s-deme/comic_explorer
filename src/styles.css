@@ -2107,12 +2107,21 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex-wrap: nowrap;
+  overflow: hidden;
+  flex-wrap: wrap;
   font-size: .86rem;
   background: #262b31;
   box-shadow: 0 1px 0 #ffffff18;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .viewer-page-navigator {
   z-index: 3;
@@ -2162,12 +2171,43 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   visibility: hidden;
 }
 .viewer-toolbar strong {
+  min-width: 40px;
   max-width: 22vw;
-  margin-right: auto;
+  flex: 1 1 120px;
+  order: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.viewer-toolbar-primary { flex: 0 0 auto; }
+.viewer-toolbar-previous { order: 2; }
+.viewer-toolbar-next { order: 3; }
+.viewer-toolbar-view-mode { order: 4; }
+.viewer-scale-control { order: 5; }
+.viewer-toolbar-zoom-out { order: 6; }
+.viewer-toolbar-zoom-in { order: 7; }
+.viewer-toolbar-bookmark { order: 8; }
+.viewer-toolbar-more { order: 9; }
+.viewer-toolbar-fullscreen { order: 10; }
+.viewer-toolbar-close { order: 11; }
+.viewer-toolbar-secondary,
+.viewer-toolbar-secondary-control { display: none; }
+.viewer-toolbar[data-more-open="true"]::after {
+  content: "";
+  flex: 0 0 100%;
+  order: 19;
+}
+.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary {
+  display: inline-flex;
+  order: 20;
+}
+.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary-control {
+  display: inline-block;
+}
+.viewer-toolbar > .viewer-control-error,
+.viewer-toolbar > .fullscreen-error { order: 30; }
+.viewer-toolbar select { max-width: 150px; }
+.viewer-toolbar-view-mode select { max-width: 104px; }
 .viewer-toolbar > span,
 .viewer-layout-control,
 .viewer-end-of-volume-control,
@@ -2199,6 +2239,15 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .fullscreen-error {
   flex-basis: 100%;
   color: #ffd6d6;
+}
+@media (max-width: 760px) {
+  .viewer-toolbar strong { max-width: none; }
+  .viewer-toolbar-zoom-out,
+  .viewer-toolbar-zoom-in { display: none; }
+}
+@media (max-width: 520px) {
+  .viewer-toolbar strong { display: none; }
+  .viewer-toolbar { gap: 4px; padding-inline: 5px; }
 }
 .viewer-stage {
   position: relative;

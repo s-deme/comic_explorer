@@ -17,13 +17,25 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-23 JST
+- 最終更新日: 2026-08-25 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
+
+## 2026-08-25 Viewerツールバー整理
+
+REQ-MVP-014AとしてViewerの常時表示を作品名、前後page、表示枚数、倍率mode、段階zoom、現在倍率、しおり保存、その他、全画面、一覧へ戻るへ限定し、低頻度操作を展開式secondary rowへ集約した。重複していた見開き・単page切替buttonとmode・読み方向の状態文字を撤去し、狭幅では段階zoom、さらに作品名を縮退する。toolbarの`overflow: hidden`、secondary controlの閉状態と展開状態をPython style contractで固定した。
+
+| Gate | 結果 | 2026-08-25の実測 |
+|---|---|---|
+| Windows tests | PASS | Python 66件、frontend 42 files / 517件、FAIL 0。Viewer focused 64件とUI style contract 22件を含む。 |
+| TypeScript typecheck | PASS | `run-typecheck-windows.ps1` exit 0。 |
+| Windows frontend build | PASS | 83 modules、exit 0。500kB超chunk warningは既知advisoryでFAILへ読み替えない。 |
+| CoDD | PASS | scan、check red FAIL 0、verify red 3 PASS / 0 FAIL。amber WARN 1、SKIP 3、VACUOUS 1を機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での1280px以下、fullscreen、keyboard focus、100/150/200% DPIの目視操作は未測定。 |
 
 ## 2026-08-25 重複catalog操作の撤去
 
