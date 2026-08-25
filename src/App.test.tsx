@@ -1849,7 +1849,8 @@ describe("application shell", () => {
 
     expect(screen.queryByLabelText("名前検索")).not.toBeInTheDocument();
     const searchToggle = screen.getByRole("button", { name: "検索ペインを表示" });
-    expect(searchToggle).toHaveTextContent("⌕");
+    expect(searchToggle.querySelector("svg")).toHaveAttribute("width", "18");
+    expect(searchToggle.querySelector("svg")).toHaveAttribute("height", "18");
     expect(searchToggle).toHaveAttribute("title", "検索を表示");
     const searchPane = openSearchPane();
     const search = within(searchPane).getByRole("button", { name: "検索" });
