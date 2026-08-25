@@ -5304,7 +5304,7 @@ export function App({
             onClick={() => toggleToolbarMenu("sort")}
             onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("sort", event)}
           >
-            並べ替え: {({
+            {({
               name: "名前",
               modified: "更新日時",
               size: "サイズ",
@@ -5367,7 +5367,7 @@ export function App({
             onClick={() => toggleToolbarMenu("catalogView")}
             onKeyDown={(event) => handleToolbarMenuTriggerKeyDown("catalogView", event)}
           >
-            一覧形式: {CATALOG_VIEW_MODE_LABELS[catalogViewMode]} <span aria-hidden="true">▾</span>
+            {CATALOG_VIEW_MODE_LABELS[catalogViewMode]} <span aria-hidden="true">▾</span>
           </button>
           {activeToolbarMenu === "catalogView" && (
             <div

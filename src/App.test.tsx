@@ -1817,12 +1817,18 @@ describe("application shell", () => {
       .not.toBeInTheDocument();
     chooseToolbarMenuItem("並べ替え条件", "並べ替え候補", "サイズ");
     expect(sortButton).toHaveAttribute("data-sort-field", "size");
+    expect(sortButton).toHaveTextContent(/^サイズ ▾$/);
+    expect(sortButton).not.toHaveTextContent("並べ替え");
 
     expect(screen.queryByRole("button", { name: "巻末動作" })).not.toBeInTheDocument();
 
     chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", "小サムネイル");
     expect(screen.getByRole("button", { name: "一覧表示形式" }))
       .toHaveAttribute("data-catalog-view-mode", "small_thumbnail");
+    expect(screen.getByRole("button", { name: "一覧表示形式" }))
+      .toHaveTextContent(/^小サムネイル ▾$/);
+    expect(screen.getByRole("button", { name: "一覧表示形式" }))
+      .not.toHaveTextContent("一覧形式");
     expect(screen.queryByRole("button", { name: "カードグリッド" }))
       .not.toBeInTheDocument();
 
