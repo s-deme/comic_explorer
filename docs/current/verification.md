@@ -25,6 +25,10 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-25 重複catalog操作の撤去
+
+toolbarの単独カードグリッド切替buttonとcatalog上部の一覧filterを撤去し、一覧形式は右側のmenu、絞り込みは検索paneへ一本化した。frontendは撤去したbutton・filter barが存在せず、catalog全件が表示されることを回帰した。Windows TypeScript typecheck、production build、Python 65件、frontend 42 files / 517件はPASSした。全体並列runで既存のFT-B14-001とFT-B11-004が各1回10秒timeoutになったが、それぞれ単独で637ms、1,027msでPASSし、frontend全体再実行でも517件すべてPASSした。
+
 ## Windows portable ZIP artifact
 
 NFR-MVP-005の配布workflowは、NSIS build後の同一release executableを`dist/portable`へcopyし、
