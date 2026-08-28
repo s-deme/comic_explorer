@@ -173,12 +173,15 @@ class UiStyleContractTests(unittest.TestCase):
 
     def test_icon_toolbar_buttons_have_visible_spacing(self) -> None:
         self.assert_rule_contains(".icon-command-toolbar", "gap: 6px")
-        self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
+        self.assert_rule_contains(".viewer-toolbar", "gap: 8px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
     def test_viewer_toolbar_keeps_primary_controls_and_opens_a_labeled_action_panel(self) -> None:
-        self.assert_rule_contains(".viewer-toolbar", "overflow: hidden")
-        self.assert_rule_contains(".viewer-toolbar-close", "order: 1")
+        self.assert_rule_contains(".viewer-toolbar", "overflow: visible")
+        self.assert_rule_contains(".viewer-toolbar", "flex-wrap: wrap")
+        self.assert_rule_contains(".viewer-toolbar-identity", "flex: 1 1 120px")
+        self.assert_rule_contains(".viewer-toolbar-group", "border-left: 1px solid var(--theme-border)")
+        self.assert_rule_contains(".viewer-toolbar-group:first-child", "border-left: 0")
         self.assert_rule_contains(".viewer-more-panel", "position: absolute")
         self.assert_rule_contains(".viewer-more-panel", "max-height: calc(100vh - 104px)")
         self.assert_rule_contains('.viewer-more-panel[data-open="false"]', "display: none")

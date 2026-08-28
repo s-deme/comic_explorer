@@ -25,6 +25,20 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 Viewer toolbarの用途別再配置
+
+REQ-MVP-014Aに対し、上部toolbarを一覧へ戻る・作品名のidentity、表示枚数、倍率、しおりと補助操作、
+全画面のgroupへ再配置した。前後pageとslideshowは既存のpage移動bar右端を維持し、補助panelの読み方操作は
+読み方向、見開きの1page調整、ランダムpageの順にした。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused Viewer / UI style | PASS | Viewer 62件、toolbar groupと補助panel内順序を確認するfrontend回帰、Python UI style 31件、FAIL 0。 |
+| Windows tests | PASS | Python 76件、frontend 44 files / 597件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後677.74kBのchunk advisoryはFAILへ読み替えない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での通常幅・狭幅・fullscreen・DPI別のgroup配置は未測定。 |
+
 ## 2026-08-29 Viewer下部操作の集約
 
 REQ-MVP-014 / 014Aに対し、前page・次pageとslideshowを上部toolbarおよび「その他の操作」panelから外し、

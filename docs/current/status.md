@@ -36,6 +36,8 @@ Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低
 
 同日に、前page・次page・slideshowを上部Viewer toolbarとその他操作panelから外し、page移動bar右端へ集約した。slider、現在page数、3操作は全画面時にも同じ下端overlayの表示・非表示を共有する。release WebView2の通常幅・狭幅・DPI別目視は未測定として残す。
 
+同日にViewer toolbarを、一覧へ戻る・作品名、表示枚数、倍率、しおりと補助操作、全画面の目的別groupへ再配置した。低頻度の読み方操作は「その他の操作」内で、読み方向、見開き調整、ランダムpageの順へ整理した。release WebView2の通常幅・狭幅・DPI別目視は未測定として残す。
+
 同日に画像フィルターdialogを、セット一覧・選択中セットの保存/有効化/削除・順序付き処理手順の三つのsurfaceへ再構成した。現在使用中のセットと手順数を明示し、少ない手順ではcontent高へ縮み、多数手順だけを各panel内でscrollする。狭いdialog幅ではcontainer queryにより1列へ切り替えるため、buttonの横方向切り落としやdialog全体の横scrollbarを作らない。FilterDialog 4件、Viewer 61件、Python UI style 31件、Windows frontend 599件、Python 75件、typecheck、buildはPASSした。release WebView2の直接目視は、この環境でbrowser接続を取得できず未測定として残す。
 
 同日にViewerの「その他の操作」を、toolbarの固定40px高で切り落とされる展開行から、表示とサイズ・移動と読み方・しおりと共有・画像の4群を持つ名前付きoverlay panelへ置き換えた。通常表示と全画面のどちらでも画像領域のlayoutを変えず、Escまたは閉じるbuttonで閉じる。Viewer表示中のnative title barは`Comic Explorer — <作品名>`へ更新し、作品切替時に再設定、Viewer終了時に`Comic Explorer`へ戻す。Tauri title APIの失敗は画面を閉じない。Viewer 62件、window adapter 6件、Python UI/release evidence 40件、Windows frontend 601件、Python 76件、typecheck、buildはPASSし、release WebView2直接目視は未測定として残す。

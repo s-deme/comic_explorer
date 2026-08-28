@@ -270,6 +270,10 @@ describe("Viewer settings", () => {
       expect(button).toHaveAttribute("title");
       expect(button.getAttribute("title")).not.toBe("");
     });
+    expect(within(toolbar!).getAllByRole("group").map((group) => group.getAttribute("aria-label")))
+      .toEqual(["表示枚数", "倍率", "しおりと補助操作", "ウィンドウ操作"]);
+    expect(toolbar?.querySelector(".viewer-toolbar-identity"))
+      .toContainElement(within(toolbar!).getByRole("button", { name: "一覧へ戻る" }));
 
     expect(within(toolbar!).queryByRole("button", { name: "見開きへ" }))
       .not.toBeInTheDocument();
@@ -287,6 +291,11 @@ describe("Viewer settings", () => {
     expect(within(panel).getByRole("heading", { name: "しおりと共有" })).toBeInTheDocument();
     expect(within(panel).getByRole("heading", { name: "画像" })).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "画像フィルター" })).toBeInTheDocument();
+    const navigationGroup = within(panel).getByRole("heading", { name: "移動と読み方" })
+      .closest("section");
+    expect(navigationGroup).not.toBeNull();
+    expect(within(navigationGroup!).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
+      .toEqual(["読み方向", "見開きを1ページ戻す", "見開きを1ページ進める", "ランダムページ"]);
     fireEvent.click(within(panel).getByRole("button", { name: "閉じる" }));
     expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });

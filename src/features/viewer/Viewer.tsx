@@ -1543,106 +1543,116 @@ export function Viewer({
           }
         }}
       >
-        <strong title={session.displayName}>{session.displayName}</strong>
-        <label className="viewer-layout-control viewer-toolbar-primary viewer-toolbar-view-mode">
-          <span className="visually-hidden">表示枚数</span>
-          <select
-            aria-label="表示枚数"
-            value={state.mode}
-            onChange={(event) => changeMode(event.target.value as ViewMode)}
+        <div className="viewer-toolbar-identity">
+          <button
+            className="viewer-icon-button viewer-toolbar-close"
+            type="button"
+            aria-label="一覧へ戻る"
+            title="ビューワを閉じて一覧へ戻る"
+            data-product-id="viewer-close"
+            onClick={close}
           >
-            {VIEW_MODES.map((mode) => (
-              <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
-            ))}
-          </select>
-        </label>
-        <label className="viewer-scale-control viewer-toolbar-primary">
-          <span className="visually-hidden">倍率</span>
-          <select
-            aria-label="倍率モード"
-            value={scale.mode}
-            onChange={(event) =>
-              applyScale({ type: "mode", mode: event.target.value as ScaleMode })
-            }
-          >
-            <option value="fit">全体フィット</option>
-            <option value="width">横幅フィット</option>
-            <option value="height">高さフィット</option>
-            <option value="original">原寸</option>
-            <option value="custom">任意倍率</option>
-          </select>
-          <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
-        </label>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-out"
-          aria-label="倍率を下げる"
-          title="倍率を下げる"
-          onClick={() => applyScale({ type: "zoomOut" })}
-        >
-          <span aria-hidden="true">−</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-in"
-          aria-label="倍率を上げる"
-          title="倍率を上げる"
-          onClick={() => applyScale({ type: "zoomIn" })}
-        >
-          <span aria-hidden="true">＋</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-bookmark"
-          type="button"
-          aria-label="しおりを保存"
-          title="現在のページをしおりに保存"
-          onClick={() => onSaveBookmark?.(state.index)}
-        >
-          <span aria-hidden="true">★</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-more"
-          type="button"
-          aria-label={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作"}
-          title={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作を表示"}
-          aria-controls="viewer-more-panel"
-          aria-expanded={toolbarMoreOpen}
-          onClick={() => setToolbarMoreOpen((open) => !open)}
-        >
-          <span aria-hidden="true">⋯</span>
-        </button>
-        <button
-          ref={fullscreenButtonRef}
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-fullscreen"
-          aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
-          title={fullscreen ? "全画面表示を終了" : "全画面表示へ切り替え"}
-          aria-pressed={fullscreen}
-          onClick={() => void requestFullscreen(!fullscreen)}
-        >
-          <span aria-hidden="true">{fullscreen ? "⊡" : "⛶"}</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-close"
-          type="button"
-          aria-label="一覧へ戻る"
-          title="ビューワを閉じて一覧へ戻る"
-          data-product-id="viewer-close"
-          onClick={close}
-        >
-          <span aria-hidden="true">↩</span>
-        </button>
-        {fullscreenError !== null && (
-          <span className="fullscreen-error" role="status">
-            {fullscreenError}
-          </span>
-        )}
-        {clipboardNotice !== null && (
-          <span className="fullscreen-error" role="status">
-            {clipboardNotice}
-          </span>
-        )}
-        {imageTransformNotice !== null && (
-          <span className="fullscreen-error" role="status">
-            {imageTransformNotice}
-          </span>
+            <span aria-hidden="true">↩</span>
+          </button>
+          <strong title={session.displayName}>{session.displayName}</strong>
+        </div>
+        <div className="viewer-toolbar-controls" aria-label="表示操作">
+          <div className="viewer-toolbar-group viewer-toolbar-group--view" role="group" aria-label="表示枚数">
+            <label className="viewer-layout-control">
+              <span className="visually-hidden">表示枚数</span>
+              <select
+                aria-label="表示枚数"
+                value={state.mode}
+                onChange={(event) => changeMode(event.target.value as ViewMode)}
+              >
+                {VIEW_MODES.map((mode) => (
+                  <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="viewer-toolbar-group viewer-toolbar-group--scale" role="group" aria-label="倍率">
+            <label className="viewer-scale-control">
+              <span className="visually-hidden">倍率</span>
+              <select
+                aria-label="倍率モード"
+                value={scale.mode}
+                onChange={(event) =>
+                  applyScale({ type: "mode", mode: event.target.value as ScaleMode })
+                }
+              >
+                <option value="fit">全体フィット</option>
+                <option value="width">横幅フィット</option>
+                <option value="height">高さフィット</option>
+                <option value="original">原寸</option>
+                <option value="custom">任意倍率</option>
+              </select>
+              <span className="viewer-scale-percent" aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
+            </label>
+            <button
+              className="viewer-icon-button viewer-toolbar-zoom-out"
+              aria-label="倍率を下げる"
+              title="倍率を下げる"
+              onClick={() => applyScale({ type: "zoomOut" })}
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <button
+              className="viewer-icon-button viewer-toolbar-zoom-in"
+              aria-label="倍率を上げる"
+              title="倍率を上げる"
+              onClick={() => applyScale({ type: "zoomIn" })}
+            >
+              <span aria-hidden="true">＋</span>
+            </button>
+          </div>
+          <div className="viewer-toolbar-group viewer-toolbar-group--utility" role="group" aria-label="しおりと補助操作">
+            <button
+              className="viewer-icon-button viewer-toolbar-bookmark"
+              type="button"
+              aria-label="しおりを保存"
+              title="現在のページをしおりに保存"
+              onClick={() => onSaveBookmark?.(state.index)}
+            >
+              <span aria-hidden="true">★</span>
+            </button>
+            <button
+              className="viewer-icon-button viewer-toolbar-more"
+              type="button"
+              aria-label={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作"}
+              title={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作を表示"}
+              aria-controls="viewer-more-panel"
+              aria-expanded={toolbarMoreOpen}
+              onClick={() => setToolbarMoreOpen((open) => !open)}
+            >
+              <span aria-hidden="true">⋯</span>
+            </button>
+          </div>
+          <div className="viewer-toolbar-group viewer-toolbar-group--window" role="group" aria-label="ウィンドウ操作">
+            <button
+              ref={fullscreenButtonRef}
+              className="viewer-icon-button viewer-toolbar-fullscreen"
+              aria-label={fullscreen ? "全画面表示を終了" : "全画面表示"}
+              title={fullscreen ? "全画面表示を終了" : "全画面表示へ切り替え"}
+              aria-pressed={fullscreen}
+              onClick={() => void requestFullscreen(!fullscreen)}
+            >
+              <span aria-hidden="true">{fullscreen ? "⊡" : "⛶"}</span>
+            </button>
+          </div>
+        </div>
+        {(fullscreenError !== null || clipboardNotice !== null || imageTransformNotice !== null) && (
+          <div className="viewer-toolbar-notices">
+            {fullscreenError !== null && (
+              <span className="fullscreen-error" role="status">{fullscreenError}</span>
+            )}
+            {clipboardNotice !== null && (
+              <span className="fullscreen-error" role="status">{clipboardNotice}</span>
+            )}
+            {imageTransformNotice !== null && (
+              <span className="fullscreen-error" role="status">{imageTransformNotice}</span>
+            )}
+          </div>
         )}
       </header>
       <section
@@ -1782,12 +1792,13 @@ export function Viewer({
             <div className="viewer-more-actions">
               <button
                 className="viewer-more-action"
-                aria-label="ランダムページ"
-                title="現在以外のページへランダム移動"
-                disabled={session.pages.length <= 1}
-                onClick={randomPage}
+                aria-label="読み方向"
+                title={state.direction === "rightToLeft"
+                  ? "読み方向を左開きへ切り替え"
+                  : "読み方向を右開きへ切り替え"}
+                onClick={toggleDirection}
               >
-                <span aria-hidden="true">⤨</span><span>ランダムページ</span>
+                <span aria-hidden="true">⇄</span><span>{state.direction === "rightToLeft" ? "左開きへ" : "右開きへ"}</span>
               </button>
               <button
                 className="viewer-more-action"
@@ -1809,13 +1820,12 @@ export function Viewer({
               </button>
               <button
                 className="viewer-more-action"
-                aria-label="読み方向"
-                title={state.direction === "rightToLeft"
-                  ? "読み方向を左開きへ切り替え"
-                  : "読み方向を右開きへ切り替え"}
-                onClick={toggleDirection}
+                aria-label="ランダムページ"
+                title="現在以外のページへランダム移動"
+                disabled={session.pages.length <= 1}
+                onClick={randomPage}
               >
-                <span aria-hidden="true">⇄</span><span>{state.direction === "rightToLeft" ? "左開きへ" : "右開きへ"}</span>
+                <span aria-hidden="true">⤨</span><span>ランダムページ</span>
               </button>
             </div>
           </section>
