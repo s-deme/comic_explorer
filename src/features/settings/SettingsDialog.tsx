@@ -47,7 +47,6 @@ import {
   MAX_WHEEL_DEAD_ZONE,
   MAX_SCROLL_STEP_PERCENT,
   MAX_KEY_SCROLL_ACCELERATION_PERCENT,
-  MAX_WHEEL_SCROLL_FACTOR,
   MAX_LOUPE_SIZE,
   MAX_LOUPE_ZOOM,
   MAX_PREFETCH_PAGE_COUNT,
@@ -57,7 +56,6 @@ import {
   MIN_WHEEL_DEAD_ZONE,
   MIN_SCROLL_STEP_PERCENT,
   MIN_KEY_SCROLL_ACCELERATION_PERCENT,
-  MIN_WHEEL_SCROLL_FACTOR,
   MIN_LOUPE_SIZE,
   MIN_LOUPE_ZOOM,
   MIN_PREFETCH_PAGE_COUNT,
@@ -65,12 +63,9 @@ import {
   MIN_VIEWER_SPACING,
   MIN_AUTO_VIEWPORT_ASPECT_PERCENT,
   MIN_PORTRAIT_ASPECT_PERCENT,
-  normalizeViewerLayoutMode,
   VIEWER_BACKGROUNDS,
   VIEWER_CURSOR_AUTO_HIDE_DELAYS,
   VIEWER_GRID_COLORS,
-  VIEWER_LAYOUT_MODE_LABELS,
-  VIEWER_LAYOUT_MODES,
   VIEW_MODE_LABELS,
   SPREAD_PAIRING_LABELS,
   SPREAD_PAIRINGS,
@@ -466,11 +461,6 @@ export function SettingsDialog({
       text: `見開き 組合せ 偶奇 奇数 偶数 ${SPREAD_PAIRING_LABELS[draft.spreadPairing]}`,
     },
     {
-      id: "viewer-layout-mode",
-      category: "viewer",
-      text: `閲覧レイアウト ページ 縦スクロール 横スクロール ${VIEWER_LAYOUT_MODE_LABELS[draft.layoutMode]} ページ送りから選びます`,
-    },
-    {
       id: "end-of-volume",
       category: "viewer",
       text: `巻末動作 次の巻 確認 ライブラリ 停止 ループ ${END_OF_VOLUME_POLICY_LABELS[draft.endOfVolumePolicy]} 最後のページから先へ進んだときの動作です`,
@@ -632,11 +622,6 @@ export function SettingsDialog({
       id: "scroll-step",
       category: "commands",
       text: `スクロール ページ内 キー 移動量 ${draft.scrollStepPercent}% 加速 ${draft.keyScrollAccelerationPercent}% 連続 ${draft.keyScrollContinuous ? "有効" : "無効"}`,
-    },
-    {
-      id: "wheel-scroll-factor",
-      category: "commands",
-      text: `連続スクロール ホイール 速度 ${Math.round(draft.wheelScrollFactor * 100)}%`,
     },
     {
       id: "smooth-scroll",
@@ -965,11 +950,6 @@ export function SettingsDialog({
               <SettingRow id="spread-pairing" title="見開きの組合せ開始" description="組合せを開始できるページ番号の偶奇を固定します。" hidden={rowHidden("spread-pairing")}>
                 <select aria-label="profile見開き組合せ開始" value={draft.spreadPairing} onChange={(event) => update({ spreadPairing: event.target.value as SettingsProfile["spreadPairing"] })}>
                   {SPREAD_PAIRINGS.map((pairing) => <option key={pairing} value={pairing}>{SPREAD_PAIRING_LABELS[pairing]}</option>)}
-                </select>
-              </SettingRow>
-              <SettingRow id="viewer-layout-mode" title="閲覧レイアウト" description="ページ送り、縦スクロール、横スクロールから選びます。" hidden={rowHidden("viewer-layout-mode")}>
-                <select aria-label="profile閲覧レイアウト" value={draft.layoutMode} onChange={(event) => update({ layoutMode: normalizeViewerLayoutMode(event.target.value) })}>
-                  {VIEWER_LAYOUT_MODES.map((mode) => <option key={mode} value={mode}>{VIEWER_LAYOUT_MODE_LABELS[mode]}</option>)}
                 </select>
               </SettingRow>
               <SettingRow id="end-of-volume" title="巻末動作" description="最後のページから先へ進んだときの動作です。" hidden={rowHidden("end-of-volume")}>
@@ -1635,25 +1615,6 @@ export function SettingsDialog({
                   />
                   <span>{draft.keyScrollContinuous ? "有効" : "無効"}</span>
                 </label>
-              </SettingRow>
-              <SettingRow id="wheel-scroll-factor" title="連続スクロールのホイール速度" description="縦・横の連続レイアウトでwheel移動量を50%〜200%に調整します。" hidden={rowHidden("wheel-scroll-factor")}>
-                <div className="settings-number-control">
-                  <input
-                    type="number"
-                    aria-label="profile連続スクロールのホイール速度（%）"
-                    min={MIN_WHEEL_SCROLL_FACTOR * 100}
-                    max={MAX_WHEEL_SCROLL_FACTOR * 100}
-                    step="10"
-                    value={Math.round(draft.wheelScrollFactor * 100)}
-                    onChange={(event) => update({
-                      wheelScrollFactor: Math.min(
-                        MAX_WHEEL_SCROLL_FACTOR,
-                        Math.max(MIN_WHEEL_SCROLL_FACTOR, Number(event.target.value) / 100),
-                      ),
-                    })}
-                  />
-                  <span>%</span>
-                </div>
               </SettingRow>
               <SettingRow id="smooth-scroll" title="ページ内スクロールアニメーション" description="次・前コマンドによるページ内移動を滑らかにします。OSの視覚効果軽減設定を常に優先します。" hidden={rowHidden("smooth-scroll")}>
                 <label className="settings-switch">

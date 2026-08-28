@@ -146,7 +146,6 @@ import type {
   ViewerBackground,
   ViewMode,
   ViewerScaleState,
-  ViewerLayoutMode,
   ViewerGridColor,
   SpreadRules,
   FitRules,
@@ -186,7 +185,6 @@ import {
   DEFAULT_FIT_RULES,
   normalizeViewerBackground,
   normalizeViewerCursorAutoHideMs,
-  normalizeViewerLayoutMode,
   normalizeViewerSpacing,
   normalizeViewerGridColor,
   normalizeZoomRetention,
@@ -691,7 +689,7 @@ export function App({
     ...DEFAULT_SPREAD_RULES,
   }));
   const [fitRules, setFitRules] = useState<FitRules>(() => ({ ...DEFAULT_FIT_RULES }));
-  const [layoutMode, setLayoutMode] = useState<ViewerLayoutMode>("paged");
+  const layoutMode = "paged" as const;
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
@@ -1291,7 +1289,6 @@ export function App({
               : DEFAULT_FIT_RULES.basis,
             includePageMargin: response.data.fitIncludePageMargin !== false,
           });
-          setLayoutMode(normalizeViewerLayoutMode(response.data.layoutMode));
           setReadingDirection(response.data.readingDirection);
           setViewerScaleMode(response.data.scaleMode);
           setViewerScale(response.data.scale);
@@ -3833,7 +3830,6 @@ export function App({
         basis: normalized.fitBasis,
         includePageMargin: normalized.fitIncludePageMargin,
       });
-      setLayoutMode(normalized.layoutMode);
       setReadingDirection(normalized.readingDirection);
       setViewerScaleMode(normalized.scaleMode);
       setViewerScale(normalized.scale);
@@ -4798,7 +4794,6 @@ export function App({
           scrollStepPercent={scrollStepPercent}
           keyScrollAccelerationPercent={keyScrollAccelerationPercent}
           keyScrollContinuous={keyScrollContinuous}
-          wheelScrollFactor={wheelScrollFactor}
           smoothScroll={smoothScroll}
           pageScanMode={pageScanMode}
           shortcuts={shortcuts}
@@ -4806,11 +4801,6 @@ export function App({
             setViewMode(mode);
             setReadingDirection(direction);
             persistViewerSettings({ viewMode: mode, readingDirection: direction });
-          }}
-          initialLayoutMode={layoutMode}
-          onLayoutChange={(next: ViewerLayoutMode) => {
-            setLayoutMode(next);
-            persistViewerSettings({ layoutMode: next });
           }}
           fullscreenAdapter={fullscreenAdapter}
           initialFullscreen={viewerLaunchMode === "fullscreen"}

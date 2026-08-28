@@ -561,7 +561,7 @@ describe("Viewer settings", () => {
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
   });
 
-  it("loads only the current page and four pages ahead in continuous layouts", async () => {
+  it("loads only the current page and four pages ahead in the paged layout", async () => {
     const unloadedSession = {
       ...multiPageSession,
       pages: Array.from({ length: 12 }, (_, index) => ({
@@ -575,7 +575,6 @@ describe("Viewer settings", () => {
         session={unloadedSession}
         generation={1}
         initialMode="single"
-        initialLayoutMode="vertical_scroll"
         initialDirection="leftToRight"
         onSettingsChange={() => undefined}
         onClose={() => undefined}
@@ -617,7 +616,6 @@ describe("Viewer settings", () => {
         session={unloadedSession}
         generation={1}
         initialMode="single"
-        initialLayoutMode="vertical_scroll"
         initialDirection="leftToRight"
         prefetchAhead={2}
         prefetchBehind={2}
@@ -661,7 +659,9 @@ describe("Viewer settings", () => {
 
     await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(1));
     expect(vi.mocked(loadPage).mock.calls[0]?.[1]).toBe(0);
-    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "1" },
+    });
     await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(2));
     expect(vi.mocked(loadPage).mock.calls[1]?.[1]).toBe(1);
     expect(vi.mocked(loadPage).mock.calls[1]?.[3]).toBe("visible");
@@ -905,7 +905,9 @@ describe("Viewer settings", () => {
     );
 
     markPrefetchedPagesReady();
-    fireEvent.click(screen.getByRole("button", { name: "次ページ" }));
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "1" },
+    });
     await waitFor(() =>
       expect(screen.getByText("2 / 2")).toBeInTheDocument(),
     );
@@ -1187,28 +1189,6 @@ describe("Viewer settings", () => {
     expect(spread).toHaveProperty("scrollTop", 50);
   });
 
-  it("REQ-LEY-P2-007 normalizes and scales wheel input only in continuous layouts", () => {
-    render(
-      <Viewer
-        session={multiPageSession}
-        generation={1}
-        initialMode="single"
-        initialLayoutMode="vertical_scroll"
-        initialDirection="rightToLeft"
-        wheelScrollFactor={1.5}
-        onSettingsChange={() => undefined}
-        onClose={() => undefined}
-      />,
-    );
-    const spread = document.querySelector<HTMLElement>(".page-spread");
-    const stage = document.querySelector<HTMLElement>(".viewer-stage");
-    expect(spread).not.toBeNull();
-    expect(stage).not.toBeNull();
-    fireEvent.wheel(stage!, { deltaX: 1, deltaY: 2, deltaMode: 1 });
-    expect(spread).toHaveProperty("scrollLeft", 24);
-    expect(spread).toHaveProperty("scrollTop", 48);
-  });
-
   it("REQ-LEY-P2-008 follows and reverses an atomic N scan before changing pages", () => {
     render(
       <Viewer
@@ -1289,81 +1269,7 @@ describe("Viewer settings", () => {
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
   });
 
-  it("FT-B04-002 connects vertical and horizontal layout modes while keeping the page anchor", async () => {
-    render(
-      <Viewer
-        session={multiPageSession}
-        generation={1}
-        initialMode="single"
-        initialLayoutMode="paged"
-        initialDirection="rightToLeft"
-        onSettingsChange={() => undefined}
-        onLayoutChange={vi.fn()}
-        onClose={() => undefined}
-      />,
-    );
-
-    const selector = screen.getByRole("combobox", { name: "閲覧レイアウト" });
-    const spread = document.querySelector(".page-spread");
-    fireEvent.change(selector, { target: { value: "vertical_scroll" } });
-    await waitFor(() => {
-      expect(spread).toHaveAttribute("data-layout-mode", "vertical_scroll");
-      expect(spread).toHaveAttribute("data-page-anchor", "0");
-      expect(screen.getByRole("article", { name: "ページ 1" })).toHaveFocus();
-    });
-
-    fireEvent.change(selector, { target: { value: "horizontal_scroll" } });
-    await waitFor(() => {
-      expect(spread).toHaveAttribute("data-layout-mode", "horizontal_scroll");
-      expect(spread).toHaveAttribute("data-page-anchor", "0");
-    });
-  });
-
-  it("FT-C-016 preserves reading order and maps wheel input to horizontal scrolling", async () => {
-    const threePageSession = {
-      ...multiPageSession,
-      pages: [
-        ...multiPageSession.pages,
-        {
-          id: "page-3" as never,
-          relativePath: "3.png" as never,
-          mediaUri: "comic://localhost/three",
-        },
-      ],
-    };
-    render(
-      <Viewer
-        session={threePageSession}
-        generation={1}
-        initialMode="single"
-        initialLayoutMode="horizontal_scroll"
-        initialDirection="rightToLeft"
-        onSettingsChange={() => undefined}
-        onClose={() => undefined}
-      />,
-    );
-
-    const spread = document.querySelector<HTMLElement>(".page-spread");
-    expect(spread).not.toBeNull();
-    expect(
-      screen.getAllByRole("article").map((page) => page.getAttribute("aria-label")),
-    ).toEqual(["ページ 3", "ページ 2", "ページ 1"]);
-
-    fireEvent.keyDown(window, { key: "r" });
-    await waitFor(() =>
-      expect(
-        screen.getAllByRole("article").map((page) => page.getAttribute("aria-label")),
-      ).toEqual(["ページ 1", "ページ 2", "ページ 3"]),
-    );
-
-    const stage = document.querySelector(".viewer-stage");
-    expect(stage).not.toBeNull();
-    fireEvent.wheel(stage as HTMLElement, { deltaY: 120 });
-    expect(spread).toHaveProperty("scrollLeft", 120);
-    expect(spread).toHaveAttribute("data-page-anchor", "0");
-  });
-
-  it("FT-B04-003 preserves reading direction, keyboard navigation, native wheel and Escape", async () => {
+  it("FT-B04-003 preserves reading direction and Escape handling", async () => {
     const onSettingsChange = vi.fn();
     const onClose = vi.fn();
     render(
@@ -1371,7 +1277,6 @@ describe("Viewer settings", () => {
         session={multiPageSession}
         generation={1}
         initialMode="single"
-        initialLayoutMode="vertical_scroll"
         initialDirection="leftToRight"
         onSettingsChange={onSettingsChange}
         onClose={onClose}
@@ -1384,23 +1289,6 @@ describe("Viewer settings", () => {
     expect(document.querySelector(".page-spread"))
       .toHaveAttribute("data-direction", "rightToLeft");
     expect(onSettingsChange).toHaveBeenLastCalledWith("single", "rightToLeft");
-
-    fireEvent.keyDown(window, { key: "ArrowLeft" });
-    await waitFor(() =>
-      expect(document.querySelector(".page-spread")).toHaveAttribute(
-        "data-page-anchor",
-        "1",
-      ),
-    );
-    expect(screen.getByRole("article", { name: "ページ 2" })).toHaveFocus();
-
-    const stage = document.querySelector(".viewer-stage");
-    expect(stage).not.toBeNull();
-    fireEvent.wheel(stage as HTMLElement, { deltaY: 120 });
-    expect(document.querySelector(".page-spread")).toHaveAttribute(
-      "data-page-anchor",
-      "1",
-    );
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
@@ -1912,7 +1800,6 @@ describe("Viewer settings", () => {
         session={multiPageSession}
         generation={1}
         initialMode="single"
-        initialLayoutMode="vertical_scroll"
         initialDirection="rightToLeft"
         onSettingsChange={() => undefined}
         onClose={() => undefined}
@@ -1926,11 +1813,15 @@ describe("Viewer settings", () => {
     fireEvent.keyDown(pixelInput, { key: "h" });
     expect(first).toHaveAttribute("data-flip-horizontal", "false");
 
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "1" },
+    });
     const second = screen.getByAltText("Multi Page 2ページ") as HTMLImageElement;
-    fireEvent.focus(second.closest(".viewer-page")!);
     fireEvent.keyDown(window, { key: "v" });
     expect(second).toHaveAttribute("data-flip-vertical", "true");
-    fireEvent.focus(screen.getByRole("article", { name: "ページ 1" }));
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
+      target: { value: "0" },
+    });
     expect(screen.getByRole("button", { name: "回転・反転をリセット" })).toBeEnabled();
   });
 
@@ -2207,17 +2098,6 @@ describe("Viewer settings", () => {
     act(() => vi.advanceTimersByTime(250));
     expect(spread).toHaveAttribute("data-scale", "1.1");
 
-    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
-      target: { value: "vertical_scroll" },
-    });
-    fireEvent.pointerDown(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
-    fireEvent.pointerUp(stage, { pointerId: 5, pointerType: "mouse", button: 0, clientX: 75, clientY: 25 });
-    act(() => vi.advanceTimersByTime(250));
-    expect(spread).toHaveAttribute("data-scale", "1.1");
-    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
-      target: { value: "paged" },
-    });
-
     fireEvent.pointerDown(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
     fireEvent.pointerUp(stage, { pointerId: 6, pointerType: "mouse", button: 0, clientX: 25, clientY: 25 });
     view.unmount();
@@ -2225,7 +2105,7 @@ describe("Viewer settings", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("REQ-LEY-P3-015 dispatches the Rust-validated right-click action in every layout", () => {
+  it("REQ-LEY-P3-015 dispatches the Rust-validated right-click action in the paged layout", () => {
     render(
       <Viewer
         session={session}
@@ -2249,14 +2129,8 @@ describe("Viewer settings", () => {
 
     rightClick(1);
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.1");
-    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
-      target: { value: "vertical_scroll" },
-    });
     rightClick(2);
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.2");
-    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
-      target: { value: "horizontal_scroll" },
-    });
     rightClick(3);
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1.3");
 
@@ -2414,11 +2288,8 @@ describe("Viewer settings", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(toggle);
-    fireEvent.change(screen.getByRole("combobox", { name: "閲覧レイアウト" }), {
-      target: { value: "vertical_scroll" },
-    });
-    expect(toggle).toBeDisabled();
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toBeEnabled();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 
   it("REQ-LEY-P3-016 ignores stale plans and presents Rust validation errors", async () => {

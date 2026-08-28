@@ -2772,53 +2772,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .page-spread[data-scale-mode="custom"] img {
   zoom: var(--viewer-custom-scale, 1);
 }
-.page-spread[data-layout-mode="vertical_scroll"] {
-  align-items: center;
-  justify-content: flex-start;
-  flex-direction: column;
-  gap: 16px;
-  padding: var(--viewer-page-margin, 0);
-  overflow: auto;
-  scroll-snap-type: y proximity;
-}
-.page-spread[data-layout-mode="horizontal_scroll"] {
-  align-items: flex-start;
-  justify-content: flex-start;
-  flex-direction: row;
-  gap: 16px;
-  padding: var(--viewer-page-margin, 0);
-  overflow: auto;
-  scroll-snap-type: x proximity;
-}
-.viewer-page-slot {
-  display: block;
-  flex: 0 0 auto;
-}
-.viewer-page {
-  display: grid;
-  min-width: 160px;
-  min-height: 160px;
-  place-items: center;
-  scroll-snap-align: start;
-}
-.viewer-page:focus-visible {
-  outline: 2px solid #8ec5ff;
-  outline-offset: 4px;
-}
-.page-spread[data-layout-mode="vertical_scroll"] .viewer-page {
-  width: min(100%, 960px);
-}
-.page-spread[data-layout-mode="horizontal_scroll"] .viewer-page {
-  height: 100%;
-}
-.page-spread[data-layout-mode="vertical_scroll"] .viewer-page img {
-  max-width: 100%;
-  max-height: none;
-}
-.page-spread[data-layout-mode="horizontal_scroll"] .viewer-page img {
-  max-width: none;
-  max-height: 100%;
-}
 .viewer-loupe {
   position: absolute;
   z-index: 4;
@@ -2907,8 +2860,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible,
-  .tree-splitter:focus-visible,
-  .viewer-page:focus-visible {
+  .tree-splitter:focus-visible {
     outline-color: Highlight;
   }
 

@@ -68,7 +68,6 @@ import {
   MIN_SCALE,
   VIEWER_BACKGROUNDS,
   VIEWER_GRID_COLORS,
-  VIEWER_LAYOUT_MODES,
   VIEW_MODES,
   SPREAD_PAIRINGS,
   FIT_BASES,
@@ -404,7 +403,10 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       ? migrateV2CatalogThumbnailSizes(candidate.catalogThumbnailSizes)
       : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
   const viewMode = enumValue(candidate.viewMode, VIEW_MODES);
-  const layoutMode = enumValue(candidate.layoutMode, VIEWER_LAYOUT_MODES);
+  const layoutMode = typeof candidate.layoutMode === "string"
+    && ["paged", "vertical_scroll", "horizontal_scroll"].includes(candidate.layoutMode)
+    ? "paged"
+    : null;
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
   const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);
   const shortcuts = strictShortcutBindings(

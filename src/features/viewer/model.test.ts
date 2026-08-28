@@ -357,15 +357,11 @@ describe("FR-B01 scale model", () => {
 });
 
 describe("FR-B04 viewer layout model", () => {
-  it("FT-B04-001 fixes the three layout modes and keeps paged as the fallback", () => {
-    expect(VIEWER_LAYOUT_MODES).toEqual([
-      "paged",
-      "vertical_scroll",
-      "horizontal_scroll",
-    ]);
+  it("FT-B04-001 fixes the viewer to the paged layout and migrates legacy values", () => {
+    expect(VIEWER_LAYOUT_MODES).toEqual(["paged"]);
     expect(normalizeViewerLayoutMode("paged")).toBe("paged");
-    expect(normalizeViewerLayoutMode("vertical_scroll")).toBe("vertical_scroll");
-    expect(normalizeViewerLayoutMode("horizontal_scroll")).toBe("horizontal_scroll");
+    expect(normalizeViewerLayoutMode("vertical_scroll")).toBe("paged");
+    expect(normalizeViewerLayoutMode("horizontal_scroll")).toBe("paged");
     expect(normalizeViewerLayoutMode("fullscreen")).toBe("paged");
   });
 });

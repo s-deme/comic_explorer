@@ -2531,7 +2531,7 @@ describe("application shell", () => {
     ).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
   });
-  it("FT-B04-001 keeps paged as the default and persists layout mode through the App", async () => {
+  it("FT-B04-001 fixes the App viewer to paged and hides the layout selector", async () => {
     openMock.mockResolvedValueOnce(viewerResponse("layout.cbz"));
     await registerTestLibrary([testEntry("layout.cbz")]);
 
@@ -2540,67 +2540,9 @@ describe("application shell", () => {
       { key: "Enter" },
     );
     await screen.findByLabelText("layout.cbz ビューワ");
-    const selector = screen.getByLabelText("閲覧レイアウト");
-    expect(selector).toHaveValue("paged");
-    expect(screen.getByRole("combobox", { name: "閲覧レイアウト" })).toHaveValue(
-      "paged",
-    );
-
-    fireEvent.change(screen.getByLabelText("閲覧レイアウト"), {
-      target: { value: "vertical_scroll" },
-    });
-    expect(screen.getByLabelText("閲覧レイアウト")).toHaveValue("vertical_scroll");
-    expect(saveViewerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ layoutMode: "vertical_scroll" }),
-      expect.any(Number),
-    );
-  });
-
-  it("FT-B04-002 observes both connected scroll layouts without changing the page anchor", async () => {
-    const entry = testEntry("scroll.cbz");
-    openMock.mockResolvedValueOnce({
-      status: "ok",
-      requestId: "scroll-open" as never,
-      generation: 1 as never,
-      data: {
-        itemKey: entry.relativePath,
-        displayName: entry.relativePath,
-        pages: [
-          { id: "page-1" as never, relativePath: "1.png" as never, mediaUri: "data:image/png;base64,one" },
-          { id: "page-2" as never, relativePath: "2.png" as never, mediaUri: "data:image/png;base64,two" },
-          { id: "page-3" as never, relativePath: "3.png" as never, mediaUri: "data:image/png;base64,three" },
-        ],
-        startIndex: 1,
-      },
-    });
-    await registerTestLibrary([entry]);
-    await openTestComic(entry.relativePath);
-
-    const selector = screen.getByLabelText("閲覧レイアウト");
-    fireEvent.change(selector, { target: { value: "vertical_scroll" } });
-    await waitFor(() => {
-      expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` })).toHaveAttribute(
-        "data-layout-mode",
-        "vertical_scroll",
-      );
-      expect(document.querySelector(".page-spread")).toHaveAttribute(
-        "data-page-anchor",
-        "1",
-      );
-    });
-    expect(screen.getByRole("article", { name: "ページ 2" })).toHaveFocus();
-
-    fireEvent.change(selector, { target: { value: "horizontal_scroll" } });
-    await waitFor(() =>
-      expect(document.querySelector(".page-spread")).toHaveAttribute(
-        "data-layout-mode",
-        "horizontal_scroll",
-      ),
-    );
-    expect(document.querySelector(".page-spread")).toHaveAttribute(
-      "data-page-anchor",
-      "1",
-    );
+    expect(screen.queryByRole("combobox", { name: "閲覧レイアウト" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "layout.cbz ビューワ" }))
+      .toHaveAttribute("data-layout-mode", "paged");
   });
 
   it("FT-B04-004 starts archives fullscreen and exits with Esc", async () => {
@@ -2681,7 +2623,7 @@ describe("application shell", () => {
     expect(adapter.enter).not.toHaveBeenCalled();
   });
 
-  it("FT-B04-005 restores layout from App settings while leaving fullscreen as window state", async () => {
+  it("FT-B04-005 restores viewer settings while keeping the layout paged", async () => {
     settingsMock.mockResolvedValue({
       status: "ok",
       requestId: "restored-layout" as never,
@@ -2689,7 +2631,7 @@ describe("application shell", () => {
       data: {
         ...DEFAULT_CATALOG_SETTINGS,
         viewMode: "spread",
-        layoutMode: "horizontal_scroll",
+        layoutMode: "paged",
         readingDirection: "leftToRight",
         scaleMode: "custom",
         scale: 1.7,
@@ -2701,7 +2643,9 @@ describe("application shell", () => {
     await registerTestLibrary([entry]);
     await openTestComic(entry.relativePath);
 
-    expect(screen.getByLabelText("閲覧レイアウト")).toHaveValue("horizontal_scroll");
+    expect(screen.queryByRole("combobox", { name: "閲覧レイアウト" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: `${entry.relativePath} ビューワ` }))
+      .toHaveAttribute("data-layout-mode", "paged");
     expect(document.querySelector(".page-spread")).toHaveAttribute(
       "data-scale-mode",
       "custom",
@@ -3847,9 +3791,6 @@ describe("application shell", () => {
       target: { value: "220" },
     });
     fireEvent.click(within(dialog).getByLabelText("profileキーの連続動作"));
-    fireEvent.change(within(dialog).getByLabelText("profile連続スクロールのホイール速度（%）"), {
-      target: { value: "140" },
-    });
     fireEvent.click(within(dialog).getByLabelText("profileページ内スクロールアニメーション"));
     fireEvent.change(within(dialog).getByLabelText("profileページ内の走査順"), {
       target: { value: "z" },
@@ -3905,7 +3846,6 @@ describe("application shell", () => {
         scrollStepPercent: 75,
         keyScrollAccelerationPercent: 220,
         keyScrollContinuous: false,
-        wheelScrollFactor: 1.4,
         smoothScroll: false,
         pageScanMode: "z",
         catalogMouseBindings: expect.objectContaining({

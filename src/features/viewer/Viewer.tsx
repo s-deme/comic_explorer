@@ -26,7 +26,6 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
   DEFAULT_KEY_SCROLL_CONTINUOUS,
-  DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_ZOOM_RETENTION,
@@ -46,7 +45,6 @@ import {
   isScrollStepPercent,
   isKeyScrollAccelerationPercent,
   keyboardScrollTarget,
-  isWheelScrollFactor,
   isPagePairable,
   type KeyboardScrollArrow,
   isLoupeSize,
@@ -54,7 +52,6 @@ import {
   isPrefetchPageCount,
   prefetchWindowIndices,
   fitScaleForPages,
-  wheelDeltaPixels,
   pageScanTarget,
   PAGE_SCAN_MODES,
   scaleForPixelDimension,
@@ -73,12 +70,7 @@ import {
   type SpreadRules,
   type FitRules,
   type PageScanMode,
-  type ViewerLayoutMode,
   type ZoomRetention,
-} from "./model";
-import {
-  VIEWER_LAYOUT_MODE_LABELS,
-  VIEWER_LAYOUT_MODES,
 } from "./model";
 import {
   tauriFullscreenAdapter,
@@ -144,10 +136,8 @@ interface ViewerProps {
   initialMode: ViewMode;
   spreadRules?: SpreadRules;
   fitRules?: FitRules;
-  initialLayoutMode?: ViewerLayoutMode;
   initialDirection: ReadingDirection;
   onSettingsChange: (mode: ViewMode, direction: ReadingDirection) => void;
-  onLayoutChange?: (layoutMode: ViewerLayoutMode) => void;
   initialScaleMode?: ScaleMode;
   initialScale?: number;
   initialLoupeEnabled?: boolean;
@@ -168,7 +158,6 @@ interface ViewerProps {
   scrollStepPercent?: number;
   keyScrollAccelerationPercent?: number;
   keyScrollContinuous?: boolean;
-  wheelScrollFactor?: number;
   smoothScroll?: boolean;
   pageScanMode?: PageScanMode;
   onScaleChange?: (scale: ViewerScaleState) => void;
@@ -241,10 +230,8 @@ export function Viewer({
   initialMode,
   spreadRules = DEFAULT_SPREAD_RULES,
   fitRules = DEFAULT_FIT_RULES,
-  initialLayoutMode = "paged",
   initialDirection,
   onSettingsChange,
-  onLayoutChange,
   initialScaleMode = "fit",
   initialScale = 1,
   initialLoupeEnabled = false,
@@ -266,7 +253,6 @@ export function Viewer({
   keyScrollAccelerationPercent: initialKeyScrollAccelerationPercent =
     DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
   keyScrollContinuous: initialKeyScrollContinuous = DEFAULT_KEY_SCROLL_CONTINUOUS,
-  wheelScrollFactor: initialWheelScrollFactor = DEFAULT_WHEEL_SCROLL_FACTOR,
   smoothScroll: initialSmoothScroll = DEFAULT_SMOOTH_SCROLL,
   pageScanMode: initialPageScanMode = DEFAULT_PAGE_SCAN_MODE,
   onScaleChange,
@@ -328,9 +314,6 @@ export function Viewer({
   const keyScrollContinuous = typeof initialKeyScrollContinuous === "boolean"
     ? initialKeyScrollContinuous
     : DEFAULT_KEY_SCROLL_CONTINUOUS;
-  const wheelScrollFactor = isWheelScrollFactor(initialWheelScrollFactor)
-    ? initialWheelScrollFactor
-    : DEFAULT_WHEEL_SCROLL_FACTOR;
   const smoothScroll = typeof initialSmoothScroll === "boolean"
     ? initialSmoothScroll
     : DEFAULT_SMOOTH_SCROLL;
@@ -363,8 +346,6 @@ export function Viewer({
     createViewerScaleState(initialScaleMode, initialScale, initialLoupeEnabled),
   );
   const [displayedScale, setDisplayedScale] = useState(initialScale);
-  const [layoutMode, setLayoutMode] =
-    useState<ViewerLayoutMode>(initialLayoutMode);
   const [autoSpread, setAutoSpread] = useState(() =>
     autoSpreadForViewport(
       window.innerWidth,
@@ -419,7 +400,6 @@ export function Viewer({
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const pageRequests = useRef(new Set<number>());
   const retainedIndicesRef = useRef(new Set<number>());
-  const scrollAnchorFrameRef = useRef<number | null>(null);
   const pointerDragRef = useRef<PointerDragState | null>(null);
   const quadrantClickTimerRef = useRef<number | null>(null);
   const pageScanInitializedRef = useRef(false);
@@ -484,7 +464,7 @@ export function Viewer({
       window.removeEventListener("resize", update);
       observer.disconnect();
     };
-  }, [fullscreen, layoutMode, spreadRules.autoViewportMinAspectPercent]);
+  }, [fullscreen, spreadRules.autoViewportMinAspectPercent]);
 
   useEffect(() => {
     const releaseRightButton = (event: PointerEvent) => {
@@ -555,10 +535,10 @@ export function Viewer({
       state,
       session.pages.length,
       effectiveLandscape,
-      layoutMode === "paged" && autoSpread,
+      autoSpread,
       spreadRules,
     ),
-    [autoSpread, effectiveLandscape, layoutMode, session.pages.length, spreadRules, state],
+    [autoSpread, effectiveLandscape, session.pages.length, spreadRules, state],
   );
   const nextStartIndex = state.index + Math.max(1, visible.length);
   const nextVisible = useMemo(() => {
@@ -567,18 +547,18 @@ export function Viewer({
       { ...state, index: nextStartIndex },
       session.pages.length,
       effectiveLandscape,
-      layoutMode === "paged" && autoSpread,
+      autoSpread,
       spreadRules,
     );
-  }, [autoSpread, effectiveLandscape, layoutMode, nextStartIndex, session.pages.length, spreadRules, state]);
+  }, [autoSpread, effectiveLandscape, nextStartIndex, session.pages.length, spreadRules, state]);
   const prefetchIndices = useMemo(
     () => prefetchWindowIndices(
-      layoutMode === "paged" ? visible : [state.index],
+      visible,
       session.pages.length,
       prefetchAhead,
       prefetchBehind,
     ),
-    [layoutMode, prefetchAhead, prefetchBehind, session.pages.length, state.index, visible],
+    [prefetchAhead, prefetchBehind, session.pages.length, visible],
   );
   const retainedIndices = useMemo(() => Array.from(new Set([
     ...visible,
@@ -591,7 +571,7 @@ export function Viewer({
   );
   retainedIndicesRef.current = new Set(retainedIndices);
   const calculatedFitScale = useMemo(() => {
-    if (scale.mode !== "fit" || layoutMode !== "paged") return null;
+    if (scale.mode !== "fit") return null;
     const sizes = visible.map((index) => {
       const size = pageSizes.get(index);
       return size === undefined ? undefined : transformedImageSize(size, transformForPage(index));
@@ -605,7 +585,7 @@ export function Viewer({
       viewerSpreadGap,
       fitRules,
     );
-  }, [fitRules, fitViewport.height, fitViewport.width, imageTransformRevision, layoutMode, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
+  }, [fitRules, fitViewport.height, fitViewport.width, imageTransformRevision, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -676,7 +656,6 @@ export function Viewer({
   }
 
   function scrollPageOverflow(move: -1 | 1, factor = 1): boolean {
-    if (layoutMode !== "paged") return false;
     const spread = spreadRef.current;
     if (!spread) return false;
     const maxScrollLeft = Math.max(0, spread.scrollWidth - spread.clientWidth);
@@ -708,7 +687,6 @@ export function Viewer({
   }
 
   function scrollWithKeyboardArrow(key: KeyboardScrollArrow, repeated: boolean): boolean {
-    if (layoutMode !== "paged") return false;
     const spread = spreadRef.current;
     if (!spread) return false;
     const target = keyboardScrollTarget({
@@ -742,10 +720,7 @@ export function Viewer({
       );
       return;
     }
-    if (
-      layoutMode === "paged"
-      && nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))
-    ) {
+    if (nextVisible.some((index) => !readyPages.has(index) && !imageErrors.has(index))) {
       setPendingNextIndex(nextStartIndex);
       return;
     }
@@ -753,20 +728,19 @@ export function Viewer({
       type: "next",
       pageCount: session.pages.length,
       landscape: effectiveLandscape,
-      autoSpread: layoutMode === "paged" && autoSpread,
+      autoSpread,
       spreadRules,
     });
   }
 
   useLayoutEffect(() => {
-    if (layoutMode !== "paged") return;
     const spread = spreadRef.current;
     pageScanInitializedRef.current = false;
     if (spread) {
       spread.scrollLeft = 0;
       spread.scrollTop = 0;
     }
-  }, [layoutMode, pageScanMode, state.direction, state.index]);
+  }, [pageScanMode, state.direction, state.index]);
 
   function previous(factor = 1, skipOverflow = false) {
     if (!skipOverflow && scrollPageOverflow(-1, factor)) return;
@@ -882,10 +856,10 @@ export function Viewer({
       type: "next",
       pageCount: session.pages.length,
       landscape: effectiveLandscape,
-      autoSpread: layoutMode === "paged" && autoSpread,
+      autoSpread,
       spreadRules,
     });
-  }, [autoSpread, effectiveLandscape, imageErrors, layoutMode, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
+  }, [autoSpread, effectiveLandscape, imageErrors, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
     setFullscreenError(null);
@@ -962,14 +936,8 @@ export function Viewer({
   }
 
   function shiftOnePage(delta: -1 | 1) {
-    if (layoutMode !== "paged" || state.mode !== "spread") return;
+    if (state.mode !== "spread") return;
     dispatch({ type: "shift", delta, pageCount: session.pages.length });
-  }
-
-  function changeLayout(next: ViewerLayoutMode) {
-    if (next !== "paged") cancelRectangleZoom();
-    setLayoutMode(next);
-    onLayoutChange?.(next);
   }
 
   function toggleDirection() {
@@ -1017,7 +985,6 @@ export function Viewer({
   }
 
   function toggleRectangleZoom() {
-    if (layoutMode !== "paged") return;
     setRectangleZoomError(null);
     if (rectangleZoomArmed) {
       cancelRectangleZoom();
@@ -1136,7 +1103,7 @@ export function Viewer({
       window.removeEventListener("resize", updateDisplayedScale);
       observer.disconnect();
     };
-  }, [fullscreen, imageTransformRevision, layoutMode, readyPages, scale.mode, scale.scale, state.index, state.mode]);
+  }, [fullscreen, imageTransformRevision, readyPages, scale.mode, scale.scale, state.index, state.mode]);
 
   function updateLoupe(event: ReactPointerEvent<HTMLDivElement>) {
     if (!scale.loupeEnabled) return;
@@ -1277,22 +1244,6 @@ export function Viewer({
     state.mode,
     visible.length,
   ]);
-
-  useEffect(() => {
-    if (layoutMode === "paged") return;
-    const anchor = stageRef.current?.querySelector<HTMLElement>(
-      `[data-page-index="${state.index}"].viewer-page`,
-    );
-    if (!anchor) return;
-    anchor.focus({ preventScroll: true });
-    anchor.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [layoutMode, state.index]);
-
-  useEffect(() => () => {
-    if (scrollAnchorFrameRef.current !== null) {
-      window.cancelAnimationFrame(scrollAnchorFrameRef.current);
-    }
-  }, []);
 
   useEffect(() => {
     positionTimerRef.current = window.setTimeout(() => {
@@ -1483,46 +1434,7 @@ export function Viewer({
     state.direction === "rightToLeft" && visible.length === 2
       ? [...visible].reverse()
       : visible;
-  const scrollLayout = layoutMode !== "paged";
-  const naturalScrollIndices = session.pages.map((_, index) => index);
-  const scrollIndices =
-    state.direction === "rightToLeft"
-      ? [...naturalScrollIndices].reverse()
-      : naturalScrollIndices;
-  const scheduleScrollAnchorUpdate = () => {
-    if (layoutMode === "paged" || scrollAnchorFrameRef.current !== null) return;
-    scrollAnchorFrameRef.current = window.requestAnimationFrame(() => {
-      scrollAnchorFrameRef.current = null;
-      const spread = spreadRef.current;
-      if (!spread) return;
-      const viewport = spread.getBoundingClientRect();
-      const vertical = layoutMode === "vertical_scroll";
-      const viewportStart = vertical ? viewport.top : viewport.left;
-      const viewportEnd = vertical ? viewport.bottom : viewport.right;
-      let bestIndex: number | null = null;
-      let bestOverlap = -1;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      spread.querySelectorAll<HTMLElement>(".viewer-page").forEach((page) => {
-        const bounds = page.getBoundingClientRect();
-        const start = vertical ? bounds.top : bounds.left;
-        const end = vertical ? bounds.bottom : bounds.right;
-        const overlap = Math.max(0, Math.min(end, viewportEnd) - Math.max(start, viewportStart));
-        if (overlap <= 0) return;
-        const distance = Math.abs(start - viewportStart);
-        const index = Number(page.dataset.pageIndex);
-        if (!Number.isInteger(index)) return;
-        if (overlap > bestOverlap || (overlap === bestOverlap && distance < bestDistance)) {
-          bestIndex = index;
-          bestOverlap = overlap;
-          bestDistance = distance;
-        }
-      });
-      if (bestIndex !== null && bestIndex !== state.index) {
-        dispatch({ type: "go", index: bestIndex });
-      }
-    });
-  };
-  const renderPage = (index: number, withAnchor = false) => {
+  const renderPage = (index: number) => {
     const page = session.pages[index];
     const imageTransform = transformForPage(index);
     const content = imageErrors.has(index) ? (
@@ -1567,27 +1479,14 @@ export function Viewer({
     ) : (
       <p role="status">ページを読み込んでいます。</p>
     );
-    if (!withAnchor) return content;
-    return (
-      <article
-        className="viewer-page"
-        data-page-index={index}
-        aria-label={`ページ ${index + 1}`}
-        tabIndex={index === state.index ? 0 : -1}
-        onFocus={() => {
-          if (index !== state.index) dispatch({ type: "go", index });
-        }}
-      >
-        {content}
-      </article>
-    );
+    return content;
   };
 
   return (
     <section
       className="viewer"
       aria-label={`${session.displayName} ビューワ`}
-      data-layout-mode={layoutMode}
+      data-layout-mode="paged"
       data-fullscreen={fullscreen}
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
       data-page-navigator-visible={!fullscreen || fullscreenPageNavigatorVisible}
@@ -1634,22 +1533,6 @@ export function Viewer({
           >
             {VIEW_MODES.map((mode) => (
               <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
-            ))}
-          </select>
-        </label>
-        <label className="viewer-layout-control viewer-toolbar-secondary">
-          レイアウト
-          <select
-            aria-label="閲覧レイアウト"
-            value={layoutMode}
-            onChange={(event) =>
-              changeLayout(event.target.value as ViewerLayoutMode)
-            }
-          >
-            {VIEWER_LAYOUT_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {VIEWER_LAYOUT_MODE_LABELS[mode]}
-              </option>
             ))}
           </select>
         </label>
@@ -1790,11 +1673,7 @@ export function Viewer({
           className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="見開きを1ページ戻す"
           title="見開きの開始位置を1ページ戻す"
-          disabled={
-            layoutMode !== "paged"
-            || state.mode !== "spread"
-            || state.index === 0
-          }
+          disabled={state.mode !== "spread" || state.index === 0}
           onClick={() => shiftOnePage(-1)}
         >
           <span aria-hidden="true">1◀</span>
@@ -1803,11 +1682,7 @@ export function Viewer({
           className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="見開きを1ページ進める"
           title="見開きの開始位置を1ページ進める"
-          disabled={
-            layoutMode !== "paged"
-            || state.mode !== "spread"
-            || state.index + 1 >= session.pages.length
-          }
+          disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
           onClick={() => shiftOnePage(1)}
         >
           <span aria-hidden="true">▶1</span>
@@ -1831,13 +1706,10 @@ export function Viewer({
         <button
           className="viewer-icon-button viewer-toolbar-secondary"
           aria-label="矩形ズーム"
-          title={layoutMode === "paged"
-            ? rectangleZoomArmed
-              ? "矩形ズームを解除"
-              : "stage上で拡大する範囲をドラッグ"
-            : "ページ送りレイアウトで利用できます"}
+          title={rectangleZoomArmed
+            ? "矩形ズームを解除"
+            : "stage上で拡大する範囲をドラッグ"}
           aria-pressed={rectangleZoomArmed}
-          disabled={layoutMode !== "paged"}
           onClick={toggleRectangleZoom}
         >
           <span aria-hidden="true">▣＋</span>
@@ -2195,7 +2067,6 @@ export function Viewer({
             lastY: event.clientY,
             pannable,
             quadrantClickEligible: event.pointerType === "mouse"
-              && layoutMode === "paged"
               && !event.ctrlKey
               && !event.metaKey
               && !event.shiftKey
@@ -2308,36 +2179,7 @@ export function Viewer({
           } else if (event.ctrlKey) {
             event.preventDefault();
             applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
-          } else if (scrollLayout) {
-            const spread = spreadRef.current;
-            if (spread) {
-              if (layoutMode === "horizontal_scroll") {
-                const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
-                  ? event.deltaX
-                  : event.deltaY;
-                spread.scrollLeft += wheelDeltaPixels(
-                  delta,
-                  event.deltaMode,
-                  spread.clientWidth,
-                  wheelScrollFactor,
-                );
-              } else {
-                spread.scrollLeft += wheelDeltaPixels(
-                  event.deltaX,
-                  event.deltaMode,
-                  spread.clientWidth,
-                  wheelScrollFactor,
-                );
-                spread.scrollTop += wheelDeltaPixels(
-                  event.deltaY,
-                  event.deltaMode,
-                  spread.clientHeight,
-                  wheelScrollFactor,
-                );
-              }
-              event.preventDefault();
-            }
-          } else if (!scrollLayout && event.deltaY !== 0) {
+          } else if (event.deltaY !== 0) {
             if (Math.abs(event.deltaY) < wheelDeadZone) return;
             event.preventDefault();
             applyMouseGesture(
@@ -2351,11 +2193,11 @@ export function Viewer({
         <div
           ref={spreadRef}
           className="page-spread"
-          data-layout-mode={layoutMode}
+          data-layout-mode="paged"
           data-direction={state.direction}
           data-scale-mode={scale.mode}
           data-scale={scale.scale}
-          data-page-count={scrollLayout ? session.pages.length : ordered.length}
+          data-page-count={ordered.length}
           data-effective-view-mode={visible.length === 2 ? "spread" : "single"}
           data-page-anchor={state.index}
           data-loupe-enabled={scale.loupeEnabled}
@@ -2364,18 +2206,11 @@ export function Viewer({
             "--viewer-custom-scale": scale.scale,
             "--viewer-fit-scale": calculatedFitScale ?? 1,
           } as CSSProperties}
-          onScroll={scheduleScrollAnchorUpdate}
         >
-          {(scrollLayout ? scrollIndices : ordered).map((index) =>
-            scrollLayout ? (
-              <span key={session.pages[index].id} className="viewer-page-slot">
-                {renderPage(index, true)}
-              </span>
-            ) : (
-              <Fragment key={session.pages[index].id}>
-                {renderPage(index)}
-              </Fragment>
-            ),
+          {ordered.map((index) =>
+            <Fragment key={session.pages[index].id}>
+              {renderPage(index)}
+            </Fragment>,
           )}
         </div>
         {rectangleZoomSelection && (
@@ -2426,7 +2261,7 @@ export function Viewer({
             />
           </div>
         )}
-        {!scrollLayout && preloadIndices.map((index) => mediaUris[index] && (
+        {preloadIndices.map((index) => mediaUris[index] && (
           <img
             key={session.pages[index].id}
             className="prefetch-page"

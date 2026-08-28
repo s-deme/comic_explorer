@@ -17,13 +17,29 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-26 JST
+- 最終更新日: 2026-08-28 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
+
+## 2026-08-28 Viewerレイアウトのページ表示固定
+
+REQ-MVP-011、REQ-MVP-014A、LEY-VIEWER-009、LEY-VIEWER-026に対し、Viewerの縦・横連続レイアウトと
+レイアウト選択UIを撤去し、表示をpageへ固定した。旧profile、SQLite復元値、native保存要求に含まれる
+`vertical_scroll`・`horizontal_scroll`は、読込み／適用境界で`paged`へ正規化する。連続表示専用のDOM、
+先読み分岐、ホイール速度設定、CSSを削除し、page表示のoverflow scroll、zoom、pointer panは維持する。
+
+| Gate | 結果 | 2026-08-28の実測 |
+|---|---|---|
+| Viewer / profile focused frontend | PASS | Viewer 61件、profile 139件、model 24件。レイアウト選択の不存在、page固定、旧値の正規化、既存page操作を確認。 |
+| Windows tests | PASS | Python 74件、frontend 44 files / 598件、FAIL 0。App全体113件を含む。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後672.14kBの既存chunk advisoryはFAILへ読み替えない。 |
+| Frontend SBOM | PASS | 785 components、unknown/prohibited license 0。 |
+| Rust focused / canonical | PASS | `viewer_layout_mode_always_normalizes_to_paged` 1件、canonical lib 271件とshutdown process 1件、FAIL 0。既存dead-code warning 2件はPASSへ加算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での実画像、wheel／pointer pan、fullscreen、DPI別操作の目視は未測定。 |
 
 ## 2026-08-25 Viewerツールバー整理
 

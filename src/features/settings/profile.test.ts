@@ -116,6 +116,16 @@ function withField(field: string, value: unknown): Record<string, unknown> {
   return profile;
 }
 
+describe("viewer layout migration", () => {
+  it.each(["vertical_scroll", "horizontal_scroll"]) (
+    "normalizes the retired %s profile value to paged",
+    (legacyLayout) => {
+      const profile = { ...validProfile(), layoutMode: legacyLayout };
+      expect(normalizeSettingsProfile(profile)?.layoutMode).toBe("paged");
+    },
+  );
+});
+
 describe("settings profile", () => {
   it("uses package metadata as the application version source of truth", () => {
     expect(APP_VERSION).toBe(packageMetadata.version);

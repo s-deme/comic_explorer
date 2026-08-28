@@ -50,10 +50,7 @@ export const DEFAULT_FIT_RULES: FitRules = {
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
 export type ZoomRetention = "global" | "book" | "page";
 export type ViewerGridColor = "light" | "dark";
-export type ViewerLayoutMode =
-  | "paged"
-  | "vertical_scroll"
-  | "horizontal_scroll";
+export type ViewerLayoutMode = "paged";
 export const PAGE_SCAN_MODES = ["vertical", "n", "z"] as const;
 export type PageScanMode = (typeof PAGE_SCAN_MODES)[number];
 export const PAGE_SCAN_MODE_LABELS: Record<PageScanMode, string> = {
@@ -65,20 +62,14 @@ export const DEFAULT_PAGE_SCAN_MODE: PageScanMode = "vertical";
 
 export const VIEWER_LAYOUT_MODES: ViewerLayoutMode[] = [
   "paged",
-  "vertical_scroll",
-  "horizontal_scroll",
 ];
 
 export const VIEWER_LAYOUT_MODE_LABELS: Record<ViewerLayoutMode, string> = {
   paged: "ページ",
-  vertical_scroll: "縦スクロール",
-  horizontal_scroll: "横スクロール",
 };
 
-export function normalizeViewerLayoutMode(value: string): ViewerLayoutMode {
-  return VIEWER_LAYOUT_MODES.includes(value as ViewerLayoutMode)
-    ? (value as ViewerLayoutMode)
-    : "paged";
+export function normalizeViewerLayoutMode(_value: string): ViewerLayoutMode {
+  return "paged";
 }
 
 export const MIN_SCALE = 0.01;

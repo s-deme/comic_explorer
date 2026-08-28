@@ -1186,15 +1186,8 @@ fn catalog_thumbnail_sizes(settings: &crate::state::Settings) -> CatalogThumbnai
     }
 }
 
-fn viewer_layout_mode(settings: &crate::state::Settings) -> String {
-    if matches!(
-        settings.layout_mode.as_str(),
-        "paged" | "vertical_scroll" | "horizontal_scroll"
-    ) {
-        settings.layout_mode.clone()
-    } else {
-        "paged".into()
-    }
+fn viewer_layout_mode(_settings: &crate::state::Settings) -> String {
+    "paged".into()
 }
 
 fn viewer_background(settings: &crate::state::Settings) -> String {
@@ -2873,7 +2866,7 @@ pub fn set_viewer_settings(
         settings.fit_allow_upscale = fit_allow_upscale;
         settings.fit_basis = fit_basis;
         settings.fit_include_page_margin = fit_include_page_margin;
-        settings.layout_mode = layout_mode;
+        settings.layout_mode = "paged".into();
         settings.reading_direction = reading_direction;
         settings.scale_mode = scale_mode;
         settings.scale = scale.to_string();
@@ -3106,7 +3099,7 @@ fn apply_settings_profile_to_settings(
     settings.fit_allow_upscale = profile.fit_allow_upscale;
     settings.fit_basis = profile.fit_basis;
     settings.fit_include_page_margin = profile.fit_include_page_margin;
-    settings.layout_mode = profile.layout_mode;
+    settings.layout_mode = "paged".into();
     settings.reading_direction = profile.reading_direction;
     settings.scale_mode = profile.scale_mode;
     settings.scale = profile.scale.to_string();
@@ -7457,15 +7450,15 @@ mod shutdown_tests {
     }
 
     #[test]
-    fn viewer_layout_mode_defaults_to_paged_for_missing_or_unknown_values() {
+    fn viewer_layout_mode_always_normalizes_to_paged() {
         let mut settings = crate::state::Settings::default();
         assert_eq!(viewer_layout_mode(&settings), "paged");
 
         settings.layout_mode = "vertical_scroll".into();
-        assert_eq!(viewer_layout_mode(&settings), "vertical_scroll");
+        assert_eq!(viewer_layout_mode(&settings), "paged");
 
         settings.layout_mode = "horizontal_scroll".into();
-        assert_eq!(viewer_layout_mode(&settings), "horizontal_scroll");
+        assert_eq!(viewer_layout_mode(&settings), "paged");
 
         settings.layout_mode = "fullscreen".into();
         assert_eq!(viewer_layout_mode(&settings), "paged");
