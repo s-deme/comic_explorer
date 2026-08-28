@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyAlwaysOnTop, applyWindowTheme } from "./window";
+import { applyAlwaysOnTop, applyWindowTheme, applyWindowTitle } from "./window";
 
 describe("always-on-top window boundary", () => {
   it("reports native success and failure without throwing", async () => {
@@ -28,5 +28,17 @@ describe("native window theme boundary", () => {
     const adapter = { setTheme: vi.fn().mockRejectedValue(new Error("denied")) };
 
     await expect(applyWindowTheme(adapter, "dark")).resolves.toBe(false);
+  });
+});
+
+describe("native window title boundary", () => {
+  it("forwards a title and isolates a native failure", async () => {
+    const success = { setTitle: vi.fn().mockResolvedValue(undefined) };
+    const failure = { setTitle: vi.fn().mockRejectedValue(new Error("denied")) };
+
+    await expect(applyWindowTitle(success, "Comic Explorer — Book")).resolves.toBe(true);
+    await expect(applyWindowTitle(failure, "Comic Explorer")).resolves.toBe(false);
+    expect(success.setTitle).toHaveBeenCalledWith("Comic Explorer — Book");
+    expect(failure.setTitle).toHaveBeenCalledWith("Comic Explorer");
   });
 });

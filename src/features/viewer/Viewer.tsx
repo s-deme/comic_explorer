@@ -77,6 +77,11 @@ import {
   type FullscreenAdapter,
 } from "./fullscreen";
 import {
+  applyWindowTitle,
+  tauriWindowTitleAdapter,
+  type WindowTitleAdapter,
+} from "../workspace/window";
+import {
   customShortcutCommand,
   fallbackShortcutCommand,
   isViewerShortcutCommand,
@@ -163,6 +168,7 @@ interface ViewerProps {
   onScaleChange?: (scale: ViewerScaleState) => void;
   shortcuts?: ShortcutBindings;
   fullscreenAdapter?: FullscreenAdapter;
+  windowTitleAdapter?: WindowTitleAdapter;
   initialFullscreen?: boolean;
   fullscreenEscapeBehavior?: FullscreenEscapeBehavior;
   preventDisplaySleepFullscreen?: boolean;
@@ -258,6 +264,7 @@ export function Viewer({
   onScaleChange,
   shortcuts,
   fullscreenAdapter = tauriFullscreenAdapter,
+  windowTitleAdapter = tauriWindowTitleAdapter,
   initialFullscreen = false,
   fullscreenEscapeBehavior = "exitFullscreen",
   preventDisplaySleepFullscreen = false,
@@ -1155,6 +1162,13 @@ export function Viewer({
   }, [scale.mode, scale.scale, state.index]);
 
   useEffect(() => {
+    void applyWindowTitle(windowTitleAdapter, `Comic Explorer — ${session.displayName}`);
+    return () => {
+      void applyWindowTitle(windowTitleAdapter, "Comic Explorer");
+    };
+  }, [session.displayName, session.itemKey, windowTitleAdapter]);
+
+  useEffect(() => {
     let mounted = true;
     lifecycleMountedRef.current = true;
     void fullscreenAdapter
@@ -1327,6 +1341,11 @@ export function Viewer({
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (event.isComposing) return;
+      if (toolbarMoreOpen && event.key === "Escape") {
+        event.preventDefault();
+        setToolbarMoreOpen(false);
+        return;
+      }
       if (rectangleZoomArmed && event.key === "Escape") {
         event.preventDefault();
         cancelRectangleZoom();
@@ -1488,6 +1507,7 @@ export function Viewer({
       aria-label={`${session.displayName} ビューワ`}
       data-layout-mode="paged"
       data-fullscreen={fullscreen}
+      data-toolbar-more-open={toolbarMoreOpen}
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
       data-page-navigator-visible={!fullscreen || fullscreenPageNavigatorVisible}
       data-slideshow={slideshowRunning}
@@ -1512,10 +1532,10 @@ export function Viewer({
     >
       <header
         className="viewer-toolbar"
-        data-more-open={toolbarMoreOpen}
         onPointerLeave={(event) => {
           if (
             fullscreen
+            && !toolbarMoreOpen
             && !(event.relatedTarget instanceof Node
               && event.currentTarget.contains(event.relatedTarget))
           ) {
@@ -1536,26 +1556,6 @@ export function Viewer({
             ))}
           </select>
         </label>
-        {onEndOfVolumePolicyChange !== undefined && (
-          <label className="viewer-end-of-volume-control viewer-toolbar-secondary">
-            巻末動作
-            <select
-              aria-label="巻末動作"
-              value={endOfVolumePolicy}
-              onChange={(event) =>
-                onEndOfVolumePolicyChange(
-                  normalizeEndOfVolumePolicy(event.target.value),
-                )
-              }
-            >
-              {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
-                <option key={policy} value={policy}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <label className="viewer-scale-control viewer-toolbar-primary">
           <span className="visually-hidden">倍率</span>
           <select
@@ -1571,67 +1571,8 @@ export function Viewer({
             <option value="original">原寸</option>
             <option value="custom">任意倍率</option>
           </select>
-          <input
-            className="viewer-toolbar-secondary-control"
-            aria-label="任意倍率（%）"
-            type="number"
-            min="1"
-            max="800"
-            step="1"
-            value={Math.round(scale.scale * 100)}
-            disabled={scale.mode !== "custom"}
-            onChange={(event) => {
-              const next = Number(event.target.value) / 100;
-              if (Number.isFinite(next)) applyScale({ type: "scale", scale: next });
-            }}
-          />
           <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
         </label>
-        <label className="viewer-pixel-control viewer-toolbar-secondary">
-          幅px
-          <input
-            aria-label="表示幅（px）"
-            type="number"
-            min="1"
-            max="32768"
-            step="1"
-            value={pixelWidthInput}
-            onChange={(event) => setPixelWidthInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") applyPixelDimension("width", pixelWidthInput);
-            }}
-          />
-          <button
-            type="button"
-            className="viewer-icon-button"
-            aria-label="表示幅を適用"
-            title="表示幅を適用"
-            onClick={() => applyPixelDimension("width", pixelWidthInput)}
-          >適用</button>
-        </label>
-        <label className="viewer-pixel-control viewer-toolbar-secondary">
-          高さpx
-          <input
-            aria-label="表示高さ（px）"
-            type="number"
-            min="1"
-            max="32768"
-            step="1"
-            value={pixelHeightInput}
-            onChange={(event) => setPixelHeightInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") applyPixelDimension("height", pixelHeightInput);
-            }}
-          />
-          <button
-            type="button"
-            className="viewer-icon-button"
-            aria-label="表示高さを適用"
-            title="表示高さを適用"
-            onClick={() => applyPixelDimension("height", pixelHeightInput)}
-          >適用</button>
-        </label>
-        {pixelScaleError && <span className="viewer-control-error" role="alert">{pixelScaleError}</span>}
         <button
           className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-previous"
           aria-label="前ページ"
@@ -1647,45 +1588,6 @@ export function Viewer({
           onClick={() => next()}
         >
           <span aria-hidden="true">▶</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="ランダムページ"
-          title="現在以外のページへランダム移動"
-          disabled={session.pages.length <= 1}
-          onClick={randomPage}
-        >
-          <span aria-hidden="true">⤨</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
-          title={slideshowRunning
-            ? "スライドショーを停止"
-            : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
-          aria-pressed={slideshowRunning}
-          disabled={session.pages.length <= 1}
-          onClick={toggleSlideshow}
-        >
-          <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="見開きを1ページ戻す"
-          title="見開きの開始位置を1ページ戻す"
-          disabled={state.mode !== "spread" || state.index === 0}
-          onClick={() => shiftOnePage(-1)}
-        >
-          <span aria-hidden="true">1◀</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="見開きを1ページ進める"
-          title="見開きの開始位置を1ページ進める"
-          disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
-          onClick={() => shiftOnePage(1)}
-        >
-          <span aria-hidden="true">▶1</span>
         </button>
         <button
           className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-out"
@@ -1704,39 +1606,6 @@ export function Viewer({
           <span aria-hidden="true">＋</span>
         </button>
         <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="矩形ズーム"
-          title={rectangleZoomArmed
-            ? "矩形ズームを解除"
-            : "stage上で拡大する範囲をドラッグ"}
-          aria-pressed={rectangleZoomArmed}
-          onClick={toggleRectangleZoom}
-        >
-          <span aria-hidden="true">▣＋</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="ルーペ"
-          title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
-          aria-pressed={scale.loupeEnabled}
-          onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
-        >
-          <span aria-hidden="true">⌕</span>
-        </button>
-        {rectangleZoomError && (
-          <span className="viewer-control-error" role="alert">{rectangleZoomError}</span>
-        )}
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          aria-label="読み方向"
-          title={state.direction === "rightToLeft"
-            ? "読み方向を左開きへ切り替え"
-            : "読み方向を右開きへ切り替え"}
-          onClick={toggleDirection}
-        >
-          <span aria-hidden="true">⇄</span>
-        </button>
-        <button
           className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-bookmark"
           type="button"
           aria-label="しおりを保存"
@@ -1746,96 +1615,11 @@ export function Viewer({
           <span aria-hidden="true">★</span>
         </button>
         <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="次のしおり"
-          title="次のしおりへ移動"
-          disabled={resolvedBookmarks.length === 0}
-          onClick={jumpToNextBookmark}
-        >
-          <span aria-hidden="true">★→</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="しおり一覧"
-          title="しおり一覧を表示"
-          disabled={bookmarks.length === 0}
-          onClick={() => setBookmarkListOpen(true)}
-        >
-          <span aria-hidden="true">☷</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
-          title={detached ? "画像表示をメイン画面へ統合" : "画像表示を別領域へ分離"}
-          aria-pressed={detached}
-          onClick={onToggleDetached}
-        >
-          <span aria-hidden="true">{detached ? "↙" : "↗"}</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="現在ページの画像をコピー"
-          title="現在ページを画像データとしてクリップボードへコピー"
-          disabled={clipboardCopying}
-          onClick={() => void copyCurrentPageImage()}
-        >
-          <span aria-hidden="true">▣</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="時計回りに90度回転"
-          title="現在ページを時計回りに90度回転 (])"
-          onClick={() => applyImageTransform("rotateClockwise")}
-        >
-          <span aria-hidden="true">↻</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="左右反転"
-          title="現在ページを左右反転 (H)"
-          onClick={() => applyImageTransform("flipHorizontal")}
-        >
-          <span aria-hidden="true">↔</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="上下反転"
-          title="現在ページを上下反転 (V)"
-          onClick={() => applyImageTransform("flipVertical")}
-        >
-          <span aria-hidden="true">↕</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="回転・反転をリセット"
-          title="現在ページの回転・反転をリセット (0)"
-          disabled={isIdentityImageTransform(transformForPage(state.index))}
-          onClick={() => applyImageTransform("reset")}
-        >
-          <span aria-hidden="true">0°</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-secondary"
-          type="button"
-          aria-label="画像フィルター"
-          title="非破壊画像フィルターを設定"
-          onClick={() => setFilterDialogOpen(true)}
-        >
-          <span aria-hidden="true">◐</span>
-        </button>
-        <button
           className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-more"
           type="button"
           aria-label={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作"}
           title={toolbarMoreOpen ? "その他の操作を閉じる" : "その他の操作を表示"}
+          aria-controls="viewer-more-panel"
           aria-expanded={toolbarMoreOpen}
           onClick={() => setToolbarMoreOpen((open) => !open)}
         >
@@ -1877,6 +1661,296 @@ export function Viewer({
           </span>
         )}
       </header>
+      <section
+        id="viewer-more-panel"
+        className="viewer-more-panel"
+        role="region"
+        aria-labelledby="viewer-more-title"
+        data-open={toolbarMoreOpen}
+        onPointerLeave={(event) => {
+          if (
+            fullscreen
+            && !(event.relatedTarget instanceof Node
+              && event.currentTarget.contains(event.relatedTarget))
+          ) {
+            setToolbarMoreOpen(false);
+            setFullscreenToolbarVisible(false);
+          }
+        }}
+      >
+        <header className="viewer-more-panel-header">
+          <div>
+            <h2 id="viewer-more-title">その他の操作</h2>
+            <p>表示・移動・画像処理をまとめて調整できます。</p>
+          </div>
+          <button type="button" onClick={() => setToolbarMoreOpen(false)}>閉じる</button>
+        </header>
+        <div className="viewer-more-groups">
+          <section className="viewer-more-group" aria-labelledby="viewer-more-display-title">
+            <h3 id="viewer-more-display-title">表示とサイズ</h3>
+            <label className="viewer-more-field">
+              任意倍率（%）
+              <input
+                aria-label="任意倍率（%）"
+                type="number"
+                min="1"
+                max="800"
+                step="1"
+                value={Math.round(scale.scale * 100)}
+                disabled={scale.mode !== "custom"}
+                onChange={(event) => {
+                  const next = Number(event.target.value) / 100;
+                  if (Number.isFinite(next)) applyScale({ type: "scale", scale: next });
+                }}
+              />
+            </label>
+            <div className="viewer-more-pixel-controls">
+              <label className="viewer-more-field">
+                表示幅（px）
+                <input
+                  aria-label="表示幅（px）"
+                  type="number"
+                  min="1"
+                  max="32768"
+                  step="1"
+                  value={pixelWidthInput}
+                  onChange={(event) => setPixelWidthInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyPixelDimension("width", pixelWidthInput);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="viewer-more-apply"
+                aria-label="表示幅を適用"
+                title="表示幅を適用"
+                onClick={() => applyPixelDimension("width", pixelWidthInput)}
+              >適用</button>
+              <label className="viewer-more-field">
+                表示高さ（px）
+                <input
+                  aria-label="表示高さ（px）"
+                  type="number"
+                  min="1"
+                  max="32768"
+                  step="1"
+                  value={pixelHeightInput}
+                  onChange={(event) => setPixelHeightInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") applyPixelDimension("height", pixelHeightInput);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="viewer-more-apply"
+                aria-label="表示高さを適用"
+                title="表示高さを適用"
+                onClick={() => applyPixelDimension("height", pixelHeightInput)}
+              >適用</button>
+            </div>
+            <div className="viewer-more-actions">
+              <button
+                className="viewer-more-action"
+                aria-label="矩形ズーム"
+                title={rectangleZoomArmed
+                  ? "矩形ズームを解除"
+                  : "stage上で拡大する範囲をドラッグ"}
+                aria-pressed={rectangleZoomArmed}
+                onClick={toggleRectangleZoom}
+              >
+                <span aria-hidden="true">▣＋</span><span>矩形ズーム</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                aria-label="ルーペ"
+                title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
+                aria-pressed={scale.loupeEnabled}
+                onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
+              >
+                <span aria-hidden="true">⌕</span><span>ルーペ</span>
+              </button>
+            </div>
+            {pixelScaleError && <span className="viewer-control-error" role="alert">{pixelScaleError}</span>}
+            {rectangleZoomError && <span className="viewer-control-error" role="alert">{rectangleZoomError}</span>}
+          </section>
+          <section className="viewer-more-group" aria-labelledby="viewer-more-navigation-title">
+            <h3 id="viewer-more-navigation-title">移動と読み方</h3>
+            {onEndOfVolumePolicyChange !== undefined && (
+              <label className="viewer-more-field">
+                巻末動作
+                <select
+                  aria-label="巻末動作"
+                  value={endOfVolumePolicy}
+                  onChange={(event) =>
+                    onEndOfVolumePolicyChange(
+                      normalizeEndOfVolumePolicy(event.target.value),
+                    )
+                  }
+                >
+                  {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([policy, label]) => (
+                    <option key={policy} value={policy}>{label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="viewer-more-actions">
+              <button
+                className="viewer-more-action"
+                aria-label="ランダムページ"
+                title="現在以外のページへランダム移動"
+                disabled={session.pages.length <= 1}
+                onClick={randomPage}
+              >
+                <span aria-hidden="true">⤨</span><span>ランダムページ</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
+                title={slideshowRunning
+                  ? "スライドショーを停止"
+                  : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
+                aria-pressed={slideshowRunning}
+                disabled={session.pages.length <= 1}
+                onClick={toggleSlideshow}
+              >
+                <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span><span>{slideshowRunning ? "停止" : "スライドショー"}</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                aria-label="見開きを1ページ戻す"
+                title="見開きの開始位置を1ページ戻す"
+                disabled={state.mode !== "spread" || state.index === 0}
+                onClick={() => shiftOnePage(-1)}
+              >
+                <span aria-hidden="true">1◀</span><span>見開きを1ページ戻す</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                aria-label="見開きを1ページ進める"
+                title="見開きの開始位置を1ページ進める"
+                disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
+                onClick={() => shiftOnePage(1)}
+              >
+                <span aria-hidden="true">▶1</span><span>見開きを1ページ進める</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                aria-label="読み方向"
+                title={state.direction === "rightToLeft"
+                  ? "読み方向を左開きへ切り替え"
+                  : "読み方向を右開きへ切り替え"}
+                onClick={toggleDirection}
+              >
+                <span aria-hidden="true">⇄</span><span>{state.direction === "rightToLeft" ? "左開きへ" : "右開きへ"}</span>
+              </button>
+            </div>
+          </section>
+          <section className="viewer-more-group" aria-labelledby="viewer-more-bookmark-title">
+            <h3 id="viewer-more-bookmark-title">しおりと共有</h3>
+            <div className="viewer-more-actions">
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="次のしおり"
+                title="次のしおりへ移動"
+                disabled={resolvedBookmarks.length === 0}
+                onClick={jumpToNextBookmark}
+              >
+                <span aria-hidden="true">★→</span><span>次のしおり</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="しおり一覧"
+                title="しおり一覧を表示"
+                disabled={bookmarks.length === 0}
+                onClick={() => {
+                  setToolbarMoreOpen(false);
+                  setBookmarkListOpen(true);
+                }}
+              >
+                <span aria-hidden="true">☷</span><span>しおり一覧</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
+                title={detached ? "画像表示をメイン画面へ統合" : "画像表示を別領域へ分離"}
+                aria-pressed={detached}
+                onClick={onToggleDetached}
+              >
+                <span aria-hidden="true">{detached ? "↙" : "↗"}</span><span>{detached ? "画像表示を統合" : "画像表示を分離"}</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="現在ページの画像をコピー"
+                title="現在ページを画像データとしてクリップボードへコピー"
+                disabled={clipboardCopying}
+                onClick={() => void copyCurrentPageImage()}
+              >
+                <span aria-hidden="true">▣</span><span>画像をコピー</span>
+              </button>
+            </div>
+          </section>
+          <section className="viewer-more-group" aria-labelledby="viewer-more-image-title">
+            <h3 id="viewer-more-image-title">画像</h3>
+            <div className="viewer-more-actions">
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="時計回りに90度回転"
+                title="現在ページを時計回りに90度回転 (])"
+                onClick={() => applyImageTransform("rotateClockwise")}
+              >
+                <span aria-hidden="true">↻</span><span>90度回転</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="左右反転"
+                title="現在ページを左右反転 (H)"
+                onClick={() => applyImageTransform("flipHorizontal")}
+              >
+                <span aria-hidden="true">↔</span><span>左右反転</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="上下反転"
+                title="現在ページを上下反転 (V)"
+                onClick={() => applyImageTransform("flipVertical")}
+              >
+                <span aria-hidden="true">↕</span><span>上下反転</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="回転・反転をリセット"
+                title="現在ページの回転・反転をリセット (0)"
+                disabled={isIdentityImageTransform(transformForPage(state.index))}
+                onClick={() => applyImageTransform("reset")}
+              >
+                <span aria-hidden="true">0°</span><span>回転・反転をリセット</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="画像フィルター"
+                title="非破壊画像フィルターを設定"
+                onClick={() => {
+                  setToolbarMoreOpen(false);
+                  setFilterDialogOpen(true);
+                }}
+              >
+                <span aria-hidden="true">◐</span><span>画像フィルター</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
       {filterDialogOpen && (
         <FilterDialog
           generation={generation}

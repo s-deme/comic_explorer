@@ -25,6 +25,21 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-28 Viewer補助操作panelとnative title
+
+REQ-MVP-014Aに対し、「その他の操作」をtoolbar内の展開行から分離し、表示とサイズ、移動と読み方、
+しおりと共有、画像の4群を持つ名前付きoverlay panelへ置き換えた。通常表示でも固定toolbar高に切り
+落とされず、全画面では画像領域をreserveしない。Escとpanel内の閉じるbuttonで閉じる。Viewer mount中は
+Tauri window APIでnative titleを`Comic Explorer — <作品名>`へ設定し、作品切替時に更新、unmount時は
+`Comic Explorer`へ戻す。native APIの拒否はcatchしてViewer lifecycleへ波及させない。
+
+| Gate | 結果 | 2026-08-28の実測 |
+|---|---|---|
+| Focused Viewer / window adapter / UI style | PASS | Viewer 62件、window adapter 6件、Python UI style 31件とrelease evidence 9件、FAIL 0。panelの4群、開閉、既存action、title設定/復帰、Tauri permissionを確認。 |
+| Windows tests | PASS | Python 76件、frontend 44 files / 601件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後675.75kBの既存chunk advisoryはFAILへ読み替えない。 |
+| 製品直接観測 | NOT RUN | この環境ではローカルbrowser接続を取得できず、release WebView2でのpanel、title bar、通常幅・狭幅・DPI別の目視操作は未測定。 |
+
 ## 2026-08-28 画像フィルター編集画面の再設計
 
 REQ-LEY-P5-002に対し、画像フィルターdialogをセット一覧、選択中セットの保存・有効化・削除、

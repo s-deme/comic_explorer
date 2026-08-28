@@ -2633,11 +2633,67 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   text-align: right;
   white-space: nowrap;
 }
+.viewer-more-panel {
+  position: absolute;
+  z-index: 4;
+  top: 48px;
+  right: 8px;
+  box-sizing: border-box;
+  width: min(620px, calc(100vw - 16px));
+  max-height: calc(100vh - 104px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  color: var(--theme-text);
+  background: var(--theme-surface-raised);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 30%);
+}
+.viewer-more-panel[data-open="false"] { display: none; }
+.viewer-more-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.viewer-more-panel-header h2,
+.viewer-more-group h3 { margin: 0; }
+.viewer-more-panel-header h2 { font-size: 1rem; }
+.viewer-more-panel-header p { margin: 4px 0 0; color: var(--theme-text-muted); font-size: .8rem; }
+.viewer-more-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.viewer-more-group {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 7px;
+  background: var(--theme-surface-muted);
+}
+.viewer-more-group h3 { font-size: .85rem; }
+.viewer-more-field { display: grid; min-width: 0; gap: 4px; font-size: .78rem; }
+.viewer-more-field input,
+.viewer-more-field select { box-sizing: border-box; width: 100%; min-width: 0; }
+.viewer-more-pixel-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: end; }
+.viewer-more-apply { min-height: 28px; }
+.viewer-more-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.viewer-more-action {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  text-align: left;
+}
+.viewer-more-action > span:first-child { width: 18px; text-align: center; }
 .viewer[data-fullscreen="true"] {
   grid-template-rows: minmax(0, 1fr);
 }
 .viewer[data-fullscreen="true"] .viewer-toolbar,
-.viewer[data-fullscreen="true"] .viewer-page-navigator {
+.viewer[data-fullscreen="true"] .viewer-page-navigator,
+.viewer[data-fullscreen="true"] .viewer-more-panel {
   --theme-surface-muted: #262b31;
   --theme-surface-raised: #343a41;
   --theme-text: #f5f7fa;
@@ -2690,29 +2746,13 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .viewer-toolbar-bookmark { order: 9; }
 .viewer-toolbar-more { order: 10; }
 .viewer-toolbar-fullscreen { order: 11; }
-.viewer-toolbar-secondary,
-.viewer-toolbar-secondary-control { display: none; }
-.viewer-toolbar[data-more-open="true"]::after {
-  content: "";
-  flex: 0 0 100%;
-  order: 19;
-}
-.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary {
-  display: inline-flex;
-  order: 20;
-}
-.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary-control {
-  display: inline-block;
-}
 .viewer-toolbar > .viewer-control-error,
 .viewer-toolbar > .fullscreen-error { order: 30; }
 .viewer-toolbar select { max-width: 150px; }
 .viewer-toolbar-view-mode select { max-width: 104px; }
 .viewer-toolbar > span,
 .viewer-layout-control,
-.viewer-end-of-volume-control,
-.viewer-scale-control,
-.viewer-pixel-control {
+.viewer-scale-control {
   flex: 0 0 auto;
 }
 .viewer-icon-button {
@@ -2724,17 +2764,12 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   place-items: center;
 }
 .viewer-scale-control,
-.viewer-pixel-control,
-.viewer-layout-control,
-.viewer-end-of-volume-control {
+.viewer-layout-control {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   white-space: nowrap;
 }
-.viewer-scale-control input[type="number"] { width: 64px; }
-.viewer-pixel-control input[type="number"] { width: 72px; }
-.viewer-pixel-control button { padding: 2px 6px; }
 .viewer-control-error { color: var(--theme-danger); font-size: .75rem; }
 .fullscreen-error {
   flex-basis: 100%;
@@ -2750,6 +2785,8 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 @media (max-width: 520px) {
   .viewer-toolbar strong { display: none; }
   .viewer-toolbar { gap: 4px; padding-inline: 5px; }
+  .viewer-more-groups { grid-template-columns: minmax(0, 1fr); }
+  .viewer-more-panel { top: 44px; max-height: calc(100vh - 96px); }
 }
 .viewer-stage {
   position: relative;

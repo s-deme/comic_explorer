@@ -249,7 +249,7 @@ describe("Viewer settings", () => {
     }
   });
 
-  it("renders viewer actions as explained icon buttons", () => {
+  it("opens a labeled panel for secondary viewer actions", () => {
     render(
       <Viewer
         session={session}
@@ -264,7 +264,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(26);
+    expect(buttons).toHaveLength(8);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -274,14 +274,45 @@ describe("Viewer settings", () => {
     expect(within(toolbar!).queryByRole("button", { name: "見開きへ" }))
       .not.toBeInTheDocument();
     const more = within(toolbar!).getByRole("button", { name: "その他の操作" });
-    expect(toolbar).toHaveAttribute("data-more-open", "false");
+    const viewer = screen.getByRole("region", { name: "Book ビューワ" });
+    expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
+    expect(more).toHaveAttribute("aria-controls", "viewer-more-panel");
     fireEvent.click(more);
-    expect(toolbar).toHaveAttribute("data-more-open", "true");
+    expect(viewer).toHaveAttribute("data-toolbar-more-open", "true");
     expect(within(toolbar!).getByRole("button", { name: "その他の操作を閉じる" }))
       .toHaveAttribute("aria-expanded", "true");
+    const panel = screen.getByRole("region", { name: "その他の操作" });
+    expect(within(panel).getByRole("heading", { name: "表示とサイズ" })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: "移動と読み方" })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: "しおりと共有" })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: "画像" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "画像フィルター" })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "閉じる" }));
+    expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
     expect(close).toHaveTextContent("↩");
     expect(close).not.toHaveTextContent("一覧へ戻る");
+  });
+
+  it("updates the native title while the Viewer is open and restores it after close", async () => {
+    const windowTitleAdapter = { setTitle: vi.fn().mockResolvedValue(undefined) };
+    const { unmount } = render(
+      <Viewer
+        session={session}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+        windowTitleAdapter={windowTitleAdapter}
+      />,
+    );
+
+    await waitFor(() => expect(windowTitleAdapter.setTitle)
+      .toHaveBeenCalledWith("Comic Explorer — Book"));
+    unmount();
+    await waitFor(() => expect(windowTitleAdapter.setTitle)
+      .toHaveBeenLastCalledWith("Comic Explorer"));
   });
 
   it("REQ-LEY-P5-002 keeps the current anchor and reloads media after Rust filter activation", async () => {

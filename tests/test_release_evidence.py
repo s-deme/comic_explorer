@@ -89,6 +89,15 @@ class ReleaseEvidenceTests(unittest.TestCase):
             {"type": "skip"},
         )
 
+    def test_main_window_can_update_its_native_title_for_the_open_viewer(self) -> None:
+        capability = json.loads(
+            (ROOT / "src-tauri" / "capabilities" / "default.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertIn("core:window:allow-set-title", capability["permissions"])
+
     def test_license_audit_accepts_allowlisted_spdx_expressions(self) -> None:
         self.assertEqual(
             generate_sbom.validate_license(

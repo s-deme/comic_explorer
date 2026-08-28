@@ -10,6 +10,10 @@ export interface WindowThemeAdapter {
   setTheme(value: NativeWindowTheme): Promise<void>;
 }
 
+export interface WindowTitleAdapter {
+  setTitle(value: string): Promise<void>;
+}
+
 export const tauriAlwaysOnTopAdapter: AlwaysOnTopAdapter = {
   setAlwaysOnTop(value) {
     return getCurrentWindow().setAlwaysOnTop(value);
@@ -19,6 +23,12 @@ export const tauriAlwaysOnTopAdapter: AlwaysOnTopAdapter = {
 export const tauriWindowThemeAdapter: WindowThemeAdapter = {
   setTheme(value) {
     return getCurrentWindow().setTheme(value);
+  },
+};
+
+export const tauriWindowTitleAdapter: WindowTitleAdapter = {
+  setTitle(value) {
+    return getCurrentWindow().setTitle(value);
   },
 };
 
@@ -40,6 +50,18 @@ export async function applyWindowTheme(
 ): Promise<boolean> {
   try {
     await adapter.setTheme(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function applyWindowTitle(
+  adapter: WindowTitleAdapter,
+  value: string,
+): Promise<boolean> {
+  try {
+    await adapter.setTitle(value);
     return true;
   } catch {
     return false;

@@ -176,14 +176,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-toolbar", "gap: 6px")
         self.assert_rule_contains(".viewer-icon-button", "min-width: 30px")
 
-    def test_viewer_toolbar_avoids_horizontal_scroll_and_collapses_secondary_controls(self) -> None:
+    def test_viewer_toolbar_keeps_primary_controls_and_opens_a_labeled_action_panel(self) -> None:
         self.assert_rule_contains(".viewer-toolbar", "overflow: hidden")
         self.assert_rule_contains(".viewer-toolbar-close", "order: 1")
-        self.assert_rule_contains(".viewer-toolbar-secondary,\n.viewer-toolbar-secondary-control", "display: none")
-        self.assert_rule_contains(
-            '.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary',
-            "display: inline-flex",
-        )
+        self.assert_rule_contains(".viewer-more-panel", "position: absolute")
+        self.assert_rule_contains(".viewer-more-panel", "max-height: calc(100vh - 104px)")
+        self.assert_rule_contains('.viewer-more-panel[data-open="false"]', "display: none")
+        self.assert_rule_contains(".viewer-more-groups", "grid-template-columns: repeat(2, minmax(0, 1fr))")
+        self.assert_rule_contains(".viewer-more-action", "display: inline-flex")
 
     def test_filter_dialog_uses_content_sized_responsive_editor_panels(self) -> None:
         self.assert_rule_contains(".filter-dialog", "max-height: calc(100vh - 24px)")
@@ -280,12 +280,12 @@ class UiStyleContractTests(unittest.TestCase):
             "cursor: none",
         )
 
-    def test_viewer_end_of_volume_control_keeps_its_label_and_select_together(self) -> None:
+    def test_viewer_more_panel_keeps_labeled_controls_together(self) -> None:
         self.assert_rule_contains(
-            ".viewer-end-of-volume-control", "display: inline-flex"
+            ".viewer-more-field", "display: grid"
         )
         self.assert_rule_contains(
-            ".viewer-end-of-volume-control", "white-space: nowrap"
+            ".viewer-more-field input,\n.viewer-more-field select", "width: 100%"
         )
 
     def test_viewer_loupe_uses_a_square_frame(self) -> None:
