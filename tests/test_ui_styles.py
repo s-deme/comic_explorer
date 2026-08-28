@@ -178,6 +178,7 @@ class UiStyleContractTests(unittest.TestCase):
 
     def test_viewer_toolbar_avoids_horizontal_scroll_and_collapses_secondary_controls(self) -> None:
         self.assert_rule_contains(".viewer-toolbar", "overflow: hidden")
+        self.assert_rule_contains(".viewer-toolbar-close", "order: 1")
         self.assert_rule_contains(".viewer-toolbar-secondary,\n.viewer-toolbar-secondary-control", "display: none")
         self.assert_rule_contains(
             '.viewer-toolbar[data-more-open="true"] .viewer-toolbar-secondary',

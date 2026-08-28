@@ -30,6 +30,8 @@ Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低
 
 2026-08-28に画像Viewerの縦・横連続レイアウトを廃止し、表示をpageへ固定した。toolbarと統合設定からレイアウト選択を撤去し、連続表示専用の描画、先読み、ホイール速度設定を除去した。既存profile、SQLite復元値、保存要求の旧`vertical_scroll`／`horizontal_scroll`は安全に`paged`へ正規化する。page内overflow scroll、zoom、pointer panは維持する。Windows frontend 598件、Python 74件、Rust 271+shutdown process 1件、typecheck、build、SBOMはPASSし、release WebView2直接観測は未測定として残す。
 
+同日に通常表示の狭いViewer toolbarで「一覧へ戻る」が末尾へ折り返されて切り落とされる不具合を修正した。この操作を先頭側primary controlへ固定し、通常表示・全画面・狭幅のいずれでも作品名や段階zoomより先に残す。Viewer 61件、Python UI style 30件、Windows frontend 598件、Python 74件、typecheck、buildはPASSし、release WebView2直接観測は未測定として残す。
+
 ## Leeyes P1〜P5進捗
 
 | tier | 対象 | Published | 未完了 |

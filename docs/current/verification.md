@@ -25,6 +25,19 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-28 Viewerの一覧復帰を常時表示
+
+REQ-MVP-014Aに対し、「一覧へ戻る」をtoolbarの先頭側primary controlへ固定した。通常表示でtoolbarが
+狭くなった場合も、作品名・段階zoomの縮退より先に折返し／overflowで消えない。全画面では従来どおり
+画面上端のtoolbar表示時に利用できる。
+
+| Gate | 結果 | 2026-08-28の実測 |
+|---|---|---|
+| Focused Viewer / UI style | PASS | Viewer 61件、toolbar closeの`order: 1`を確認するPython UI style 30件、FAIL 0。 |
+| Windows tests | PASS | Python 74件、frontend 44 files / 598件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後672.14kBの既存chunk advisoryはFAILへ読み替えない。 |
+| 製品直接観測 | NOT RUN | release WebView2での通常幅・狭幅・fullscreen・DPI別の目視操作は未測定。 |
+
 ## 2026-08-28 Viewerレイアウトのページ表示固定
 
 REQ-MVP-011、REQ-MVP-014A、LEY-VIEWER-009、LEY-VIEWER-026に対し、Viewerの縦・横連続レイアウトと
