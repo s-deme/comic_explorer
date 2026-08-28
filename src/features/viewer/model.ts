@@ -50,7 +50,6 @@ export const DEFAULT_FIT_RULES: FitRules = {
 export type ViewerBackground = "checker" | "dark" | "black" | "light";
 export type ZoomRetention = "global" | "book" | "page";
 export type ViewerGridColor = "light" | "dark";
-export type ViewerLayoutMode = "paged";
 export const PAGE_SCAN_MODES = ["vertical", "n", "z"] as const;
 export type PageScanMode = (typeof PAGE_SCAN_MODES)[number];
 export const PAGE_SCAN_MODE_LABELS: Record<PageScanMode, string> = {
@@ -59,18 +58,6 @@ export const PAGE_SCAN_MODE_LABELS: Record<PageScanMode, string> = {
   z: "Z字",
 };
 export const DEFAULT_PAGE_SCAN_MODE: PageScanMode = "vertical";
-
-export const VIEWER_LAYOUT_MODES: ViewerLayoutMode[] = [
-  "paged",
-];
-
-export const VIEWER_LAYOUT_MODE_LABELS: Record<ViewerLayoutMode, string> = {
-  paged: "ページ",
-};
-
-export function normalizeViewerLayoutMode(_value: string): ViewerLayoutMode {
-  return "paged";
-}
 
 export const MIN_SCALE = 0.01;
 export const MAX_SCALE = 8;
@@ -115,9 +102,6 @@ export const MIN_KEY_SCROLL_ACCELERATION_PERCENT = 100;
 export const MAX_KEY_SCROLL_ACCELERATION_PERCENT = 300;
 export const DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT = 150;
 export const DEFAULT_KEY_SCROLL_CONTINUOUS = true;
-export const MIN_WHEEL_SCROLL_FACTOR = 0.5;
-export const MAX_WHEEL_SCROLL_FACTOR = 2;
-export const DEFAULT_WHEEL_SCROLL_FACTOR = 1;
 export const DEFAULT_SMOOTH_SCROLL = true;
 export const MIN_PREFETCH_PAGE_COUNT = 0;
 export const MAX_PREFETCH_PAGE_COUNT = 4;
@@ -150,12 +134,6 @@ export function isKeyScrollAccelerationPercent(value: unknown): value is number 
     && Number.isInteger(value)
     && value >= MIN_KEY_SCROLL_ACCELERATION_PERCENT
     && value <= MAX_KEY_SCROLL_ACCELERATION_PERCENT;
-}
-
-export function isWheelScrollFactor(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value)
-    && value >= MIN_WHEEL_SCROLL_FACTOR
-    && value <= MAX_WHEEL_SCROLL_FACTOR;
 }
 
 export function isLoupeSize(value: unknown): value is number {
@@ -205,13 +183,11 @@ export function wheelDeltaPixels(
   delta: number,
   deltaMode: number,
   viewportSize: number,
-  factor = DEFAULT_WHEEL_SCROLL_FACTOR,
 ): number {
   if (!Number.isFinite(delta)) return 0;
   const safeViewport = Number.isFinite(viewportSize) && viewportSize > 0 ? viewportSize : 1;
   const unit = deltaMode === 1 ? 16 : deltaMode === 2 ? safeViewport : 1;
-  const safeFactor = isWheelScrollFactor(factor) ? factor : DEFAULT_WHEEL_SCROLL_FACTOR;
-  return delta * unit * safeFactor;
+  return delta * unit;
 }
 
 export interface PageScanViewport {

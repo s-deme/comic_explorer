@@ -12,7 +12,7 @@ import {
 } from "../library/client";
 import type { ThumbnailViewState } from "../catalog/CatalogGrid";
 import { presentError } from "../errors/presentation";
-import type { CatalogPalette, DetailGridLineMode, DetailRowDensity } from "../settings/profile";
+import type { DetailGridLineMode, DetailRowDensity } from "../settings/profile";
 
 interface ArchiveExplorerPaneProps {
   archiveRelativePath: string;
@@ -20,7 +20,6 @@ interface ArchiveExplorerPaneProps {
   onClose: () => void;
   viewMode: CatalogViewMode;
   thumbnailSizes: CatalogThumbnailSizes;
-  palette: CatalogPalette;
   detailGridLines: DetailGridLineMode;
   detailRowDensity: DetailRowDensity;
   detailShowKind: boolean;
@@ -39,7 +38,6 @@ export function ArchiveExplorerPane({
   onClose,
   viewMode,
   thumbnailSizes,
-  palette,
   detailGridLines,
   detailRowDensity,
   detailShowKind,
@@ -276,7 +274,6 @@ export function ArchiveExplorerPane({
             selectedPath={selectedEntryId}
             viewMode={viewMode}
             thumbnailSizes={thumbnailSizes}
-            palette={palette}
             detailGridLines={detailGridLines}
             detailRowDensity={detailRowDensity}
             detailShowKind={detailShowKind}

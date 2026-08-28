@@ -328,30 +328,12 @@ class UiStyleContractTests(unittest.TestCase):
             ".catalog-cell--reference_tile .catalog-actions", "right: 10px"
         )
 
-    def test_catalog_palette_aliases_isolate_local_overrides_from_app_theme(self) -> None:
+    def test_catalog_uses_the_global_theme_without_local_palette_overrides(self) -> None:
         catalog = self.rule_body(".catalog-scroll")
         self.assertIn("--catalog-canvas: var(--theme-canvas)", catalog)
         self.assertIn("--catalog-text: var(--theme-text)", catalog)
         self.assertIn("--catalog-focus: var(--theme-focus)", catalog)
-        for palette in ("paper", "midnight", "highContrast"):
-            body = self.rule_body(
-                f'.catalog-scroll[data-catalog-palette="{palette}"]'
-            )
-            for local_token in (
-                "canvas",
-                "surface",
-                "text",
-                "muted",
-                "border",
-                "focus",
-                "accent",
-                "danger",
-                "hover",
-                "error-surface",
-                "selected",
-                "on-selected",
-            ):
-                self.assertIn(f"--catalog-{local_token}:", body)
+        self.assertNotIn("data-catalog-palette", STYLES)
         for selector in (
             ".favorite-toggle",
             '.favorite-toggle[data-favorite="true"]',

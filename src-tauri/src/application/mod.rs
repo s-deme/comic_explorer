@@ -476,7 +476,6 @@ pub struct CatalogSettings {
     pub fit_allow_upscale: bool,
     pub fit_basis: String,
     pub fit_include_page_margin: bool,
-    pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
     pub scale: f64,
@@ -509,7 +508,6 @@ pub struct CatalogSettings {
     pub scroll_step_percent: u16,
     pub key_scroll_acceleration_percent: u16,
     pub key_scroll_continuous: bool,
-    pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
@@ -535,7 +533,6 @@ pub struct CatalogSettings {
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
     pub show_hidden_files: bool,
-    pub catalog_palette: String,
     pub theme_selection: ThemeSelection,
     pub custom_theme_snapshot: Option<CustomThemeSnapshot>,
     pub theme_fallback_reason: Option<String>,
@@ -595,7 +592,6 @@ pub struct SettingsProfileInput {
     pub fit_allow_upscale: bool,
     pub fit_basis: String,
     pub fit_include_page_margin: bool,
-    pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
     pub scale: f64,
@@ -628,7 +624,6 @@ pub struct SettingsProfileInput {
     pub scroll_step_percent: u16,
     pub key_scroll_acceleration_percent: u16,
     pub key_scroll_continuous: bool,
-    pub wheel_scroll_factor: f64,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
@@ -654,7 +649,6 @@ pub struct SettingsProfileInput {
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
     pub show_hidden_files: bool,
-    pub catalog_palette: String,
     pub theme_selection: ThemeSelection,
     pub custom_theme_snapshot: Option<CustomThemeSnapshot>,
     pub restore_last_viewer: bool,
@@ -731,8 +725,6 @@ const MAX_SCROLL_STEP_PERCENT: u16 = 100;
 const MIN_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 100;
 const MAX_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 300;
 const DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT: u16 = 150;
-const MIN_WHEEL_SCROLL_FACTOR: f64 = 0.5;
-const MAX_WHEEL_SCROLL_FACTOR: f64 = 2.0;
 const DEFAULT_VIEWER_PAGE_MARGIN: u16 = 0;
 const DEFAULT_VIEWER_SPREAD_GAP: u16 = 8;
 const MIN_CATALOG_THUMBNAIL_SIZE: u16 = 64;
@@ -1186,10 +1178,6 @@ fn catalog_thumbnail_sizes(settings: &crate::state::Settings) -> CatalogThumbnai
     }
 }
 
-fn viewer_layout_mode(_settings: &crate::state::Settings) -> String {
-    "paged".into()
-}
-
 fn viewer_background(settings: &crate::state::Settings) -> String {
     if matches!(
         settings.viewer_background.as_str(),
@@ -1302,18 +1290,6 @@ fn key_scroll_acceleration_percent(settings: &crate::state::Settings) -> u16 {
         .unwrap_or(DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT)
 }
 
-fn wheel_scroll_factor(settings: &crate::state::Settings) -> f64 {
-    settings
-        .wheel_scroll_factor
-        .parse::<f64>()
-        .ok()
-        .filter(|factor| {
-            factor.is_finite()
-                && (MIN_WHEEL_SCROLL_FACTOR..=MAX_WHEEL_SCROLL_FACTOR).contains(factor)
-        })
-        .unwrap_or(1.0)
-}
-
 fn page_scan_mode(settings: &crate::state::Settings) -> String {
     match settings.page_scan_mode.as_str() {
         "vertical" | "n" | "z" => settings.page_scan_mode.clone(),
@@ -1403,7 +1379,6 @@ fn catalog_settings_resolved(
     let spread_pairing = spread_pairing(&settings);
     let fit_basis = fit_basis(&settings);
     let catalog_thumbnail_sizes = catalog_thumbnail_sizes(&settings);
-    let layout_mode = viewer_layout_mode(&settings);
     let slideshow_interval_ms = slideshow_interval_ms(&settings);
     let slideshow_order = slideshow_order(&settings);
     let viewer_background = viewer_background(&settings);
@@ -1418,7 +1393,6 @@ fn catalog_settings_resolved(
     let wheel_dead_zone = wheel_dead_zone(&settings);
     let scroll_step_percent = scroll_step_percent(&settings);
     let key_scroll_acceleration_percent = key_scroll_acceleration_percent(&settings);
-    let wheel_scroll_factor = wheel_scroll_factor(&settings);
     let page_scan_mode = page_scan_mode(&settings);
     let loupe_size = loupe_size(&settings);
     let loupe_zoom = loupe_zoom(&settings);
@@ -1450,7 +1424,6 @@ fn catalog_settings_resolved(
         fit_allow_upscale: settings.fit_allow_upscale,
         fit_basis,
         fit_include_page_margin: settings.fit_include_page_margin,
-        layout_mode,
         reading_direction: settings.reading_direction,
         scale_mode,
         scale,
@@ -1491,7 +1464,6 @@ fn catalog_settings_resolved(
         scroll_step_percent,
         key_scroll_acceleration_percent,
         key_scroll_continuous: settings.key_scroll_continuous,
-        wheel_scroll_factor,
         smooth_scroll: settings.smooth_scroll,
         page_scan_mode,
         tree_visible: settings.tree_visible,
@@ -1544,10 +1516,6 @@ fn catalog_settings_resolved(
             _ => "last".into(),
         },
         show_hidden_files: settings.show_hidden_files,
-        catalog_palette: match settings.catalog_palette.as_str() {
-            "system" | "paper" | "midnight" | "highContrast" => settings.catalog_palette,
-            _ => "system".into(),
-        },
         theme_selection: normalized_theme.selection,
         custom_theme_snapshot: normalized_theme.snapshot,
         theme_fallback_reason: normalized_theme.fallback_reason,
@@ -2804,7 +2772,6 @@ pub fn set_viewer_settings(
     fit_allow_upscale: bool,
     fit_basis: String,
     fit_include_page_margin: bool,
-    layout_mode: String,
     reading_direction: String,
     scale_mode: String,
     scale: f64,
@@ -2824,10 +2791,6 @@ pub fn set_viewer_settings(
             .contains(&auto_spread_min_viewport_aspect_percent)
         || !matches!(spread_pairing.as_str(), "continuous" | "odd" | "even")
         || !matches!(fit_basis.as_str(), "spread" | "page")
-        || !matches!(
-            layout_mode.as_str(),
-            "paged" | "vertical_scroll" | "horizontal_scroll"
-        )
         || !matches!(reading_direction.as_str(), "rightToLeft" | "leftToRight")
         || !matches!(
             scale_mode.as_str(),
@@ -2866,7 +2829,6 @@ pub fn set_viewer_settings(
         settings.fit_allow_upscale = fit_allow_upscale;
         settings.fit_basis = fit_basis;
         settings.fit_include_page_margin = fit_include_page_margin;
-        settings.layout_mode = "paged".into();
         settings.reading_direction = reading_direction;
         settings.scale_mode = scale_mode;
         settings.scale = scale.to_string();
@@ -2967,10 +2929,6 @@ fn validate_settings_profile(
         .into_iter()
         .all(|size| (MIN_CATALOG_THUMBNAIL_SIZE..=MAX_CATALOG_THUMBNAIL_SIZE).contains(&size))
         || !matches!(
-            profile.layout_mode.as_str(),
-            "paged" | "vertical_scroll" | "horizontal_scroll"
-        )
-        || !matches!(
             profile.reading_direction.as_str(),
             "rightToLeft" | "leftToRight"
         )
@@ -3022,9 +2980,6 @@ fn validate_settings_profile(
             .contains(&profile.scroll_step_percent)
         || !(MIN_KEY_SCROLL_ACCELERATION_PERCENT..=MAX_KEY_SCROLL_ACCELERATION_PERCENT)
             .contains(&profile.key_scroll_acceleration_percent)
-        || !profile.wheel_scroll_factor.is_finite()
-        || !(MIN_WHEEL_SCROLL_FACTOR..=MAX_WHEEL_SCROLL_FACTOR)
-            .contains(&profile.wheel_scroll_factor)
         || !matches!(profile.page_scan_mode.as_str(), "vertical" | "n" | "z")
         || !(180..=480).contains(&profile.tree_width)
         || !(120..=480).contains(&profile.tree_height)
@@ -3055,10 +3010,6 @@ fn validate_settings_profile(
             "visible" | "near" | "all"
         )
         || !matches!(profile.startup_location.as_str(), "last" | "driveRoot")
-        || !matches!(
-            profile.catalog_palette.as_str(),
-            "system" | "paper" | "midnight" | "highContrast"
-        )
     {
         return Err(request_error(
             ErrorCode::InvalidRequest,
@@ -3099,7 +3050,6 @@ fn apply_settings_profile_to_settings(
     settings.fit_allow_upscale = profile.fit_allow_upscale;
     settings.fit_basis = profile.fit_basis;
     settings.fit_include_page_margin = profile.fit_include_page_margin;
-    settings.layout_mode = "paged".into();
     settings.reading_direction = profile.reading_direction;
     settings.scale_mode = profile.scale_mode;
     settings.scale = profile.scale.to_string();
@@ -3131,7 +3081,6 @@ fn apply_settings_profile_to_settings(
     settings.scroll_step_percent = profile.scroll_step_percent.to_string();
     settings.key_scroll_acceleration_percent = profile.key_scroll_acceleration_percent.to_string();
     settings.key_scroll_continuous = profile.key_scroll_continuous;
-    settings.wheel_scroll_factor = profile.wheel_scroll_factor.to_string();
     settings.smooth_scroll = profile.smooth_scroll;
     settings.page_scan_mode = profile.page_scan_mode;
     settings.tree_visible = profile.tree_visible;
@@ -3157,7 +3106,6 @@ fn apply_settings_profile_to_settings(
     settings.thumbnail_generation_scope = profile.thumbnail_generation_scope;
     settings.startup_location = profile.startup_location;
     settings.show_hidden_files = profile.show_hidden_files;
-    settings.catalog_palette = profile.catalog_palette;
     let (theme_selection_json, custom_theme_snapshot_json) = themes::encode_theme_settings(
         &profile.theme_selection,
         profile.custom_theme_snapshot.as_ref(),
@@ -3206,6 +3154,9 @@ fn decode_stored_settings_profile(profile_json: &str) -> Result<SettingsProfileI
             "Stored settings profile is invalid.",
         )
     })?;
+    object.remove("layoutMode");
+    object.remove("wheelScrollFactor");
+    object.remove("catalogPalette");
     object.entry("treeHeight").or_insert(serde_json::json!(240));
     object
         .entry("catalogPanePosition")
@@ -6664,21 +6615,16 @@ mod shutdown_tests {
         assert_eq!(scroll_step_percent(&settings), 90);
         assert_eq!(key_scroll_acceleration_percent(&settings), 150);
         assert!(settings.key_scroll_continuous);
-        assert_eq!(wheel_scroll_factor(&settings), 1.0);
         settings.scroll_step_percent = "75".into();
         settings.key_scroll_acceleration_percent = "220".into();
         settings.key_scroll_continuous = false;
-        settings.wheel_scroll_factor = "1.4".into();
         assert_eq!(scroll_step_percent(&settings), 75);
         assert_eq!(key_scroll_acceleration_percent(&settings), 220);
         assert!(!settings.key_scroll_continuous);
-        assert_eq!(wheel_scroll_factor(&settings), 1.4);
         settings.scroll_step_percent = "101".into();
         settings.key_scroll_acceleration_percent = "301".into();
-        settings.wheel_scroll_factor = "NaN".into();
         assert_eq!(scroll_step_percent(&settings), 90);
         assert_eq!(key_scroll_acceleration_percent(&settings), 150);
-        assert_eq!(wheel_scroll_factor(&settings), 1.0);
     }
 
     #[test]
@@ -6863,7 +6809,6 @@ mod shutdown_tests {
             fit_allow_upscale: false,
             fit_basis: "spread".into(),
             fit_include_page_margin: true,
-            layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
             scale: 1.0,
@@ -6895,7 +6840,6 @@ mod shutdown_tests {
             scroll_step_percent: 90,
             key_scroll_acceleration_percent: 150,
             key_scroll_continuous: true,
-            wheel_scroll_factor: 1.0,
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
             tree_visible: false,
@@ -6921,7 +6865,6 @@ mod shutdown_tests {
             thumbnail_generation_scope: "near".into(),
             startup_location: "last".into(),
             show_hidden_files: false,
-            catalog_palette: "system".into(),
             theme_selection: ThemeSelection::System,
             custom_theme_snapshot: None,
             restore_last_viewer: false,
@@ -7072,12 +7015,6 @@ mod shutdown_tests {
             ErrorCode::InvalidRequest
         );
         profile.key_scroll_acceleration_percent = 220;
-        profile.wheel_scroll_factor = 2.01;
-        assert_eq!(
-            validate_settings_profile(&profile).unwrap_err().code,
-            ErrorCode::InvalidRequest
-        );
-        profile.wheel_scroll_factor = 1.4;
         profile.page_scan_mode = "spiral".into();
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
@@ -7106,12 +7043,6 @@ mod shutdown_tests {
         );
         profile.navigation_selection_policy = "restore".into();
 
-        profile.catalog_palette = "custom".into();
-        assert_eq!(
-            validate_settings_profile(&profile).unwrap_err().code,
-            ErrorCode::InvalidRequest
-        );
-        profile.catalog_palette = "system".into();
         profile.thumbnail_generation_scope = "unlimited".into();
         assert_eq!(
             validate_settings_profile(&profile).unwrap_err().code,
@@ -7225,6 +7156,15 @@ mod shutdown_tests {
             }
         );
         assert!(recovered_theme.custom_theme_snapshot.is_none());
+        let mut retired_settings = serde_json::to_value(&normalized).unwrap();
+        let retired_object = retired_settings.as_object_mut().unwrap();
+        retired_object.insert("layoutMode".into(), serde_json::json!("vertical_scroll"));
+        retired_object.insert("wheelScrollFactor".into(), serde_json::json!(1.4));
+        retired_object.insert("catalogPalette".into(), serde_json::json!("midnight"));
+        assert_eq!(
+            decode_stored_settings_profile(&retired_settings.to_string()).unwrap(),
+            normalized,
+        );
         let mut unknown = serde_json::to_value(&normalized).unwrap();
         unknown
             .as_object_mut()
@@ -7447,21 +7387,6 @@ mod shutdown_tests {
         assert_eq!(viewer_start_index(requested_page.as_ref(), None, &pages), 1);
 
         std::fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn viewer_layout_mode_always_normalizes_to_paged() {
-        let mut settings = crate::state::Settings::default();
-        assert_eq!(viewer_layout_mode(&settings), "paged");
-
-        settings.layout_mode = "vertical_scroll".into();
-        assert_eq!(viewer_layout_mode(&settings), "paged");
-
-        settings.layout_mode = "horizontal_scroll".into();
-        assert_eq!(viewer_layout_mode(&settings), "paged");
-
-        settings.layout_mode = "fullscreen".into();
-        assert_eq!(viewer_layout_mode(&settings), "paged");
     }
 
     #[test]

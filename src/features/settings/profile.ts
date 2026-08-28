@@ -36,7 +36,6 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
   DEFAULT_KEY_SCROLL_CONTINUOUS,
-  DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_LOUPE_SIZE,
@@ -59,7 +58,6 @@ import {
   isWheelDeadZone,
   isScrollStepPercent,
   isKeyScrollAccelerationPercent,
-  isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
   isPrefetchPageCount,
@@ -75,7 +73,6 @@ import {
   type ScaleMode,
   type ViewerBackground,
   type ViewerGridColor,
-  type ViewerLayoutMode,
   type ViewMode,
   type SpreadPairing,
   type FitBasis,
@@ -107,7 +104,7 @@ import {
   type ThemeSelection,
 } from "./theme";
 
-export const SETTINGS_PROFILE_VERSION = 28;
+export const SETTINGS_PROFILE_VERSION = 29;
 export const APP_VERSION = packageMetadata.version;
 
 export const MIN_TREE_WIDTH = 180;
@@ -146,10 +143,6 @@ export const DEFAULT_THUMBNAIL_GENERATION_SCOPE: ThumbnailGenerationScope = "nea
 export const STARTUP_LOCATIONS = ["last", "driveRoot"] as const;
 export type StartupLocation = (typeof STARTUP_LOCATIONS)[number];
 export const DEFAULT_STARTUP_LOCATION: StartupLocation = "last";
-export const CATALOG_PALETTES = ["system", "paper", "midnight", "highContrast"] as const;
-export type CatalogPalette = (typeof CATALOG_PALETTES)[number];
-export const DEFAULT_CATALOG_PALETTE: CatalogPalette = "system";
-
 export const MOUSE_GESTURE_ACTIONS = ["none", ...VIEWER_SHORTCUT_COMMANDS] as const;
 export type MouseGestureAction = (typeof MOUSE_GESTURE_ACTIONS)[number];
 export const LEGACY_MOUSE_GESTURE_NAMES = ["swipeLeft", "swipeRight", "doubleClick"] as const;
@@ -199,7 +192,6 @@ export interface SettingsProfile {
   fitAllowUpscale: boolean;
   fitBasis: FitBasis;
   fitIncludePageMargin: boolean;
-  layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
   scale: number;
@@ -231,7 +223,6 @@ export interface SettingsProfile {
   scrollStepPercent: number;
   keyScrollAccelerationPercent: number;
   keyScrollContinuous: boolean;
-  wheelScrollFactor: number;
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
   treeVisible: boolean;
@@ -251,7 +242,6 @@ export interface SettingsProfile {
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
   showHiddenFiles: boolean;
-  catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
   autoRefreshCurrentFolder: boolean;
   folderOpenRule: FolderOpenRule;
@@ -285,7 +275,6 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     fitAllowUpscale: DEFAULT_FIT_RULES.allowUpscale,
     fitBasis: DEFAULT_FIT_RULES.basis,
     fitIncludePageMargin: DEFAULT_FIT_RULES.includePageMargin,
-    layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
     scale: DEFAULT_SCALE,
@@ -317,7 +306,6 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     scrollStepPercent: DEFAULT_SCROLL_STEP_PERCENT,
     keyScrollAccelerationPercent: DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
     keyScrollContinuous: DEFAULT_KEY_SCROLL_CONTINUOUS,
-    wheelScrollFactor: DEFAULT_WHEEL_SCROLL_FACTOR,
     smoothScroll: DEFAULT_SMOOTH_SCROLL,
     pageScanMode: DEFAULT_PAGE_SCAN_MODE,
     treeVisible: true,
@@ -337,7 +325,6 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     thumbnailGenerationScope: DEFAULT_THUMBNAIL_GENERATION_SCOPE,
     startupLocation: DEFAULT_STARTUP_LOCATION,
     showHiddenFiles: false,
-    catalogPalette: DEFAULT_CATALOG_PALETTE,
     restoreLastViewer: false,
     autoRefreshCurrentFolder: true,
     folderOpenRule: "navigate",
@@ -403,10 +390,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       ? migrateV2CatalogThumbnailSizes(candidate.catalogThumbnailSizes)
       : strictCatalogThumbnailSizes(candidate.catalogThumbnailSizes);
   const viewMode = enumValue(candidate.viewMode, VIEW_MODES);
-  const layoutMode = typeof candidate.layoutMode === "string"
-    && ["paged", "vertical_scroll", "horizontal_scroll"].includes(candidate.layoutMode)
-    ? "paged"
-    : null;
   const readingDirection = enumValue(candidate.readingDirection, ["rightToLeft", "leftToRight"] as const);
   const scaleMode = enumValue(candidate.scaleMode, ["fit", "width", "height", "original", "custom"] as const);
   const shortcuts = strictShortcutBindings(
@@ -444,10 +427,12 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const addressBarVisible = legacyP1Preferences ? true : candidate.addressBarVisible;
   const statusBarVisible = legacyP1Preferences ? true : candidate.statusBarVisible;
   const alwaysOnTop = legacyP1Preferences ? false : candidate.alwaysOnTop;
-  const themeSelection = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+  const themeSelection = candidate.profileVersion === 28
+    || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? normalizeThemeSelection(candidate.themeSelection)
     : { ...LEGACY_THEME_SELECTION };
-  const customThemeSnapshot = candidate.profileVersion === SETTINGS_PROFILE_VERSION
+  const customThemeSnapshot = candidate.profileVersion === 28
+    || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? candidate.customThemeSnapshot === null
       ? null
       : normalizeCustomThemeSnapshot(candidate.customThemeSnapshot)
@@ -464,9 +449,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     : enumValue(candidate.startupLocation, STARTUP_LOCATIONS);
   const legacyP1CPreferences = legacyP1BPreferences || candidate.profileVersion === 6;
   const showHiddenFiles = legacyP1CPreferences ? false : candidate.showHiddenFiles;
-  const catalogPalette = legacyP1CPreferences
-    ? DEFAULT_CATALOG_PALETTE
-    : enumValue(candidate.catalogPalette, CATALOG_PALETTES);
   const restoreLastViewer = legacyP1CPreferences ? false : candidate.restoreLastViewer;
   const legacySpreadRules = legacyP1CPreferences || candidate.profileVersion === 7;
   const spreadPortraitMaxAspectPercent = legacySpreadRules
@@ -495,9 +477,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const scrollStepPercent = legacyScrollPreferences
     ? DEFAULT_SCROLL_STEP_PERCENT
     : candidate.scrollStepPercent;
-  const wheelScrollFactor = legacyScrollPreferences
-    ? DEFAULT_WHEEL_SCROLL_FACTOR
-    : candidate.wheelScrollFactor;
   const smoothScroll = legacyScrollPreferences
     ? DEFAULT_SMOOTH_SCROLL
     : candidate.smoothScroll;
@@ -599,11 +578,13 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
   const viewerQuadrantBindings = candidate.profileVersion === 25
     || candidate.profileVersion === 26
     || candidate.profileVersion === 27
+    || candidate.profileVersion === 28
     || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerQuadrantBindings(candidate.viewerQuadrantBindings)
     : { ...DEFAULT_VIEWER_QUADRANT_BINDINGS };
   const viewerRightClickAction = candidate.profileVersion === 26
     || candidate.profileVersion === 27
+    || candidate.profileVersion === 28
     || candidate.profileVersion === SETTINGS_PROFILE_VERSION
     ? strictViewerRightClickAction(candidate.viewerRightClickAction)
     : DEFAULT_VIEWER_RIGHT_CLICK_ACTION;
@@ -635,6 +616,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
       && candidate.profileVersion !== 25
       && candidate.profileVersion !== 26
       && candidate.profileVersion !== 27
+      && candidate.profileVersion !== 28
       && candidate.profileVersion !== SETTINGS_PROFILE_VERSION) ||
     sortField === null ||
     typeof candidate.sortDescending !== "boolean" ||
@@ -649,7 +631,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof fitAllowUpscale !== "boolean" ||
     fitBasis === null ||
     typeof fitIncludePageMargin !== "boolean" ||
-    layoutMode === null ||
     readingDirection === null ||
     scaleMode === null ||
     typeof candidate.scale !== "number" ||
@@ -684,7 +665,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     !isScrollStepPercent(scrollStepPercent) ||
     !isKeyScrollAccelerationPercent(keyScrollAccelerationPercent) ||
     typeof keyScrollContinuous !== "boolean" ||
-    !isWheelScrollFactor(wheelScrollFactor) ||
     typeof smoothScroll !== "boolean" ||
     pageScanMode === null ||
     typeof candidate.treeVisible !== "boolean" ||
@@ -705,7 +685,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     typeof statusBarVisible !== "boolean" ||
     typeof alwaysOnTop !== "boolean" ||
     themeSelection === null ||
-    (candidate.profileVersion === SETTINGS_PROFILE_VERSION
+    ((candidate.profileVersion === 28 || candidate.profileVersion === SETTINGS_PROFILE_VERSION)
       && candidate.customThemeSnapshot !== null
       && customThemeSnapshot === null) ||
     !themeSelectionMatchesSnapshot(themeSelection, customThemeSnapshot) ||
@@ -713,7 +693,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     thumbnailGenerationScope === null ||
     startupLocation === null ||
     typeof showHiddenFiles !== "boolean" ||
-    catalogPalette === null ||
     typeof restoreLastViewer !== "boolean" ||
     typeof autoRefreshCurrentFolder !== "boolean" ||
     folderOpenRule === null ||
@@ -747,7 +726,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     fitAllowUpscale,
     fitBasis,
     fitIncludePageMargin,
-    layoutMode,
     readingDirection,
     scaleMode,
     scale: candidate.scale,
@@ -779,7 +757,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     scrollStepPercent,
     keyScrollAccelerationPercent,
     keyScrollContinuous,
-    wheelScrollFactor,
     smoothScroll,
     pageScanMode,
     treeVisible: candidate.treeVisible,
@@ -799,7 +776,6 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     thumbnailGenerationScope,
     startupLocation,
     showHiddenFiles,
-    catalogPalette,
     restoreLastViewer,
     autoRefreshCurrentFolder,
     folderOpenRule,

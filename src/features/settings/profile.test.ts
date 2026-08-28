@@ -33,7 +33,6 @@ function validProfile(): SettingsProfile {
     fitAllowUpscale: false,
     fitBasis: "spread",
     fitIncludePageMargin: true,
-    layoutMode: "paged",
     readingDirection: "rightToLeft",
     scaleMode: "fit",
     scale: 1,
@@ -65,7 +64,6 @@ function validProfile(): SettingsProfile {
     scrollStepPercent: 90,
     keyScrollAccelerationPercent: 150,
     keyScrollContinuous: true,
-    wheelScrollFactor: 1,
     smoothScroll: true,
     pageScanMode: "vertical",
     treeVisible: true,
@@ -85,7 +83,6 @@ function validProfile(): SettingsProfile {
     thumbnailGenerationScope: "near",
     startupLocation: "last",
     showHiddenFiles: false,
-    catalogPalette: "system",
     restoreLastViewer: false,
     autoRefreshCurrentFolder: true,
     folderOpenRule: "navigate",
@@ -116,14 +113,16 @@ function withField(field: string, value: unknown): Record<string, unknown> {
   return profile;
 }
 
-describe("viewer layout migration", () => {
-  it.each(["vertical_scroll", "horizontal_scroll"]) (
-    "normalizes the retired %s profile value to paged",
-    (legacyLayout) => {
-      const profile = { ...validProfile(), layoutMode: legacyLayout };
-      expect(normalizeSettingsProfile(profile)?.layoutMode).toBe("paged");
-    },
-  );
+describe("retired settings migration", () => {
+  it("discards retired layout, wheel factor, and catalog palette keys", () => {
+    const profile = {
+      ...validProfile(),
+      layoutMode: "vertical_scroll",
+      wheelScrollFactor: 1.4,
+      catalogPalette: "midnight",
+    };
+    expect(normalizeSettingsProfile(profile)).toEqual(validProfile());
+  });
 });
 
 describe("settings profile", () => {
@@ -167,7 +166,7 @@ describe("settings profile", () => {
     expect(profile?.viewMode).toBe("auto");
   });
 
-  it.each([0, 29, 99, "21", undefined])(
+  it.each([0, 30, 99, "21", undefined])(
     "rejects an unknown or malformed profile version (%s)",
     (profileVersion) => {
       expect(normalizeSettingsProfile(withField("profileVersion", profileVersion))).toBeNull();
@@ -340,7 +339,6 @@ describe("settings profile", () => {
     const legacy = validProfile() as unknown as Record<string, unknown>;
     legacy.profileVersion = 6;
     delete legacy.showHiddenFiles;
-    delete legacy.catalogPalette;
     delete legacy.restoreLastViewer;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
@@ -613,7 +611,6 @@ describe("settings profile", () => {
     const legacy = validProfile() as unknown as Record<string, unknown>;
     legacy.profileVersion = 9;
     delete legacy.scrollStepPercent;
-    delete legacy.wheelScrollFactor;
     delete legacy.smoothScroll;
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
@@ -622,17 +619,14 @@ describe("settings profile", () => {
     expect(normalizeSettingsProfile({
       ...validProfile(),
       scrollStepPercent: 75,
-      wheelScrollFactor: 1.4,
       smoothScroll: false,
     })).toEqual(expect.objectContaining({
       scrollStepPercent: 75,
-      wheelScrollFactor: 1.4,
       smoothScroll: false,
     }));
     for (const [field, value] of [
       ["scrollStepPercent", 9], ["scrollStepPercent", 101],
-      ["scrollStepPercent", 50.5], ["wheelScrollFactor", 0.49],
-      ["wheelScrollFactor", 2.01], ["smoothScroll", "true"],
+      ["scrollStepPercent", 50.5], ["smoothScroll", "true"],
     ] as const) {
       expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
     }
@@ -796,7 +790,6 @@ describe("settings profile", () => {
     ["endOfVolumePolicy", "next"],
     ["catalogViewMode", "tiles"],
     ["viewMode", "continuous"],
-    ["layoutMode", "grid"],
     ["readingDirection", "topToBottom"],
     ["scaleMode", "automatic"],
     ["viewerBackground", "transparent"],
@@ -822,12 +815,6 @@ describe("settings profile", () => {
     ["thumbnailGenerationScope", "unlimited"],
     ["startupLocation", "desktop"],
   ])("rejects an invalid P1-B profile field %s=%s", (field, value) => {
-    expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
-  });
-
-  it.each([
-    ["catalogPalette", "custom"],
-  ])("rejects an invalid P1-C profile field %s=%s", (field, value) => {
     expect(normalizeSettingsProfile(withField(field, value))).toBeNull();
   });
 
@@ -871,7 +858,7 @@ describe("settings profile", () => {
 
   it("requires every profile field instead of silently defaulting it", () => {
     const candidate = validProfile() as unknown as Record<string, unknown>;
-    delete candidate.layoutMode;
+    delete candidate.readingDirection;
     expect(normalizeSettingsProfile(candidate)).toBeNull();
   });
 

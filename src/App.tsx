@@ -168,7 +168,6 @@ import {
   DEFAULT_SCROLL_STEP_PERCENT,
   DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
   DEFAULT_KEY_SCROLL_CONTINUOUS,
-  DEFAULT_WHEEL_SCROLL_FACTOR,
   DEFAULT_SMOOTH_SCROLL,
   DEFAULT_PAGE_SCAN_MODE,
   DEFAULT_LOUPE_SIZE,
@@ -193,7 +192,6 @@ import {
   isWheelDeadZone,
   isScrollStepPercent,
   isKeyScrollAccelerationPercent,
-  isWheelScrollFactor,
   isLoupeSize,
   isLoupeZoom,
   isPrefetchPageCount,
@@ -288,7 +286,6 @@ import {
   createDefaultSettingsProfile,
   DEFAULT_MOUSE_GESTURES,
   DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
-  DEFAULT_CATALOG_PALETTE,
   DEFAULT_TREE_WIDTH,
   DEFAULT_TREE_HEIGHT,
   DEFAULT_CATALOG_PANE_POSITION,
@@ -304,7 +301,6 @@ import {
   normalizeMouseGestures,
   normalizeSettingsProfile,
   type MouseGestureAction,
-  type CatalogPalette,
   type CatalogPanePosition,
   type MouseGestureBindings,
   type MouseGestureName,
@@ -689,7 +685,6 @@ export function App({
     ...DEFAULT_SPREAD_RULES,
   }));
   const [fitRules, setFitRules] = useState<FitRules>(() => ({ ...DEFAULT_FIT_RULES }));
-  const layoutMode = "paged" as const;
   const [readingDirection, setReadingDirection] =
     useState<ReadingDirection>("rightToLeft");
   const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
@@ -734,7 +729,6 @@ export function App({
     useState(DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT);
   const [keyScrollContinuous, setKeyScrollContinuous] =
     useState(DEFAULT_KEY_SCROLL_CONTINUOUS);
-  const [wheelScrollFactor, setWheelScrollFactor] = useState(DEFAULT_WHEEL_SCROLL_FACTOR);
   const [smoothScroll, setSmoothScroll] = useState(DEFAULT_SMOOTH_SCROLL);
   const [pageScanMode, setPageScanMode] = useState<PageScanMode>(DEFAULT_PAGE_SCAN_MODE);
   const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
@@ -798,7 +792,6 @@ export function App({
   const [startupLocation, setStartupLocation] = useState<StartupLocation>(DEFAULT_STARTUP_LOCATION);
   const startupLocationRef = useRef<StartupLocation>(DEFAULT_STARTUP_LOCATION);
   const [showHiddenFiles, setShowHiddenFiles] = useState(false);
-  const [catalogPalette, setCatalogPalette] = useState<CatalogPalette>(DEFAULT_CATALOG_PALETTE);
   const [restoreLastViewer, setRestoreLastViewer] = useState(false);
   const restoreLastViewerRef = useRef(false);
   const [autoRefreshCurrentFolder, setAutoRefreshCurrentFolder] = useState(true);
@@ -1354,9 +1347,6 @@ export function App({
               : DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
           );
           setKeyScrollContinuous(response.data.keyScrollContinuous !== false);
-          setWheelScrollFactor(isWheelScrollFactor(response.data.wheelScrollFactor)
-            ? response.data.wheelScrollFactor
-            : DEFAULT_WHEEL_SCROLL_FACTOR);
           setSmoothScroll(response.data.smoothScroll !== false);
           setPageScanMode(PAGE_SCAN_MODES.includes(response.data.pageScanMode)
             ? response.data.pageScanMode
@@ -1394,11 +1384,6 @@ export function App({
           startupLocationRef.current = restoredStartupLocation;
           setStartupLocation(restoredStartupLocation);
           setShowHiddenFiles(response.data.showHiddenFiles === true);
-          setCatalogPalette(
-            ["system", "paper", "midnight", "highContrast"].includes(response.data.catalogPalette)
-              ? response.data.catalogPalette as CatalogPalette
-              : DEFAULT_CATALOG_PALETTE,
-          );
           restoreLastViewerRef.current = response.data.restoreLastViewer === true;
           setRestoreLastViewer(restoreLastViewerRef.current);
           autoRefreshCurrentFolderRef.current = response.data.autoRefreshCurrentFolder !== false;
@@ -3339,7 +3324,6 @@ export function App({
       fitAllowUpscale: fitRules.allowUpscale,
       fitBasis: fitRules.basis,
       fitIncludePageMargin: fitRules.includePageMargin,
-      layoutMode,
       readingDirection,
       scaleMode: viewerScaleMode,
       scale: viewerScale,
@@ -3371,7 +3355,6 @@ export function App({
       scrollStepPercent,
       keyScrollAccelerationPercent,
       keyScrollContinuous,
-      wheelScrollFactor,
       smoothScroll,
       pageScanMode,
       treeVisible,
@@ -3391,7 +3374,6 @@ export function App({
       thumbnailGenerationScope,
       startupLocation,
       showHiddenFiles,
-      catalogPalette,
       restoreLastViewer,
       autoRefreshCurrentFolder,
       folderOpenRule,
@@ -3861,7 +3843,6 @@ export function App({
       setScrollStepPercent(normalized.scrollStepPercent);
       setKeyScrollAccelerationPercent(normalized.keyScrollAccelerationPercent);
       setKeyScrollContinuous(normalized.keyScrollContinuous);
-      setWheelScrollFactor(normalized.wheelScrollFactor);
       setSmoothScroll(normalized.smoothScroll);
       setPageScanMode(normalized.pageScanMode);
       setTreeVisible(normalized.treeVisible);
@@ -3890,7 +3871,6 @@ export function App({
       setStartupLocation(normalized.startupLocation);
       const hiddenVisibilityChanged = normalized.showHiddenFiles !== showHiddenFiles;
       setShowHiddenFiles(normalized.showHiddenFiles);
-      setCatalogPalette(normalized.catalogPalette);
       restoreLastViewerRef.current = normalized.restoreLastViewer;
       setRestoreLastViewer(normalized.restoreLastViewer);
       const autoRefreshChanged = normalized.autoRefreshCurrentFolder !== autoRefreshCurrentFolder;
@@ -4170,7 +4150,7 @@ export function App({
     return () => window.removeEventListener("keydown", openSettingsFromKeyboard);
   }, [
     settingsOpen, viewerSession, sortField, sortDescending, endOfVolumePolicy,
-    catalogViewMode, catalogThumbnailSizes, viewMode, layoutMode, readingDirection,
+    catalogViewMode, catalogThumbnailSizes, viewMode, readingDirection,
     viewerScaleMode, viewerScale, loupeEnabled, loupeSize, loupeZoom,
     prefetchAhead, prefetchBehind, prefetchMemoryMiB,
     fullscreenEscapeBehavior, preventDisplaySleepFullscreen,
@@ -4181,12 +4161,12 @@ export function App({
     viewerSpreadGap, cursorAutoHideMs, zoomRetention, viewerGridEnabled,
     viewerGridSize, viewerGridColor, panFactor, wheelDeadZone, scrollStepPercent,
     keyScrollAccelerationPercent, keyScrollContinuous,
-    wheelScrollFactor, smoothScroll, pageScanMode, treeVisible,
+    smoothScroll, pageScanMode, treeVisible,
     treeAutoCollapse, treeConfirmChildren, treeWidth,
     menuBarVisible, toolbarVisible, addressBarVisible, statusBarVisible,
     alwaysOnTop, themeSelection, customThemeSnapshot,
     navigationSelectionPolicy, thumbnailGenerationScope,
-    startupLocation, showHiddenFiles, catalogPalette, restoreLastViewer,
+    startupLocation, showHiddenFiles, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
     shortcuts, catalogMouseBindings, viewerQuadrantBindings, viewerRightClickAction, mouseGestures,
@@ -4508,7 +4488,7 @@ export function App({
         | "spreadPortraitMaxAspectPercent" | "autoSpreadMinViewportAspectPercent"
         | "spreadFirstPageSingle" | "spreadPairing"
         | "fitAllowUpscale" | "fitBasis" | "fitIncludePageMargin"
-        | "layoutMode" | "viewerBackground" | "viewerPageMargin"
+        | "viewerBackground" | "viewerPageMargin"
         | "viewerSpreadGap" | "cursorAutoHideMs"
       >
     >,
@@ -4524,7 +4504,6 @@ export function App({
         fitAllowUpscale: fitRules.allowUpscale,
         fitBasis: fitRules.basis,
         fitIncludePageMargin: fitRules.includePageMargin,
-        layoutMode,
         readingDirection,
         scaleMode: viewerScaleMode,
         scale: viewerScale,
@@ -6522,14 +6501,12 @@ export function App({
         <section
           className={`catalog-pane${archiveExplorerPath !== null ? " catalog-pane--archive" : ""}`}
           aria-busy={loadState.status === "loading"}
-          data-catalog-palette={catalogPalette}
         >
           {archiveExplorerPath !== null && (
             <ArchiveExplorerPane
               archiveRelativePath={archiveExplorerPath}
               viewMode={catalogViewMode}
               thumbnailSizes={catalogThumbnailSizes}
-              palette={catalogPalette}
               detailGridLines={detailGridLines}
               detailRowDensity={detailRowDensity}
               detailShowKind={detailShowKind}
@@ -6636,7 +6613,6 @@ export function App({
               selectedPaths={selectedPaths}
               viewMode={catalogViewMode}
               thumbnailSizes={catalogThumbnailSizes}
-              palette={catalogPalette}
               detailGridLines={detailGridLines}
               detailRowDensity={detailRowDensity}
               detailShowKind={detailShowKind}

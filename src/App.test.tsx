@@ -347,7 +347,6 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   fitAllowUpscale: false,
   fitBasis: "spread",
   fitIncludePageMargin: true,
-  layoutMode: "paged",
   readingDirection: "rightToLeft",
   scaleMode: "fit",
   scale: 1,
@@ -379,7 +378,6 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   scrollStepPercent: 90,
   keyScrollAccelerationPercent: 150,
   keyScrollContinuous: true,
-  wheelScrollFactor: 1,
   smoothScroll: true,
   pageScanMode: "vertical",
   treeVisible: true,
@@ -400,7 +398,6 @@ const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
   thumbnailGenerationScope: "near",
   startupLocation: "last",
   showHiddenFiles: false,
-  catalogPalette: "system",
   restoreLastViewer: false,
     autoRefreshCurrentFolder: true,
     folderOpenRule: "navigate",
@@ -2631,7 +2628,6 @@ describe("application shell", () => {
       data: {
         ...DEFAULT_CATALOG_SETTINGS,
         viewMode: "spread",
-        layoutMode: "paged",
         readingDirection: "leftToRight",
         scaleMode: "custom",
         scale: 1.7,
@@ -3876,24 +3872,32 @@ describe("application shell", () => {
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
   }, 60_000);
 
-  it("REQ-LEY-P1-017 and P1-019 persist hidden visibility and a safe catalog palette", async () => {
+  it("REQ-MVP-022 orders settings by task and removes retired duplicate controls", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     listMock.mockClear();
     chooseAppMenuItem("オプション", "統合設定…");
     const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    expect(within(categories).getAllByRole("button").map((button) => button.textContent))
+      .toEqual([
+        expect.stringContaining("一覧"),
+        expect.stringContaining("ビューワ"),
+        expect.stringContaining("画面とテーマ"),
+        expect.stringContaining("操作と入力"),
+        expect.stringContaining("プロファイル"),
+      ]);
+    expect(within(dialog).queryByText("一覧配色")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("レイアウト")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByLabelText("profile隠し項目を表示"));
-    fireEvent.change(within(dialog).getByLabelText("profile一覧配色"), {
-      target: { value: "midnight" },
-    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(saveSettingsProfileMock).toHaveBeenCalledWith(
-      expect.objectContaining({ showHiddenFiles: true, catalogPalette: "midnight" }),
+      expect.objectContaining({ showHiddenFiles: true }),
       expect.any(Number),
     );
     await waitFor(() => expect(listMock).toHaveBeenCalled());
-    expect(screen.getByRole("grid")).toHaveAttribute("data-catalog-palette", "midnight");
+    expect(screen.getByRole("grid")).not.toHaveAttribute("data-catalog-palette");
   });
 
   it("REQ-LEY-P1-001, P1-002, and P1-005 connect keyboard settings, shell surfaces, and topmost atomically", async () => {

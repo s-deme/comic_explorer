@@ -104,7 +104,6 @@ pub struct Settings {
     pub fit_allow_upscale: bool,
     pub fit_basis: String,
     pub fit_include_page_margin: bool,
-    pub layout_mode: String,
     pub reading_direction: String,
     pub scale_mode: String,
     pub scale: String,
@@ -136,7 +135,6 @@ pub struct Settings {
     pub scroll_step_percent: String,
     pub key_scroll_acceleration_percent: String,
     pub key_scroll_continuous: bool,
-    pub wheel_scroll_factor: String,
     pub smooth_scroll: bool,
     pub page_scan_mode: String,
     pub tree_visible: bool,
@@ -162,7 +160,6 @@ pub struct Settings {
     pub thumbnail_generation_scope: String,
     pub startup_location: String,
     pub show_hidden_files: bool,
-    pub catalog_palette: String,
     pub app_theme_selection_json: String,
     pub custom_theme_snapshot_json: Option<String>,
     pub restore_last_viewer: bool,
@@ -281,7 +278,6 @@ impl Default for Settings {
             fit_allow_upscale: false,
             fit_basis: "spread".into(),
             fit_include_page_margin: true,
-            layout_mode: "paged".into(),
             reading_direction: "rightToLeft".into(),
             scale_mode: "fit".into(),
             scale: "1".into(),
@@ -313,7 +309,6 @@ impl Default for Settings {
             scroll_step_percent: "90".into(),
             key_scroll_acceleration_percent: "150".into(),
             key_scroll_continuous: true,
-            wheel_scroll_factor: "1".into(),
             smooth_scroll: true,
             page_scan_mode: "vertical".into(),
             tree_visible: true,
@@ -339,7 +334,6 @@ impl Default for Settings {
             thumbnail_generation_scope: "near".into(),
             startup_location: "last".into(),
             show_hidden_files: false,
-            catalog_palette: "system".into(),
             app_theme_selection_json: r#"{"kind":"system"}"#.into(),
             custom_theme_snapshot_json: None,
             restore_last_viewer: false,
@@ -430,7 +424,6 @@ impl StateStore {
                 "fitAllowUpscale" => settings.fit_allow_upscale = value == "true",
                 "fitBasis" => settings.fit_basis = value,
                 "fitIncludePageMargin" => settings.fit_include_page_margin = value == "true",
-                "layoutMode" => settings.layout_mode = value,
                 "readingDirection" => settings.reading_direction = value,
                 "scaleMode" => settings.scale_mode = value,
                 "scale" => settings.scale = value,
@@ -468,7 +461,6 @@ impl StateStore {
                 "scrollStepPercent" => settings.scroll_step_percent = value,
                 "keyScrollAccelerationPercent" => settings.key_scroll_acceleration_percent = value,
                 "keyScrollContinuous" => settings.key_scroll_continuous = value == "true",
-                "wheelScrollFactor" => settings.wheel_scroll_factor = value,
                 "smoothScroll" => settings.smooth_scroll = value == "true",
                 "pageScanMode" => settings.page_scan_mode = value,
                 "treeVisible" => settings.tree_visible = value == "true",
@@ -511,7 +503,6 @@ impl StateStore {
                 "thumbnailGenerationScope" => settings.thumbnail_generation_scope = value,
                 "startupLocation" => settings.startup_location = value,
                 "showHiddenFiles" => settings.show_hidden_files = value == "true",
-                "catalogPalette" => settings.catalog_palette = value,
                 "appThemeSelection" => settings.app_theme_selection_json = value,
                 "customThemeSnapshot" => settings.custom_theme_snapshot_json = Some(value),
                 "restoreLastViewer" => settings.restore_last_viewer = value == "true",
@@ -648,7 +639,6 @@ impl StateStore {
                 "fitIncludePageMargin",
                 settings.fit_include_page_margin.to_string(),
             ),
-            ("layoutMode", settings.layout_mode.clone()),
             ("readingDirection", settings.reading_direction.clone()),
             ("scaleMode", settings.scale_mode.clone()),
             ("scale", settings.scale.clone()),
@@ -707,7 +697,6 @@ impl StateStore {
                 "keyScrollContinuous",
                 settings.key_scroll_continuous.to_string(),
             ),
-            ("wheelScrollFactor", settings.wheel_scroll_factor.clone()),
             ("smoothScroll", settings.smooth_scroll.to_string()),
             ("pageScanMode", settings.page_scan_mode.clone()),
             ("treeVisible", settings.tree_visible.to_string()),
@@ -757,7 +746,6 @@ impl StateStore {
             ),
             ("startupLocation", settings.startup_location.clone()),
             ("showHiddenFiles", settings.show_hidden_files.to_string()),
-            ("catalogPalette", settings.catalog_palette.clone()),
             (
                 "appThemeSelection",
                 settings.app_theme_selection_json.clone(),
@@ -796,6 +784,12 @@ impl StateStore {
                 .execute("DELETE FROM settings WHERE key='libraryRoot'", [])
                 .map_err(database_error)?;
         }
+        transaction
+            .execute(
+                "DELETE FROM settings WHERE key IN ('layoutMode', 'wheelScrollFactor', 'catalogPalette')",
+                [],
+            )
+            .map_err(database_error)?;
         if let Some(snapshot) = &settings.custom_theme_snapshot_json {
             transaction
                 .execute(
@@ -3133,7 +3127,6 @@ mod tests {
                 fit_allow_upscale: true,
                 fit_basis: "page".into(),
                 fit_include_page_margin: false,
-                layout_mode: "vertical_scroll".into(),
                 reading_direction: "leftToRight".into(),
                 scale_mode: "custom".into(),
                 scale: "1.7".into(),
@@ -3165,7 +3158,6 @@ mod tests {
                 scroll_step_percent: "75".into(),
                 key_scroll_acceleration_percent: "180".into(),
                 key_scroll_continuous: false,
-                wheel_scroll_factor: "1.4".into(),
                 smooth_scroll: false,
                 page_scan_mode: "z".into(),
                 tree_visible: false,
@@ -3191,7 +3183,6 @@ mod tests {
                 thumbnail_generation_scope: "all".into(),
                 startup_location: "driveRoot".into(),
                 show_hidden_files: true,
-                catalog_palette: "midnight".into(),
                 app_theme_selection_json: r#"{"kind":"builtin","themeId":"forest"}"#.into(),
                 custom_theme_snapshot_json: None,
                 restore_last_viewer: true,
@@ -3234,7 +3225,23 @@ mod tests {
                 .into_iter()
                 .collect(),
             };
+            store
+                .connection
+                .execute(
+                    "INSERT INTO settings(key, value) VALUES('layoutMode', 'vertical_scroll'), ('wheelScrollFactor', '1.4'), ('catalogPalette', 'midnight')",
+                    [],
+                )
+                .unwrap();
             store.save_settings(&settings).unwrap();
+            let retired_count: i64 = store
+                .connection
+                .query_row(
+                    "SELECT COUNT(*) FROM settings WHERE key IN ('layoutMode', 'wheelScrollFactor', 'catalogPalette')",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(retired_count, 0);
             store
                 .save_reading_position(
                     "item-1",
@@ -3271,7 +3278,6 @@ mod tests {
         assert_eq!(restored.catalog_view_mode, "card_grid");
         assert_eq!(restored.card_grid_thumbnail_size, "224");
         assert_eq!(restored.reference_tile_thumbnail_size, "152");
-        assert_eq!(restored.layout_mode, "vertical_scroll");
         assert_eq!(restored.spread_portrait_max_aspect_percent, "82");
         assert_eq!(restored.auto_spread_min_viewport_aspect_percent, "160");
         assert!(restored.spread_first_page_single);
@@ -3307,7 +3313,6 @@ mod tests {
         assert_eq!(restored.scroll_step_percent, "75");
         assert_eq!(restored.key_scroll_acceleration_percent, "180");
         assert!(!restored.key_scroll_continuous);
-        assert_eq!(restored.wheel_scroll_factor, "1.4");
         assert!(!restored.smooth_scroll);
         assert_eq!(restored.page_scan_mode, "z");
         assert!(!restored.tree_visible);
@@ -3333,7 +3338,6 @@ mod tests {
         assert_eq!(restored.thumbnail_generation_scope, "all");
         assert_eq!(restored.startup_location, "driveRoot");
         assert!(restored.show_hidden_files);
-        assert_eq!(restored.catalog_palette, "midnight");
         assert!(restored.restore_last_viewer);
         assert!(!restored.auto_refresh_current_folder);
         assert_eq!(restored.shortcut_bindings["nextPage"], ["N", "PageDown"]);

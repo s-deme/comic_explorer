@@ -17,7 +17,6 @@ import type {
   ScaleMode,
   ViewerBackground,
   ViewerGridColor,
-  ViewerLayoutMode,
   ViewMode,
   SpreadPairing,
   FitBasis,
@@ -33,7 +32,6 @@ import type { ViewerQuadrantBindings } from "../input/viewer-quadrants";
 import {
   SETTINGS_PROFILE_VERSION,
   type MouseGestureBindings,
-  CatalogPalette,
   CatalogPanePosition,
   FileOpenRule,
   FolderOpenRule,
@@ -517,7 +515,6 @@ export interface CatalogSettings {
   fitAllowUpscale: boolean;
   fitBasis: FitBasis;
   fitIncludePageMargin: boolean;
-  layoutMode: ViewerLayoutMode;
   readingDirection: "rightToLeft" | "leftToRight";
   scaleMode: ScaleMode;
   scale: number;
@@ -549,7 +546,6 @@ export interface CatalogSettings {
   scrollStepPercent: number;
   keyScrollAccelerationPercent: number;
   keyScrollContinuous: boolean;
-  wheelScrollFactor: number;
   smoothScroll: boolean;
   pageScanMode: PageScanMode;
   treeVisible: boolean;
@@ -570,7 +566,6 @@ export interface CatalogSettings {
   thumbnailGenerationScope: ThumbnailGenerationScope;
   startupLocation: StartupLocation;
   showHiddenFiles: boolean;
-  catalogPalette: CatalogPalette;
   restoreLastViewer: boolean;
   autoRefreshCurrentFolder: boolean;
   folderOpenRule: FolderOpenRule;
@@ -609,7 +604,6 @@ export async function saveViewerSettings(
     | "fitAllowUpscale"
     | "fitBasis"
     | "fitIncludePageMargin"
-    | "layoutMode"
     | "readingDirection"
     | "scaleMode"
     | "scale"
@@ -631,7 +625,6 @@ export async function saveViewerSettings(
     fitAllowUpscale: settings.fitAllowUpscale,
     fitBasis: settings.fitBasis,
     fitIncludePageMargin: settings.fitIncludePageMargin,
-    layoutMode: settings.layoutMode,
     readingDirection: settings.readingDirection,
     scaleMode: settings.scaleMode,
     scale: settings.scale,
@@ -663,7 +656,6 @@ export async function saveSettingsProfile(
       fitAllowUpscale: profile.fitAllowUpscale,
       fitBasis: profile.fitBasis,
       fitIncludePageMargin: profile.fitIncludePageMargin,
-      layoutMode: profile.layoutMode,
       readingDirection: profile.readingDirection,
       scaleMode: profile.scaleMode,
       scale: profile.scale,
@@ -695,7 +687,6 @@ export async function saveSettingsProfile(
       scrollStepPercent: profile.scrollStepPercent,
       keyScrollAccelerationPercent: profile.keyScrollAccelerationPercent,
       keyScrollContinuous: profile.keyScrollContinuous,
-      wheelScrollFactor: profile.wheelScrollFactor,
       smoothScroll: profile.smoothScroll,
       pageScanMode: profile.pageScanMode,
       treeVisible: profile.treeVisible,
@@ -715,7 +706,6 @@ export async function saveSettingsProfile(
       thumbnailGenerationScope: profile.thumbnailGenerationScope,
       startupLocation: profile.startupLocation,
       showHiddenFiles: profile.showHiddenFiles,
-      catalogPalette: profile.catalogPalette,
       restoreLastViewer: profile.restoreLastViewer,
       autoRefreshCurrentFolder: profile.autoRefreshCurrentFolder,
       folderOpenRule: profile.folderOpenRule,

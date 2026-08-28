@@ -39,7 +39,6 @@ interface CatalogGridProps {
   onMouseAction?: (action: CatalogMouseAction, entry: CatalogEntry) => void;
   viewMode?: CatalogViewMode;
   thumbnailSizes?: CatalogThumbnailSizes;
-  palette?: "system" | "paper" | "midnight" | "highContrast";
   detailGridLines?: DetailGridLineMode;
   detailRowDensity?: DetailRowDensity;
   detailShowKind?: boolean;
@@ -211,7 +210,6 @@ export function CatalogGrid({
   onMouseAction,
   viewMode = "cover_list",
   thumbnailSizes = DEFAULT_CATALOG_THUMBNAIL_SIZES,
-  palette = "system",
   detailGridLines = "none",
   detailRowDensity = "standard",
   detailShowKind = true,
@@ -433,7 +431,6 @@ export function CatalogGrid({
       data-catalog-view-mode={viewMode}
       data-catalog-column-count={columnCount}
       data-entry-count={entries.length}
-      data-catalog-palette={palette}
       data-native-drop-path={readOnly ? undefined : currentFolderPath}
       data-detail-grid-lines={detailGridLines}
       data-detail-row-density={detailRowDensity}

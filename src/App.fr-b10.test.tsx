@@ -199,7 +199,6 @@ describe("FR-B10 connected tag management", () => {
         catalogViewMode: "cover_list",
         catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
         viewMode: "single",
-        layoutMode: "paged",
         readingDirection: "rightToLeft",
         scaleMode: "fit",
         scale: 1,

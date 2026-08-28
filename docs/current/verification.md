@@ -17,13 +17,29 @@ codd:
 
 ## 対象
 
-- 最終更新日: 2026-08-28 JST
+- 最終更新日: 2026-08-29 JST
 - version: 0.1.0
 - 文書統合開始時commit: `3777cf5ec552aef80e0cd52ea19011edf3c7f68d`
 - 対象: 上記commit以降の実装と、本ドキュメントを含むcurrent branch差分
 
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
+
+## 2026-08-29 統合設定の整理
+
+REQ-MVP-022に対し、総合設定を「一覧、ビューワ、画面とテーマ、操作と入力、プロファイル」の作業順へ
+並べ替え、各category内を目的別のgroupへ分割した。検索時は該当groupだけを表示する。global themeを唯一の
+配色選択とし、一覧だけの配色、機能を持たないwheel倍率、すでにpage固定のViewer layout保存値を削除した。
+既存profileとSQLiteの3値は読み込み時に破棄し、次の保存でSQLiteから消去する。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused settings migration / App UI | PASS | profile版境界5件、REQ-MVP-022の設定category順・撤去済みcontrol・一覧palette不在を確認するApp 1件、FAIL 0。 |
+| Windows tests | PASS | Python 76件、frontend 44 files / 597件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後677.06kBのchunk advisoryはFAILへ読み替えない。 |
+| Rust canonical | PASS | lib 270件とshutdown process 1件、FAIL 0。既存dead-code warning 2件はPASSへ加算しない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | この環境ではrelease WebView2での通常幅・狭幅・DPI別の目視操作を未実施。 |
 
 ## 2026-08-28 Viewer補助操作panelとnative title
 

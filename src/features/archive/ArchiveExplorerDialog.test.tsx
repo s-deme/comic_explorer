@@ -149,7 +149,6 @@ describe("ArchiveExplorerPane", () => {
       <ArchiveExplorerPane
         {...displayProps}
         viewMode="detail_list"
-        palette="paper"
         archiveRelativePath="book.cbz"
         onOpenPage={vi.fn()}
         onClose={vi.fn()}
@@ -157,7 +156,6 @@ describe("ArchiveExplorerPane", () => {
     );
     const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
     expect(grid).toHaveAttribute("data-catalog-view-mode", "detail_list");
-    expect(grid).toHaveAttribute("data-catalog-palette", "paper");
     const chapter = within(grid).getByRole("button", { name: /chapter/ });
     expect(chapter).toHaveClass("catalog-item--detail_list");
     expect(chapter).not.toHaveAttribute("draggable", "true");

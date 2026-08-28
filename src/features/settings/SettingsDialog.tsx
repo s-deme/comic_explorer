@@ -85,7 +85,6 @@ import {
 } from "../viewer/slideshow";
 import {
   CONFIGURABLE_MOUSE_GESTURE_NAMES,
-  CATALOG_PALETTES,
   NAVIGATION_SELECTION_POLICIES,
   STARTUP_LOCATIONS,
   THUMBNAIL_GENERATION_SCOPES,
@@ -125,10 +124,6 @@ const SLIDESHOW_ORDER_LABELS: Record<SettingsProfile["slideshowOrder"], string> 
   random: "ランダム（1巡内で重複なし）",
 };
 
-const CATALOG_PALETTE_LABELS: Record<SettingsProfile["catalogPalette"], string> = {
-  system: "システム", paper: "紙面", midnight: "夜間", highContrast: "高コントラスト",
-};
-
 const NAVIGATION_SELECTION_LABELS: Record<SettingsProfile["navigationSelectionPolicy"], string> = {
   none: "選択なし", first: "先頭", last: "末尾", restore: "前回選択を復元",
 };
@@ -164,11 +159,11 @@ interface SettingsCategoryDefinition {
 }
 
 const SETTINGS_CATEGORIES: readonly SettingsCategoryDefinition[] = [
-  { id: "catalog", label: "一覧表示", description: "並べ替えと表示形式", icon: "▦" },
-  { id: "viewer", label: "ビューワ", description: "ページ表示と読み進め方", icon: "▣" },
-  { id: "interface", label: "画面", description: "配色、ペインと操作バー", icon: "◫" },
-  { id: "commands", label: "操作", description: "キーとジェスチャー", icon: "⌨" },
-  { id: "profile", label: "プロファイル", description: "設定の移行と復元", icon: "⇄" },
+  { id: "catalog", label: "一覧", description: "表示、並び順、開き方", icon: "▦" },
+  { id: "viewer", label: "ビューワ", description: "読む、表示、拡大", icon: "▣" },
+  { id: "interface", label: "画面とテーマ", description: "配色、ペイン、ウィンドウ", icon: "◫" },
+  { id: "commands", label: "操作と入力", description: "キー、クリック、ジェスチャー", icon: "⌨" },
+  { id: "profile", label: "プロファイル", description: "起動、保存、移行", icon: "⇄" },
 ] as const;
 
 const SORT_FIELD_LABELS: Record<SortField, string> = {
@@ -431,11 +426,6 @@ export function SettingsDialog({
       text: `詳細 リスト 列 種別 サイズ 更新日時 表示 ${draft.detailShowKind} ${draft.detailShowSize} ${draft.detailShowModified}`,
     },
     {
-      id: "catalog-palette",
-      category: "catalog",
-      text: `一覧 配色 背景 文字 選択 contrast ${CATALOG_PALETTE_LABELS[draft.catalogPalette]}`,
-    },
-    {
       id: "viewer-view-mode",
       category: "viewer",
       text: `閲覧モード 自動 単ページ 見開き ${VIEW_MODE_LABELS[draft.viewMode]} 表示領域と画像寸法から自動判定、または表示枚数を固定します`,
@@ -676,6 +666,7 @@ export function SettingsDialog({
   ).length;
   const isSearching = normalizedQuery !== "";
   const rowHidden = (id: string) => isSearching && !matchedIds.has(id);
+  const groupHidden = (ids: readonly string[]) => isSearching && !ids.some((id) => matchedIds.has(id));
   const panelHidden = (category: SettingsCategory) => isSearching
     ? categoryMatchCount(category) === 0
     : activeCategory !== category;
@@ -756,8 +747,10 @@ export function SettingsDialog({
               </div>
             )}
 
-            <section className="settings-panel" aria-label="基本設定" hidden={panelHidden("catalog")}>
-              <h3>一覧表示</h3>
+            <section className="settings-panel" aria-label="一覧設定" hidden={panelHidden("catalog")}>
+              <h3>一覧</h3>
+              <p className="settings-section-description">表示形式と並び順、一覧から開くときの動作をまとめます。</p>
+              <h3 className="settings-subheading" hidden={groupHidden(["sort-field", "sort-direction"])}>並び順</h3>
               <SettingRow
                 id="sort-field"
                 title="並べ替え"
@@ -790,6 +783,7 @@ export function SettingsDialog({
                   <span>{draft.sortDescending ? "降順" : "昇順"}</span>
                 </label>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["catalog-view-mode", "small-thumbnail-size", "cover-list-thumbnail-size", "card-grid-thumbnail-size", "reference-tile-thumbnail-size"])}>表示形式</h3>
               <SettingRow
                 id="catalog-view-mode"
                 title="一覧形式"
@@ -835,6 +829,7 @@ export function SettingsDialog({
                   </div>
                 </SettingRow>
               ))}
+              <h3 className="settings-subheading" hidden={groupHidden(["navigation-selection-policy", "thumbnail-generation-scope", "show-hidden-files", "auto-refresh-current-folder", "folder-open-rule", "image-open-rule", "archive-open-rule"])}>一覧の動作</h3>
               <SettingRow id="navigation-selection-policy" title="移動後の初期選択" description="フォルダへ移動した直後に選ぶ項目を指定します。" hidden={rowHidden("navigation-selection-policy")}>
                 <select aria-label="profile移動後の初期選択" value={draft.navigationSelectionPolicy} onChange={(event) => update({ navigationSelectionPolicy: event.target.value as SettingsProfile["navigationSelectionPolicy"] })}>
                   {NAVIGATION_SELECTION_POLICIES.map((policy) => <option key={policy} value={policy}>{NAVIGATION_SELECTION_LABELS[policy]}</option>)}
@@ -872,6 +867,7 @@ export function SettingsDialog({
                   {FILE_OPEN_RULES.map((rule) => <option key={rule} value={rule}>{FILE_OPEN_RULE_LABELS[rule]}</option>)}
                 </select>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["detail-grid-lines", "detail-row-density", "detail-columns"])}>詳細リスト</h3>
               <SettingRow id="detail-grid-lines" title="詳細リストの罫線" description="詳細リストの行または列の境界を表示します。" hidden={rowHidden("detail-grid-lines")}>
                 <select aria-label="profile詳細リストの罫線" value={draft.detailGridLines} onChange={(event) => update({ detailGridLines: event.target.value as SettingsProfile["detailGridLines"] })}>
                   {DETAIL_GRID_LINE_MODES.map((mode) => <option key={mode} value={mode}>{DETAIL_GRID_LINE_LABELS[mode]}</option>)}
@@ -889,15 +885,12 @@ export function SettingsDialog({
                   <label><input type="checkbox" aria-label="profile詳細リストに更新日時を表示" checked={draft.detailShowModified} onChange={(event) => update({ detailShowModified: event.target.checked })} />更新日時</label>
                 </div>
               </SettingRow>
-              <SettingRow id="catalog-palette" title="一覧配色" description="判読性を確認した背景・文字・選択色の組を選びます。" hidden={rowHidden("catalog-palette")}>
-                <select aria-label="profile一覧配色" value={draft.catalogPalette} onChange={(event) => update({ catalogPalette: event.target.value as SettingsProfile["catalogPalette"] })}>
-                  {CATALOG_PALETTES.map((palette) => <option key={palette} value={palette}>{CATALOG_PALETTE_LABELS[palette]}</option>)}
-                </select>
-              </SettingRow>
             </section>
 
             <section className="settings-panel" aria-label="ビューワ設定" hidden={panelHidden("viewer")}>
               <h3>ビューワ</h3>
+              <p className="settings-section-description">読み方と表示倍率を調整します。細かな判定値と性能設定は下部にまとめています。</p>
+              <h3 className="settings-subheading" hidden={groupHidden(["viewer-view-mode", "spread-portrait-ratio", "auto-spread-viewport-ratio", "spread-first-page-single", "spread-pairing"])}>表示枚数と見開き</h3>
               <SettingRow id="viewer-view-mode" title="閲覧モード" description="自動判定、単ページ固定、見開き固定から選びます。" hidden={rowHidden("viewer-view-mode")}>
                 <select aria-label="profile閲覧モード" value={draft.viewMode} onChange={(event) => update({ viewMode: event.target.value as SettingsProfile["viewMode"] })}>
                   {Object.entries(VIEW_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -952,6 +945,7 @@ export function SettingsDialog({
                   {SPREAD_PAIRINGS.map((pairing) => <option key={pairing} value={pairing}>{SPREAD_PAIRING_LABELS[pairing]}</option>)}
                 </select>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["end-of-volume", "slideshow-settings", "viewer-catalog-selection-sync", "reading-direction"])}>読み進め方</h3>
               <SettingRow id="end-of-volume" title="巻末動作" description="最後のページから先へ進んだときの動作です。" hidden={rowHidden("end-of-volume")}>
                 <select aria-label="profile巻末動作" value={draft.endOfVolumePolicy} onChange={(event) => update({ endOfVolumePolicy: normalizeEndOfVolumePolicy(event.target.value) })}>
                   {Object.entries(END_OF_VOLUME_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -1015,6 +1009,7 @@ export function SettingsDialog({
                   {Object.entries(READING_DIRECTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["loupe", "viewer-prefetch", "viewer-fullscreen-lifecycle"])}>補助機能と性能</h3>
               <SettingRow id="loupe" title="ルーペ" description="ポインター位置を正方形の拡大鏡で確認します。" hidden={rowHidden("loupe")}>
                 <div className="settings-inline-actions">
                   <label className="settings-switch">
@@ -1075,6 +1070,7 @@ export function SettingsDialog({
                   </label>
                 </div>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["viewer-background", "viewer-page-margin", "viewer-spread-gap", "cursor-auto-hide", "scale-mode", "fit-upscale", "fit-basis", "fit-margin", "custom-scale", "zoom-retention", "viewer-grid"])}>外観と倍率</h3>
               <SettingRow id="viewer-background" title="背景" description="画像表示領域の背景を選びます。" hidden={rowHidden("viewer-background")}>
                 <select
                   aria-label="profileビューワ背景"
@@ -1236,7 +1232,8 @@ export function SettingsDialog({
             </section>
 
             <section className="settings-panel" aria-label="画面設定" hidden={panelHidden("interface")}>
-              <h3>画面</h3>
+              <h3>画面とテーマ</h3>
+              <p className="settings-section-description">アプリ全体の配色、一覧の配置、ウィンドウの振る舞いを設定します。</p>
               {!panelHidden("interface") && !rowHidden("app-theme") && (
                 <SettingRow
                   id="app-theme"
@@ -1256,6 +1253,7 @@ export function SettingsDialog({
                   />
                 </SettingRow>
               )}
+              <h3 className="settings-subheading" hidden={groupHidden(["tree-visible", "menu-visible", "toolbar-visible", "address-visible", "status-visible"])}>表示する要素</h3>
               {([
                 ["tree-visible", "treeVisible", "フォルダツリー", "ライブラリの階層を左側へ表示します。"],
                 ["menu-visible", "menuBarVisible", "メニューバー", "すべてのアプリメニューを画面上部へ表示します。"],
@@ -1275,6 +1273,7 @@ export function SettingsDialog({
                   </label>
                 </SettingRow>
               ))}
+              <h3 className="settings-subheading" hidden={groupHidden(["catalog-pane-position", "tree-details"])}>一覧とツリー</h3>
               <SettingRow id="catalog-pane-position" title="一覧ペインの位置" description="フォルダツリーまたは検索ペインに対する一覧の位置と、上下配置時のnavigation高さを指定します。" hidden={rowHidden("catalog-pane-position")}>
                 <div className="settings-inline-actions">
                   <select
@@ -1348,6 +1347,7 @@ export function SettingsDialog({
                   </label>
                 </div>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["always-on-top", "tray-lifecycle"])}>ウィンドウ</h3>
               <SettingRow id="always-on-top" title="常に手前" description="main windowを他のwindowより手前に保ちます。" hidden={rowHidden("always-on-top")}>
                 <label className="settings-switch">
                   <input
@@ -1399,7 +1399,7 @@ export function SettingsDialog({
             <section className="settings-panel settings-panel--commands" aria-label="ショートカット設定" hidden={panelHidden("commands")}>
               <div className="settings-panel-heading">
                 <div>
-                  <h3>コマンド設定</h3>
+                  <h3>操作と入力</h3>
                   <p>入力欄でキーを押して割り当てます。重複キーとアプリの予約操作は設定できません。</p>
                 </div>
                 <button type="button" onClick={onResetAllShortcuts}>キーをすべて既定に戻す</button>
@@ -1647,6 +1647,8 @@ export function SettingsDialog({
 
             <section className="settings-panel" aria-label="プロファイル設定" hidden={panelHidden("profile")}>
               <h3>プロファイル</h3>
+              <p className="settings-section-description">起動時の復元と、設定の保存・移行を扱います。</p>
+              <h3 className="settings-subheading" hidden={groupHidden(["startup-location", "restore-last-viewer"])}>起動</h3>
               <SettingRow id="startup-location" title="起動場所" description="前回のフォルダ、または前回ドライブのルートから開始します。" hidden={rowHidden("startup-location")}>
                 <select aria-label="profile起動場所" value={draft.startupLocation} onChange={(event) => update({ startupLocation: event.target.value as SettingsProfile["startupLocation"] })}>
                   {STARTUP_LOCATIONS.map((location) => <option key={location} value={location}>{STARTUP_LOCATION_LABELS[location]}</option>)}
@@ -1658,6 +1660,7 @@ export function SettingsDialog({
                   <span>{draft.restoreLastViewer ? "有効" : "無効"}</span>
                 </label>
               </SettingRow>
+              <h3 className="settings-subheading" hidden={groupHidden(["profile-selector", "profile-transfer", "profile-safety"])}>保存と移行</h3>
               <SettingRow id="profile-selector" title="使用するプロファイル" description="用途別の設定snapshotをアプリ内へ保存し、確認後に即時切り替えます。" hidden={rowHidden("profile-selector")}>
                 <div className="settings-profile-manager">
                   <div className="settings-inline-actions">

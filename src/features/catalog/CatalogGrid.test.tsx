@@ -240,7 +240,7 @@ describe("CatalogGrid", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("exposes the selected safe catalog palette as a rendering contract", () => {
+  it("uses the global application theme rather than a local catalog palette", () => {
     render(
       <CatalogGrid
         entries={entries(1)}
@@ -248,10 +248,9 @@ describe("CatalogGrid", () => {
         onSelect={() => undefined}
         onNavigate={() => undefined}
         onRead={() => undefined}
-        palette="midnight"
       />,
     );
-    expect(screen.getByRole("grid")).toHaveAttribute("data-catalog-palette", "midnight");
+    expect(screen.getByRole("grid")).not.toHaveAttribute("data-catalog-palette");
   });
 
   it("extends the pointer-compatible range with Shift+Arrow", () => {
