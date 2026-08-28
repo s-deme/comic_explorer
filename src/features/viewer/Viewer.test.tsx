@@ -264,7 +264,7 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(8);
+    expect(buttons).toHaveLength(6);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
@@ -562,7 +562,7 @@ describe("Viewer settings", () => {
     }
   });
 
-  it("moves to any page from the bottom page navigator instead of the toolbar", () => {
+  it("keeps page and slideshow controls at the bottom-right page navigator", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -583,6 +583,13 @@ describe("Viewer settings", () => {
     expect(slider).toHaveValue("0");
     expect(slider).toHaveAttribute("aria-valuetext", "1 / 2");
     expect(within(navigator).getByText("1 / 2")).toBeInTheDocument();
+    const actions = within(navigator).getByRole("group", { name: "ページ操作" });
+    expect(within(actions).getByRole("button", { name: "前ページ" })).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: "次ページ" })).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: "スライドショーを開始" }))
+      .toBeInTheDocument();
+    expect(toolbar?.querySelector(".viewer-toolbar-previous")).toBeNull();
+    expect(toolbar?.querySelector(".viewer-toolbar-next")).toBeNull();
 
     fireEvent.change(slider, { target: { value: "1" } });
 
@@ -1604,7 +1611,7 @@ describe("Viewer settings", () => {
     }
   });
 
-  it("REQ-LEY-P2-001 starts and stops a fixed-interval slideshow from the toolbar", async () => {
+  it("REQ-LEY-P2-001 starts and stops a fixed-interval slideshow from the page navigator", async () => {
     vi.useFakeTimers();
     try {
       render(

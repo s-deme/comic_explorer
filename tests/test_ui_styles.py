@@ -209,11 +209,14 @@ class UiStyleContractTests(unittest.TestCase):
         self.assertIn("background: rgb(38 43 49 / 94%)", STYLES)
         self.assertIn("color-scheme: dark", STYLES)
 
-    def test_page_navigator_stretches_a_slider_across_the_viewer_bottom(self) -> None:
+    def test_page_navigator_keeps_its_slider_and_controls_at_the_viewer_bottom(self) -> None:
         self.assert_rule_contains(".viewer-page-navigator", "display: flex")
         self.assert_rule_contains(
             '.viewer-page-navigator input[type="range"]', "flex: 1"
         )
+        self.assert_rule_contains(".viewer-page-actions", "display: inline-flex")
+        self.assert_rule_contains(".viewer-page-actions", "flex: 0 0 auto")
+        self.assert_rule_contains(".viewer-page-action", "min-width: 32px")
 
     def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:
         self.assert_rule_contains(

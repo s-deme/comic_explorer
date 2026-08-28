@@ -1574,22 +1574,6 @@ export function Viewer({
           <span aria-label="現在の倍率">{Math.round(displayedScale * 100)}%</span>
         </label>
         <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-previous"
-          aria-label="前ページ"
-          title="前ページへ移動"
-          onClick={() => previous()}
-        >
-          <span aria-hidden="true">◀</span>
-        </button>
-        <button
-          className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-next"
-          aria-label="次ページ"
-          title="次ページへ移動"
-          onClick={() => next()}
-        >
-          <span aria-hidden="true">▶</span>
-        </button>
-        <button
           className="viewer-icon-button viewer-toolbar-primary viewer-toolbar-zoom-out"
           aria-label="倍率を下げる"
           title="倍率を下げる"
@@ -1804,18 +1788,6 @@ export function Viewer({
                 onClick={randomPage}
               >
                 <span aria-hidden="true">⤨</span><span>ランダムページ</span>
-              </button>
-              <button
-                className="viewer-more-action"
-                aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
-                title={slideshowRunning
-                  ? "スライドショーを停止"
-                  : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
-                aria-pressed={slideshowRunning}
-                disabled={session.pages.length <= 1}
-                onClick={toggleSlideshow}
-              >
-                <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span><span>{slideshowRunning ? "停止" : "スライドショー"}</span>
               </button>
               <button
                 className="viewer-more-action"
@@ -2391,6 +2363,39 @@ export function Viewer({
           onChange={(event) => dispatch({ type: "go", index: Number(event.target.value) })}
         />
         <output aria-live="polite">{progress}</output>
+        <div className="viewer-page-actions" role="group" aria-label="ページ操作">
+          <button
+            className="viewer-icon-button viewer-page-action"
+            type="button"
+            aria-label="前ページ"
+            title="前ページへ移動"
+            onClick={() => previous()}
+          >
+            <span aria-hidden="true">◀</span>
+          </button>
+          <button
+            className="viewer-icon-button viewer-page-action"
+            type="button"
+            aria-label="次ページ"
+            title="次ページへ移動"
+            onClick={() => next()}
+          >
+            <span aria-hidden="true">▶</span>
+          </button>
+          <button
+            className="viewer-icon-button viewer-page-action viewer-page-action--slideshow"
+            type="button"
+            aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
+            title={slideshowRunning
+              ? "スライドショーを停止"
+              : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
+            aria-pressed={slideshowRunning}
+            disabled={session.pages.length <= 1}
+            onClick={toggleSlideshow}
+          >
+            <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
+          </button>
+        </div>
       </nav>
     </section>
   );

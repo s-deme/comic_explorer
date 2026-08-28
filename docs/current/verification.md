@@ -25,6 +25,20 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 Viewer下部操作の集約
+
+REQ-MVP-014 / 014Aに対し、前page・次pageとslideshowを上部toolbarおよび「その他の操作」panelから外し、
+画像表示領域下部のpage移動bar右端へ集約した。slider、現在page数、3操作は通常表示と全画面overlayで同じ
+visibilityを共有する。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused Viewer / UI style | PASS | Viewer 62件、page navigatorの操作groupを確認するfocused test 1件、Python UI style 31件、FAIL 0。 |
+| Windows tests | PASS | Python 76件、frontend 44 files / 597件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。85 modulesのproduction buildがexit 0。minify後677.14kBのchunk advisoryはFAILへ読み替えない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での通常幅・狭幅・fullscreen・DPI別の操作位置は未測定。 |
+
 ## 2026-08-29 統合設定の整理
 
 REQ-MVP-022に対し、総合設定を「一覧、ビューワ、画面とテーマ、操作と入力、プロファイル」の作業順へ
