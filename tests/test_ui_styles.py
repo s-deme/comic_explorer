@@ -185,6 +185,14 @@ class UiStyleContractTests(unittest.TestCase):
             "display: inline-flex",
         )
 
+    def test_filter_dialog_uses_content_sized_responsive_editor_panels(self) -> None:
+        self.assert_rule_contains(".filter-dialog", "max-height: calc(100vh - 24px)")
+        self.assert_rule_contains(
+            ".filter-layout", "grid-template-columns: minmax(184px, 230px) minmax(0, 1fr)"
+        )
+        self.assert_rule_contains(".filter-chain", "max-height: min(520px, calc(100vh - 210px))")
+        self.assertIn("@container (max-width: 700px)", STYLES)
+
     def test_fullscreen_viewer_overlays_hidden_controls_without_reserving_space(self) -> None:
         self.assert_rule_contains(
             '.viewer[data-fullscreen="true"]',
@@ -401,7 +409,7 @@ class UiStyleContractTests(unittest.TestCase):
             STYLES,
         )
         self.assert_rule_contains(
-            '.filter-layout nav li[aria-current="true"] small',
+            '.filter-set-panel li[aria-current="true"] button small',
             "color: var(--theme-on-selection)",
         )
 

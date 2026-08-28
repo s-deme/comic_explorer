@@ -82,13 +82,179 @@ export function FilterDialog({ generation, onApplied, onClose }: Props) {
   function selectSet(id: number) { const set = catalog.sets.find((candidate) => candidate.id === id); if (!set) return; setSelectedId(id); setName(set.name); setChain(structuredClone(set.chain)); }
   async function run(operation: Promise<Awaited<ReturnType<typeof listViewerFilterSets>>>, success: string) { setBusy(true); try { const response = await operation; if (response.status === "ok") { accept(response.data); setNotice(success); } else setNotice(responseNotice(response)); } catch { setNotice("フィルター操作を完了できませんでした。"); } finally { setBusy(false); } }
 
-  return <div className="dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="画像フィルター" className="filter-dialog">
-    <header className="quick-access-heading"><div><h2>画像フィルター</h2><p>Rustで表示byteだけを変換します。原本とthumbnailは変更しません。</p></div><button type="button" onClick={onClose}>閉じる</button></header>
-    {notice !== null && <p role="status">{notice}</p>}
-    <div className="filter-layout"><nav aria-label="フィルターセット"><button type="button" disabled={busy} onClick={() => { setSelectedId(null); setName("新しいフィルター"); setChain([{ enabled: true, filter: defaultFilter("grayscale") }]); }}>新規セット</button><button type="button" disabled={busy || !catalog.sets.some((set) => set.active)} onClick={() => void run(activateViewerFilterSet(null, generation), "フィルターを無効にしました。現在ページを再読込します。")}>フィルターなし</button><ul>{catalog.sets.map((set) => <li key={set.id} aria-current={set.id === selectedId}><button type="button" onClick={() => selectSet(set.id)}>{set.active ? "● " : "○ "}{set.name}<small>{set.chain.length} step</small></button></li>)}</ul></nav>
-      <section className="filter-chain"><div className="filter-set-actions"><label>セット名<input aria-label="フィルターセット名" maxLength={64} value={name} onChange={(event) => setName(event.target.value)} /></label><button type="button" disabled={busy || chain.length === 0} onClick={() => void run(saveViewerFilterSet(name, chain, selectedId !== null, generation), "フィルターセットをRust SQLiteへ保存しました。")}>保存</button><button type="button" disabled={busy || selectedId === null} onClick={() => selectedId !== null && void run(activateViewerFilterSet(selectedId, generation), "選択セットを有効にし、現在ページを再読込します。")}>有効にする</button><button type="button" disabled={busy || selectedId === null} onClick={() => { if (selectedId !== null && window.confirm("このフィルターセットを削除しますか？")) void run(deleteViewerFilterSet(selectedId, generation), "フィルターセットを削除しました。"); }}>削除</button></div>
-        <div className="filter-add"><select aria-label="追加するフィルター" value={addKind} onChange={(event) => setAddKind(event.target.value as ViewerFilter["kind"])}>{FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{LABELS[kind]}</option>)}</select><button type="button" disabled={chain.length >= catalog.maximumSteps} onClick={() => setChain((current) => [...current, { enabled: true, filter: defaultFilter(addKind) }])}>追加</button><span>{chain.length} / {catalog.maximumSteps} step</span></div>
-        <ol aria-label="順序付きフィルターチェーン">{chain.map((step, index) => <li key={index}><header><label><input aria-label={`${index + 1}: ${LABELS[step.filter.kind]}を有効`} type="checkbox" checked={step.enabled} onChange={(event) => setChain((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, enabled: event.target.checked } : item))} />{index + 1}. {LABELS[step.filter.kind]}</label><button type="button" aria-label={`${index + 1}を上へ`} disabled={index === 0} onClick={() => setChain((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>↑</button><button type="button" aria-label={`${index + 1}を下へ`} disabled={index === chain.length - 1} onClick={() => setChain((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; return next; })}>↓</button><button type="button" aria-label={`${index + 1}を削除`} onClick={() => setChain((current) => current.filter((_, itemIndex) => itemIndex !== index))}>削除</button></header><FilterEditor step={step} onChange={(next) => setChain((current) => current.map((item, itemIndex) => itemIndex === index ? next : item))} /></li>)}</ol>
-      </section></div>
-  </section></div>;
+  return (
+    <div className="dialog-backdrop">
+      <section role="dialog" aria-modal="true" aria-label="画像フィルター" className="filter-dialog">
+        <header className="filter-dialog-header">
+          <div>
+            <p className="filter-dialog-eyebrow">表示だけを調整</p>
+            <h2>画像フィルター</h2>
+            <p>原本とサムネイルは変更せず、現在の表示だけに適用します。</p>
+          </div>
+          <button className="filter-dialog-close" type="button" onClick={onClose}>閉じる</button>
+        </header>
+        {notice !== null && <p className="filter-dialog-notice" role="status">{notice}</p>}
+        <div className="filter-layout">
+          <nav className="filter-set-panel" aria-label="フィルターセット">
+            <header>
+              <div>
+                <h3>フィルターセット</h3>
+                <p>{catalog.sets.length} / {catalog.maximumSets} セット</p>
+              </div>
+            </header>
+            <div className="filter-set-actions">
+              <button
+                className="filter-action-primary"
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setSelectedId(null);
+                  setName("新しいフィルター");
+                  setChain([{ enabled: true, filter: defaultFilter("grayscale") }]);
+                  setNotice(null);
+                }}
+              >
+                新規セット
+              </button>
+              <button
+                type="button"
+                disabled={busy || !catalog.sets.some((set) => set.active)}
+                onClick={() => void run(
+                  activateViewerFilterSet(null, generation),
+                  "フィルターを無効にしました。現在ページを再読込します。",
+                )}
+              >
+                フィルターなし
+              </button>
+            </div>
+            <ul>
+              {catalog.sets.map((set) => (
+                <li key={set.id} aria-current={set.id === selectedId}>
+                  <button type="button" disabled={busy} onClick={() => selectSet(set.id)}>
+                    <span>{set.active ? "● " : "○ "}{set.name}</span>
+                    <small>{set.active ? "現在使用中 · " : ""}{set.chain.length} 手順</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <section className="filter-chain" aria-label="フィルター手順を編集">
+            <header className="filter-chain-header">
+              <label className="filter-set-name-field">
+                <span>セット名</span>
+                <input
+                  aria-label="フィルターセット名"
+                  maxLength={64}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+              <div className="filter-set-action-buttons">
+                <button
+                  type="button"
+                  disabled={busy || chain.length === 0}
+                  onClick={() => void run(
+                    saveViewerFilterSet(name, chain, selectedId !== null, generation),
+                    "フィルターセットをRust SQLiteへ保存しました。",
+                  )}
+                >
+                  保存
+                </button>
+                <button
+                  className="filter-action-primary"
+                  type="button"
+                  disabled={busy || selectedId === null}
+                  onClick={() => selectedId !== null && void run(
+                    activateViewerFilterSet(selectedId, generation),
+                    "選択セットを有効にし、現在ページを再読込します。",
+                  )}
+                >
+                  有効にする
+                </button>
+                <button
+                  className="filter-action-danger"
+                  type="button"
+                  disabled={busy || selectedId === null}
+                  onClick={() => {
+                    if (selectedId !== null && window.confirm("このフィルターセットを削除しますか？")) {
+                      void run(deleteViewerFilterSet(selectedId, generation), "フィルターセットを削除しました。");
+                    }
+                  }}
+                >
+                  削除
+                </button>
+              </div>
+            </header>
+            <div className="filter-chain-toolbar">
+              <div>
+                <h3>処理手順</h3>
+                <p>{chain.length} / {catalog.maximumSteps} 手順</p>
+              </div>
+              <div className="filter-add">
+                <label className="visually-hidden" htmlFor="viewer-filter-kind">追加するフィルター</label>
+                <select
+                  id="viewer-filter-kind"
+                  aria-label="追加するフィルター"
+                  value={addKind}
+                  onChange={(event) => setAddKind(event.target.value as ViewerFilter["kind"])}
+                >
+                  {FILTER_KINDS.map((kind) => <option key={kind} value={kind}>{LABELS[kind]}</option>)}
+                </select>
+                <button
+                  type="button"
+                  disabled={busy || chain.length >= catalog.maximumSteps}
+                  onClick={() => setChain((current) => [
+                    ...current,
+                    { enabled: true, filter: defaultFilter(addKind) },
+                  ])}
+                >
+                  追加
+                </button>
+              </div>
+            </div>
+            <ol aria-label="順序付きフィルターチェーン">
+              {chain.map((step, index) => (
+                <li key={index} className="filter-step-card">
+                  <header>
+                    <label>
+                      <input
+                        aria-label={`${index + 1}: ${LABELS[step.filter.kind]}を有効`}
+                        type="checkbox"
+                        checked={step.enabled}
+                        onChange={(event) => setChain((current) => current.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, enabled: event.target.checked } : item,
+                        ))}
+                      />
+                      {index + 1}. {LABELS[step.filter.kind]}
+                    </label>
+                    <div className="filter-step-actions">
+                      <button type="button" aria-label={`${index + 1}を上へ`} disabled={index === 0} onClick={() => setChain((current) => {
+                        const next = [...current];
+                        [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                        return next;
+                      })}>↑</button>
+                      <button type="button" aria-label={`${index + 1}を下へ`} disabled={index === chain.length - 1} onClick={() => setChain((current) => {
+                        const next = [...current];
+                        [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                        return next;
+                      })}>↓</button>
+                      <button type="button" aria-label={`${index + 1}を削除`} onClick={() => setChain((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index),
+                      )}>削除</button>
+                    </div>
+                  </header>
+                  <FilterEditor
+                    step={step}
+                    onChange={(next) => setChain((current) => current.map((item, itemIndex) =>
+                      itemIndex === index ? next : item,
+                    ))}
+                  />
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
 }

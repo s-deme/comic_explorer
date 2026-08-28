@@ -58,11 +58,20 @@ describe("FilterDialog", () => {
       fireEvent.change(selector, { target: { value: kind } });
       fireEvent.click(screen.getByRole("button", { name: "追加" }));
     }
-    expect(screen.getByText("14 / 16 step")).toBeInTheDocument();
+    expect(screen.getByText("14 / 16 手順")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(saveViewerFilterSet).toHaveBeenCalled());
     const chain = vi.mocked(saveViewerFilterSet).mock.calls[0][1];
     expect(chain.map((step) => step.filter.kind)).toEqual(FILTER_KINDS);
+  });
+
+  it("separates the selected set actions from the ordered processing steps", async () => {
+    render(<FilterDialog generation={8} onApplied={vi.fn()} onClose={vi.fn()} />);
+
+    expect(await screen.findByText("フィルターセット")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "処理手順" })).toBeInTheDocument();
+    expect(screen.getByText("表示だけを調整")).toBeInTheDocument();
+    expect(screen.getByText("1 / 16 手順")).toBeInTheDocument();
   });
 
   it("REQ-LEY-P5-002 activates, disables, and confirms deletion through Rust IPC", async () => {

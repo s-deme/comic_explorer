@@ -2343,22 +2343,129 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .media-entry-content > aside { padding: 10px; border-left: 1px solid var(--theme-border); }
 .media-entry-content img { display: block; max-width: 100%; max-height: 360px; margin: auto; object-fit: contain; }
 
-.filter-dialog { width: min(1100px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 8px; padding: 14px; border: 1px solid var(--theme-border); border-radius: 10px; background: var(--theme-canvas); box-shadow: 0 14px 40px rgb(0 0 0 / 28%); color: var(--theme-text); }
-.filter-layout { min-height: 0; display: grid; grid-template-columns: minmax(210px, .55fr) minmax(500px, 1.6fr); gap: 10px; }
-.filter-layout > nav, .filter-chain { min-height: 0; overflow: auto; padding: 9px; border: 1px solid var(--theme-border); background: var(--theme-surface); }
-.filter-layout nav ul { padding: 0; list-style: none; }
-.filter-layout nav li button { width: 100%; padding: 7px; border: 0; text-align: left; background: transparent; }
-.filter-layout nav li[aria-current="true"] button { color: var(--theme-on-selection); background: var(--theme-selection); }
-.filter-layout nav small { display: block; color: var(--theme-text-muted); }
-.filter-layout nav li[aria-current="true"] small { color: var(--theme-on-selection); }
-.filter-set-actions, .filter-add, .filter-parameters { display: flex; flex-wrap: wrap; align-items: end; gap: 7px; }
-.filter-set-actions label, .filter-chain li label { display: grid; gap: 3px; }
-.filter-add { margin-block: 10px; }
-.filter-chain ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.filter-chain ol > li { padding: 8px; border: 1px solid var(--theme-border); border-radius: 6px; }
-.filter-chain ol > li > header { display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
-.filter-chain ol > li > header label { min-width: 0; flex: 1; display: flex; align-items: center; }
+.filter-dialog {
+  container-type: inline-size;
+  box-sizing: border-box;
+  width: min(960px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-canvas);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 34%);
+  color: var(--theme-text);
+}
+.filter-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--theme-border);
+}
+.filter-dialog-header > div { min-width: 0; }
+.filter-dialog-header h2 { margin: 0; font-size: 1.2rem; }
+.filter-dialog-header p { margin: 5px 0 0; color: var(--theme-text-muted); }
+.filter-dialog-eyebrow { margin: 0 0 4px !important; color: var(--theme-accent) !important; font-size: .75rem; font-weight: 700; letter-spacing: .04em; }
+.filter-dialog-close { flex: 0 0 auto; }
+.filter-dialog-notice { margin: 0; padding: 8px 22px; border-bottom: 1px solid var(--theme-border); color: var(--theme-accent); background: var(--theme-surface-muted); }
+.filter-layout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(184px, 230px) minmax(0, 1fr);
+  align-items: start;
+}
+.filter-set-panel,
+.filter-chain {
+  box-sizing: border-box;
+  min-width: 0;
+  max-height: min(520px, calc(100vh - 210px));
+  overflow: auto;
+}
+.filter-set-panel {
+  padding: 16px;
+  border-right: 1px solid var(--theme-border);
+  background: var(--theme-surface-muted);
+}
+.filter-set-panel > header,
+.filter-chain-toolbar,
+.filter-chain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.filter-set-panel h3,
+.filter-chain h3 { margin: 0; font-size: .9rem; }
+.filter-set-panel p,
+.filter-chain-toolbar p { margin: 3px 0 0; color: var(--theme-text-muted); font-size: .78rem; }
+.filter-set-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin-block: 14px;
+}
+.filter-action-primary { color: var(--theme-on-selection); background: var(--theme-selection); border-color: var(--theme-selection); }
+.filter-action-primary:disabled { color: var(--theme-text-muted); background: var(--theme-surface); border-color: var(--theme-border); }
+.filter-action-danger:not(:disabled) { color: var(--theme-danger); }
+.filter-set-panel ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.filter-set-panel li button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--theme-text);
+  background: transparent;
+}
+.filter-set-panel li button > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-set-panel li button small { color: var(--theme-text-muted); }
+.filter-set-panel li[aria-current="true"] button { color: var(--theme-on-selection); background: var(--theme-selection); }
+.filter-set-panel li[aria-current="true"] button small { color: var(--theme-on-selection); }
+.filter-chain { padding: 18px 20px 20px; }
+.filter-chain-header { align-items: end; }
+.filter-set-name-field { display: grid; min-width: min(100%, 300px); flex: 1 1 260px; gap: 5px; font-weight: 700; }
+.filter-set-name-field input { box-sizing: border-box; width: 100%; }
+.filter-set-action-buttons,
+.filter-add,
+.filter-parameters,
+.filter-step-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.filter-set-action-buttons { justify-content: flex-end; }
+.filter-chain-toolbar { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--theme-border); }
+.filter-add select { min-width: min(100%, 210px); }
+.filter-chain ol { display: grid; gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }
+.filter-step-card { min-width: 0; padding: 11px; border: 1px solid var(--theme-border); border-radius: 8px; background: var(--theme-surface-muted); }
+.filter-step-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.filter-step-card > header > label { display: flex; min-width: 0; align-items: center; gap: 5px; font-weight: 700; overflow-wrap: anywhere; }
+.filter-step-actions { flex: 0 0 auto; justify-content: flex-end; }
+.filter-step-actions button { min-width: 34px; }
+.filter-parameters { align-items: end; }
+.filter-parameters label { display: grid; gap: 3px; }
 .filter-edges label { grid-template-columns: auto minmax(60px, 85px) auto; align-items: center; }
+@container (max-width: 700px) {
+  .filter-layout { grid-template-columns: minmax(0, 1fr); }
+  .filter-set-panel { max-height: 210px; border-right: 0; border-bottom: 1px solid var(--theme-border); }
+  .filter-set-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-chain { max-height: min(520px, calc(100vh - 310px)); }
+}
+@container (max-width: 460px) {
+  .filter-dialog-header { padding: 16px; gap: 10px; }
+  .filter-dialog-header p:not(.filter-dialog-eyebrow) { font-size: .85rem; }
+  .filter-dialog-notice { padding-inline: 16px; }
+  .filter-set-panel,
+  .filter-chain { padding: 14px; }
+  .filter-chain-header { align-items: stretch; flex-direction: column; }
+  .filter-set-action-buttons { justify-content: stretch; }
+  .filter-set-action-buttons button { flex: 1 1 auto; }
+  .filter-chain-toolbar { align-items: stretch; flex-direction: column; }
+  .filter-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .filter-add select { min-width: 0; }
+  .filter-step-card > header { align-items: flex-start; flex-direction: column; }
+  .filter-step-actions { width: 100%; justify-content: flex-end; }
+}
 
 .archive-explorer-pane {
   position: absolute;
@@ -2393,7 +2500,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   .bookshelf-transfer { grid-column: auto; }
   .archive-pane-header { align-items: stretch; flex-direction: column; }
   .media-catalog-layout { grid-template-columns: 1fr; grid-template-rows: minmax(160px, .6fr) minmax(280px, 1.4fr); }
-  .filter-layout { grid-template-columns: 1fr; grid-template-rows: minmax(130px, .4fr) minmax(320px, 1.6fr); }
   .dialog-backdrop > .settings-dialog {
     width: calc(100vw - 16px);
     height: calc(100vh - 16px);

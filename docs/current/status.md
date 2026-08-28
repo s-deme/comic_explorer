@@ -32,6 +32,8 @@ Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低
 
 同日に通常表示の狭いViewer toolbarで「一覧へ戻る」が末尾へ折り返されて切り落とされる不具合を修正した。この操作を先頭側primary controlへ固定し、通常表示・全画面・狭幅のいずれでも作品名や段階zoomより先に残す。Viewer 61件、Python UI style 30件、Windows frontend 598件、Python 74件、typecheck、buildはPASSし、release WebView2直接観測は未測定として残す。
 
+同日に画像フィルターdialogを、セット一覧・選択中セットの保存/有効化/削除・順序付き処理手順の三つのsurfaceへ再構成した。現在使用中のセットと手順数を明示し、少ない手順ではcontent高へ縮み、多数手順だけを各panel内でscrollする。狭いdialog幅ではcontainer queryにより1列へ切り替えるため、buttonの横方向切り落としやdialog全体の横scrollbarを作らない。FilterDialog 4件、Viewer 61件、Python UI style 31件、Windows frontend 599件、Python 75件、typecheck、buildはPASSした。release WebView2の直接目視は、この環境でbrowser接続を取得できず未測定として残す。
+
 ## Leeyes P1〜P5進捗
 
 | tier | 対象 | Published | 未完了 |
