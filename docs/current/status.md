@@ -27,6 +27,10 @@ codd:
 PublishedまたはVerifiedは、台帳に対応する実装・テスト・verification referenceがあり、必要なgateを通過した機能だけを指す。
 未測定、外部環境待ち、推定結果をPASSや完了へ読み替えない。次の作業は利用者が選んだID・挙動だけを対象にする。
 
+## MVP release case summary
+
+`source: docs/current/verification.md`、`scope: MVP release cases`、`PASS: 60`、`FAIL: 0`、`BLOCKED: 12`、`NOT RUN: 1`、`total: 73`
+
 ## 未測定の代表例
 
 - release WebView2での実操作、DPI、screen reader、high contrast

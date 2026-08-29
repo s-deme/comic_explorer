@@ -32,6 +32,7 @@ import type { CatalogEntry } from "./types/domain";
 import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
 import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
 import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
+import { testArchiveEntry as testEntry } from "./test/catalog-fixtures";
 
 function openLibraryMenuItem(name: "閲覧履歴") {
   fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
@@ -129,14 +130,6 @@ const saveReadingMock = vi.mocked(saveReadingPosition);
 const setRatingMock = vi.mocked(setItemRating);
 const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
 const historyMock = vi.mocked(listReadingHistory);
-
-function testEntry(relativePath: string): CatalogEntry {
-  return {
-    relativePath: relativePath as never,
-    kind: "archive",
-    archiveKind: "cbz",
-  };
-}
 
 function testSession(itemKey: string) {
   return {

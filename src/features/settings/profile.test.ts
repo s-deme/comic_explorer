@@ -280,66 +280,43 @@ describe("settings profile", () => {
     });
   });
 
-  it("migrates a v1 profile with the default thumbnail sizes", () => {
-    const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 1;
-    delete legacy.catalogThumbnailSizes;
-    delete legacy.viewerBackground;
-    delete legacy.viewerPageMargin;
-    delete legacy.viewerSpreadGap;
-    delete legacy.cursorAutoHideMs;
-    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
-  });
-
-  it("migrates a v2 profile with the new card-grid thumbnail size", () => {
-    const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 2;
-    legacy.catalogThumbnailSizes = {
-      smallThumbnail: 104,
-      coverList: 144,
-      referenceTile: 128,
-    };
-    delete legacy.viewerBackground;
-    delete legacy.viewerPageMargin;
-    delete legacy.viewerSpreadGap;
-    delete legacy.cursorAutoHideMs;
-    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
-  });
-
-  it("migrates a v3 profile with the default viewer appearance settings", () => {
-    const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 3;
-    delete legacy.viewerBackground;
-    delete legacy.viewerPageMargin;
-    delete legacy.viewerSpreadGap;
-    delete legacy.cursorAutoHideMs;
-    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
-  });
-
-  it("migrates a v4 profile with the P1-A viewer and shell defaults", () => {
-    const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 4;
-    for (const field of [
+  const legacyDefaultMigrations: Array<[
+    label: string,
+    profileVersion: number,
+    omittedFields: string[],
+  ]> = [
+    ["v1 profile with the default thumbnail sizes", 1, [
+      "catalogThumbnailSizes", "viewerBackground", "viewerPageMargin", "viewerSpreadGap", "cursorAutoHideMs",
+    ]],
+    ["v2 profile with the new card-grid thumbnail size", 2, [
+      "viewerBackground", "viewerPageMargin", "viewerSpreadGap", "cursorAutoHideMs",
+    ]],
+    ["v3 profile with the default viewer appearance settings", 3, [
+      "viewerBackground", "viewerPageMargin", "viewerSpreadGap", "cursorAutoHideMs",
+    ]],
+    ["v4 profile with the P1-A viewer and shell defaults", 4, [
       "zoomRetention", "viewerGridEnabled", "viewerGridSize", "viewerGridColor",
       "panFactor", "wheelDeadZone", "addressBarVisible", "statusBarVisible", "alwaysOnTop",
-    ]) delete legacy[field];
-    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
-  });
+    ]],
+    ["v5 profile with the P1-B navigation defaults", 5, [
+      "navigationSelectionPolicy", "thumbnailGenerationScope", "startupLocation",
+    ]],
+    ["v6 profile with the P1-C catalog and restore defaults", 6, [
+      "showHiddenFiles", "restoreLastViewer",
+    ]],
+  ];
 
-  it("migrates a v5 profile with the P1-B navigation defaults", () => {
+  it.each(legacyDefaultMigrations)("migrates a %s", (_label, profileVersion, omittedFields) => {
     const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 5;
-    delete legacy.navigationSelectionPolicy;
-    delete legacy.thumbnailGenerationScope;
-    delete legacy.startupLocation;
-    expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
-  });
-
-  it("migrates a v6 profile with the P1-C catalog and restore defaults", () => {
-    const legacy = validProfile() as unknown as Record<string, unknown>;
-    legacy.profileVersion = 6;
-    delete legacy.showHiddenFiles;
-    delete legacy.restoreLastViewer;
+    legacy.profileVersion = profileVersion;
+    if (profileVersion === 2) {
+      legacy.catalogThumbnailSizes = {
+        smallThumbnail: 104,
+        coverList: 144,
+        referenceTile: 128,
+      };
+    }
+    for (const field of omittedFields) delete legacy[field];
     expect(normalizeSettingsProfile(legacy)).toEqual(validProfile());
   });
 

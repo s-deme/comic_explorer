@@ -34,6 +34,7 @@ dag:
   test_file_patterns:
     - "src/**/*.test.ts"
     - "src/**/*.test.tsx"
+    - "src/test/**/*.ts"
     - "src-tauri/tests/**/*.rs"
 
 common_node_patterns:

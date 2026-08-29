@@ -30,6 +30,16 @@ Windows filesystemでは次を正規の入口とする。
 2026-08-29時点で、最新のコード変更に対するWindows build、CoDD scan/check/verify、aggregate testは成功している。
 aggregate testは2 workerを既定とし、最終CoDD verifyが同じaggregate testを実行するため、直前に重複実行しない。
 
+## MVP release case summary
+
+| 結果 | 件数 |
+| --- | ---: |
+| PASS | 60 |
+| FAIL | 0 |
+| BLOCKED | 12 |
+| NOT RUN | 1 |
+| **合計** | **73** |
+
 ## 記録規則
 
 - 変更中は影響箇所のfocused testとtypecheckを使い、最終変更後にbuildとCoDD scan/check/verifyを1回実行する。

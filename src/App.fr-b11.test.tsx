@@ -35,6 +35,7 @@ import {
 } from "./features/input/shortcuts";
 import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
 import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
+import { testArchiveEntry as testEntry } from "./test/catalog-fixtures";
 import {
   getCatalogSettings,
   getItemMetadata,
@@ -229,14 +230,6 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
       viewerRightClickAction: "none",
       mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
     } satisfies CatalogSettings,
-  };
-}
-
-function testEntry(relativePath: string): CatalogEntry {
-  return {
-    relativePath: relativePath as never,
-    kind: "archive",
-    archiveKind: "cbz",
   };
 }
 
