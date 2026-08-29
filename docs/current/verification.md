@@ -25,6 +25,23 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 Viewer移動操作・ルーペ・画像変換の整理
+
+REQ-MVP-014、REQ-MVP-014A、REQ-LEY-P2-016に対し、見開きの1page戻し/進めとrandom pageを
+下部page移動bar右端の操作groupへ移し、前後page・slideshowと全画面overlayのvisibilityを共有した。
+ルーペはtoolbarへ移し、しおり保存の直前に置いた。下部toolbarには作品名を表示せず、native title
+`Comic Explorer — <作品名>`だけを作品名の表示場所とする。回転・反転はpage別stateを廃止してViewer
+session共通stateとし、見開きの両page、移動後のpage、loupeへ同じCSS transformを適用する。回転角と
+左右/上下反転のON/OFFは状態表示とbuttonのpressed状態で確認でき、対象を切り替える新sessionでresetする。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused Viewer / UI style | PASS | Viewer 63件は、下部操作の順序、toolbar内でのルーペとしおりの順、見開き両page・移動先・loupeの共通変換、pressed/state表示、新sessionでのresetを確認。Python UI style 32件もPASS。 |
+| Windows tests | PASS | `run-tests-windows.ps1`: Python 77件、frontend 45 files / 600件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。88 modulesのproduction buildがexit 0、minify後695.27kBのchunk advisoryはFAILへ読み替えない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での通常幅・狭幅・fullscreen・DPI別の下部操作、ルーペ、画像変換の目視は未測定。 |
+
 ## 2026-08-29 操作と入力のキー・マウス・ジェスチャー分離
 
 REQ-FR-B11-004に対し、統合設定の「操作と入力」をキー設定、マウス設定、ジェスチャー設定の3 groupへ

@@ -264,16 +264,21 @@ describe("Viewer settings", () => {
     const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
     expect(toolbar).not.toBeNull();
     const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(6);
+    expect(buttons).toHaveLength(7);
     buttons.forEach((button) => {
       expect(button).toHaveClass("viewer-icon-button");
       expect(button).toHaveAttribute("title");
       expect(button.getAttribute("title")).not.toBe("");
     });
     expect(within(toolbar!).getAllByRole("group").map((group) => group.getAttribute("aria-label")))
-      .toEqual(["表示枚数", "倍率", "しおりと補助操作", "ウィンドウ操作"]);
+      .toEqual(["表示枚数", "倍率", "ルーペとしおりと補助操作", "ウィンドウ操作"]);
+    expect(within(within(toolbar!).getByRole("group", { name: "ルーペとしおりと補助操作" }))
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")))
+      .toEqual(["ルーペ", "しおりを保存", "その他の操作"]);
     expect(toolbar?.querySelector(".viewer-toolbar-identity"))
       .toContainElement(within(toolbar!).getByRole("button", { name: "一覧へ戻る" }));
+    expect(toolbar?.querySelector(".viewer-toolbar-identity strong")).not.toBeInTheDocument();
 
     expect(within(toolbar!).queryByRole("button", { name: "見開きへ" }))
       .not.toBeInTheDocument();
@@ -295,7 +300,18 @@ describe("Viewer settings", () => {
       .closest("section");
     expect(navigationGroup).not.toBeNull();
     expect(within(navigationGroup!).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual(["読み方向", "見開きを1ページ戻す", "見開きを1ページ進める", "ランダムページ"]);
+      .toEqual(["読み方向"]);
+    const pageActions = within(screen.getByRole("navigation", { name: "ページ移動" }))
+      .getByRole("group", { name: "ページ操作" });
+    expect(within(pageActions).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
+      .toEqual([
+        "見開きを1ページ戻す",
+        "前ページ",
+        "次ページ",
+        "見開きを1ページ進める",
+        "ランダムページ",
+        "スライドショーを開始",
+      ]);
     fireEvent.click(within(panel).getByRole("button", { name: "閉じる" }));
     expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
@@ -1807,7 +1823,7 @@ describe("Viewer settings", () => {
     expect(screen.queryByText(/画像としてコピーしました/)).not.toBeInTheDocument();
   });
 
-  it("REQ-LEY-P2-016 rotates and flips only the current anchor without changing its media URI", () => {
+  it("REQ-LEY-P2-016 rotates and flips every Viewer image without changing its media URI", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -1832,16 +1848,24 @@ describe("Viewer settings", () => {
     expect(first).toHaveAttribute("data-flip-horizontal", "true");
     expect(first).toHaveAttribute("data-flip-vertical", "true");
     expect(first).toHaveStyle({ transform: "scaleX(-1) scaleY(-1) rotate(90deg)" });
-    expect(second).toHaveAttribute("data-quarter-turns", "0");
-    expect(second).toHaveStyle({ transform: "scaleX(1) scaleY(1) rotate(0deg)" });
+    expect(second).toHaveAttribute("data-quarter-turns", "1");
+    expect(second).toHaveAttribute("data-flip-horizontal", "true");
+    expect(second).toHaveAttribute("data-flip-vertical", "true");
+    expect(second).toHaveStyle({ transform: "scaleX(-1) scaleY(-1) rotate(90deg)" });
+    expect(screen.getByText("回転: 90° / 左右反転: ON / 上下反転: ON")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "時計回りに90度回転" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "左右反転" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "上下反転" })).toHaveAttribute("aria-pressed", "true");
     expect(reset).toBeEnabled();
 
     fireEvent.click(reset);
     expect(first).toHaveAttribute("data-image-transformed", "false");
+    expect(second).toHaveAttribute("data-image-transformed", "false");
+    expect(screen.getByText("回転: 0° / 左右反転: OFF / 上下反転: OFF")).toBeInTheDocument();
     expect(reset).toBeDisabled();
   });
 
-  it("REQ-LEY-P2-016 keeps page transforms for the Viewer session and isolates fixed keys from editors", () => {
+  it("REQ-LEY-P2-016 keeps one transform for the Viewer session and isolates fixed keys from editors", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -1864,12 +1888,46 @@ describe("Viewer settings", () => {
       target: { value: "1" },
     });
     const second = screen.getByAltText("Multi Page 2ページ") as HTMLImageElement;
+    expect(second).toHaveAttribute("data-quarter-turns", "1");
     fireEvent.keyDown(window, { key: "v" });
     expect(second).toHaveAttribute("data-flip-vertical", "true");
     fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), {
       target: { value: "0" },
     });
     expect(screen.getByRole("button", { name: "回転・反転をリセット" })).toBeEnabled();
+  });
+
+  it("REQ-LEY-P2-016 resets the shared transform for a new Viewer session", () => {
+    const { rerender } = render(
+      <Viewer
+        session={multiPageSession}
+        generation={1}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "時計回りに90度回転" }));
+    expect(screen.getByAltText("Multi Page 1ページ")).toHaveAttribute("data-quarter-turns", "1");
+
+    rerender(
+      <Viewer
+        session={{
+          ...multiPageSession,
+          itemKey: "next-multi-page" as never,
+          displayName: "Next Multi Page",
+        }}
+        generation={2}
+        initialMode="single"
+        initialDirection="rightToLeft"
+        onSettingsChange={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(screen.getByAltText("Next Multi Page 1ページ")).toHaveAttribute("data-quarter-turns", "0");
+    expect(screen.getByRole("button", { name: "回転・反転をリセット" })).toBeDisabled();
   });
 
   it("REQ-LEY-P2-016 uses transformed dimensions for automatic spread pairing and the loupe", async () => {

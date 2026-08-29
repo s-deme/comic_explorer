@@ -366,6 +366,9 @@ export function Viewer({
   const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
   const [clipboardCopying, setClipboardCopying] = useState(false);
   const [imageTransformNotice, setImageTransformNotice] = useState<string | null>(null);
+  const [imageTransform, setImageTransform] = useState<ViewerImageTransform>(
+    () => ({ ...IDENTITY_IMAGE_TRANSFORM }),
+  );
   const [bookmarkListOpen, setBookmarkListOpen] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
@@ -423,8 +426,6 @@ export function Viewer({
   const lifecycleMountedRef = useRef(true);
   const randomSlideshowQueueRef = useRef<number[]>([]);
   const clipboardRequestRef = useRef(0);
-  const pageTransformsRef = useRef(new Map<number, ViewerImageTransform>());
-  const [imageTransformRevision, setImageTransformRevision] = useState(0);
 
   function reloadFilteredPages() {
     pageRequests.current.clear();
@@ -518,12 +519,15 @@ export function Viewer({
     scheduleCursorHide();
     return clearCursorHideTimer;
   }, [cursorAutoHideMs, panning, rectangleZoomArmed, scale.loupeEnabled]);
-  const transformForPage = (index: number): ViewerImageTransform =>
-    pageTransformsRef.current.get(index) ?? IDENTITY_IMAGE_TRANSFORM;
+  useEffect(() => {
+    setImageTransform({ ...IDENTITY_IMAGE_TRANSFORM });
+    setImageTransformNotice(null);
+  }, [generation, session.itemKey]);
+
   const effectiveLandscape = useMemo(() => {
     const next = new Set(landscape);
     pageSizes.forEach((size, index) => {
-      const transformed = transformedImageSize(size, transformForPage(index));
+      const transformed = transformedImageSize(size, imageTransform);
       if (isPagePairable(
         transformed.width,
         transformed.height,
@@ -532,7 +536,7 @@ export function Viewer({
       else next.add(index);
     });
     return next;
-  }, [imageTransformRevision, landscape, pageSizes, spreadRules.portraitMaxAspectPercent]);
+  }, [imageTransform, landscape, pageSizes, spreadRules.portraitMaxAspectPercent]);
   const visible = useMemo(
     () => visibleIndices(
       state,
@@ -577,7 +581,7 @@ export function Viewer({
     if (scale.mode !== "fit") return null;
     const sizes = visible.map((index) => {
       const size = pageSizes.get(index);
-      return size === undefined ? undefined : transformedImageSize(size, transformForPage(index));
+      return size === undefined ? undefined : transformedImageSize(size, imageTransform);
     });
     if (sizes.some((size) => size === undefined)) return null;
     return fitScaleForPages(
@@ -588,7 +592,7 @@ export function Viewer({
       viewerSpreadGap,
       fitRules,
     );
-  }, [fitRules, fitViewport.height, fitViewport.width, imageTransformRevision, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
+  }, [fitRules, fitViewport.height, fitViewport.width, imageTransform, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -763,15 +767,7 @@ export function Viewer({
   }
 
   function applyImageTransform(action: ImageTransformAction) {
-    const pageIndex = state.index;
-    const current = transformForPage(pageIndex);
-    const next = applyViewerImageTransform(current, action);
-    if (isIdentityImageTransform(next)) {
-      pageTransformsRef.current.delete(pageIndex);
-    } else {
-      pageTransformsRef.current.set(pageIndex, next);
-    }
-    setImageTransformRevision((revision) => revision + 1);
+    setImageTransform((current) => applyViewerImageTransform(current, action));
     setLoupe(null);
     const actionLabel = action === "rotateClockwise"
       ? "時計回りに90度回転"
@@ -780,7 +776,7 @@ export function Viewer({
         : action === "flipVertical"
           ? "上下反転"
           : "回転・反転をリセット";
-    setImageTransformNotice(`ページ ${pageIndex + 1} を${actionLabel}しました。`);
+    setImageTransformNotice(`Viewerのすべての画像に${actionLabel}を適用しました。`);
   }
 
   function advanceSlideshow() {
@@ -1106,7 +1102,7 @@ export function Viewer({
       window.removeEventListener("resize", updateDisplayedScale);
       observer.disconnect();
     };
-  }, [fullscreen, imageTransformRevision, readyPages, scale.mode, scale.scale, state.index, state.mode]);
+  }, [fullscreen, imageTransform, readyPages, scale.mode, scale.scale, state.index, state.mode]);
 
   function updateLoupe(event: ReactPointerEvent<HTMLDivElement>) {
     if (!scale.loupeEnabled) return;
@@ -1446,7 +1442,6 @@ export function Viewer({
       : visible;
   const renderPage = (index: number) => {
     const page = session.pages[index];
-    const imageTransform = transformForPage(index);
     const content = imageErrors.has(index) ? (
       <div className="page-error" role="alert">
         <h2>画像を読み込めません</h2>
@@ -1545,7 +1540,6 @@ export function Viewer({
           >
             <span aria-hidden="true">↩</span>
           </button>
-          <strong title={session.displayName}>{session.displayName}</strong>
         </div>
         <div className="viewer-toolbar-controls" aria-label="表示操作">
           <div className="viewer-toolbar-group viewer-toolbar-group--view" role="group" aria-label="表示枚数">
@@ -1597,7 +1591,17 @@ export function Viewer({
               <span aria-hidden="true">＋</span>
             </button>
           </div>
-          <div className="viewer-toolbar-group viewer-toolbar-group--utility" role="group" aria-label="しおりと補助操作">
+          <div className="viewer-toolbar-group viewer-toolbar-group--utility" role="group" aria-label="ルーペとしおりと補助操作">
+            <button
+              className="viewer-icon-button viewer-toolbar-loupe"
+              type="button"
+              aria-label="ルーペ"
+              title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
+              aria-pressed={scale.loupeEnabled}
+              onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
+            >
+              <span aria-hidden="true">⌕</span>
+            </button>
             <button
               className="viewer-icon-button viewer-toolbar-bookmark"
               type="button"
@@ -1666,7 +1670,7 @@ export function Viewer({
         <header className="viewer-more-panel-header">
           <div>
             <h2 id="viewer-more-title">その他の操作</h2>
-            <p>表示・移動・画像処理をまとめて調整できます。</p>
+            <p>表示、読み方、しおり、画像処理をまとめて調整できます。</p>
           </div>
           <button type="button" onClick={() => setToolbarMoreOpen(false)}>閉じる</button>
         </header>
@@ -1747,15 +1751,6 @@ export function Viewer({
               >
                 <span aria-hidden="true">▣＋</span><span>矩形ズーム</span>
               </button>
-              <button
-                className="viewer-more-action"
-                aria-label="ルーペ"
-                title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
-                aria-pressed={scale.loupeEnabled}
-                onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
-              >
-                <span aria-hidden="true">⌕</span><span>ルーペ</span>
-              </button>
             </div>
             {pixelScaleError && <span className="viewer-control-error" role="alert">{pixelScaleError}</span>}
             {rectangleZoomError && <span className="viewer-control-error" role="alert">{rectangleZoomError}</span>}
@@ -1790,33 +1785,6 @@ export function Viewer({
                 onClick={toggleDirection}
               >
                 <span aria-hidden="true">⇄</span><span>{state.direction === "rightToLeft" ? "左開きへ" : "右開きへ"}</span>
-              </button>
-              <button
-                className="viewer-more-action"
-                aria-label="見開きを1ページ戻す"
-                title="見開きの開始位置を1ページ戻す"
-                disabled={state.mode !== "spread" || state.index === 0}
-                onClick={() => shiftOnePage(-1)}
-              >
-                <span aria-hidden="true">1◀</span><span>見開きを1ページ戻す</span>
-              </button>
-              <button
-                className="viewer-more-action"
-                aria-label="見開きを1ページ進める"
-                title="見開きの開始位置を1ページ進める"
-                disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
-                onClick={() => shiftOnePage(1)}
-              >
-                <span aria-hidden="true">▶1</span><span>見開きを1ページ進める</span>
-              </button>
-              <button
-                className="viewer-more-action"
-                aria-label="ランダムページ"
-                title="現在以外のページへランダム移動"
-                disabled={session.pages.length <= 1}
-                onClick={randomPage}
-              >
-                <span aria-hidden="true">⤨</span><span>ランダムページ</span>
               </button>
             </div>
           </section>
@@ -1860,12 +1828,20 @@ export function Viewer({
           </section>
           <section className="viewer-more-group" aria-labelledby="viewer-more-image-title">
             <h3 id="viewer-more-image-title">画像</h3>
+            <output
+              className="viewer-image-transform-status"
+              aria-live="polite"
+              data-transformed={!isIdentityImageTransform(imageTransform)}
+            >
+              回転: {imageTransform.quarterTurns * 90}° / 左右反転: {imageTransform.flipHorizontal ? "ON" : "OFF"} / 上下反転: {imageTransform.flipVertical ? "ON" : "OFF"}
+            </output>
             <div className="viewer-more-actions">
               <button
                 className="viewer-more-action"
                 type="button"
                 aria-label="時計回りに90度回転"
-                title="現在ページを時計回りに90度回転 (])"
+                title="すべての画像を時計回りに90度回転 (])"
+                aria-pressed={imageTransform.quarterTurns !== 0}
                 onClick={() => applyImageTransform("rotateClockwise")}
               >
                 <span aria-hidden="true">↻</span><span>90度回転</span>
@@ -1874,7 +1850,8 @@ export function Viewer({
                 className="viewer-more-action"
                 type="button"
                 aria-label="左右反転"
-                title="現在ページを左右反転 (H)"
+                title="すべての画像を左右反転 (H)"
+                aria-pressed={imageTransform.flipHorizontal}
                 onClick={() => applyImageTransform("flipHorizontal")}
               >
                 <span aria-hidden="true">↔</span><span>左右反転</span>
@@ -1883,7 +1860,8 @@ export function Viewer({
                 className="viewer-more-action"
                 type="button"
                 aria-label="上下反転"
-                title="現在ページを上下反転 (V)"
+                title="すべての画像を上下反転 (V)"
+                aria-pressed={imageTransform.flipVertical}
                 onClick={() => applyImageTransform("flipVertical")}
               >
                 <span aria-hidden="true">↕</span><span>上下反転</span>
@@ -1892,8 +1870,8 @@ export function Viewer({
                 className="viewer-more-action"
                 type="button"
                 aria-label="回転・反転をリセット"
-                title="現在ページの回転・反転をリセット (0)"
-                disabled={isIdentityImageTransform(transformForPage(state.index))}
+                title="すべての画像の回転・反転をリセット (0)"
+                disabled={isIdentityImageTransform(imageTransform)}
                 onClick={() => applyImageTransform("reset")}
               >
                 <span aria-hidden="true">0°</span><span>回転・反転をリセット</span>
@@ -2286,14 +2264,14 @@ export function Viewer({
             <span
               className="viewer-loupe-surface"
               aria-hidden="true"
-              data-quarter-turns={transformForPage(loupe.index).quarterTurns}
-              data-flip-horizontal={transformForPage(loupe.index).flipHorizontal}
-              data-flip-vertical={transformForPage(loupe.index).flipVertical}
+              data-quarter-turns={imageTransform.quarterTurns}
+              data-flip-horizontal={imageTransform.flipHorizontal}
+              data-flip-vertical={imageTransform.flipVertical}
               style={{
                 backgroundImage: `url("${mediaUris[loupe.index]}")`,
                 backgroundSize: `${loupe.imageWidth * loupeZoom}px ${loupe.imageHeight * loupeZoom}px`,
                 backgroundPosition: `${loupeSize / 2 - loupe.imageX * loupeZoom}px ${loupeSize / 2 - loupe.imageY * loupeZoom}px`,
-                transform: imageTransformCss(transformForPage(loupe.index)),
+                transform: imageTransformCss(imageTransform),
               }}
             />
           </div>
@@ -2358,6 +2336,16 @@ export function Viewer({
           <button
             className="viewer-icon-button viewer-page-action"
             type="button"
+            aria-label="見開きを1ページ戻す"
+            title="見開きの開始位置を1ページ戻す"
+            disabled={state.mode !== "spread" || state.index === 0}
+            onClick={() => shiftOnePage(-1)}
+          >
+            <span aria-hidden="true">1◀</span>
+          </button>
+          <button
+            className="viewer-icon-button viewer-page-action"
+            type="button"
             aria-label="前ページ"
             title="前ページへ移動"
             onClick={() => previous()}
@@ -2372,6 +2360,26 @@ export function Viewer({
             onClick={() => next()}
           >
             <span aria-hidden="true">▶</span>
+          </button>
+          <button
+            className="viewer-icon-button viewer-page-action"
+            type="button"
+            aria-label="見開きを1ページ進める"
+            title="見開きの開始位置を1ページ進める"
+            disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
+            onClick={() => shiftOnePage(1)}
+          >
+            <span aria-hidden="true">▶1</span>
+          </button>
+          <button
+            className="viewer-icon-button viewer-page-action"
+            type="button"
+            aria-label="ランダムページ"
+            title="現在以外のページへランダム移動"
+            disabled={session.pages.length <= 1}
+            onClick={randomPage}
+          >
+            <span aria-hidden="true">⤨</span>
           </button>
           <button
             className="viewer-icon-button viewer-page-action viewer-page-action--slideshow"

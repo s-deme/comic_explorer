@@ -26,7 +26,9 @@ codd:
 
 現行要件台帳はMVP 28件（REQ 22、NFR 6）とMVP後/将来76件の計104件である。Leeyes互換機能は別の運用台帳`leeyes-feature-tracker.csv`で192件を管理する。2026-08-21に、当時UndecidedかつMissing / Partialだった103件（Missing 67件、Partial 36件）をP1〜P5の実装対象として一括選択した。対象集合と順序は`leeyes-implementation-manifest.csv`を正とし、既存Published 3件は再実装対象に含めない。
 
-Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低頻度操作を展開式secondary rowへ集約した。横scrollbarは撤去し、狭幅では段階zoomと作品名を順に縮退する。Windows自動gateはPASSし、release WebView2のDPI別目視は未測定として残す。
+Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低頻度操作を展開式panelへ集約した。作品名はnative titleだけに表示し、一覧へ戻るは常に先頭側へ固定する。横scrollbarは撤去し、狭幅では段階zoomだけを縮退する。Windows自動gateはPASSし、release WebView2のDPI別目視は未測定として残す。
+
+2026-08-29にViewerの見開き1page調整とrandom pageを下部page移動bar右端へ移し、前後page・slideshowと同じ操作群へ集約した。ルーペはtoolbarのしおり保存直前に常設し、その他操作panelから外した。回転・反転はViewer session内の全画像・見開き・移動先・ルーペで共有し、回転角と左右/上下反転のON/OFFを状態表示とbuttonのpressed状態で明示する。Viewer 63件、Python UI style 32件、Windows Python 77件、frontend 600件、typecheck、build、CoDDはPASSした。release WebView2での通常幅・狭幅・fullscreen・DPI別目視は未測定として残す。
 
 2026-08-28に画像Viewerの縦・横連続レイアウトを廃止し、表示をpageへ固定した。toolbarと統合設定からレイアウト選択を撤去し、連続表示専用の描画、先読み、ホイール速度設定を除去した。既存profile、SQLite復元値、保存要求の旧`vertical_scroll`／`horizontal_scroll`は安全に`paged`へ正規化する。page内overflow scroll、zoom、pointer panは維持する。Windows frontend 598件、Python 74件、Rust 271+shutdown process 1件、typecheck、build、SBOMはPASSし、release WebView2直接観測は未測定として残す。
 

@@ -185,7 +185,7 @@ class UiStyleContractTests(unittest.TestCase):
     def test_viewer_toolbar_keeps_primary_controls_and_opens_a_labeled_action_panel(self) -> None:
         self.assert_rule_contains(".viewer-toolbar", "overflow: visible")
         self.assert_rule_contains(".viewer-toolbar", "flex-wrap: wrap")
-        self.assert_rule_contains(".viewer-toolbar-identity", "flex: 1 1 120px")
+        self.assert_rule_contains(".viewer-toolbar-identity", "flex: 0 0 auto")
         self.assert_rule_contains(".viewer-toolbar-group", "border-left: 1px solid var(--theme-border)")
         self.assert_rule_contains(".viewer-toolbar-group:first-child", "border-left: 0")
         self.assert_rule_contains(".viewer-more-panel", "position: absolute")
@@ -226,6 +226,16 @@ class UiStyleContractTests(unittest.TestCase):
         self.assert_rule_contains(".viewer-page-actions", "display: inline-flex")
         self.assert_rule_contains(".viewer-page-actions", "flex: 0 0 auto")
         self.assert_rule_contains(".viewer-page-action", "min-width: 32px")
+
+    def test_viewer_transform_and_loupe_states_have_visible_on_off_feedback(self) -> None:
+        self.assert_rule_contains(
+            '.viewer-more-action[aria-pressed="true"],\n.viewer-toolbar-loupe[aria-pressed="true"]',
+            "background: var(--theme-accent)",
+        )
+        self.assert_rule_contains(
+            '.viewer-image-transform-status[data-transformed="true"]',
+            "border-color: var(--theme-accent)",
+        )
 
     def test_viewer_stage_uses_a_dark_checkerboard_background(self) -> None:
         self.assert_rule_contains(
