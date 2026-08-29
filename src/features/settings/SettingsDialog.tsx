@@ -150,6 +150,7 @@ const CATALOG_PANE_POSITION_LABELS: Record<SettingsProfile["catalogPanePosition"
 };
 
 type SettingsCategory = "catalog" | "viewer" | "interface" | "commands" | "profile";
+type InputSettingsGroup = "keyboard" | "mouse" | "gestures";
 
 interface SettingsCategoryDefinition {
   id: SettingsCategory;
@@ -165,6 +166,20 @@ const SETTINGS_CATEGORIES: readonly SettingsCategoryDefinition[] = [
   { id: "commands", label: "操作と入力", description: "キー、クリック、ジェスチャー", icon: "⌨" },
   { id: "profile", label: "プロファイル", description: "起動、保存、移行", icon: "⇄" },
 ] as const;
+
+const INPUT_SETTINGS_GROUPS: readonly {
+  id: InputSettingsGroup;
+  label: string;
+  description: string;
+}[] = [
+  { id: "keyboard", label: "キー設定", description: "ショートカットとキー操作" },
+  { id: "mouse", label: "マウス設定", description: "クリックとドラッグ" },
+  { id: "gestures", label: "ジェスチャー設定", description: "スワイプ・ホイール・追加ボタン" },
+];
+
+const SWIPE_GESTURE_NAMES = ["swipeLeft", "swipeRight"] as const;
+const WHEEL_GESTURE_NAMES = ["wheelUp", "wheelDown", "rightWheelUp", "rightWheelDown"] as const;
+const MOUSE_BUTTON_GESTURE_NAMES = ["middleClick", "backButton", "forwardButton"] as const;
 
 const SORT_FIELD_LABELS: Record<SortField, string> = {
   name: "名前",
@@ -333,6 +348,7 @@ export function SettingsDialog({
   themeManager,
 }: SettingsDialogProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("catalog");
+  const [activeInputGroup, setActiveInputGroup] = useState<InputSettingsGroup>("keyboard");
   const [query, setQuery] = useState("");
   const [profileName, setProfileName] = useState("");
   const [pendingOverwrite, setPendingOverwrite] = useState<string | null>(null);
@@ -667,6 +683,9 @@ export function SettingsDialog({
   const isSearching = normalizedQuery !== "";
   const rowHidden = (id: string) => isSearching && !matchedIds.has(id);
   const groupHidden = (ids: readonly string[]) => isSearching && !ids.some((id) => matchedIds.has(id));
+  const inputGroupHidden = (group: InputSettingsGroup, ids: readonly string[]) => isSearching
+    ? groupHidden(ids)
+    : activeInputGroup !== group;
   const panelHidden = (category: SettingsCategory) => isSearching
     ? categoryMatchCount(category) === 0
     : activeCategory !== category;
@@ -1396,112 +1415,239 @@ export function SettingsDialog({
               </SettingRow>
             </section>
 
-            <section className="settings-panel settings-panel--commands" aria-label="ショートカット設定" hidden={panelHidden("commands")}>
+            <section className="settings-panel settings-panel--commands" aria-label="操作と入力の設定" hidden={panelHidden("commands")}>
               <div className="settings-panel-heading">
                 <div>
                   <h3>操作と入力</h3>
-                  <p>入力欄でキーを押して割り当てます。重複キーとアプリの予約操作は設定できません。</p>
+                  <p>キー、クリック、Viewer画像領域のジェスチャーを、目的別に分けて設定します。</p>
                 </div>
-                <button type="button" onClick={onResetAllShortcuts}>キーをすべて既定に戻す</button>
               </div>
-              <div className="settings-command-header" aria-hidden="true">
-                <span>グループ</span><span>コマンド</span><span>キー</span><span>マウス</span><span>説明</span><span />
-              </div>
-              {SHORTCUT_COMMANDS.map((command) => (
-                <div
-                  key={command}
-                  className="settings-command-row"
-                  data-shortcut-command={command}
-                  data-setting-id={`shortcut-${command}`}
-                  hidden={rowHidden(`shortcut-${command}`)}
-                >
-                  <span className="settings-command-group">{SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]}</span>
-                  <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
-                  <div className="settings-shortcut-bindings">
-                    {draft.shortcuts[command].map((binding, index) => (
-                      <span className="settings-shortcut-binding" key={`${command}-${index}`}>
-                        <input
-                          id={index === 0 ? `shortcut-${command}` : undefined}
-                          aria-label={`${SHORTCUT_LABELS[command]}ショートカット${index === 0 ? "" : ` ${index + 1}`}`}
-                          value={binding}
-                          readOnly
-                          onKeyDown={(event) => onShortcutKeyDown(command, index, event)}
-                        />
+              <nav className="settings-input-group-navigation" aria-label="操作と入力の分類" hidden={isSearching}>
+                {INPUT_SETTINGS_GROUPS.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    aria-current={activeInputGroup === group.id ? "page" : undefined}
+                    onClick={() => setActiveInputGroup(group.id)}
+                  >
+                    <strong>{group.label}</strong>
+                    <small>{group.description}</small>
+                  </button>
+                ))}
+              </nav>
+
+              <section
+                className="settings-input-group"
+                aria-labelledby="settings-keyboard-heading"
+                hidden={inputGroupHidden("keyboard", [
+                  ...SHORTCUT_COMMANDS.map((command) => `shortcut-${command}`),
+                  "scroll-step",
+                  "key-scroll-acceleration",
+                  "key-scroll-continuous",
+                  "smooth-scroll",
+                  "page-scan-mode",
+                ])}
+              >
+                <div className="settings-input-group-heading">
+                  <div>
+                    <h4 id="settings-keyboard-heading">キー設定</h4>
+                    <p>入力欄を選んでキーを押すと割り当てます。重複キーとアプリの予約操作は設定できません。</p>
+                  </div>
+                  <button type="button" onClick={onResetAllShortcuts}>キーをすべて既定に戻す</button>
+                </div>
+                <div className="settings-command-header" aria-hidden="true">
+                  <span>グループ</span><span>コマンド</span><span>キー</span><span>説明</span><span />
+                </div>
+                {SHORTCUT_COMMANDS.map((command) => (
+                  <div
+                    key={command}
+                    className="settings-command-row"
+                    data-shortcut-command={command}
+                    data-setting-id={`shortcut-${command}`}
+                    hidden={rowHidden(`shortcut-${command}`)}
+                  >
+                    <span className="settings-command-group">{SHORTCUT_GROUP_LABELS[SHORTCUT_GROUPS[command]]}</span>
+                    <label htmlFor={`shortcut-${command}`}>{SHORTCUT_LABELS[command]}</label>
+                    <div className="settings-shortcut-bindings">
+                      {draft.shortcuts[command].map((binding, index) => (
+                        <span className="settings-shortcut-binding" key={`${command}-${index}`}>
+                          <input
+                            id={index === 0 ? `shortcut-${command}` : undefined}
+                            aria-label={`${SHORTCUT_LABELS[command]}ショートカット${index === 0 ? "" : ` ${index + 1}`}`}
+                            value={binding}
+                            readOnly
+                            onKeyDown={(event) => onShortcutKeyDown(command, index, event)}
+                          />
+                          <button
+                            type="button"
+                            aria-label={`${SHORTCUT_LABELS[command]}ショートカット ${index + 1} を削除`}
+                            disabled={draft.shortcuts[command].length === 1}
+                            onClick={() => onRemoveShortcut(command, index)}
+                          >削除</button>
+                        </span>
+                      ))}
+                      {draft.shortcuts[command].length < 4 && (
                         <button
                           type="button"
-                          aria-label={`${SHORTCUT_LABELS[command]}ショートカット ${index + 1} を削除`}
-                          disabled={draft.shortcuts[command].length === 1}
-                          onClick={() => onRemoveShortcut(command, index)}
-                        >削除</button>
-                      </span>
-                    ))}
-                    {draft.shortcuts[command].length < 4 && (
-                      <button
-                        type="button"
-                        aria-label={`${SHORTCUT_LABELS[command]}へキーを追加`}
-                        onKeyDown={(event) => onShortcutKeyDown(
-                          command,
-                          draft.shortcuts[command].length,
-                          event,
-                        )}
-                      >キーを追加（選択してキー入力）</button>
-                    )}
+                          aria-label={`${SHORTCUT_LABELS[command]}へキーを追加`}
+                          onKeyDown={(event) => onShortcutKeyDown(
+                            command,
+                            draft.shortcuts[command].length,
+                            event,
+                          )}
+                        >キーを追加（選択してキー入力）</button>
+                      )}
+                    </div>
+                    <span className="settings-command-description">
+                      {SHORTCUT_DESCRIPTIONS[command]}
+                      <small>既定: {DEFAULT_SHORTCUTS[command].join(" / ")} / 代替: {SHORTCUT_FALLBACKS[command]}</small>
+                    </span>
+                    <button type="button" aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`} onClick={() => onResetShortcut(command)}>戻す</button>
                   </div>
-                  <span className="settings-command-mouse">
-                    {CONFIGURABLE_MOUSE_GESTURE_NAMES
-                      .filter((name) => draft.mouseGestures[name] === command)
-                      .map((name) => GESTURE_LABELS[name])
-                      .join(" / ") || "—"}
-                  </span>
-                  <span className="settings-command-description">
-                    {SHORTCUT_DESCRIPTIONS[command]}
-                    <small>既定: {DEFAULT_SHORTCUTS[command].join(" / ")} / 代替: {SHORTCUT_FALLBACKS[command]}</small>
-                  </span>
-                  <button type="button" aria-label={`${SHORTCUT_LABELS[command]}を既定に戻す`} onClick={() => onResetShortcut(command)}>戻す</button>
-                </div>
-              ))}
-              <h3 className="settings-subheading">一覧マウス割当</h3>
-              {CATALOG_MOUSE_GESTURE_NAMES.map((name) => (
-                <SettingRow
-                  key={name}
-                  id={`catalog-mouse-${name}`}
-                  title={CATALOG_MOUSE_GESTURE_LABELS[name]}
-                  description={CATALOG_MOUSE_GESTURE_DESCRIPTIONS[name]}
-                  hidden={rowHidden(`catalog-mouse-${name}`)}
-                >
-                  <select
-                    aria-label={`profile一覧${CATALOG_MOUSE_GESTURE_LABELS[name]}割当`}
-                    value={draft.catalogMouseBindings[name]}
-                    onChange={(event) => update({
-                      catalogMouseBindings: {
-                        ...draft.catalogMouseBindings,
-                        [name]: event.target.value as CatalogMouseAction,
-                      },
-                    })}
-                  >
-                    {CATALOG_MOUSE_ACTIONS.map((action) => (
-                      <option key={action} value={action}>{catalogMouseActionLabel(action)}</option>
-                    ))}
+                ))}
+                <h5 className="settings-subheading" hidden={groupHidden(["scroll-step", "key-scroll-acceleration", "key-scroll-continuous", "smooth-scroll", "page-scan-mode"])}>キーによる閲覧</h5>
+                <SettingRow id="scroll-step" title="キー・コマンドのページ内移動量" description="大きな画像で矢印キーと次・前コマンドが送る量を表示領域の10%〜100%で指定します。" hidden={rowHidden("scroll-step")}>
+                  <div className="settings-number-control">
+                    <input
+                      type="number"
+                      aria-label="profileページ内スクロール量（%）"
+                      min={MIN_SCROLL_STEP_PERCENT}
+                      max={MAX_SCROLL_STEP_PERCENT}
+                      step="5"
+                      value={draft.scrollStepPercent}
+                      onChange={(event) => update({
+                        scrollStepPercent: Math.min(
+                          MAX_SCROLL_STEP_PERCENT,
+                          Math.max(MIN_SCROLL_STEP_PERCENT, Math.round(Number(event.target.value))),
+                        ),
+                      })}
+                    />
+                    <span>%</span>
+                  </div>
+                </SettingRow>
+                <SettingRow id="key-scroll-acceleration" title="キーリピート加速" description="キーを押し続けたときのページ内移動量を100%〜300%に加速します。" hidden={rowHidden("key-scroll-acceleration")}>
+                  <div className="settings-number-control">
+                    <input
+                      type="number"
+                      aria-label="profileキーリピート加速（%）"
+                      min={MIN_KEY_SCROLL_ACCELERATION_PERCENT}
+                      max={MAX_KEY_SCROLL_ACCELERATION_PERCENT}
+                      step="10"
+                      value={draft.keyScrollAccelerationPercent}
+                      onChange={(event) => update({
+                        keyScrollAccelerationPercent: Math.min(
+                          MAX_KEY_SCROLL_ACCELERATION_PERCENT,
+                          Math.max(
+                            MIN_KEY_SCROLL_ACCELERATION_PERCENT,
+                            Math.round(Number(event.target.value)),
+                          ),
+                        ),
+                      })}
+                    />
+                    <span>%</span>
+                  </div>
+                </SettingRow>
+                <SettingRow id="key-scroll-continuous" title="キーの連続動作" description="無効にするとキーを押し続けても最初の1回だけ移動します。" hidden={rowHidden("key-scroll-continuous")}>
+                  <label className="settings-switch">
+                    <input
+                      type="checkbox"
+                      aria-label="profileキーの連続動作"
+                      checked={draft.keyScrollContinuous}
+                      onChange={(event) => update({ keyScrollContinuous: event.target.checked })}
+                    />
+                    <span>{draft.keyScrollContinuous ? "有効" : "無効"}</span>
+                  </label>
+                </SettingRow>
+                <SettingRow id="smooth-scroll" title="ページ内スクロールアニメーション" description="次・前コマンドによるページ内移動を滑らかにします。OSの視覚効果軽減設定を常に優先します。" hidden={rowHidden("smooth-scroll")}>
+                  <label className="settings-switch">
+                    <input type="checkbox" aria-label="profileページ内スクロールアニメーション" checked={draft.smoothScroll} onChange={(event) => update({ smoothScroll: event.target.checked })} />
+                    <span>{draft.smoothScroll ? "有効" : "無効"}</span>
+                  </label>
+                </SettingRow>
+                <SettingRow id="page-scan-mode" title="ページ内の走査順" description="大きな画像を標準縦送り、N字（列優先）、Z字（行優先）で読書方向に走査します。" hidden={rowHidden("page-scan-mode")}>
+                  <select aria-label="profileページ内の走査順" value={draft.pageScanMode} onChange={(event) => update({ pageScanMode: event.target.value as SettingsProfile["pageScanMode"] })}>
+                    {PAGE_SCAN_MODES.map((mode) => <option key={mode} value={mode}>{PAGE_SCAN_MODE_LABELS[mode]}</option>)}
                   </select>
                 </SettingRow>
-              ))}
-              <h3 className="settings-subheading">Viewer 4象限クリック</h3>
-              {VIEWER_QUADRANT_NAMES.map((name) => (
+              </section>
+
+              <section
+                className="settings-input-group"
+                aria-labelledby="settings-mouse-heading"
+                hidden={inputGroupHidden("mouse", [
+                  ...CATALOG_MOUSE_GESTURE_NAMES.map((name) => `catalog-mouse-${name}`),
+                  ...VIEWER_QUADRANT_NAMES.map((name) => `viewer-quadrant-${name}`),
+                  "viewer-right-click",
+                  "pan-factor",
+                ])}
+              >
+                <div className="settings-input-group-heading">
+                  <div>
+                    <h4 id="settings-mouse-heading">マウス設定</h4>
+                    <p>一覧のクリック、Viewerのクリック領域、右クリック、画像をドラッグしたときの移動を設定します。</p>
+                  </div>
+                </div>
+                <h5 className="settings-subheading" hidden={groupHidden(CATALOG_MOUSE_GESTURE_NAMES.map((name) => `catalog-mouse-${name}`))}>一覧のクリック</h5>
+                {CATALOG_MOUSE_GESTURE_NAMES.map((name) => (
+                  <SettingRow
+                    key={name}
+                    id={`catalog-mouse-${name}`}
+                    title={CATALOG_MOUSE_GESTURE_LABELS[name]}
+                    description={CATALOG_MOUSE_GESTURE_DESCRIPTIONS[name]}
+                    hidden={rowHidden(`catalog-mouse-${name}`)}
+                  >
+                    <select
+                      aria-label={`profile一覧${CATALOG_MOUSE_GESTURE_LABELS[name]}割当`}
+                      value={draft.catalogMouseBindings[name]}
+                      onChange={(event) => update({
+                        catalogMouseBindings: {
+                          ...draft.catalogMouseBindings,
+                          [name]: event.target.value as CatalogMouseAction,
+                        },
+                      })}
+                    >
+                      {CATALOG_MOUSE_ACTIONS.map((action) => (
+                        <option key={action} value={action}>{catalogMouseActionLabel(action)}</option>
+                      ))}
+                    </select>
+                  </SettingRow>
+                ))}
+                <h5 className="settings-subheading" hidden={groupHidden([...VIEWER_QUADRANT_NAMES.map((name) => `viewer-quadrant-${name}`), "viewer-right-click"])}>Viewerのクリック</h5>
+                {VIEWER_QUADRANT_NAMES.map((name) => (
+                  <SettingRow
+                    key={name}
+                    id={`viewer-quadrant-${name}`}
+                    title={`${VIEWER_QUADRANT_LABELS[name]}のクリック`}
+                    description="Viewer stageを中央で4分割します。ドラッグ、touch、pen、修飾キー付き操作とダブルクリックには反応しません。"
+                    hidden={rowHidden(`viewer-quadrant-${name}`)}
+                  >
+                    <select
+                      aria-label={`profileViewer${VIEWER_QUADRANT_LABELS[name]}クリック割当`}
+                      value={draft.viewerQuadrantBindings[name]}
+                      onChange={(event) => update({
+                        viewerQuadrantBindings: {
+                          ...draft.viewerQuadrantBindings,
+                          [name]: event.target.value as ViewerQuadrantAction,
+                        },
+                      })}
+                    >
+                      {VIEWER_QUADRANT_ACTIONS.map((action) => (
+                        <option key={action} value={action}>{viewerQuadrantActionLabel(action)}</option>
+                      ))}
+                    </select>
+                  </SettingRow>
+                ))}
                 <SettingRow
-                  key={name}
-                  id={`viewer-quadrant-${name}`}
-                  title={`${VIEWER_QUADRANT_LABELS[name]}のクリック`}
-                  description="Viewer stageを中央で4分割します。ドラッグ、touch、pen、修飾キー付き操作とダブルクリックには反応しません。"
-                  hidden={rowHidden(`viewer-quadrant-${name}`)}
+                  id="viewer-right-click"
+                  title="Viewer右クリック"
+                  description="stageの右クリックに割り当てます。右ボタン+ホイールとcatalogのcontext menuは変更しません。"
+                  hidden={rowHidden("viewer-right-click")}
                 >
                   <select
-                    aria-label={`profileViewer${VIEWER_QUADRANT_LABELS[name]}クリック割当`}
-                    value={draft.viewerQuadrantBindings[name]}
+                    aria-label="profileViewer右クリック割当"
+                    value={draft.viewerRightClickAction}
                     onChange={(event) => update({
-                      viewerQuadrantBindings: {
-                        ...draft.viewerQuadrantBindings,
-                        [name]: event.target.value as ViewerQuadrantAction,
-                      },
+                      viewerRightClickAction: event.target.value as ViewerQuadrantAction,
                     })}
                   >
                     {VIEWER_QUADRANT_ACTIONS.map((action) => (
@@ -1509,140 +1655,104 @@ export function SettingsDialog({
                     ))}
                   </select>
                 </SettingRow>
-              ))}
-              <SettingRow
-                id="viewer-right-click"
-                title="Viewer右クリック"
-                description="stageの右クリックに割り当てます。右ボタン+ホイールとcatalogのcontext menuは変更しません。"
-                hidden={rowHidden("viewer-right-click")}
-              >
-                <select
-                  aria-label="profileViewer右クリック割当"
-                  value={draft.viewerRightClickAction}
-                  onChange={(event) => update({
-                    viewerRightClickAction: event.target.value as ViewerQuadrantAction,
-                  })}
-                >
-                  {VIEWER_QUADRANT_ACTIONS.map((action) => (
-                    <option key={action} value={action}>{viewerQuadrantActionLabel(action)}</option>
-                  ))}
-                </select>
-              </SettingRow>
-              <h3 className="settings-subheading">Viewerマウスジェスチャー</h3>
-              <SettingRow id="pan-factor" title="ドラッグ移動係数" description="画像をpointerでpanするときの移動量だけを50%〜200%で調整します。" hidden={rowHidden("pan-factor")}>
-                <div className="settings-number-control">
-                  <input
-                    type="number"
-                    aria-label="profileドラッグ移動係数（%）"
-                    min={MIN_PAN_FACTOR * 100}
-                    max={MAX_PAN_FACTOR * 100}
-                    step="10"
-                    value={Math.round(draft.panFactor * 100)}
-                    onChange={(event) => update({
-                      panFactor: Math.min(
-                        MAX_PAN_FACTOR,
-                        Math.max(MIN_PAN_FACTOR, Number(event.target.value) / 100),
-                      ),
-                    })}
-                  />
-                  <span>%</span>
-                </div>
-              </SettingRow>
-              <SettingRow id="wheel-dead-zone" title="ホイール不感帯" description="ページ送りに変換しない小さなwheel deltaを0〜200で指定します。" hidden={rowHidden("wheel-dead-zone")}>
-                <input
-                  type="number"
-                  aria-label="profileホイール不感帯"
-                  min={MIN_WHEEL_DEAD_ZONE}
-                  max={MAX_WHEEL_DEAD_ZONE}
-                  step="1"
-                  value={draft.wheelDeadZone}
-                  onChange={(event) => update({
-                    wheelDeadZone: Math.min(
-                      MAX_WHEEL_DEAD_ZONE,
-                      Math.max(MIN_WHEEL_DEAD_ZONE, Math.round(Number(event.target.value))),
-                    ),
-                  })}
-                />
-              </SettingRow>
-              <SettingRow id="scroll-step" title="キー・コマンドのページ内移動量" description="大きな画像で矢印キーと次・前コマンドが送る量を表示領域の10%〜100%で指定します。" hidden={rowHidden("scroll-step")}>
-                <div className="settings-number-control">
-                  <input
-                    type="number"
-                    aria-label="profileページ内スクロール量（%）"
-                    min={MIN_SCROLL_STEP_PERCENT}
-                    max={MAX_SCROLL_STEP_PERCENT}
-                    step="5"
-                    value={draft.scrollStepPercent}
-                    onChange={(event) => update({
-                      scrollStepPercent: Math.min(
-                        MAX_SCROLL_STEP_PERCENT,
-                        Math.max(MIN_SCROLL_STEP_PERCENT, Math.round(Number(event.target.value))),
-                      ),
-                    })}
-                  />
-                  <span>%</span>
-                </div>
-              </SettingRow>
-              <SettingRow id="key-scroll-acceleration" title="キーリピート加速" description="キーを押し続けたときのページ内移動量を100%〜300%に加速します。" hidden={rowHidden("scroll-step")}>
-                <div className="settings-number-control">
-                  <input
-                    type="number"
-                    aria-label="profileキーリピート加速（%）"
-                    min={MIN_KEY_SCROLL_ACCELERATION_PERCENT}
-                    max={MAX_KEY_SCROLL_ACCELERATION_PERCENT}
-                    step="10"
-                    value={draft.keyScrollAccelerationPercent}
-                    onChange={(event) => update({
-                      keyScrollAccelerationPercent: Math.min(
-                        MAX_KEY_SCROLL_ACCELERATION_PERCENT,
-                        Math.max(
-                          MIN_KEY_SCROLL_ACCELERATION_PERCENT,
-                          Math.round(Number(event.target.value)),
+                <SettingRow id="pan-factor" title="ドラッグ移動係数" description="画像をpointerでpanするときの移動量だけを50%〜200%で調整します。" hidden={rowHidden("pan-factor")}>
+                  <div className="settings-number-control">
+                    <input
+                      type="number"
+                      aria-label="profileドラッグ移動係数（%）"
+                      min={MIN_PAN_FACTOR * 100}
+                      max={MAX_PAN_FACTOR * 100}
+                      step="10"
+                      value={Math.round(draft.panFactor * 100)}
+                      onChange={(event) => update({
+                        panFactor: Math.min(
+                          MAX_PAN_FACTOR,
+                          Math.max(MIN_PAN_FACTOR, Number(event.target.value) / 100),
                         ),
+                      })}
+                    />
+                    <span>%</span>
+                  </div>
+                </SettingRow>
+              </section>
+
+              <section
+                className="settings-input-group"
+                aria-labelledby="settings-gestures-heading"
+                hidden={inputGroupHidden("gestures", [
+                  ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => `gesture-${name}`),
+                  "gesture-double-click",
+                  "wheel-dead-zone",
+                ])}
+              >
+                <div className="settings-input-group-heading">
+                  <div>
+                    <h4 id="settings-gestures-heading">ジェスチャー設定</h4>
+                    <p>Viewerの画像表示領域だけで実行します。割り当てを変更しても、通常の右クリックmenu、Ctrl＋ホイール拡大縮小、touch、penは変わりません。</p>
+                  </div>
+                </div>
+                <h5 className="settings-subheading" hidden={groupHidden(SWIPE_GESTURE_NAMES.map((name) => `gesture-${name}`))}>スワイプ</h5>
+                {SWIPE_GESTURE_NAMES.map((name) => (
+                  <SettingRow
+                    key={name}
+                    id={`gesture-${name}`}
+                    title={GESTURE_LABELS[name]}
+                    description={GESTURE_DESCRIPTIONS[name]}
+                    hidden={rowHidden(`gesture-${name}`)}
+                  >
+                    <select aria-label={`${name}ジェスチャー`} value={draft.mouseGestures[name]} onChange={(event) => onMouseGestureChange(name, event.target.value as MouseGestureAction)}>
+                      {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{gestureActionLabel(action)}</option>)}
+                    </select>
+                  </SettingRow>
+                ))}
+                <h5 className="settings-subheading" hidden={groupHidden(["wheel-dead-zone", ...WHEEL_GESTURE_NAMES.map((name) => `gesture-${name}`)])}>ホイール</h5>
+                <SettingRow id="wheel-dead-zone" title="ホイール不感帯" description="ページ送りに変換しない小さなwheel deltaを0〜200で指定します。" hidden={rowHidden("wheel-dead-zone")}>
+                  <input
+                    type="number"
+                    aria-label="profileホイール不感帯"
+                    min={MIN_WHEEL_DEAD_ZONE}
+                    max={MAX_WHEEL_DEAD_ZONE}
+                    step="1"
+                    value={draft.wheelDeadZone}
+                    onChange={(event) => update({
+                      wheelDeadZone: Math.min(
+                        MAX_WHEEL_DEAD_ZONE,
+                        Math.max(MIN_WHEEL_DEAD_ZONE, Math.round(Number(event.target.value))),
                       ),
                     })}
                   />
-                  <span>%</span>
-                </div>
-              </SettingRow>
-              <SettingRow id="key-scroll-continuous" title="キーの連続動作" description="無効にするとキーを押し続けても最初の1回だけ移動します。" hidden={rowHidden("scroll-step")}>
-                <label className="settings-switch">
-                  <input
-                    type="checkbox"
-                    aria-label="profileキーの連続動作"
-                    checked={draft.keyScrollContinuous}
-                    onChange={(event) => update({ keyScrollContinuous: event.target.checked })}
-                  />
-                  <span>{draft.keyScrollContinuous ? "有効" : "無効"}</span>
-                </label>
-              </SettingRow>
-              <SettingRow id="smooth-scroll" title="ページ内スクロールアニメーション" description="次・前コマンドによるページ内移動を滑らかにします。OSの視覚効果軽減設定を常に優先します。" hidden={rowHidden("smooth-scroll")}>
-                <label className="settings-switch">
-                  <input type="checkbox" aria-label="profileページ内スクロールアニメーション" checked={draft.smoothScroll} onChange={(event) => update({ smoothScroll: event.target.checked })} />
-                  <span>{draft.smoothScroll ? "有効" : "無効"}</span>
-                </label>
-              </SettingRow>
-              <SettingRow id="page-scan-mode" title="ページ内の走査順" description="大きな画像を標準縦送り、N字（列優先）、Z字（行優先）で読書方向に走査します。" hidden={rowHidden("page-scan-mode")}>
-                <select aria-label="profileページ内の走査順" value={draft.pageScanMode} onChange={(event) => update({ pageScanMode: event.target.value as SettingsProfile["pageScanMode"] })}>
-                  {PAGE_SCAN_MODES.map((mode) => <option key={mode} value={mode}>{PAGE_SCAN_MODE_LABELS[mode]}</option>)}
-                </select>
-              </SettingRow>
-              {CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => (
-                <SettingRow
-                  key={name}
-                  id={`gesture-${name}`}
-                  title={GESTURE_LABELS[name]}
-                  description={GESTURE_DESCRIPTIONS[name]}
-                  hidden={rowHidden(`gesture-${name}`)}
-                >
-                  <select aria-label={`${name}ジェスチャー`} value={draft.mouseGestures[name]} onChange={(event) => onMouseGestureChange(name, event.target.value as MouseGestureAction)}>
-                    {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{gestureActionLabel(action)}</option>)}
-                  </select>
                 </SettingRow>
-              ))}
-              <SettingRow id="gesture-double-click" title="ダブルクリック" description={`${GESTURE_DESCRIPTIONS.doubleClick} 誤操作を避けるため変更できません。`} hidden={rowHidden("gesture-double-click")}>
-                <span className="settings-fixed-value">doubleClick: 全画面表示／解除（固定）</span>
-              </SettingRow>
+                {WHEEL_GESTURE_NAMES.map((name) => (
+                  <SettingRow
+                    key={name}
+                    id={`gesture-${name}`}
+                    title={GESTURE_LABELS[name]}
+                    description={GESTURE_DESCRIPTIONS[name]}
+                    hidden={rowHidden(`gesture-${name}`)}
+                  >
+                    <select aria-label={`${name}ジェスチャー`} value={draft.mouseGestures[name]} onChange={(event) => onMouseGestureChange(name, event.target.value as MouseGestureAction)}>
+                      {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{gestureActionLabel(action)}</option>)}
+                    </select>
+                  </SettingRow>
+                ))}
+                <h5 className="settings-subheading" hidden={groupHidden([...MOUSE_BUTTON_GESTURE_NAMES.map((name) => `gesture-${name}`), "gesture-double-click"])}>追加ボタン</h5>
+                {MOUSE_BUTTON_GESTURE_NAMES.map((name) => (
+                  <SettingRow
+                    key={name}
+                    id={`gesture-${name}`}
+                    title={GESTURE_LABELS[name]}
+                    description={GESTURE_DESCRIPTIONS[name]}
+                    hidden={rowHidden(`gesture-${name}`)}
+                  >
+                    <select aria-label={`${name}ジェスチャー`} value={draft.mouseGestures[name]} onChange={(event) => onMouseGestureChange(name, event.target.value as MouseGestureAction)}>
+                      {MOUSE_GESTURE_ACTIONS.map((action) => <option key={action} value={action}>{gestureActionLabel(action)}</option>)}
+                    </select>
+                  </SettingRow>
+                ))}
+                <SettingRow id="gesture-double-click" title="ダブルクリック" description={`${GESTURE_DESCRIPTIONS.doubleClick} 誤操作を避けるため変更できません。`} hidden={rowHidden("gesture-double-click")}>
+                  <span className="settings-fixed-value">doubleClick: 全画面表示／解除（固定）</span>
+                </SettingRow>
+              </section>
             </section>
 
             <section className="settings-panel" aria-label="プロファイル設定" hidden={panelHidden("profile")}>

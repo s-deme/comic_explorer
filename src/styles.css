@@ -1525,11 +1525,21 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .settings-panel-heading h3 { margin: 0 0 3px !important; }
 .settings-panel-heading p { margin: 0; color: var(--theme-text-muted); font-size: .8rem; }
 .settings-section-description { margin: -2px 0 14px; color: var(--theme-text-muted); font-size: .82rem; line-height: 1.45; }
+.settings-input-group-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 18px; }
+.settings-input-group-navigation button { display: grid; min-width: 0; gap: 3px; padding: 10px 12px; border: 1px solid var(--theme-border); background: var(--theme-surface-muted); color: var(--theme-text); text-align: left; }
+.settings-input-group-navigation button strong { font-size: .88rem; }
+.settings-input-group-navigation button small { color: var(--theme-text-muted); font-size: .75rem; line-height: 1.35; }
+.settings-input-group-navigation button[aria-current="page"] { border-color: var(--theme-accent); background: var(--ui-soft-accent); color: var(--theme-accent); }
+.settings-input-group-navigation button[aria-current="page"] small { color: inherit; }
+.settings-input-group { min-width: 0; }
+.settings-input-group-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 10px 0 12px; }
+.settings-input-group-heading h4 { margin: 0 0 3px; color: var(--theme-text); font-size: 1rem; }
+.settings-input-group-heading p { margin: 0; color: var(--theme-text-muted); font-size: .8rem; line-height: 1.45; }
 .settings-command-header,
 .settings-command-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(72px, .42fr) minmax(120px, .72fr) minmax(110px, .62fr) minmax(110px, .72fr) minmax(220px, 1.5fr) 58px;
+  grid-template-columns: minmax(72px, .42fr) minmax(120px, .72fr) minmax(110px, .72fr) minmax(220px, 1.5fr) 58px;
   align-items: center;
   gap: 10px;
   padding: 9px 8px;
@@ -1563,7 +1573,6 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .settings-shortcut-binding input { width: 100%; min-width: 0; }
 .settings-shortcut-binding button,
 .settings-shortcut-bindings > button { min-height: 28px; padding-inline: 6px; font-size: .72rem; }
-.settings-command-mouse { overflow-wrap: anywhere; }
 .settings-command-description small { display: block; margin-top: 3px; color: var(--theme-text-muted); line-height: 1.35; }
 .settings-command-row > button { min-height: 30px; padding-inline: 8px; }
 .settings-subheading { margin-top: 26px !important; }
@@ -2454,15 +2463,13 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   .settings-command-row > label { grid-column: 2; grid-row: 1; }
   .settings-command-row > button { grid-column: 3; grid-row: 1; }
   .settings-command-row > .settings-shortcut-bindings { grid-column: 1 / -1; grid-row: 2; }
-  .settings-command-row > .settings-command-mouse {
+  .settings-command-row > .settings-command-description {
     grid-column: 1 / -1;
     grid-row: 3;
   }
-  .settings-command-row > .settings-command-description {
-    grid-column: 1 / -1;
-    grid-row: 4;
-  }
   .settings-panel-heading { align-items: stretch; flex-direction: column; }
+  .settings-input-group-navigation { grid-template-columns: 1fr; }
+  .settings-input-group-heading { align-items: stretch; flex-direction: column; }
   .settings-actions p[role="status"] { order: 5; width: 100%; flex-basis: 100%; white-space: normal; }
 }
 

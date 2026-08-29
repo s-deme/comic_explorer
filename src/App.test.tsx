@@ -3654,8 +3654,15 @@ describe("application shell", () => {
     expect(within(categories).getByRole("button", { name: /^一覧表示/ }))
       .toHaveAttribute("aria-current", "page");
     fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
+    const inputGroups = within(dialog).getByRole("navigation", { name: "操作と入力の分類" });
+    expect(within(inputGroups).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      expect.stringContaining("キー設定"),
+      expect.stringContaining("マウス設定"),
+      expect.stringContaining("ジェスチャー設定"),
+    ]);
     expect(within(dialog).queryByLabelText("doubleClickジェスチャー"))
       .not.toBeInTheDocument();
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
     expect(within(dialog).getByText("doubleClick: 全画面表示／解除（固定）"))
       .toBeInTheDocument();
     fireEvent.click(within(categories).getByRole("button", { name: /^一覧表示/ }));
@@ -3686,13 +3693,16 @@ describe("application shell", () => {
     expect(draftScale).toHaveAttribute("step", "1");
     fireEvent.change(draftScale, { target: { value: "175" } });
     fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^キー設定/ }));
     fireEvent.keyDown(within(dialog).getByLabelText("次ページショートカット"), {
       key: "j",
       ctrlKey: true,
     });
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^マウス設定/ }));
     fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
       target: { value: "toggleSearch" },
     });
@@ -3791,9 +3801,12 @@ describe("application shell", () => {
     fireEvent.change(within(dialog).getByLabelText("profileページ内の走査順"), {
       target: { value: "z" },
     });
+    const reopenedInputGroups = within(dialog).getByRole("navigation", { name: "操作と入力の分類" });
+    fireEvent.click(within(reopenedInputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
+    fireEvent.click(within(reopenedInputGroups).getByRole("button", { name: /^マウス設定/ }));
     fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
       target: { value: "toggleSearch" },
     });

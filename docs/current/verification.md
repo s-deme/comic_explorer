@@ -25,6 +25,23 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 操作と入力のキー・マウス・ジェスチャー分離
+
+REQ-FR-B11-004に対し、統合設定の「操作と入力」をキー設定、マウス設定、ジェスチャー設定の3 groupへ
+分割した。キー設定には既存shortcut command表とキーによるpage内移動、マウス設定にはcatalog click・
+Viewer 4象限click・右click・drag pan、ジェスチャー設定にはViewer画像表示領域で動くswipe、wheel、
+右button+wheel、中/side buttonの割当とwheel不感帯を置く。double clickは全画面表示／解除に固定し、
+通常right click menu、Ctrl+wheel、touch、penを変更しない。profile保存と既存Viewer command dispatchは
+変更せず、設定変更は従来どおりApplyまでdraftへ留まる。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused settings / search | PASS | AppのFT-B19-001、FT-B19-006、REQ-MVP-022を実行し、3 groupの表示、group切替、ジェスチャー・マウス割当、検索、draftのapply/cancelを確認。FAIL 0。Python UI style 31件もPASS。 |
+| Windows tests | PASS | Python 76件、frontend 45 files / 599件、FAIL 0。 |
+| TypeScript typecheck / frontend build | PASS | `run-typecheck-windows.ps1` exit 0。88 modulesのproduction buildがexit 0、minify後695.15kBのchunk advisoryはFAILへ読み替えない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での通常幅・狭幅・DPI別のgroup切替、mouse deviceごとのgesture操作は未測定。 |
+
 ## 2026-08-29 テーマ選択previewと明色バリエーション
 
 REQ-FR-B24-001、002、006に対し、テーマ選択をカード状radio一覧から単一dropdownへ変更し、選択中の

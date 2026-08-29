@@ -42,6 +42,8 @@ Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低
 
 同日にアプリテーマ選択をカード状のradio一覧からdropdownへ置き換え、その直下に選択中の16 semantic colorを反映する非操作previewを常設した。system previewはWindowsの現在のlight/darkへ追従し、選択変更はApplyまで画面全体へ反映しない。組込みテーマは既存7件に、明るい赤のさくら、青のオーシャン、緑のメドウ、紫のラベンダーを追加して11件とし、全組込み配色をcustom themeと同じcontrast境界で検査する。release WebView2での各配色・forced-colors・DPI別目視は未測定として残す。
 
+同日に「操作と入力」をキー設定、マウス設定、ジェスチャー設定へ分割した。ジェスチャー設定ではViewer画像表示領域に限る左右swipe、wheel、右button+wheel、中button、戻る/進むside buttonの割当を、スワイプ・ホイール・追加buttonの順に表示する。double clickは誤操作回避のため全画面表示／解除に固定し、通常right click menu、Ctrl+wheelの倍率変更、touch、penへは影響させない。既存のprofile、SQLite保存、Viewer command dispatchを維持し、release WebView2での実device操作は未測定として残す。
+
 同日に画像フィルターdialogを、セット一覧・選択中セットの保存/有効化/削除・順序付き処理手順の三つのsurfaceへ再構成した。現在使用中のセットと手順数を明示し、少ない手順ではcontent高へ縮み、多数手順だけを各panel内でscrollする。狭いdialog幅ではcontainer queryにより1列へ切り替えるため、buttonの横方向切り落としやdialog全体の横scrollbarを作らない。FilterDialog 4件、Viewer 61件、Python UI style 31件、Windows frontend 599件、Python 75件、typecheck、buildはPASSした。release WebView2の直接目視は、この環境でbrowser接続を取得できず未測定として残す。
 
 同日にViewerの「その他の操作」を、toolbarの固定40px高で切り落とされる展開行から、表示とサイズ・移動と読み方・しおりと共有・画像の4群を持つ名前付きoverlay panelへ置き換えた。通常表示と全画面のどちらでも画像領域のlayoutを変えず、Escまたは閉じるbuttonで閉じる。Viewer表示中のnative title barは`Comic Explorer — <作品名>`へ更新し、作品切替時に再設定、Viewer終了時に`Comic Explorer`へ戻す。Tauri title APIの失敗は画面を閉じない。Viewer 62件、window adapter 6件、Python UI/release evidence 40件、Windows frontend 601件、Python 76件、typecheck、buildはPASSし、release WebView2直接目視は未測定として残す。
@@ -193,7 +195,7 @@ P5-BではLEY-FILTER-001〜016の16件をPublishedとし、P1〜P5の全103件�
 | FR-B08 / P8 GIF | FUT-C-006〜008のGIF範囲 | Implemented / BLOCKED | 実decodeとWIC先頭frame thumbnailはPASS。release WebView2でanimation、corrupt fallback未測定。 |
 | FR-B08 / P8 AVIF | FUT-C-006〜008のAVIF範囲 | Partial / BLOCKED | 安全な分類・metadata・MIMEのみ。製品decode未受入。 |
 | FR-B10 | tag | Implemented / PASS | — |
-| FR-B11 / keyboard・mouse | FUT-C-019 | Implemented / PASS | 16 command、9種類の変更可能mouse入力、固定double click、旧設定移行を検証済み。任意軌跡gesture、touch、gamepadはCandidate。 |
+| FR-B11 / keyboard・mouse・Viewer gesture | FUT-C-019 | Implemented / PASS | 16 command、9種類の変更可能mouse入力、固定double click、旧設定移行を検証済み。統合設定はキー、マウス、Viewer gestureを別groupで表示する。任意軌跡gesture、touch、gamepadはCandidate。 |
 | FR-B12 / P9 | FUT-C-001, FUT-C-002 | Implemented / PASS | RAR/CBR、7z/CB7、LZH readerとZIP/RAR/7z/LZH混在の多重圧縮をWindows Rust canonical、再生成可能fixture、license gateで直接検証済み。 |
 | FR-B13 / P1 | catalog command | Implemented / PASS | — |
 | FR-B14 / P2 | open・navigation | Implemented / PASS | — |
