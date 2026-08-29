@@ -28,8 +28,6 @@ ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱してい�
 - 明るさ、コントラスト、ガンマ、色反転、トリミングなどを原本を変えずに適用する
 - ファイルの名前変更、コピー、移動、新規フォルダー作成などを確認しながら行う
 
-より詳しい内容は[実装済み機能の一覧](docs/implemented-features.md)で確認できます。
-
 ## はじめかた
 
 1. Comic Explorerを起動します。
@@ -98,12 +96,7 @@ EPUBは画像を含むZIP互換書庫として開きます。電子書籍の文�
 - Susieプラグインなど、外部DLLを読み込むプラグイン機能には対応していません。
 - Windows 10/11の環境差、高DPI、スクリーンリーダー、大規模コレクションの性能は引き続き確認中です。
 
-未実装、別方式で提供している機能、安全上採用していない機能は
-[未実装・非採用機能](docs/unimplemented-features.md)に分けて記載しています。
-
 ## 関連ドキュメント
 
-- [実装済み機能](docs/implemented-features.md)
-- [未実装・非採用機能](docs/unimplemented-features.md)
 - [現在の開発・検証状況](docs/current/status.md)
 - [ドキュメント一覧](docs/README.md)
