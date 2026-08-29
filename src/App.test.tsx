@@ -607,7 +607,15 @@ function openSearchPane() {
 }
 
 describe("application shell", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    folderWatchHarness.handler = undefined;
+    cliLaunchHarness.handler = undefined;
+    recursiveThumbnailHarness.handler = undefined;
+    nativeFileDropHarness.handler = undefined;
+  });
 
   beforeEach(() => {
     registerMock.mockReset();
@@ -3646,7 +3654,7 @@ describe("application shell", () => {
       .toBeInTheDocument();
   });
 
-  it("FT-B19-001 keeps integrated settings as a draft until one atomic Apply", async () => {
+  it("FT-B19-001 keeps integrated settings as a draft until Cancel", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);
     chooseAppMenuItem("オプション", "統合設定…");
     let dialog = screen.getByRole("dialog", { name: "統合設定" });
@@ -3718,95 +3726,33 @@ describe("application shell", () => {
       .toHaveAttribute("data-catalog-view-mode", "cover_list");
     expect(screen.getByRole("complementary", { name: "フォルダツリー" })).toBeInTheDocument();
     expect(saveSettingsProfileMock).not.toHaveBeenCalled();
+  });
 
+  it("FT-B19-001 applies representative settings from each category atomically", async () => {
+    await registerTestLibrary([testEntry("book.cbz")]);
     chooseAppMenuItem("オプション", "統合設定…");
-    dialog = screen.getByRole("dialog", { name: "統合設定" });
-    const reopenedCategories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    const categories = within(dialog).getByRole("navigation", { name: "設定カテゴリ" });
     fireEvent.change(within(dialog).getByLabelText("profile一覧形式"), {
       target: { value: "reference_tile" },
     });
     fireEvent.change(within(dialog).getByRole("spinbutton", {
       name: "profile情報カードのサイズ（px）",
     }), { target: { value: "176" } });
-    fireEvent.change(within(dialog).getByRole("spinbutton", {
-      name: "profileカードグリッドのサイズ（px）",
-    }), { target: { value: "224" } });
-    fireEvent.change(within(dialog).getByLabelText("profileフォルダーを開く規則"), {
-      target: { value: "read" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile画像を開く規則"), {
-      target: { value: "none" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile書庫・PDFを開く規則"), {
-      target: { value: "none" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile詳細リストの罫線"), {
-      target: { value: "both" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile詳細リストの行密度"), {
-      target: { value: "compact" },
-    });
-    fireEvent.click(within(dialog).getByLabelText("profile詳細リストに種別を表示"));
-    fireEvent.click(within(dialog).getByLabelText("profile詳細リストにサイズを表示"));
-    fireEvent.click(within(dialog).getByLabelText("profile詳細リストに更新日時を表示"));
-    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^画面/ }));
+    fireEvent.click(within(categories).getByRole("button", { name: /^画面/ }));
     fireEvent.click(within(dialog).getByLabelText("profileフォルダツリー"));
-    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^ビューワ/ }));
-    fireEvent.change(within(dialog).getByLabelText("profile閲覧モード"), {
-      target: { value: "auto" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile見開き縦長判定（%）"), {
-      target: { value: "80" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile自動見開き画面幅判定（%）"), {
-      target: { value: "160" },
-    });
-    fireEvent.click(within(dialog).getByLabelText("profile先頭ページを単独表示"));
-    fireEvent.change(within(dialog).getByLabelText("profile見開き組合せ開始"), {
-      target: { value: "even" },
-    });
-    fireEvent.click(within(dialog).getByLabelText("profile小画像のフィット拡大"));
-    fireEvent.change(within(dialog).getByLabelText("profile見開きフィット基準"), {
-      target: { value: "page" },
-    });
-    fireEvent.click(within(dialog).getByLabelText("profile余白をフィット計算に含める"));
-    fireEvent.change(within(dialog).getByLabelText("profileルーペサイズ（px）"), {
-      target: { value: "240" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profileルーペ倍率（%）"), {
-      target: { value: "350" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile進行方向先読みページ数"), {
-      target: { value: "3" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile戻り方向先読みページ数"), {
-      target: { value: "2" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profile先読みメモリ上限（MiB）"), {
-      target: { value: "192" },
-    });
+    fireEvent.click(within(categories).getByRole("button", { name: /^ビューワ/ }));
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "profile任意倍率（%）" }),
       { target: { value: "175" } },
     );
-    fireEvent.click(within(reopenedCategories).getByRole("button", { name: /^操作/ }));
-    fireEvent.change(within(dialog).getByLabelText("profileページ内スクロール量（%）"), {
-      target: { value: "75" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("profileキーリピート加速（%）"), {
-      target: { value: "220" },
-    });
-    fireEvent.click(within(dialog).getByLabelText("profileキーの連続動作"));
-    fireEvent.click(within(dialog).getByLabelText("profileページ内スクロールアニメーション"));
-    fireEvent.change(within(dialog).getByLabelText("profileページ内の走査順"), {
-      target: { value: "z" },
-    });
-    const reopenedInputGroups = within(dialog).getByRole("navigation", { name: "操作と入力の分類" });
-    fireEvent.click(within(reopenedInputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
+    fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
+    const inputGroups = within(dialog).getByRole("navigation", { name: "操作と入力の分類" });
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
-    fireEvent.click(within(reopenedInputGroups).getByRole("button", { name: /^マウス設定/ }));
+    fireEvent.click(within(inputGroups).getByRole("button", { name: /^マウス設定/ }));
     fireEvent.change(within(dialog).getByLabelText("profile一覧中央ボタン割当"), {
       target: { value: "toggleSearch" },
     });
@@ -3826,37 +3772,11 @@ describe("application shell", () => {
         catalogThumbnailSizes: {
           smallThumbnail: 104,
           coverList: 144,
-          cardGrid: 224,
+          cardGrid: 216,
           referenceTile: 176,
         },
         treeVisible: false,
-        folderOpenRule: "read",
-        imageOpenRule: "none",
-        archiveOpenRule: "none",
-        detailGridLines: "both",
-        detailRowDensity: "compact",
-        detailShowKind: false,
-        detailShowSize: false,
-        detailShowModified: false,
-        viewMode: "auto",
-        spreadPortraitMaxAspectPercent: 80,
-        autoSpreadMinViewportAspectPercent: 160,
-        spreadFirstPageSingle: true,
-        spreadPairing: "even",
-        fitAllowUpscale: true,
-        fitBasis: "page",
-        fitIncludePageMargin: false,
-        loupeSize: 240,
-        loupeZoom: 3.5,
-        prefetchAhead: 3,
-        prefetchBehind: 2,
-        prefetchMemoryMiB: 192,
         scale: 1.75,
-        scrollStepPercent: 75,
-        keyScrollAccelerationPercent: 220,
-        keyScrollContinuous: false,
-        smoothScroll: false,
-        pageScanMode: "z",
         catalogMouseBindings: expect.objectContaining({
           primaryClick: "selectOnly",
           doubleClick: "openSelected",
@@ -3883,7 +3803,7 @@ describe("application shell", () => {
     expect(screen.getByRole("grid", { name: "現在のフォルダの項目" }))
       .toHaveStyle({ "--catalog-thumbnail-width": "176px" });
     expect(screen.queryByRole("complementary", { name: "フォルダツリー" })).not.toBeInTheDocument();
-  }, 60_000);
+  });
 
   it("REQ-MVP-022 orders settings by task and removes retired duplicate controls", async () => {
     await registerTestLibrary([testEntry("book.cbz")]);

@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$VenvPath = ".venv-windows"
+    [string]$VenvPath = ".venv-windows",
+    [ValidateRange(1, 4)]
+    [int]$FrontendWorkers = 2
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,7 +39,7 @@ try {
 
     $frontendTests = Invoke-TrackedNative -FilePath $node `
         -Arguments @((Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
-            "--pool=threads", "--poolOptions.threads.singleThread=true") `
+            "--pool=threads", "--maxWorkers=$FrontendWorkers", "--minWorkers=1") `
         -WorkingDirectory $projectRoot
     if ($frontendTests.StandardOutput) { [Console]::Out.Write($frontendTests.StandardOutput) }
     if ($frontendTests.StandardError) { [Console]::Error.Write($frontendTests.StandardError) }

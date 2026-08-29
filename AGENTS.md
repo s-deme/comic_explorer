@@ -47,12 +47,30 @@ Before implementing or changing user-visible behavior:
 
 For documentation, design, code, configuration, or test-only changes, update
 the relevant artifact first; do not create a new requirement unless behavior
-or acceptance criteria changed. After any tracked artifact change:
+or acceptance criteria changed. After any tracked artifact change, run scan
+and check. For a source or test change, also run the focused test that exercises
+the changed behavior:
 
 1. Run `.venv/bin/codd scan`.
 2. Run `.venv/bin/codd check`.
-3. Run `.venv/bin/codd verify` when executable code and tests are present and
-   the change can affect them.
+3. Run the canonical `.venv/bin/codd verify` once after the final executable
+   source or test change in the release batch. Do not separately run the full
+   platform test runner immediately before that command: CoDD verify already
+   invokes the configured aggregate test command.
+
+## Release batches and verification
+
+A single user request that explicitly lists multiple related implementation
+tasks is one release batch. Keep its worktree changes together and publish one
+commit after the batch's final verification. A later request starts a new batch
+after a completed handoff; only combine later requests when the user explicitly
+asks to combine them or while the current batch remains in progress.
+
+During a release batch, use focused tests and type checks after each affected
+area. After the final source or test change, run the build and the canonical
+CoDD scan, check, and verify sequence exactly once. If a gate is retried, record
+the reason (a repair or a diagnosed intermittent failure) in the handoff. This
+keeps feedback quick without weakening the final release gate.
 
 Do not report a change as complete when a relevant CoDD red gate fails. If a
 gate is intentionally not applicable (for example, before CI or tests exist),
