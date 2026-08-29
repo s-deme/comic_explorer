@@ -27,6 +27,29 @@ describe("catalog sorting", () => {
     ]);
   });
 
+  it("mixes hiragana and katakana names in gojuon order", () => {
+    const values = [
+      entry("イヅミ.cbz"),
+      entry("アカネ.cbz"),
+      entry("うた.cbz"),
+      entry("あかね.cbz"),
+      entry("いおり.cbz"),
+      entry("アキラ.cbz"),
+      entry("ウミ.cbz"),
+    ];
+
+    expect(sortCatalogEntries(values, "name", "ascending").map((item) => item.relativePath))
+      .toEqual([
+        "あかね.cbz",
+        "アカネ.cbz",
+        "アキラ.cbz",
+        "いおり.cbz",
+        "イヅミ.cbz",
+        "うた.cbz",
+        "ウミ.cbz",
+      ]);
+  });
+
   it("keeps missing modified values and sizes last in both directions", () => {
     const values = [
       entry("missing.cbz", { archiveKind: "cbz" }),

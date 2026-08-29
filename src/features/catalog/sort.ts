@@ -50,6 +50,22 @@ function displayName(entry: CatalogEntry): string {
   return entry.relativePath.split("/").at(-1) ?? entry.relativePath;
 }
 
+function normalizeKanaForSort(value: string): string {
+  return value.replace(/[\u30a1-\u30f6]/g, (character) =>
+    String.fromCharCode(character.charCodeAt(0) - 0x60),
+  );
+}
+
+function displayNameCompare(left: CatalogEntry, right: CatalogEntry): number {
+  const leftName = displayName(left);
+  const rightName = displayName(right);
+  const normalizedDifference = naturalCompare(
+    normalizeKanaForSort(leftName),
+    normalizeKanaForSort(rightName),
+  );
+  return normalizedDifference || naturalCompare(leftName, rightName);
+}
+
 function kindRank(entry: CatalogEntry): number {
   if (entry.kind === "folder") return 0;
   if (entry.kind === "comicFolder") return 1;
@@ -83,7 +99,7 @@ export function compareCatalogEntries(
   direction: SortDirection,
 ): number {
   let primary = 0;
-  if (field === "name") primary = naturalCompare(displayName(left), displayName(right));
+  if (field === "name") primary = displayNameCompare(left, right);
   else if (field === "modified")
     primary = optionalNumberCompare(left.modifiedMs, right.modifiedMs, direction);
   else if (field === "size")
@@ -95,7 +111,7 @@ export function compareCatalogEntries(
   }
   if (primary !== 0) return primary;
 
-  const name = naturalCompare(displayName(left), displayName(right));
+  const name = displayNameCompare(left, right);
   if (name !== 0) return name;
   return ordinalCompare(left.relativePath, right.relativePath);
 }
