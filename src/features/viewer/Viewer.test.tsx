@@ -1962,9 +1962,7 @@ describe("Viewer settings", () => {
     expect(onDeleteBookmark).toHaveBeenCalledWith("removed.png");
   });
 
-  it("FT-B18-003 closes a detached viewer with one Escape instead of only toggling its shell", async () => {
-    const onClose = vi.fn();
-    const onToggleDetached = vi.fn();
+  it("does not expose the retired same-window image separation control", () => {
     render(
       <Viewer
         session={session}
@@ -1972,17 +1970,11 @@ describe("Viewer settings", () => {
         initialMode="single"
         initialDirection="rightToLeft"
         onSettingsChange={() => undefined}
-        onClose={onClose}
-        detached
-        onToggleDetached={onToggleDetached}
+        onClose={() => undefined}
       />,
     );
 
-    const detachButton = screen.getByRole("button", { name: "画像表示を統合" });
-    detachButton.focus();
-    fireEvent.keyDown(detachButton, { key: "Escape" });
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(onToggleDetached).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /画像表示を.*分離|画像表示を.*統合/ })).toBeNull();
   });
 
   it("FT-B19-003 and REQ-LEY-P1-009 connect gestures with a wheel dead zone", () => {

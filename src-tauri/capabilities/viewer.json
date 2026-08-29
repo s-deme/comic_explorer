@@ -1,0 +1,12 @@
+{
+  "identifier": "viewer",
+  "description": "Capability for the reusable Comic Explorer Viewer window",
+  "windows": ["viewer"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-set-theme",
+    "core:window:allow-set-title"
+  ]
+}

@@ -181,8 +181,6 @@ interface ViewerProps {
   mouseGestures?: MouseGestureBindings;
   quadrantBindings?: ViewerQuadrantBindings;
   rightClickAction?: ViewerRightClickAction;
-  detached?: boolean;
-  onToggleDetached?: () => void;
   onSaveBookmark?: (index: number) => void;
   onNextBookmark?: (index: number) => number | null;
   onDeleteBookmark?: (pageKey: string) => void;
@@ -277,8 +275,6 @@ export function Viewer({
   mouseGestures,
   quadrantBindings,
   rightClickAction,
-  detached = false,
-  onToggleDetached,
   onSaveBookmark,
   onNextBookmark,
   onDeleteBookmark,
@@ -1351,11 +1347,6 @@ export function Viewer({
         cancelRectangleZoom();
         return;
       }
-      if (detached && event.key === "Escape") {
-        event.preventDefault();
-        handleCloseCommand();
-        return;
-      }
       const target = event.target instanceof HTMLElement ? event.target : null;
       const editingText = target !== null && (
         target.matches("input, textarea, select, [contenteditable=true]")
@@ -1462,7 +1453,7 @@ export function Viewer({
         <p>{page.relativePath}</p>
         <button onClick={() => previous()}>前ページ</button>
         <button data-product-id="viewer-error-next" onClick={() => next()}>次ページ</button>
-        <button onClick={close}>一覧へ戻る</button>
+        <button onClick={close}>ビューワを閉じる</button>
       </div>
     ) : mediaUris[index] ? (
       <img
@@ -1548,7 +1539,7 @@ export function Viewer({
             className="viewer-icon-button viewer-toolbar-close"
             type="button"
             aria-label="一覧へ戻る"
-            title="ビューワを閉じて一覧へ戻る"
+            title="ビューワを閉じる（一覧は開いたまま）"
             data-product-id="viewer-close"
             onClick={close}
           >
@@ -1854,16 +1845,6 @@ export function Viewer({
                 }}
               >
                 <span aria-hidden="true">☷</span><span>しおり一覧</span>
-              </button>
-              <button
-                className="viewer-more-action"
-                type="button"
-                aria-label={detached ? "画像表示を統合" : "画像表示を分離"}
-                title={detached ? "画像表示をメイン画面へ統合" : "画像表示を別領域へ分離"}
-                aria-pressed={detached}
-                onClick={onToggleDetached}
-              >
-                <span aria-hidden="true">{detached ? "↙" : "↗"}</span><span>{detached ? "画像表示を統合" : "画像表示を分離"}</span>
               </button>
               <button
                 className="viewer-more-action"

@@ -1,4 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CatalogGrid } from "./features/catalog/CatalogGrid";
 import {
   navigationReducer,
@@ -139,6 +142,11 @@ import {
   type EndOfVolumePolicy,
 } from "./features/catalog/end-of-volume";
 import { Viewer } from "./features/viewer/Viewer";
+import {
+  openViewerWindow,
+  type ViewerWindowLaunchMode,
+  type ViewerWindowStartAt,
+} from "./features/viewer/viewer-window";
 import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import type {
   ReadingDirection,
@@ -435,7 +443,7 @@ function themeRecordViews(catalog: CustomThemeCatalog): ThemeRecordView[] {
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
 type ToolbarMenuId = "sort" | "catalogView";
-type ViewerLaunchMode = "normal" | "fullscreen" | "slideshow";
+type ViewerLaunchMode = ViewerWindowLaunchMode;
 
 interface CatalogContextMenuState {
   entry: CatalogEntry | null;
@@ -805,7 +813,6 @@ export function App({
   const [detailShowSize, setDetailShowSize] = useState(true);
   const [detailShowModified, setDetailShowModified] = useState(true);
   const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
-  const [viewerDetached, setViewerDetached] = useState(false);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [trayNotice, setTrayNotice] = useState<string | null>(null);
   const [runtimeLabel, setRuntimeLabel] = useState("確認中");
@@ -4535,7 +4542,6 @@ export function App({
     setMetadataNotice(null);
     setBookmarks([]);
     setBookmarkNotice(null);
-    setViewerDetached(false);
     setThumbnails({});
     thumbnailRequests.current.clear();
   }
@@ -4561,10 +4567,51 @@ export function App({
     setSelectedPath((current) => current === candidate ? current : candidate);
   }
 
+  useEffect(() => {
+    if (!isTauri()) return;
+    let disposed = false;
+    let removeClosed: (() => void) | undefined;
+    let removePageChanged: (() => void) | undefined;
+    void listen("viewer:closed", () => {
+      void getCurrentWindow().show()
+        .then(() => getCurrentWindow().setFocus())
+        .catch(() => undefined);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else removeClosed = unlisten;
+    }).catch(() => undefined);
+    void listen<{ itemKey: string; pageKey: string }>("viewer:page-changed", (event) => {
+      if (
+        !viewerCatalogSelectionSync
+        || loadedCatalogPath !== navigation.current
+      ) return;
+      const candidate = visibleEntryPaths.has(event.payload.pageKey)
+        ? event.payload.pageKey
+        : visibleEntryPaths.has(event.payload.itemKey)
+          ? event.payload.itemKey
+          : null;
+      if (candidate === null) return;
+      selectionAnchor.current = candidate;
+      rememberedCatalogSelections.current.set(navigation.current, candidate);
+      setSelectedPaths((current) => current.length === 1 && current[0] === candidate
+        ? current
+        : [candidate]);
+      setSelectedPath((current) => current === candidate ? current : candidate);
+    }).then((unlisten) => {
+      if (disposed) unlisten();
+      else removePageChanged = unlisten;
+    }).catch(() => undefined);
+    return () => {
+      disposed = true;
+      removeClosed?.();
+      removePageChanged?.();
+    };
+  }, [loadedCatalogPath, navigation.current, viewerCatalogSelectionSync, visibleEntryPaths]);
+
   async function openComicEntry(
     entry: CatalogEntry,
     launchMode: ViewerLaunchMode = "normal",
-    startAt: "restored" | "first" | "last" = "restored",
+    startAt: ViewerWindowStartAt = "restored",
     preferArchiveFullscreen = true,
     requestedPageKey: string | null = null,
   ): Promise<boolean> {
@@ -4575,6 +4622,25 @@ export function App({
     setPendingEndOfVolume(null);
     setEndOfVolumeNotice(null);
     setLoadState({ status: "loading", path: entry.relativePath });
+    if (isTauri()) {
+      const opened = await openViewerWindow({
+        itemRelativePath: entry.relativePath,
+        launchMode: resolvedLaunchMode,
+        startAt,
+        requestedPageKey,
+      });
+      if (opened) {
+        rememberRecent(entry);
+        setLoadState({ status: "ready" });
+        return true;
+      }
+      setLoadState({
+        status: "error",
+        path: entry.relativePath,
+        message: "Viewerウィンドウを開けませんでした。",
+      });
+      return false;
+    }
     viewerGeneration.current += 1;
     const requestGeneration = viewerGeneration.current;
     try {
@@ -4741,10 +4807,7 @@ export function App({
   if (viewerSession !== null) {
     const activeViewerGeneration = viewerGeneration.current;
     return (
-      <div
-        className={viewerDetached ? "viewer-shell viewer-shell--detached" : "viewer-shell"}
-        data-viewer-detached={viewerDetached}
-      >
+      <div className="viewer-shell">
         <Viewer
           key={`${viewerSession.itemKey}:${viewerGeneration.current}`}
           session={viewerSession}
@@ -4814,8 +4877,6 @@ export function App({
           mouseGestures={mouseGestures}
           quadrantBindings={viewerQuadrantBindings}
           rightClickAction={viewerRightClickAction}
-          detached={viewerDetached}
-          onToggleDetached={() => setViewerDetached((current) => !current)}
           onSaveBookmark={saveCurrentBookmark}
           onDeleteBookmark={deleteCurrentBookmark}
           onNextBookmark={(index) => nextBookmark(

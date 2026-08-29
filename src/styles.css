@@ -476,16 +476,15 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   min-height: 25px;
   padding: 2px 4px;
 }
-.viewer-shell--detached {
-  position: fixed;
-  z-index: 20;
-  inset: 12px;
-  overflow: auto;
-  border: 2px solid var(--theme-accent);
+.viewer-window-state {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--theme-text);
   background: var(--theme-canvas);
-  box-shadow: 0 16px 48px color-mix(in srgb, var(--theme-text) 32%, transparent);
 }
-.viewer-shell--detached .viewer { min-height: calc(100vh - 28px); }
 .folder-tree {
   grid-area: navigation;
   position: relative;

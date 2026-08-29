@@ -25,6 +25,22 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 Viewer専用window化
+
+REQ-MVP-014Aに対し、Viewerを再利用するnative `viewer` windowへ移した。カタログwindowはViewerを
+開いてもmount解除・thumbnail破棄・一覧再取得を行わず、selectionとscroll位置を保持する。同じViewerを
+再度開く時は、そのwindowへ新しい作品／pageを渡してfocusする。閉じる操作はViewerだけを閉じ、一覧windowを
+前面へ戻す。従来の見かけだけを切り替える「画像表示を分離」操作は撤去した。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused Viewer / viewer-window | PASS | Viewer 62件、viewer window URL引数の往復・異常値拒否 2件、FAIL 0。 |
+| Windows tests | PASS | Python 76件、frontend 45 files / 599件、FAIL 0。 |
+| TypeScript typecheck / frontend build / SBOM | PASS | `run-typecheck-windows.ps1` exit 0。88 modulesのproduction buildがexit 0、minify後689.61kBのchunk advisoryはFAILへ読み替えない。SBOMは785 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | `cargo fmt --check`、locked check、lib 270件とshutdown process 1件、FAIL 0。既存dead-code warning 2件はPASSへ加算しない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での複数window起動、既存window再利用、DPI別の目視操作は未測定。 |
+
 ## 2026-08-29 Viewer toolbarの用途別再配置
 
 REQ-MVP-014Aに対し、上部toolbarを一覧へ戻る・作品名のidentity、表示枚数、倍率、しおりと補助操作、
