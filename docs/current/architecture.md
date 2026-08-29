@@ -31,6 +31,15 @@ codd:
 - filesystem変更は利用者が明示したfile manager操作だけに限定し、確認・再検証・結果の再列挙を行う。
 - すべての外部入力は境界で失敗を分類し、現在の画面を不必要に初期化しない。
 
+## 保守性を保つ実装境界
+
+- `App` はwindow shellとfeatureの組み立てだけを担い、catalog、file operation、reading、settings、Viewerの状態遷移と非同期処理はfeatureごとのcontrollerへ閉じ込める。
+- UIのIPC clientは共通のrequest context生成・Tauri invoke基盤と、catalog、file、reading、settings、Viewerなどのfeature facadeに分離する。DTOのwire nameとresponse shapeはfeature横断で一貫させる。
+- RustのTauri commandはfeatureごとのadapter moduleに置き、path検証、resource上限、SQLite書込みの正本をRust境界の外へ出さない。commandの登録だけはbootstrapに集約する。
+- SQLiteのconnection lifecycleとmigration適用はstate層に残し、settings、reading、catalog、integrationなどのrepository操作とmigration定義は責務ごとのmoduleに分ける。
+- frontend・backendでそれぞれ必要な設定の既定値とvalidationは、backendが返すcanonical settings responseを比較する契約テストでドリフトを検出する。言語間で実装詳細を共有しない。
+- feature controllerは狭いadapter interfaceを受け取り、unit testではそのfeatureが使うcommandだけをmockする。`App` のテストはfeatureをまたぐ利用者フローに限定する。
+
 ## 代表フロー
 
 1. UIがdrive/folderまたは作品を選ぶ。

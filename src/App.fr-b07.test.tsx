@@ -103,6 +103,8 @@ vi.mock("./features/library/client", () => ({
   executeNamedSettingsProfileSwitch: vi.fn(),
   deleteNamedSettingsProfile: vi.fn(),
   saveViewerSettings: vi.fn(),
+  diagnoseLibrary: vi.fn(async () => ({ status: "cancelled" })),
+  cancelLibraryDiagnostics: vi.fn(async () => ({ status: "cancelled" })),
   getTrayStatus: vi.fn(),
   storeMainWindowInTray: vi.fn(),
   quitApplication: vi.fn(),

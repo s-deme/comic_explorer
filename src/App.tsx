@@ -62,8 +62,6 @@ import {
   queryTags,
   setItemRating,
   searchLibrary,
-  diagnoseLibrary,
-  cancelLibraryDiagnostics,
   takeRecoveryNotice,
   addFavorite,
   listFavorites,
@@ -97,7 +95,6 @@ import {
   type CliLaunchPlan,
   type CliLaunchRequest,
   type CatalogActivationTrigger,
-  type DiagnosticReport,
   type FavoriteEntry,
   type FileClipboardStatus,
   type FileOperationResult,
@@ -121,6 +118,8 @@ import {
   listenNativeFileDrops,
   nativeDropTargetAt,
 } from "./features/library/native-file-drop";
+import { useLibraryDiagnostics } from "./features/diagnostics/useLibraryDiagnostics";
+import { LibraryDiagnosticsDialog } from "./features/diagnostics/LibraryDiagnosticsDialog";
 import {
   CatalogContextMenu,
   type CatalogContextAction,
@@ -515,34 +514,6 @@ function entryKindLabel(entry: CatalogEntry): string {
   return itemKindLabel(entry.kind, entry.relativePath, entry.archiveKind);
 }
 
-function diagnosticStatusLabel(status: DiagnosticReport["findings"][number]["status"]): string {
-  switch (status) {
-    case "added":
-      return "追加";
-    case "changed":
-      return "変更";
-    case "missing":
-      return "欠落";
-    case "duplicate":
-      return "重複";
-    case "corrupt":
-      return "破損書庫";
-  }
-}
-
-function diagnosticSeverityLabel(
-  severity: DiagnosticReport["findings"][number]["severity"],
-): string {
-  switch (severity) {
-    case "info":
-      return "情報";
-    case "warning":
-      return "警告";
-    case "error":
-      return "エラー";
-  }
-}
-
 function absoluteLoadTarget(libraryRoot: string | null, path: string): string {
   if (parseWindowsDriveAddress(path) !== null) return normalizeWindowsDisplayPath(path);
   if (libraryRoot === null || path === "") return normalizeWindowsDisplayPath(libraryRoot ?? path);
@@ -567,7 +538,6 @@ export function App({
   const historyGeneration = useRef(0);
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
-  const diagnosticGeneration = useRef(0);
   const recursiveThumbnailGeneration = useRef(0);
   const searchSourceGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
@@ -856,10 +826,16 @@ export function App({
   const [tagNameDraft, setTagNameDraft] = useState("");
   const [tagRenameDrafts, setTagRenameDrafts] = useState<Record<string, string>>({});
   const [tagNotice, setTagNotice] = useState<string | null>(null);
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
-  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport | null>(null);
-  const [diagnosticNotice, setDiagnosticNotice] = useState<string | null>(null);
+  const {
+    diagnosticsOpen,
+    diagnosticsLoading,
+    diagnosticReport,
+    diagnosticNotice,
+    runDiagnostics,
+    cancelDiagnostics,
+    resetDiagnostics,
+    closeDiagnostics,
+  } = useLibraryDiagnostics();
   const trayApiAvailable = trayStatusAvailable(trayStatus);
 
   useEffect(() => {
@@ -1762,8 +1738,7 @@ export function App({
     selectionPath: string | null = null,
   ): Promise<boolean> {
     clearSearch();
-    setDiagnosticReport(null);
-    setDiagnosticNotice(null);
+    resetDiagnostics();
     generation.current += 1;
     const response = await registerLibraryRoot(absolutePath, generation.current);
     if (response.status === "ok") {
@@ -2587,8 +2562,7 @@ export function App({
 
   async function chooseRootWithPicker() {
     clearSearch();
-    setDiagnosticReport(null);
-    setDiagnosticNotice(null);
+    resetDiagnostics();
     generation.current += 1;
     const response = await pickLibraryRoot(generation.current);
     if (response.status === "ok" && response.data) {
@@ -3109,37 +3083,6 @@ export function App({
     }
     void refreshItemTags(selectedPath);
   }, [selectedPath, tagsOpen]);
-
-  async function runDiagnostics(retry = false) {
-    const requestGeneration = ++diagnosticGeneration.current;
-    const baseline = diagnosticReport?.snapshot ?? null;
-    setDiagnosticsOpen(true);
-    setDiagnosticsLoading(true);
-    setDiagnosticNotice(null);
-    try {
-      const response = await diagnoseLibrary(baseline, requestGeneration, retry);
-      if (requestGeneration !== diagnosticGeneration.current) return;
-      if (response.status === "ok") {
-        setDiagnosticReport(response.data);
-      } else if (response.status === "cancelled") {
-        setDiagnosticNotice("ライブラリ診断をキャンセルしました。");
-      } else {
-        setDiagnosticNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === diagnosticGeneration.current) {
-        setDiagnosticNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === diagnosticGeneration.current) {
-        setDiagnosticsLoading(false);
-      }
-    }
-  }
-
-  function cancelDiagnostics() {
-    void cancelLibraryDiagnostics(diagnosticGeneration.current).catch(() => undefined);
-  }
 
   async function runRecursiveThumbnailGeneration() {
     if (libraryRoot === null || recursiveThumbnailRunning) return;
@@ -5925,102 +5868,15 @@ export function App({
           )}
         </div>
       </div>}
-      {(diagnosticsOpen || diagnosticsLoading || diagnosticNotice !== null) && (
-        <div className="dialog-backdrop">
-          <section
-            className="diagnostic-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="ライブラリ診断"
-            aria-busy={diagnosticsLoading}
-          >
-          <div className="diagnostic-panel-heading">
-            <h2>ライブラリ診断</h2>
-            <button
-              type="button"
-              onClick={() => {
-                setDiagnosticsOpen(false);
-                setDiagnosticNotice(null);
-              }}
-            >
-              閉じる
-            </button>
-          </div>
-          <section className="diagnostic-explanation" aria-labelledby="diagnostic-purpose-title">
-            <h3 id="diagnostic-purpose-title">何をする機能ですか？</h3>
-            <p>
-              ライブラリ内を読み取り専用で確認し、前回の診断結果からの追加・変更・欠落、重複した項目、
-              開けない対応書庫を一覧します。
-            </p>
-            <p>
-              作品ファイルは変更・削除せず、外部へ送信しません。初回は比較用の基準を作るため、項目が
-              「追加」と表示されることがあります。
-            </p>
-          </section>
-          {diagnosticsLoading && (
-            <div
-              className="diagnostic-progress"
-              role="status"
-              aria-live="polite"
-              data-diagnostic-loading="true"
-            >
-              <span className="diagnostic-activity-indicator" data-diagnostic-activity="indeterminate" aria-hidden="true" />
-              <div className="diagnostic-progress-copy">
-                <strong>診断を実行中です</strong>
-                <span>ライブラリの構成と対応書庫を確認しています。完了までこの表示が動き続けます。</span>
-              </div>
-              <button type="button" onClick={cancelDiagnostics}>
-                診断をキャンセル
-              </button>
-            </div>
-          )}
-          {diagnosticNotice !== null && (
-            <p role="alert" data-diagnostic-notice="true">
-              {diagnosticNotice}
-            </p>
-          )}
-          {diagnosticReport !== null && (
-            <>
-              <p
-                data-diagnostic-summary
-                data-scanned-count={diagnosticReport.summary.scanned}
-                data-finding-count={diagnosticReport.summary.findings}
-              >
-                検査 {diagnosticReport.summary.scanned}項目、問題 {diagnosticReport.summary.findings}件
-                （追加 {diagnosticReport.summary.added} / 変更 {diagnosticReport.summary.changed} /
-                欠落 {diagnosticReport.summary.missing} / 重複 {diagnosticReport.summary.duplicates} /
-                破損 {diagnosticReport.summary.corrupt}）
-              </p>
-              {diagnosticReport.findings.length === 0 ? (
-                <p role="status">問題は見つかりませんでした。</p>
-              ) : (
-                <ul aria-label="診断結果">
-                  {diagnosticReport.findings.map((finding, index) => (
-                    <li
-                      key={`${finding.itemIdentity}-${finding.status}-${index}`}
-                      data-diagnostic-status={finding.status}
-                      data-diagnostic-severity={finding.severity}
-                      data-diagnostic-path={finding.relativePath ?? finding.itemIdentity}
-                    >
-                      <span>{finding.relativePath ?? finding.itemIdentity}</span>
-                      <span>{diagnosticStatusLabel(finding.status)}</span>
-                      <span>{diagnosticSeverityLabel(finding.severity)}</span>
-                      <span>{finding.message}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <button type="button" onClick={() => void runDiagnostics(true)}>
-                診断を再実行
-              </button>
-            </>
-          )}
-          {diagnosticReport === null && !diagnosticsLoading && diagnosticNotice === null && (
-            <p role="status">診断結果はまだありません。</p>
-          )}
-          </section>
-        </div>
-      )}
+      <LibraryDiagnosticsDialog
+        open={diagnosticsOpen}
+        loading={diagnosticsLoading}
+        report={diagnosticReport}
+        notice={diagnosticNotice}
+        onClose={closeDiagnostics}
+        onCancel={cancelDiagnostics}
+        onRetry={() => void runDiagnostics(true)}
+      />
       {addressBarVisible && <form
         className="address-bar"
         onSubmit={(event) => {
