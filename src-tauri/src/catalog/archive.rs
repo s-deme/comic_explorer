@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 use delharc::LhaHeader;
+use encoding_rs::SHIFT_JIS;
 use sevenz_rust::{
     Archive as SevenZipArchive, Error as SevenZipError, Password, SevenZMethod, SevenZReader,
 };
@@ -472,9 +473,10 @@ fn list_zip_archive(path: &Path) -> Result<ArchiveListing, AppError> {
         if entry.is_dir() {
             continue;
         }
-        let relative = RelativePath::parse(entry.name()).map_err(|_| AppError {
+        let entry_name = zip_entry_name(entry.name_raw(), entry.name());
+        let relative = RelativePath::parse(&entry_name).map_err(|_| AppError {
             code: ErrorCode::InvalidPath,
-            message: format!("Unsafe archive entry path: {}", entry.name()),
+            message: format!("Unsafe archive entry path: {entry_name}"),
             target: None,
             retryable: false,
         })?;
@@ -688,7 +690,8 @@ fn read_zip_entry(
         target: None,
         retryable: false,
     })?;
-    let entry = archive.by_name(entry_name).map_err(|source| AppError {
+    let index = zip_entry_index(&mut archive, entry_name)?;
+    let entry = archive.by_index(index).map_err(|source| AppError {
         code: ErrorCode::CorruptArchive,
         message: format!("Cannot read archive entry: {source}"),
         target: None,
@@ -729,6 +732,30 @@ fn read_zip_entry(
         bytes,
         fingerprint_detail: detail,
     })
+}
+
+fn zip_entry_index(archive: &mut ZipArchive<File>, entry_name: &str) -> Result<usize, AppError> {
+    for index in 0..archive.len() {
+        let entry = archive.by_index_raw(index).map_err(|source| AppError {
+            code: ErrorCode::CorruptArchive,
+            message: format!("Cannot read archive entry {index}: {source}"),
+            target: None,
+            retryable: false,
+        })?;
+        if zip_entry_name(entry.name_raw(), entry.name()) == entry_name {
+            return Ok(index);
+        }
+    }
+    Err(archive_entry_not_found())
+}
+
+fn zip_entry_name(raw_name: &[u8], fallback_name: &str) -> String {
+    if let Ok(utf8_name) = std::str::from_utf8(raw_name) {
+        return utf8_name.to_owned();
+    }
+    SHIFT_JIS
+        .decode_without_bom_handling_and_without_replacement(raw_name)
+        .map_or_else(|| fallback_name.to_owned(), |decoded| decoded.into_owned())
 }
 
 fn read_rar_entry(
@@ -1321,6 +1348,12 @@ mod tests {
         writer.finish().unwrap().into_inner()
     }
 
+    fn shift_jis_zip_name(bytes: &[u8]) -> String {
+        // zip writes the bytes of a Rust string verbatim. This models a legacy
+        // archive whose filenames are Shift_JIS without the UTF-8 flag.
+        unsafe { String::from_utf8_unchecked(bytes.to_vec()) }
+    }
+
     fn virtual_children<'a>(
         entries: &'a [ArchiveVirtualEntry],
         parent_id: Option<&str>,
@@ -1388,6 +1421,37 @@ mod tests {
             ]
         );
         assert!(!path.parent().unwrap().join("chapter").exists());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn lists_and_reads_shift_jis_zip_entry_names_without_utf8_flag() {
+        let path = temporary_archive("shift-jis-names");
+        let file = File::create(&path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        let name = shift_jis_zip_name(&[
+            0x97, 0x63, 0x8f, 0x97, b'/', b'0', b'0', b'0', b'1', b'.', b'j', b'p', b'g',
+        ]);
+        writer
+            .start_file(
+                name,
+                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated),
+            )
+            .unwrap();
+        writer.write_all(b"legacy-page").unwrap();
+        writer.finish().unwrap();
+
+        let pages = enumerate_archive_pages(&path).unwrap();
+        assert_eq!(
+            pages.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            ["幼女/0001.jpg"]
+        );
+        assert_eq!(
+            read_archive_entry(&path, pages[0].as_str(), 1024)
+                .unwrap()
+                .bytes,
+            b"legacy-page"
+        );
         fs::remove_file(path).unwrap();
     }
 

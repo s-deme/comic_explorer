@@ -106,6 +106,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | cargo / embed-resource | 3.0.11 | MIT |
 | cargo / embed_plist | 1.2.2 | MIT OR Apache-2.0 |
+| cargo / encoding_rs | 0.8.35 | (Apache-2.0 OR MIT) AND BSD-3-Clause |
 | cargo / endi | 1.1.1 | MIT |
 | cargo / enumflags2 | 0.7.12 | MIT OR Apache-2.0 |
 | cargo / enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 |

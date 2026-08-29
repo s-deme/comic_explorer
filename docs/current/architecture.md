@@ -26,6 +26,7 @@ codd:
 ## 恒久的な設計境界
 
 - Rustだけがcanonical path、root containment、archive entry、resource上限、SQLite書込みを判断する。
+- ZIP entry名はUTF-8 flagを正本とし、flagのない日本語名はShift_JISとして復元する。表示・安全性検証・entry再読込には同じ復元名を使う。
 - Viewerはmain catalog windowをunmountしない再利用windowである。閉じてもcatalogの一覧・選択・scrollを保持する。
 - 画像変換、filter、thumbnail、clipboardは表示用の派生データだけを扱い、library原本を書き換えない。
 - filesystem変更は利用者が明示したfile manager操作だけに限定し、確認・再検証・結果の再列挙を行う。

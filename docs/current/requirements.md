@@ -30,7 +30,7 @@ codd:
 | REQ-MVP-006 | 範囲を制限した非同期thumbnailとcacheを使う。 |
 | REQ-MVP-007 | sort、一覧形式、形式別thumbnail寸法を保存・復元する。名前順ではひらがなとカタカナを同じ読みとして比較し、混在して五十音順に並べる。 |
 | REQ-MVP-008 | 対応画像folderを安全に1冊として読む。 |
-| REQ-MVP-009 | 対応archiveを上限・危険path検証付きで非展開閲覧する。 |
+| REQ-MVP-009 | 対応archiveを上限・危険path検証付きで非展開閲覧する。UTF-8 flagのないShift_JIS名を持つZIPも、安全な内部pathとして読み取る。 |
 | REQ-MVP-010 | folderは移動、archive・PDF・画像はViewerで開き、文脈を復元する。 |
 | REQ-MVP-011 | Viewerはページ送りだけを使い、旧scroll layout値をページ送りへ正規化する。 |
 | REQ-MVP-012 | 見開きは最大2pageで、横長・末尾pageは単独表示する。 |
