@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import * as libraryClientFacade from "./client";
+import * as libraryClientCommands from "./client/commands";
 import { createDefaultSettingsProfile } from "../settings/profile";
 import {
   deleteCatalogMask,
@@ -83,6 +85,12 @@ describe("library client settings contract", () => {
     invokeMock.mockResolvedValue({ status: "cancelled" });
     listenMock.mockReset();
     listenMock.mockResolvedValue(vi.fn());
+  });
+
+  it("exports every transport command through a feature facade", () => {
+    expect(Object.keys(libraryClientFacade).sort()).toEqual(
+      Object.keys(libraryClientCommands).sort(),
+    );
   });
 
   it("REQ-LEY-P3-021 uses typed Rust queue IPC and the bounded native event", async () => {

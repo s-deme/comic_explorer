@@ -35,8 +35,8 @@ codd:
 
 - `App` はwindow shellとfeatureの組み立てだけを担い、catalog、file operation、reading、settings、Viewerの状態遷移と非同期処理はfeatureごとのcontrollerへ閉じ込める。
 - UIのIPC clientは共通のrequest context生成・Tauri invoke基盤と、catalog、file、reading、settings、Viewerなどのfeature facadeに分離する。DTOのwire nameとresponse shapeはfeature横断で一貫させる。
-- RustのTauri commandはfeatureごとのadapter moduleに置き、path検証、resource上限、SQLite書込みの正本をRust境界の外へ出さない。commandの登録だけはbootstrapに集約する。
-- SQLiteのconnection lifecycleとmigration適用はstate層に残し、settings、reading、catalog、integrationなどのrepository操作とmigration定義は責務ごとのmoduleに分ける。
+- RustのTauri commandはfeatureごとのadapter moduleに置き、path検証、resource上限、SQLite書込みの正本をRust境界の外へ出さない。commandの登録だけはbootstrapに集約する。設定の command と設定 profile の検証・変換は同じfeature moduleに置く。
+- SQLiteのconnection lifecycleとmigration適用はstate層に残し、settings、reading、catalog、integrationなどのrepository操作とmigration定義は責務ごとのmoduleに分ける。`reading_repository` と `catalog_repository` は `StateStore` の接続を共有しつつ領域ごとのqueryを所有する。
 - frontend・backendでそれぞれ必要な設定の既定値とvalidationは、backendが返すcanonical settings responseを比較する契約テストでドリフトを検出する。言語間で実装詳細を共有しない。
 - feature controllerは狭いadapter interfaceを受け取り、unit testではそのfeatureが使うcommandだけをmockする。`App` のテストはfeatureをまたぐ利用者フローに限定する。
 
