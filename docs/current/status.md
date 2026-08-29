@@ -40,6 +40,8 @@ Viewer toolbarはREQ-MVP-014Aにより主要操作だけを常時表示し、低
 
 同日にViewerをmain windowの画面切替から再利用可能な専用native windowへ移した。main側のcatalog、選択、scroll、読み込み済みthumbnailはViewerを開閉してもclear・unmount・再列挙しない。初回は相対item keyを持つViewer route、再利用時はwindow eventで作品を切り替え、閉じるとViewer windowだけを閉じてmainへfocusを戻す。Viewer window側は既存の安全なopen、bookmark、読書位置、page先読み、巻末移動、theme/settings境界を使う。同一window内の疑似「画像表示を分離」は廃止した。release WebView2での複数window、fullscreen、DPI別目視は未測定として残す。
 
+同日にアプリテーマ選択をカード状のradio一覧からdropdownへ置き換え、その直下に選択中の16 semantic colorを反映する非操作previewを常設した。system previewはWindowsの現在のlight/darkへ追従し、選択変更はApplyまで画面全体へ反映しない。組込みテーマは既存7件に、明るい赤のさくら、青のオーシャン、緑のメドウ、紫のラベンダーを追加して11件とし、全組込み配色をcustom themeと同じcontrast境界で検査する。release WebView2での各配色・forced-colors・DPI別目視は未測定として残す。
+
 同日に画像フィルターdialogを、セット一覧・選択中セットの保存/有効化/削除・順序付き処理手順の三つのsurfaceへ再構成した。現在使用中のセットと手順数を明示し、少ない手順ではcontent高へ縮み、多数手順だけを各panel内でscrollする。狭いdialog幅ではcontainer queryにより1列へ切り替えるため、buttonの横方向切り落としやdialog全体の横scrollbarを作らない。FilterDialog 4件、Viewer 61件、Python UI style 31件、Windows frontend 599件、Python 75件、typecheck、buildはPASSした。release WebView2の直接目視は、この環境でbrowser接続を取得できず未測定として残す。
 
 同日にViewerの「その他の操作」を、toolbarの固定40px高で切り落とされる展開行から、表示とサイズ・移動と読み方・しおりと共有・画像の4群を持つ名前付きoverlay panelへ置き換えた。通常表示と全画面のどちらでも画像領域のlayoutを変えず、Escまたは閉じるbuttonで閉じる。Viewer表示中のnative title barは`Comic Explorer — <作品名>`へ更新し、作品切替時に再設定、Viewer終了時に`Comic Explorer`へ戻す。Tauri title APIの失敗は画面を閉じない。Viewer 62件、window adapter 6件、Python UI/release evidence 40件、Windows frontend 601件、Python 76件、typecheck、buildはPASSし、release WebView2直接目視は未測定として残す。
@@ -204,7 +206,7 @@ P5-BではLEY-FILTER-001〜016の16件をPublishedとし、P1〜P5の全103件�
 | FR-B21 | standalone PDF | Implemented / PASS | Windows.Data.Pdfの実render、canonical path正規化、上限・分類・root containmentに加え、release WebView2のviewer・thumbnail実decodeを日本語名PDFで直接観測済み。 |
 | FR-B22 | file manager | Implemented / BLOCKED | Windows filesystemとOS clipboardのbackend実動作、Shell delete path正規化、catalog/tree context menu・keyboard操作・右click宛先paste・catalog/tree双方を起点とするdrag move・tree folder削除後の安全な親folder遷移・操作後tree再列挙・確認dialogのfrontend接続はPASS。native picker、ごみ箱、Explorerとの実paste、アプリ選択の製品直接観測は未測定。 |
 | FR-B23 | Leeyes viewer操作・外観 | Implemented / PASS | 既存3件にP1-Aのviewer/input 6件を加え、1〜800%倍率、pixel寸法、倍率scope、grid、pan係数、wheel不感帯、profile v5・SQLite保存、v1〜v4移行、不正値拒否をWindows frontend 316件、Python 59件、Rust canonical、typecheck、buildで検証済み。release WebView2上の目視・実device操作は未測定。 |
-| FR-B24 | アプリテーマ | Implemented / PASS | システム連動と7組み込みテーマ、16 semantic tokenのカスタムテーマ作成・複製・編集・JSON入出力、最大32件、SQLite schema v13、profile v29、native title bar同期、旧設定移行と原子的rollbackをWindows frontend 600件、Python 74件、Rust canonical 271+1件、typecheck、build、SBOM、CoDDで検証済み。release WebView2の色・DPI・Windows high contrast/forced-colors直接観測は未測定。 |
+| FR-B24 | アプリテーマ | Implemented / PASS | システム連動と11組み込みテーマ、dropdown選択と局所preview、16 semantic tokenのカスタムテーマ作成・複製・編集・JSON入出力、最大32件、SQLite schema v13、profile v29、native title bar同期、旧設定移行と原子的rollbackをWindows frontend、Python、Rust canonical、typecheck、build、SBOM、CoDDで検証する。release WebView2の色・DPI・Windows high contrast/forced-colors直接観測は未測定。 |
 
 ## CandidateとRejected
 

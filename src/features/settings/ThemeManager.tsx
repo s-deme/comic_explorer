@@ -1,5 +1,6 @@
 import {
   useId,
+  useEffect,
   useMemo,
   useState,
   type ChangeEvent,
@@ -14,6 +15,7 @@ import {
   validateThemeContrast,
   type CustomThemeSnapshot,
   type ThemeColorKey,
+  type ThemeBaseScheme,
   type ThemeDefinitionV1,
   type ThemeSelection,
 } from "./theme";
@@ -159,6 +161,69 @@ function ThemeSwatch({ definition }: { definition: ThemeDefinitionV1 }) {
   );
 }
 
+function previewStyle(definition: ThemeDefinitionV1): CSSProperties {
+  return {
+    "--preview-canvas": definition.colors.canvas,
+    "--preview-surface": definition.colors.surface,
+    "--preview-surface-muted": definition.colors.surfaceMuted,
+    "--preview-surface-raised": definition.colors.surfaceRaised,
+    "--preview-text": definition.colors.text,
+    "--preview-text-muted": definition.colors.textMuted,
+    "--preview-border": definition.colors.border,
+    "--preview-accent": definition.colors.accent,
+    "--preview-on-accent": definition.colors.onAccent,
+    "--preview-selection": definition.colors.selection,
+    "--preview-on-selection": definition.colors.onSelection,
+    "--preview-focus": definition.colors.focus,
+    "--preview-danger": definition.colors.danger,
+    "--preview-on-danger": definition.colors.onDanger,
+    "--preview-warning": definition.colors.warning,
+    "--preview-success": definition.colors.success,
+    colorScheme: definition.baseScheme,
+  } as CSSProperties;
+}
+
+function ThemePreview({
+  definition,
+  title,
+}: {
+  definition: ThemeDefinitionV1;
+  title: string;
+}) {
+  return (
+    <div className="theme-preview" style={previewStyle(definition)}>
+      <div className="theme-preview-toolbar">
+        <strong>{title}</strong>
+        <span className="theme-preview-accent-control">操作</span>
+      </div>
+      <div className="theme-preview-body">
+        <div className="theme-preview-raised">
+          <p>本文と <span className="theme-preview-muted">補助文字</span></p>
+          <p className="theme-preview-selection">選択中の項目</p>
+          <div className="theme-preview-states">
+            <span className="theme-preview-focus-control">フォーカス</span>
+            <span className="theme-preview-success">成功</span>
+            <span className="theme-preview-warning">警告</span>
+            <span className="theme-preview-danger">危険操作</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function systemThemeScheme(): ThemeBaseScheme {
+  return typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function baseSchemeLabel(scheme: ThemeBaseScheme): string {
+  return scheme === "dark" ? "ダーク" : "ライト";
+}
+
 export function ThemeManager({
   selection,
   snapshot,
@@ -182,6 +247,19 @@ export function ThemeManager({
   const [pendingDeleteThemeId, setPendingDeleteThemeId] = useState<number | null>(null);
   const [pendingDeleteInvalidThemeId, setPendingDeleteInvalidThemeId] = useState<number | null>(null);
   const [importPreview, setImportPreview] = useState<ThemeImportPreviewView | null>(null);
+  const [systemScheme, setSystemScheme] = useState<ThemeBaseScheme>(systemThemeScheme);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemScheme(media.matches ? "dark" : "light");
+    update();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+    media.addListener?.(update);
+    return () => media.removeListener?.(update);
+  }, []);
   const selectedLocalTheme = useMemo(() => {
     if (
       selection.kind !== "custom"
@@ -204,9 +282,23 @@ export function ThemeManager({
       ? `builtin:${selection.themeId}`
       : selectedLocalTheme !== null
         ? localChoiceValue(selectedLocalTheme)
-        : portableSnapshot !== null
+          : portableSnapshot !== null
           ? portableChoiceValue(portableSnapshot)
           : "";
+  const selectedDefinition = selection.kind === "system"
+    ? BUILTIN_THEMES[systemScheme]
+    : selection.kind === "builtin"
+      ? BUILTIN_THEMES[selection.themeId]
+      : snapshot !== null
+        && snapshot.themeId === selection.themeId
+        && snapshot.revision === selection.revision
+        ? snapshot.definition
+        : BUILTIN_THEMES.light;
+  const selectedThemeLabel = selection.kind === "system"
+    ? `システム（${systemScheme === "dark" ? "ダーク" : "ライト"}）`
+    : selection.kind === "builtin"
+      ? BUILTIN_THEME_LABELS[selection.themeId]
+      : selectedDefinition.name;
   const contrastIssues = useMemo(
     () => editor === null ? [] : validateThemeContrast(editor.colors),
     [editor],
@@ -239,7 +331,7 @@ export function ThemeManager({
     setEditor(copyDefinition(theme.definition));
   }
 
-  function chooseTheme(event: ChangeEvent<HTMLInputElement>) {
+  function chooseTheme(event: ChangeEvent<HTMLSelectElement>) {
     const value = event.target.value;
     if (value === "system") {
       onSelectionChange({ kind: "system" }, null);
@@ -336,110 +428,70 @@ export function ThemeManager({
 
   return (
     <div className="theme-manager">
-      <fieldset className="theme-choice-grid" disabled={busy}>
+      <fieldset className="theme-selection" disabled={busy}>
         <legend>アプリテーマ</legend>
-        <div className="theme-choice" data-selected={selectedValue === "system"}>
-          <input
-            id={`${controlId}-system`}
-            type="radio"
-            name={`${controlId}-app-theme`}
-            aria-label="システムテーマ"
-            value="system"
-            checked={selectedValue === "system"}
+        <label className="theme-selection-control" htmlFor={`${controlId}-app-theme`}>
+          <span>テーマ</span>
+          <select
+            id={`${controlId}-app-theme`}
+            aria-label="アプリテーマ"
+            value={selectedValue}
             onChange={chooseTheme}
-          />
-          <label className="theme-choice-label" htmlFor={`${controlId}-system`}>
-            <span><strong>システム</strong><small>Windowsのライト／ダーク設定へ追従</small></span>
-          </label>
-        </div>
-        {BUILTIN_THEME_IDS.map((themeId) => (
-          <div
-            className="theme-choice"
-            data-selected={selectedValue === `builtin:${themeId}`}
-            key={themeId}
           >
-            <input
-              id={`${controlId}-builtin-${themeId}`}
-              type="radio"
-              name={`${controlId}-app-theme`}
-              aria-label={`${BUILTIN_THEME_LABELS[themeId]}テーマ`}
-              value={`builtin:${themeId}`}
-              checked={selectedValue === `builtin:${themeId}`}
-              onChange={chooseTheme}
-            />
-            <label className="theme-choice-label" htmlFor={`${controlId}-builtin-${themeId}`}>
-              <ThemeSwatch definition={BUILTIN_THEMES[themeId]} />
-              <span><strong>{BUILTIN_THEME_LABELS[themeId]}</strong><small>組み込み・{BUILTIN_THEMES[themeId].baseScheme}</small></span>
-            </label>
-            <div className="theme-choice-actions">
-              <button
-                type="button"
-                aria-label={`${BUILTIN_THEME_LABELS[themeId]}組み込みテーマを複製`}
-                onClick={() => beginCreate(BUILTIN_THEMES[themeId], `${BUILTIN_THEME_LABELS[themeId]} のコピー`)}
-              >
-                複製
-              </button>
-            </div>
-          </div>
-        ))}
-        {portableSnapshot !== null && (
-          <div className="theme-choice theme-choice--portable" data-selected="true">
-            <input
-              id={`${controlId}-portable-${portableSnapshot.themeId}-${portableSnapshot.revision}`}
-              type="radio"
-              name={`${controlId}-app-theme`}
-              aria-label={`${portableSnapshot.definition.name}移植テーマ`}
-              value={portableChoiceValue(portableSnapshot)}
-              checked
-              onChange={chooseTheme}
-            />
-            <label
-              className="theme-choice-label"
-              htmlFor={`${controlId}-portable-${portableSnapshot.themeId}-${portableSnapshot.revision}`}
-            >
-              <ThemeSwatch definition={portableSnapshot.definition} />
-              <span>
-                <strong>{portableSnapshot.definition.name}</strong>
-                <small>
-                  {customThemes.some((theme) => theme.id === portableSnapshot.themeId)
-                    ? "移植テーマ・ローカル版とは異なるスナップショット"
-                    : "移植テーマ・ローカル未登録"}
-                </small>
-              </span>
-            </label>
-            <div className="theme-choice-actions">
-              <button
-                type="button"
-                aria-label={`${portableSnapshot.definition.name}移植テーマをローカルへ複製`}
-                onClick={() => beginCreate(
-                  portableSnapshot.definition,
-                  `${portableSnapshot.definition.name} のコピー`,
-                )}
-              >
-                ローカルへ複製
-              </button>
-            </div>
-          </div>
-        )}
+            {selectedValue === "" && <option value="" disabled>読み込みできないテーマ</option>}
+            <option value="system">システム（Windowsのライト／ダーク設定へ追従）</option>
+            <optgroup label="組み込みテーマ">
+              {BUILTIN_THEME_IDS.map((themeId) => (
+                <option key={themeId} value={`builtin:${themeId}`}>
+                  {BUILTIN_THEME_LABELS[themeId]}（{baseSchemeLabel(BUILTIN_THEMES[themeId].baseScheme)}）
+                </option>
+              ))}
+            </optgroup>
+            {customThemes.length > 0 && (
+              <optgroup label="カスタムテーマ">
+                {customThemes.map((theme) => (
+                  <option key={`${theme.id}-${theme.revision}`} value={localChoiceValue(theme)}>
+                    {theme.definition.name}（rev.{theme.revision}）
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {portableSnapshot !== null && (
+              <optgroup label="移植テーマ">
+                <option value={portableChoiceValue(portableSnapshot)}>
+                  {portableSnapshot.definition.name}（{customThemes.some((theme) => theme.id === portableSnapshot.themeId)
+                    ? "ローカル版と異なるスナップショット"
+                    : "ローカル未登録"}）
+                </option>
+              </optgroup>
+            )}
+          </select>
+        </label>
+        <p className="theme-selection-description">
+          {selectedThemeLabel} の配色です。適用を押すまで、アプリ全体の配色は変わりません。
+        </p>
+        <ThemePreview definition={selectedDefinition} title="選択中のテーマをプレビュー" />
+        <div className="settings-inline-actions">
+          <button
+            type="button"
+            aria-label={`選択中のテーマ「${selectedThemeLabel}」を複製`}
+            onClick={() => beginCreate(selectedDefinition, `${selectedDefinition.name} のコピー`)}
+          >
+            選択中のテーマを複製
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset className="theme-record-list" disabled={busy}>
+        <legend>カスタムテーマを管理</legend>
         {customThemes.map((theme) => (
-          <div
-            className="theme-choice"
+          <section
+            className="theme-record"
             data-selected={selectedValue === localChoiceValue(theme)}
+            aria-label={`${theme.definition.name}カスタムテーマ`}
             key={`${theme.id}-${theme.revision}`}
           >
-            <input
-              id={`${controlId}-custom-${theme.id}-${theme.revision}`}
-              type="radio"
-              name={`${controlId}-app-theme`}
-              aria-label={`${theme.definition.name}カスタムテーマ`}
-              value={localChoiceValue(theme)}
-              checked={selectedValue === localChoiceValue(theme)}
-              onChange={chooseTheme}
-            />
-            <label
-              className="theme-choice-label"
-              htmlFor={`${controlId}-custom-${theme.id}-${theme.revision}`}
-            >
+            <div className="theme-record-summary">
               <ThemeSwatch definition={theme.definition} />
               <span>
                 <strong>{theme.definition.name}</strong>
@@ -450,8 +502,8 @@ export function ThemeManager({
                     : ""}
                 </small>
               </span>
-            </label>
-            <div className="theme-choice-actions settings-inline-actions">
+            </div>
+            <div className="theme-record-actions settings-inline-actions">
               <button
                 type="button"
                 aria-label={appliedSelection.kind === "custom" && appliedSelection.themeId === theme.id
@@ -506,21 +558,20 @@ export function ThemeManager({
                 </button>
               )}
             </div>
-          </div>
+          </section>
         ))}
         {invalidThemes.map((theme) => {
           const displayName = invalidThemeDisplayName(theme);
           const active = theme.active
             || (appliedSelection.kind === "custom" && appliedSelection.themeId === theme.id);
           return (
-            <div
-              className="theme-choice theme-choice--invalid"
-              data-selected="false"
+            <section
+              className="theme-record theme-record--invalid"
               role="group"
               aria-label={`${displayName}破損テーマ`}
               key={`invalid-${theme.id}`}
             >
-              <div className="theme-choice-label">
+              <div className="theme-record-summary">
                 <span className="theme-invalid-badge">読み込み不可</span>
                 <span>
                   <strong>{displayName}</strong>
@@ -528,7 +579,7 @@ export function ThemeManager({
                   {active && <small>適用中のため、別テーマを適用してから削除できます。</small>}
                 </span>
               </div>
-              <div className="theme-choice-actions settings-inline-actions">
+              <div className="theme-record-actions settings-inline-actions">
                 <button
                   type="button"
                   className="danger-button"
@@ -556,9 +607,12 @@ export function ThemeManager({
                   </button>
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
+        {customThemes.length === 0 && invalidThemes.length === 0 && (
+          <p className="theme-record-empty">保存済みのカスタムテーマはありません。</p>
+        )}
       </fieldset>
 
       <div className="settings-inline-actions">
@@ -668,45 +722,7 @@ export function ThemeManager({
               </label>
             ))}
           </div>
-          <div
-            className="theme-preview"
-            style={{
-              "--preview-canvas": editor.colors.canvas,
-              "--preview-surface": editor.colors.surface,
-              "--preview-surface-muted": editor.colors.surfaceMuted,
-              "--preview-surface-raised": editor.colors.surfaceRaised,
-              "--preview-text": editor.colors.text,
-              "--preview-text-muted": editor.colors.textMuted,
-              "--preview-border": editor.colors.border,
-              "--preview-accent": editor.colors.accent,
-              "--preview-on-accent": editor.colors.onAccent,
-              "--preview-selection": editor.colors.selection,
-              "--preview-on-selection": editor.colors.onSelection,
-              "--preview-focus": editor.colors.focus,
-              "--preview-danger": editor.colors.danger,
-              "--preview-on-danger": editor.colors.onDanger,
-              "--preview-warning": editor.colors.warning,
-              "--preview-success": editor.colors.success,
-              colorScheme: editor.baseScheme,
-            } as CSSProperties}
-          >
-            <div className="theme-preview-toolbar">
-              <strong>テーマのプレビュー</strong>
-              <span className="theme-preview-accent-control">操作</span>
-            </div>
-            <div className="theme-preview-body">
-              <div className="theme-preview-raised">
-                <p>本文と <span className="theme-preview-muted">補助文字</span></p>
-                <p className="theme-preview-selection">選択中の項目</p>
-                <div className="theme-preview-states">
-                  <span className="theme-preview-focus-control">フォーカス</span>
-                  <span className="theme-preview-success">成功</span>
-                  <span className="theme-preview-warning">警告</span>
-                  <span className="theme-preview-danger">危険操作</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ThemePreview definition={editor} title="編集内容のプレビュー" />
           {contrastIssues.length > 0 && (
             <div className="theme-validation" role="alert">
               <strong>コントラストを調整してください（{contrastIssues.length}件）</strong>

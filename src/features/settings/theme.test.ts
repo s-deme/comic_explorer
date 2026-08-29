@@ -34,9 +34,10 @@ function customSnapshot(): CustomThemeSnapshot {
 }
 
 describe("application theme model", () => {
-  it("defines seven complete built-in palettes that pass the shared contrast boundary", () => {
+  it("defines eleven complete built-in palettes that pass the shared contrast boundary", () => {
     expect(BUILTIN_THEME_IDS).toEqual([
       "light", "dark", "paper", "midnight", "oled", "forest", "highContrast",
+      "sakura", "ocean", "meadow", "lavender",
     ]);
     for (const id of BUILTIN_THEME_IDS) {
       const definition = BUILTIN_THEMES[id];

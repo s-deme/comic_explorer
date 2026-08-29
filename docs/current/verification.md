@@ -25,6 +25,23 @@ codd:
 実装コードと実行可能なテストコードを検証内容の正本とする。本書は最後に受理された結果と
 未完了境界の要約であり、Git履歴上の過去runを現在のPASSへ合算しない。
 
+## 2026-08-29 テーマ選択previewと明色バリエーション
+
+REQ-FR-B24-001、002、006に対し、テーマ選択をカード状radio一覧から単一dropdownへ変更し、選択中の
+system／組込み／カスタムthemeの16 semantic colorを使う非操作previewを直下へ常設した。system previewは
+現在のlight/darkを追従し、選択変更はApplyまでrootへ反映しない。組込みthemeは11件へ拡張し、既存7件へ
+明るい赤のさくら、青のオーシャン、緑のメドウ、紫のラベンダーを追加した。frontendとRustの双方で全IDを
+受理し、全組込み配色は既存custom themeと同じcontrast境界を通る。
+
+| Gate | 結果 | 2026-08-29の実測 |
+|---|---|---|
+| Focused Theme / App / UI style | PASS | theme model 18件、ThemeManager 19件、App theme適用・rollback 4件、Rustの11組込みID受理 1件、Python UI style 31件、FAIL 0。 |
+| Windows tests | PASS | Python 76件、frontend 45 files / 599件、FAIL 0。 |
+| TypeScript typecheck / frontend build / SBOM | PASS | `run-typecheck-windows.ps1` exit 0。88 modulesのproduction buildがexit 0、minify後691.58kBのchunk advisoryはFAILへ読み替えない。SBOMは785 components、unknown/prohibited license 0。 |
+| Rust canonical | PASS | `cargo fmt --check`、locked check、lib 271件とshutdown process 1件、FAIL 0。既存dead-code warning 2件はPASSへ加算しない。 |
+| CoDD | PASS | scan、check、verifyがすべてred FAIL 0。既存の解決不能import 2件などadvisoryは機能PASSへ合算しない。 |
+| 製品直接観測 | NOT RUN | release WebView2での全theme、forced-colors、DPI別の色・可読性の目視は未測定。 |
+
 ## 2026-08-29 Viewer専用window化
 
 REQ-MVP-014Aに対し、Viewerを再利用するnative `viewer` windowへ移した。カタログwindowはViewerを

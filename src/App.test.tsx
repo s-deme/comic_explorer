@@ -3964,7 +3964,9 @@ describe("application shell", () => {
     chooseAppMenuItem("オプション", "統合設定…");
     const dialog = screen.getByRole("dialog", { name: "統合設定" });
     fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
-    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:dark" },
+    });
 
     expect(document.documentElement).toHaveAttribute("data-theme-id", "system");
     expect(saveSettingsProfileMock).not.toHaveBeenCalled();
@@ -4027,7 +4029,9 @@ describe("application shell", () => {
     chooseAppMenuItem("オプション", "統合設定…");
     const dialog = screen.getByRole("dialog", { name: "統合設定" });
     fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
-    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:dark" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     expect(await within(dialog).findByText(/設定を保存できませんでした/)).toBeInTheDocument();
@@ -4048,7 +4052,9 @@ describe("application shell", () => {
     chooseAppMenuItem("オプション", "統合設定…");
     const dialog = screen.getByRole("dialog", { name: "統合設定" });
     fireEvent.click(within(dialog).getByRole("button", { name: /^画面/ }));
-    fireEvent.click(within(dialog).getByRole("radio", { name: "ダークテーマ" }));
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:dark" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "適用" }));
 
     expect(await within(dialog).findByText(/ウィンドウ外観も元に戻せませんでした/))

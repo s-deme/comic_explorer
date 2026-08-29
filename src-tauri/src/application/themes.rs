@@ -22,6 +22,10 @@ pub enum BuiltinThemeId {
     Oled,
     Forest,
     HighContrast,
+    Sakura,
+    Ocean,
+    Meadow,
+    Lavender,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1064,6 +1068,28 @@ mod tests {
                 warning: "#FFD166".into(),
                 success: "#79E09A".into(),
             },
+        }
+    }
+
+    #[test]
+    fn fr_b24_accepts_every_builtin_theme_selection() {
+        for theme_id in [
+            "light",
+            "dark",
+            "paper",
+            "midnight",
+            "oled",
+            "forest",
+            "highContrast",
+            "sakura",
+            "ocean",
+            "meadow",
+            "lavender",
+        ] {
+            let selection: ThemeSelection =
+                serde_json::from_str(&format!(r#"{{"kind":"builtin","themeId":"{theme_id}"}}"#,))
+                    .unwrap();
+            assert!(normalize_theme_profile_fields(selection, None).is_ok());
         }
     }
 

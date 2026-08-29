@@ -89,7 +89,7 @@ function props(overrides: Partial<ThemeManagerProps> = {}): ThemeManagerProps {
 }
 
 function themeCard(name: string): HTMLElement {
-  const card = screen.getByText(name, { selector: "strong" }).closest(".theme-choice");
+  const card = screen.getByText(name, { selector: "strong" }).closest(".theme-record");
   if (!(card instanceof HTMLElement)) throw new Error(`theme card not found: ${name}`);
   return card;
 }
@@ -100,23 +100,17 @@ afterEach(() => {
 });
 
 describe("ThemeManager", () => {
-  it("REQ-FR-B24-001 selects system, a fixed built-in, and a custom snapshot", () => {
+  it("REQ-FR-B24-001 selects system, all built-ins, and custom themes from one dropdown", () => {
     const onSelectionChange = vi.fn();
     const initial = props({ onSelectionChange });
     const { rerender } = render(<ThemeManager {...initial} />);
 
-    const systemRadio = screen.getByRole("radio", { name: "システムテーマ" });
-    const forestRadio = screen.getByRole("radio", { name: "フォレストテーマ" });
-    expect(systemRadio).toBeChecked();
-    expect(systemRadio).toHaveAccessibleName("システムテーマ");
-    expect(forestRadio).toHaveAccessibleName("フォレストテーマ");
-    const forestCard = themeCard("フォレスト");
-    const forestLabel = forestCard.querySelector(".theme-choice-label");
-    const duplicate = within(forestCard).getByRole("button", {
-      name: "フォレスト組み込みテーマを複製",
-    });
-    expect(forestLabel).toHaveAttribute("for", forestRadio.id);
-    expect(forestLabel).not.toContainElement(duplicate);
+    const select = screen.getByRole("combobox", { name: "アプリテーマ" });
+    expect(select).toHaveValue("system");
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(expect.arrayContaining([
+      "さくら（ライト）", "オーシャン（ライト）", "メドウ（ライト）", "ラベンダー（ライト）",
+    ]));
     const customCard = themeCard("My Midnight");
     expect(within(customCard).getByRole("button", { name: "My Midnightカスタムテーマを編集" }))
       .toBeInTheDocument();
@@ -126,10 +120,10 @@ describe("ThemeManager", () => {
       .toBeInTheDocument();
     expect(within(customCard).getByRole("button", { name: "My Midnightカスタムテーマを削除" }))
       .toBeInTheDocument();
-    forestRadio.focus();
-    expect(forestRadio).toHaveFocus();
+    select.focus();
+    expect(select).toHaveFocus();
 
-    fireEvent.click(forestRadio);
+    fireEvent.change(select, { target: { value: "builtin:forest" } });
     expect(onSelectionChange).toHaveBeenLastCalledWith(
       { kind: "builtin", themeId: "forest" },
       null,
@@ -140,12 +134,12 @@ describe("ThemeManager", () => {
       themeId: customTheme.id,
       revision: customTheme.revision,
     }} snapshot={snapshot()} />);
-    expect(screen.getByRole("radio", { name: /My Midnight/ })).toBeChecked();
-    fireEvent.click(screen.getByRole("radio", { name: /システム/ }));
+    expect(select).toHaveValue("custom:7:3");
+    fireEvent.change(select, { target: { value: "system" } });
     expect(onSelectionChange).toHaveBeenLastCalledWith({ kind: "system" }, null);
 
     rerender(<ThemeManager {...initial} selection={{ kind: "system" }} snapshot={null} />);
-    fireEvent.click(screen.getByRole("radio", { name: /My Midnight/ }));
+    fireEvent.change(select, { target: { value: "custom:7:3" } });
     expect(onSelectionChange).toHaveBeenLastCalledWith(
       { kind: "custom", themeId: 7, revision: 3 },
       snapshot(),
@@ -171,8 +165,8 @@ describe("ThemeManager", () => {
       onSelectionChange,
     })} />);
 
-    expect(screen.getByRole("radio", { name: "My Midnightカスタムテーマ" })).toBeChecked();
-    expect(screen.queryByRole("radio", { name: /移植テーマ/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "アプリテーマ" })).toHaveValue("custom:7:3");
+    expect(screen.queryByRole("option", { name: /移植テーマ/ })).not.toBeInTheDocument();
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
@@ -190,14 +184,11 @@ describe("ThemeManager", () => {
       onSelectionChange,
     })} />);
 
-    const portableRadio = screen.getByRole("radio", { name: "Portable Paper移植テーマ" });
-    expect(portableRadio).toBeChecked();
-    expect(themeCard("Portable Paper")).toHaveAttribute("data-selected", "true");
-    expect(screen.getByText("移植テーマ・ローカル未登録")).toBeInTheDocument();
-    expect(within(themeCard("Portable Paper")).getByRole("button", {
-      name: "Portable Paper移植テーマをローカルへ複製",
-    }))
-      .toBeInTheDocument();
+    const select = screen.getByRole("combobox", { name: "アプリテーマ" });
+    expect(select).toHaveValue("portable:99:8");
+    expect(screen.getByRole("option", { name: /Portable Paper.*ローカル未登録/ })).toBeInTheDocument();
+    expect(screen.getByText("選択中のテーマをプレビュー").closest(".theme-preview"))
+      .toHaveStyle({ "--preview-canvas": BUILTIN_THEMES.paper.colors.canvas });
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
@@ -220,15 +211,13 @@ describe("ThemeManager", () => {
       onSelectionChange,
     })} />);
 
-    expect(screen.getByRole("radio", { name: "Portable Revision Three移植テーマ" }))
-      .toBeChecked();
-    const localRadio = screen.getByRole("radio", { name: "Local Revision Fourカスタムテーマ" });
-    expect(localRadio).not.toBeChecked();
-    expect(screen.getByText("移植テーマ・ローカル版とは異なるスナップショット"))
+    const select = screen.getByRole("combobox", { name: "アプリテーマ" });
+    expect(select).toHaveValue("portable:7:3");
+    expect(screen.getByRole("option", { name: /Portable Revision Three.*ローカル版と異なる/ }))
       .toBeInTheDocument();
     expect(onSelectionChange).not.toHaveBeenCalled();
 
-    fireEvent.click(localRadio);
+    fireEvent.change(select, { target: { value: "custom:7:4" } });
     expect(onSelectionChange).toHaveBeenCalledWith(
       { kind: "custom", themeId: 7, revision: 4 },
       snapshot(localTheme),
@@ -253,17 +242,18 @@ describe("ThemeManager", () => {
       onSelectionChange,
     })} />);
 
-    expect(screen.getByRole("radio", { name: "Portable OLED移植テーマ" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Local Forestカスタムテーマ" }))
-      .not.toBeChecked();
+    expect(screen.getByRole("combobox", { name: "アプリテーマ" })).toHaveValue("portable:7:3");
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   it("REQ-FR-B24-003 duplicates a built-in into the complete 16-color editor and blocks low contrast", () => {
-    render(<ThemeManager {...props()} />);
-    fireEvent.click(within(themeCard("ミッドナイト")).getByRole("button", {
-      name: "ミッドナイト組み込みテーマを複製",
-    }));
+    const initial = props();
+    const { rerender } = render(<ThemeManager {...initial} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:midnight" },
+    });
+    rerender(<ThemeManager {...initial} selection={{ kind: "builtin", themeId: "midnight" }} snapshot={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "選択中のテーマ「ミッドナイト」を複製" }));
 
     const editor = screen.getByRole("region", { name: "カスタムテーマ編集" });
     expect(within(editor).getByRole("textbox", { name: "テーマ名" }))
@@ -291,10 +281,13 @@ describe("ThemeManager", () => {
     { label: "backslash", value: "\\", error: "テーマ名に /、\\、制御文字は使用できません。" },
     { label: "control", value: "bad\u0001name", error: "テーマ名に /、\\、制御文字は使用できません。" },
   ])("REQ-FR-B24-003 explains an invalid $label theme name", ({ value, error }) => {
-    render(<ThemeManager {...props()} />);
-    fireEvent.click(within(themeCard("ミッドナイト")).getByRole("button", {
-      name: "ミッドナイト組み込みテーマを複製",
-    }));
+    const initial = props();
+    const { rerender } = render(<ThemeManager {...initial} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:midnight" },
+    });
+    rerender(<ThemeManager {...initial} selection={{ kind: "builtin", themeId: "midnight" }} snapshot={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "選択中のテーマ「ミッドナイト」を複製" }));
 
     const editor = screen.getByRole("region", { name: "カスタムテーマ編集" });
     const name = within(editor).getByRole("textbox", { name: "テーマ名" });
@@ -308,13 +301,15 @@ describe("ThemeManager", () => {
     expect(within(editor).getByRole("button", { name: "テーマを保存" })).toBeDisabled();
   });
 
-  it("REQ-FR-B24-003 scopes all 16 draft colors to a non-interactive preview mock", () => {
-    render(<ThemeManager {...props()} />);
-    fireEvent.click(within(themeCard("OLEDブラック")).getByRole("button", {
-      name: "OLEDブラック組み込みテーマを複製",
-    }));
+  it("REQ-FR-B24-002 and 003 scope every selected and editable theme color to non-interactive previews", () => {
+    const initial = props();
+    const { rerender } = render(<ThemeManager {...initial} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:oled" },
+    });
+    rerender(<ThemeManager {...initial} selection={{ kind: "builtin", themeId: "oled" }} snapshot={null} />);
 
-    const heading = screen.getByText("テーマのプレビュー");
+    const heading = screen.getByText("選択中のテーマをプレビュー");
     const preview = heading.closest(".theme-preview");
     expect(preview).toBeInstanceOf(HTMLElement);
     if (!(preview instanceof HTMLElement)) throw new Error("theme preview not found");
@@ -330,6 +325,10 @@ describe("ThemeManager", () => {
     expect(preview.querySelector(".theme-preview-danger")).toHaveTextContent("危険操作");
     expect(within(preview).getByText("操作").tagName).toBe("SPAN");
     expect(within(preview).queryByRole("button")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "選択中のテーマ「OLEDブラック」を複製" }));
+    const editorPreview = screen.getByText("編集内容のプレビュー").closest(".theme-preview");
+    expect(editorPreview).toHaveStyle({ "--preview-canvas": BUILTIN_THEMES.oled.colors.canvas });
   });
 
   it("REQ-FR-B24-003 selects the revisioned custom snapshot returned after save", async () => {
@@ -341,10 +340,13 @@ describe("ThemeManager", () => {
     };
     const onSave = vi.fn(async () => saved);
     const onSelectionChange = vi.fn();
-    render(<ThemeManager {...props({ onSave, onSelectionChange })} />);
-    fireEvent.click(within(themeCard("ペーパー")).getByRole("button", {
-      name: "ペーパー組み込みテーマを複製",
-    }));
+    const initial = props({ onSave, onSelectionChange });
+    const { rerender } = render(<ThemeManager {...initial} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "アプリテーマ" }), {
+      target: { value: "builtin:paper" },
+    });
+    rerender(<ThemeManager {...initial} selection={{ kind: "builtin", themeId: "paper" }} snapshot={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "選択中のテーマ「ペーパー」を複製" }));
     fireEvent.click(screen.getByRole("button", { name: "テーマを保存" }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(
