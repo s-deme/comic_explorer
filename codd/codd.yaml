@@ -99,6 +99,7 @@ scan:
     - "src-tauri/tauri.conf.json"
     - ".github/workflows/architecture-spike.yml"
     - ".github/workflows/product-quality.yml"
+    - ".github/workflows/windows-build.yml"
   exclude:
     - "**/node_modules/**"
     - "**/__pycache__/**"

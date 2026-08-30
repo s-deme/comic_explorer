@@ -22,6 +22,7 @@ codd:
 | Catalog | `src/features/catalog/`, `src/features/navigation/` | drive境界内の一覧、tree、search、selection、virtualize。 |
 | Viewer | `src/features/viewer/` | 別native windowのpage表示、入力、prefetch、非破壊filter/transformの反映。 |
 | Settings | `src/features/settings/`, app-local SQLite | strict profile、migration、named profile、themeを保存・正規化する。 |
+| Delivery | `.github/workflows/windows-build.yml` | `v<version>` tagをapplication versionと照合し、Windows installer、portable ZIP、SHA-256 checksumを同じGitHub Releaseへ公開する。 |
 
 ## 恒久的な設計境界
 

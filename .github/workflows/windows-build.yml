@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows-installer:
@@ -32,20 +34,43 @@ jobs:
       - name: Build Windows NSIS installer
         run: npm run tauri -- build --bundles nsis
 
-      - name: Prepare portable package
+      - name: Prepare release packages
         shell: pwsh
         run: |
+          $version = (Get-Content -LiteralPath "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json).version
           $portableRoot = Join-Path $PWD "dist\portable"
+          $releaseRoot = Join-Path $PWD "dist\release"
           New-Item -ItemType Directory -Force -Path $portableRoot | Out-Null
+          New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
           Copy-Item -LiteralPath "src-tauri\target\release\comic-explorer.exe" -Destination $portableRoot
           Copy-Item -LiteralPath "THIRD-PARTY-NOTICES.md" -Destination $portableRoot
           Copy-Item -LiteralPath "dist\SBOM.json" -Destination $portableRoot
+
+          $installers = @(Get-ChildItem -LiteralPath "src-tauri\target\release\bundle\nsis" -Filter "*.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)."
+          }
+
+          $installerPath = Join-Path $releaseRoot "Comic-Explorer-$version-windows-x64-setup.exe"
+          $portablePath = Join-Path $releaseRoot "Comic-Explorer-$version-windows-x64-portable.zip"
+          Copy-Item -LiteralPath $installers[0].FullName -Destination $installerPath
+          Compress-Archive -Path (Join-Path $portableRoot "*") -DestinationPath $portablePath
+
+          $checksumLines = @($installerPath, $portablePath) | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($_))"
+          }
+          [IO.File]::WriteAllLines(
+            (Join-Path $releaseRoot "SHA256SUMS.txt"),
+            $checksumLines,
+            [Text.UTF8Encoding]::new($false)
+          )
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v6
         with:
           name: comic-explorer-windows-installer-${{ github.sha }}
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          path: dist/release/*-setup.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -53,6 +78,60 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: comic-explorer-windows-portable-${{ github.sha }}
-          path: dist/portable/
+          path: dist/release/*-portable.zip
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: comic-explorer-windows-checksums-${{ github.sha }}
+          path: dist/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content -LiteralPath "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json).version
+          $expectedTag = "v$version"
+          if ($env:GITHUB_REF_NAME -cne $expectedTag) {
+            throw "Release tag '$env:GITHUB_REF_NAME' must match application version '$expectedTag'."
+          }
+
+          $releaseRoot = Join-Path $PWD "dist\release"
+          $assets = @(Get-ChildItem -LiteralPath $releaseRoot -File | Select-Object -ExpandProperty FullName)
+          $expectedAssets = @(
+            "Comic-Explorer-$version-windows-x64-setup.exe",
+            "Comic-Explorer-$version-windows-x64-portable.zip",
+            "SHA256SUMS.txt"
+          )
+          $releaseJson = gh release view $env:GITHUB_REF_NAME --json isDraft,assets 2>$null
+
+          if ($LASTEXITCODE -eq 0) {
+            $release = $releaseJson | ConvertFrom-Json
+            if (!$release.isDraft) {
+              $publishedAssets = @($release.assets | ForEach-Object { $_.name })
+              $missingAssets = @($expectedAssets | Where-Object { $_ -notin $publishedAssets })
+              if ($missingAssets.Count -ne 0) {
+                throw "Published release is missing assets: $($missingAssets -join ', ')."
+              }
+              Write-Host "Release $env:GITHUB_REF_NAME is already published with all expected assets."
+              exit 0
+            }
+
+            gh release upload $env:GITHUB_REF_NAME @assets --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME @assets --draft --verify-tag --generate-notes --title "Comic Explorer $env:GITHUB_REF_NAME"
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to prepare GitHub Release $env:GITHUB_REF_NAME."
+          }
+
+          gh release edit $env:GITHUB_REF_NAME --draft=false --latest
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to publish GitHub Release $env:GITHUB_REF_NAME."
+          }

@@ -66,7 +66,7 @@ class ReleaseEvidenceTests(unittest.TestCase):
             encoding="utf-8"
         )
         build = workflow.index("npm run tauri -- build --bundles nsis")
-        portable = workflow.index("Prepare portable package")
+        portable = workflow.index("Prepare release packages")
         installer_upload = workflow.index("Upload installer artifact")
         portable_upload = workflow.index("Upload portable ZIP artifact")
 
@@ -76,8 +76,35 @@ class ReleaseEvidenceTests(unittest.TestCase):
         self.assertIn('"src-tauri\\target\\release\\comic-explorer.exe"', workflow)
         self.assertIn('"THIRD-PARTY-NOTICES.md"', workflow)
         self.assertIn('"dist\\SBOM.json"', workflow)
+        self.assertIn("Compress-Archive", workflow)
         self.assertIn("name: comic-explorer-windows-portable-${{ github.sha }}", workflow)
-        self.assertIn("path: dist/portable/", workflow)
+        self.assertIn("path: dist/release/*-portable.zip", workflow)
+
+    def test_version_tags_publish_durable_github_release_assets(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "windows-build.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('      - "v*"', workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')", workflow)
+        self.assertIn('$expectedTag = "v$version"', workflow)
+        self.assertIn("gh release create", workflow)
+        self.assertIn("--draft --verify-tag --generate-notes", workflow)
+        self.assertIn("gh release edit", workflow)
+        self.assertIn("--draft=false --latest", workflow)
+        self.assertIn('"Comic-Explorer-$version-windows-x64-setup.exe"', workflow)
+        self.assertIn('"Comic-Explorer-$version-windows-x64-portable.zip"', workflow)
+        self.assertIn('"SHA256SUMS.txt"', workflow)
+
+    def test_readme_links_to_the_latest_github_release(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "https://github.com/s-deme/comic_explorer/releases/latest",
+            readme,
+        )
+        self.assertIn("SHA256SUMS.txt", readme)
 
     def test_windows_packages_require_preinstalled_webview2(self) -> None:
         tauri_config = json.loads(

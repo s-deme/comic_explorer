@@ -53,7 +53,7 @@ codd:
 | NFR-MVP-001 | 大規模catalogでも遅延処理、virtualize、bounded thumbnail cacheを使う。 |
 | NFR-MVP-002 | 起動、一覧、page、検索、memoryの性能目標を維持し、未測定は未測定と記録する。 |
 | NFR-MVP-003 | keyboard操作、focus可視化、判読可能なテーマ、responsiveな一覧・dialogを維持する。 |
-| NFR-MVP-004 | 再配布可能license、SBOM、THIRD-PARTY-NOTICESを同期する。 |
+| NFR-MVP-004 | 再配布可能license、SBOM、THIRD-PARTY-NOTICESを同期し、version tagに対応するGitHub ReleaseからWindows installer、portable ZIP、SHA-256 checksumを取得可能にする。 |
 | NFR-MVP-005 | Windows installerとportable artifactは既存WebView2を利用する。 |
 | NFR-MVP-006 | 実測、推定、未測定を混同しない。 |
 | NFR-MAINT-001 | Windows filesystemではWindows-native CoDD、test、typecheck、buildを使う。 |

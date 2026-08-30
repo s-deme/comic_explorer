@@ -7,10 +7,11 @@ Comic Explorerは、PCに保存している漫画や画像を、Windowsのエク
 
 ## ダウンロード
 
-GitHub Actionsの最新の「Windows packages」runから、用途に合わせて次のartifactを取得できます。
+[最新のGitHub Release](https://github.com/s-deme/comic_explorer/releases/latest)から、用途に合わせて次のファイルをダウンロードできます。
 
-- `comic-explorer-windows-installer-<commit>`: Windows installer
-- `comic-explorer-windows-portable-<commit>`: 展開して`comic-explorer.exe`を直接起動するZIP版
+- `Comic-Explorer-<version>-windows-x64-setup.exe`: Windows installer
+- `Comic-Explorer-<version>-windows-x64-portable.zip`: 展開して`comic-explorer.exe`を直接起動するZIP版
+- `SHA256SUMS.txt`: 配布ファイルのSHA-256 checksum
 
 ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
 どちらの配布形式にもWebView2 Runtimeは同梱されず、インストーラからの取得も行いません。
