@@ -117,8 +117,10 @@ describe("catalog sorting", () => {
       entry("current.cbz", { archiveKind: "cbz" }),
       entry("later.zip"),
     ];
+    const originalOrder = [...values];
     expect(previousComicEntry(values, "current.cbz")?.relativePath).toBe("plain-folder");
     expect(previousComicEntry(values, "first.pdf")).toBeUndefined();
     expect(previousComicEntry(values, "missing.cbz")).toBeUndefined();
+    expect(values).toEqual(originalOrder);
   });
 });

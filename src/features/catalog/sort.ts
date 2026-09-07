@@ -152,7 +152,7 @@ export function previousComicEntry(
     (entry) => entry.relativePath === currentRelativePath,
   );
   if (current < 0) return undefined;
-  return [...entries]
+  return entries
     .slice(0, current)
     .reverse()
     .find(isReadableVolumeEntry);
