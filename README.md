@@ -13,7 +13,7 @@ Comic Explorerは、PCに保存している漫画や画像を、Windowsのエク
 - `Comic-Explorer-<version>-windows-x64-portable.zip`: 展開して`comic-explorer.exe`を直接起動するZIP版
 - `SHA256SUMS.txt`: 配布ファイルのSHA-256 checksum
 
-ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
+ZIP版には実行ファイルのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
 どちらの配布形式にもWebView2 Runtimeは同梱されず、インストーラからの取得も行いません。
 起動には端末へ導入済みのMicrosoft Edge WebView2 Runtimeが必要です。
 
@@ -22,7 +22,7 @@ ZIP版には実行fileのほか、THIRD-PARTY-NOTICESとSBOMを同梱してい�
 - PC内のドライブとフォルダーをツリーからたどる
 - 漫画の表紙をサムネイルやカード形式で一覧表示する
 - フォルダー、PDF、ZIP、RAR、7z、LZHなどを直接開く
-- 単ページ、見開き、連続スクロール、全画面で読む
+- 単ページ、見開き、全画面で読む
 - 読む方向、拡大率、余白、背景、ページ送りを好みに合わせる
 - しおり、読書位置、お気に入り、タグ、メモ、評価、本棚を保存する
 - 名前、種類、サイズ、更新日、複数の場所を組み合わせて検索する

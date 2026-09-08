@@ -13,6 +13,7 @@
 | [verification.md](current/verification.md) | 最新検証結果、実行コマンド、未実測項目 |
 | [leeyes-feature-tracker.csv](current/leeyes-feature-tracker.csv) | Leeyes互換機能ごとの状態、要件、実装・テスト・検証証跡 |
 | [leeyes-implementation-manifest.csv](current/leeyes-implementation-manifest.csv) | 選択済み機能の実装順序 |
+| [development.md](development.md) | Windowsでの開発環境、実行、標準検証入口 |
 
 `current/leeyes-feature-tracker.md` はCSV台帳の更新規則である。統合前の要件、設計、計画、個別結果はGit履歴で参照・復元する。
 
