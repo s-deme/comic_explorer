@@ -5,17 +5,14 @@ Comic Explorerは、PCに保存している漫画や画像を、Windowsのエク
 
 > 現在のバージョンは0.1.0（開発版）です。一般配布に向けた実機確認を継続しています。
 
-## ダウンロード
+## インストールと起動
 
-[最新のGitHub Release](https://github.com/s-deme/comic_explorer/releases/latest)から、用途に合わせて次のファイルをダウンロードできます。
+1. [最新のGitHub Release](https://github.com/s-deme/comic_explorer/releases/latest)から、用途に合うファイルをダウンロードします。
+2. インストーラー版は `Comic-Explorer-<version>-windows-x64-setup.exe` を実行し、案内に従ってインストールします。
+3. ZIP版は `Comic-Explorer-<version>-windows-x64-portable.zip` を任意の場所に展開し、`comic-explorer.exe` を起動します。
 
-- `Comic-Explorer-<version>-windows-x64-setup.exe`: Windows installer
-- `Comic-Explorer-<version>-windows-x64-portable.zip`: 展開して`comic-explorer.exe`を直接起動するZIP版
-- `SHA256SUMS.txt`: 配布ファイルのSHA-256 checksum
-
-ZIP版には実行ファイルのほか、THIRD-PARTY-NOTICESとSBOMを同梱しています。
-どちらの配布形式にもWebView2 Runtimeは同梱されず、インストーラからの取得も行いません。
-起動には端末へ導入済みのMicrosoft Edge WebView2 Runtimeが必要です。
+ダウンロードしたファイルを確認したい場合は、同じReleaseの `SHA256SUMS.txt` を使えます。
+Comic ExplorerはMicrosoft Edge WebView2 Runtimeを利用します。インストーラーとZIP版には同梱されないため、起動できない場合は端末にWebView2 Runtimeが導入されていることを確認してください。
 
 ## できること
 
@@ -29,7 +26,7 @@ ZIP版には実行ファイルのほか、THIRD-PARTY-NOTICESとSBOMを同梱し
 - 明るさ、コントラスト、ガンマ、色反転、トリミングなどを原本を変えずに適用する
 - ファイルの名前変更、コピー、移動、新規フォルダー作成などを確認しながら行う
 
-## はじめかた
+## 最初の作品を開く
 
 1. Comic Explorerを起動します。
 2. 左側の「PC」から読みたい漫画があるドライブを選びます。
@@ -70,7 +67,7 @@ ZIP版には実行ファイルのほか、THIRD-PARTY-NOTICESとSBOMを同梱し
 
 EPUBは画像を含むZIP互換書庫として開きます。電子書籍の文章レイアウトやHTML本文の表示には対応していません。
 
-## 表示と整理
+## 読む・探す・整理する
 
 一覧は、詳細表示、サムネイル、表紙グリッド、カード、情報カードから選べます。表示サイズ、並べ替え、
 ファイルマスク、背景色、罫線、行間なども変更できます。
@@ -78,7 +75,7 @@ EPUBは画像を含むZIP互換書庫として開きます。電子書籍の文�
 お気に入り、タグ、メモ、評価、読書履歴、本棚はアプリ内に保存されます。元の漫画フォルダーへ
 管理ファイルを追加しないため、既存のコレクション構成をそのまま保てます。
 
-## 原本とプライバシー
+## 安心して使うために
 
 - 閲覧、サムネイル作成、画像フィルターでは元の画像や書庫を書き換えません。
 - 漫画、ファイルパス、読書履歴、設定を外部へ送信しません。
@@ -89,15 +86,10 @@ EPUBは画像を含むZIP互換書庫として開きます。電子書籍の文�
 ファイルの削除、名前変更、コピー、移動などを実行した場合は、選択した原本が実際に変更されます。
 確認画面の対象と操作内容を確認してから実行してください。
 
-## 現在の制限
+## 知っておきたい制限
 
 - Windows専用です。
 - AVIF画像の表示には未対応です。
 - アニメーションGIFは、利用環境によって静止画として表示される場合があります。
 - Susieプラグインなど、外部DLLを読み込むプラグイン機能には対応していません。
 - Windows 10/11の環境差、高DPI、スクリーンリーダー、大規模コレクションの性能は引き続き確認中です。
-
-## 関連ドキュメント
-
-- [現在の開発・検証状況](docs/current/status.md)
-- [ドキュメント一覧](docs/README.md)
