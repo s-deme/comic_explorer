@@ -316,7 +316,7 @@ fn is_webp(bytes: &[u8]) -> bool {
     bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP"
 }
 
-/// Decodes a static WebP without depending on the operating system's image codecs.
+/// Decodes a WebP (first animation frame) without depending on OS image codecs.
 ///
 /// WIC expects an opaque 24bpp BGR bitmap for the JPEG encoder. WebP's decoded
 /// pixels are unpremultiplied sRGB, so alpha is composited over white before the
@@ -332,12 +332,6 @@ fn decode_static_webp_pixels(bytes: &[u8]) -> Result<(u32, u32, usize, Vec<u8>),
                 &format!("Cannot decode WebP cover: {error}"),
             )
         })?;
-    if decoder.is_animated() {
-        return Err(thumbnail_error(
-            ErrorCode::UnsupportedFormat,
-            "Animated WebP covers are not supported.",
-        ));
-    }
 
     let (width, height) = decoder.dimensions();
     if (width, height) != (metadata.width, metadata.height)
@@ -966,6 +960,16 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(before, after);
         assert!(!root.join("1.png").exists());
+    }
+
+    #[test]
+    fn fr_b08_webp_animation_decodes_first_frame_for_derived_images() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-WEBP-001/errors/5-animated.webp");
+        let bytes = std::fs::read(path).unwrap();
+        let (width, height, channels, pixels) = decode_static_webp_pixels(&bytes).unwrap();
+        assert_eq!((width, height), (1, 1));
+        assert_eq!(pixels.len(), channels);
     }
 
     #[test]

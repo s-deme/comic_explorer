@@ -59,7 +59,7 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 | FIX-RAR-ERROR-001 | 破損、暗号化フラグ、分割フラグ、危険な相対path | なし | `corrupt`, `encrypted`, `unsupported`, `unsafe-entry`に分類 |
 | FIX-LIBRARY-001 | 通常／漫画folder、ZIP/CBZ/EPUB/RAR、未対応書庫、空、深い階層、長名、同値metadata | 項目sort規則による | 漫画folderはEnterで移動、明示的な`読む`で閲覧 |
 | FIX-READING-001 | 12ページのfolder/ZIP/CBZ/EPUB/RAR、保存・追加・削除 | `page1.png`〜`page12.png`／`page1.png` | 保存はpage7。同距離近傍は後方候補を優先 |
-| FIX-WEBP-001 | static WebP folder/ZIP/CBZ/EPUB/RAR | `1-lossy.webp, 2-lossless.webp, 3-alpha.webp`／`1-lossy.webp` | fixed 1×1 lossy/lossless/alpha。正常系は`folder/`のみ、negativeは別の`errors/4-corrupt.webp`・`errors/5-animated.webp` |
+| FIX-WEBP-001 | WebP folder/ZIP/CBZ/EPUB/RAR | `1-lossy.webp, 2-lossless.webp, 3-alpha.webp`／`1-lossy.webp` | fixed 1×1 lossy/lossless/alpha。`errors/4-corrupt.webp`は不正データ。歴史的にerrors配下にある`5-animated.webp`は現在アニメーション・先頭フレームの正常系 |
 | FIX-PERFORMANCE-001 | 1,000／10,000項目、300ページfolder/CBZ | 数字3桁の自然順 | `--include-performance`時だけ生成 |
 
 ## 原本改変検出

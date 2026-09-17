@@ -8,6 +8,7 @@ import {
   type ViewerSession,
 } from "../library/client";
 import { presentError, presentUnexpectedError } from "../errors/presentation";
+import { PagePreviewDialog } from "./PagePreviewDialog";
 import {
   clampLoupePointer,
   clampLoupeCenter,
@@ -412,6 +413,7 @@ export function Viewer({
   const rightButtonHeldRef = useRef(false);
   const rightClickRef = useRef<RightClickState | null>(null);
   const [panning, setPanning] = useState(false);
+  const [pagePreviewOpen, setPagePreviewOpen] = useState(false);
   const [rectangleZoomArmed, setRectangleZoomArmed] = useState(false);
   const [rectangleZoomSelection, setRectangleZoomSelection] =
     useState<RectangleZoomSelection | null>(null);
@@ -1332,6 +1334,7 @@ export function Viewer({
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
+      if (pagePreviewOpen) return;
       if (event.isComposing) return;
       if (toolbarMoreOpen && event.key === "Escape") {
         event.preventDefault();
@@ -2332,6 +2335,7 @@ export function Viewer({
           onChange={(event) => dispatch({ type: "go", index: Number(event.target.value) })}
         />
         <output aria-live="polite">{progress}</output>
+        <button type="button" data-product-id="viewer-preview" onClick={() => { setSlideshowRunning(false); setPagePreviewOpen(true); }}>プレビュー</button>
         <div className="viewer-page-actions" role="group" aria-label="ページ操作">
           <button
             className="viewer-icon-button viewer-page-action"
@@ -2396,6 +2400,13 @@ export function Viewer({
           </button>
         </div>
       </nav>
+      {pagePreviewOpen && <PagePreviewDialog
+        session={session}
+        generation={generation}
+        initialIndex={state.index}
+        onClose={() => setPagePreviewOpen(false)}
+        onSelect={(index) => { dispatch({ type: "go", index }); setPagePreviewOpen(false); }}
+      />}
     </section>
   );
 }

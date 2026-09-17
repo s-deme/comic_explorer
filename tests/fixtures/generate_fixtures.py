@@ -30,7 +30,7 @@ ZIP_TIME = (2023, 11, 14, 22, 13, 20)
 SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png", ".webp"}
 
 # Fixed 1x1 WebP conformance payloads keep fixture generation deterministic and
-# standard-library-only. The animation is a negative input for the static lane.
+# standard-library-only. The animation also verifies first-frame thumbnail decoding.
 WEBP_LOSSY = base64.b64decode(
     "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
 )

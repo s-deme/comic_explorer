@@ -550,7 +550,7 @@ class WindowsNativeToolchainTests(unittest.TestCase):
             '"webp folder ZIP and CBZ enumeration"',
             '"webp thumbnail decode and cache generation"',
             '"webp corrupt local error"',
-            '"webp animated local error"',
+            '"webp animated page displays"',
             '"webp local error next recovery"',
             '"webp thumbnail cache hit"',
         ):

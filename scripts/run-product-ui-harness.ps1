@@ -29,6 +29,7 @@ $script:sequence = 0
 $script:socket = $null
 $script:testStage = "preflight"
 $script:activeProduct = $null
+$script:viewerTarget = $false
 
 function Get-FreeTcpPort {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -89,7 +90,9 @@ function Connect-Cdp([int]$TimeoutSeconds = 30) {
     do {
         try {
             $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 2
-            $page = $pages | Where-Object { $_.type -eq "page" } | Select-Object -First 1
+            $page = $pages | Where-Object {
+                $_.type -eq "page" -and ($_.url.Contains('#viewer?') -eq $script:viewerTarget)
+            } | Select-Object -First 1
             if ($page) {
                 $script:socket = [Net.WebSockets.ClientWebSocket]::new()
                 $connectTimeout = [Threading.CancellationTokenSource]::new(
@@ -410,7 +413,7 @@ function Start-Product([string]$DataRoot = $appData) {
         $script:port = Get-FreeTcpPort
         $env:LOCALAPPDATA = $DataRoot
         $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
-        $process = Start-Process -FilePath $executable -PassThru
+        $process = Start-Process -FilePath $executable -WindowStyle Hidden -PassThru
         $script:activeProduct = $process
         try {
             $timeout = if ($attempt -eq 1) { 10 } else { 20 }
@@ -879,11 +882,11 @@ try {
         $webpPathsJson = @($webpItems.Path) | ConvertTo-Json -Compress
         Wait-Evaluate (
             "(() => { const paths = $webpPathsJson; return paths.every((path) => " +
-            "document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]') !== null); })()"
+            "[...document.querySelectorAll('.catalog-item')].find(n => n.dataset.relativePath === path || n.dataset.relativePath.endsWith('/' + path)) != null); })()"
         ) "webp folder ZIP and CBZ enumeration"
         Wait-Evaluate (
             "(() => { const paths = $webpPathsJson; return paths.every((path) => { " +
-            "const item = document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]'); " +
+            "const item = [...document.querySelectorAll('.catalog-item')].find(n => n.dataset.relativePath === path || n.dataset.relativePath.endsWith('/' + path)); " +
             "const image = item?.closest('.catalog-cell')?.querySelector('.thumbnail img'); " +
             "return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0; }); })()"
         ) "webp thumbnail decode and cache generation"
@@ -892,17 +895,37 @@ try {
             $webpDisplayNameJson = $webpItem.DisplayName | ConvertTo-Json -Compress
             Invoke-Evaluate (
                 "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
-                ".find((node) => node.dataset.relativePath === $webpPathJson); " +
+                ".find((node) => node.dataset.relativePath === $webpPathJson || node.dataset.relativePath.endsWith('/' + $webpPathJson)); " +
                 "if (!item) return false; item.click(); " +
-                "item.closest('.catalog-cell')?.querySelector('.read-action')?.click(); return true; })()"
+                "item.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', ctrlKey:true, bubbles:true})); return true; })()"
             ) | Out-Null
+            $script:socket.Dispose()
+            $script:socket = $null
+            $script:viewerTarget = $true
+            Connect-Cdp
             Wait-Evaluate (
-                "document.querySelector('.viewer .viewer-toolbar strong')?.textContent === " +
-                "$webpDisplayNameJson"
+                "document.querySelector('.viewer')?.getAttribute('aria-label') === " +
+                "$webpDisplayNameJson + ' ビューワ'"
             ) "webp viewer open $($webpItem.Path)"
+            if ($webpItem.Path -eq "0-webp-folder") {
+                Invoke-Evaluate "document.querySelector('[data-product-id=viewer-preview]').click(); true" | Out-Null
+                Wait-Evaluate "document.querySelector('.page-preview-dialog[open] img')?.naturalWidth > 0" "page preview native image"
+                Invoke-Evaluate (
+                    "(() => { const input = document.querySelector('.page-preview-dialog input[type=range]'); " +
+                    "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '2'); " +
+                    "input.dispatchEvent(new Event('change', {bubbles:true})); input.dispatchEvent(new Event('input', {bubbles:true})); return true; })()"
+                ) | Out-Null
+                Wait-Evaluate "document.querySelector('.page-preview-dialog img')?.alt.startsWith('2') && document.querySelector('.page-preview-dialog img')?.naturalWidth > 0" "page preview selection"
+                Wait-ViewerPage 1 "preview preserves reading position"
+                $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
+                [IO.File]::WriteAllBytes((Join-Path $evidenceRoot "page-preview.png"), [Convert]::FromBase64String($capture.data))
+                Invoke-Key "Escape" "Escape" 27
+                Wait-Evaluate "document.querySelector('.page-preview-dialog') === null && document.querySelector('.viewer') !== null" "preview escape returns to reader"
+                Wait-ViewerPage 1 "preview cancel preserves reading position"
+            }
             for ($page = 1; $page -le 3; $page++) {
                 Wait-Evaluate (
-                    "document.querySelector('.viewer-toolbar span:last-of-type')?.textContent.startsWith('$page / $($webpItem.PageCount)') && " +
+                    "document.querySelector('.viewer-page-navigator output')?.textContent.startsWith('$page / $($webpItem.PageCount)') && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
                 ) "webp viewer $($webpItem.Path) static page $page dimensions"
@@ -926,23 +949,21 @@ try {
                     throw "WebP product gate could not advance past the corrupt page."
                 }
                 Wait-Evaluate (
-                    "document.querySelector('.page-error[role=alert]')?.textContent.includes('5-animated.webp')"
-                ) "webp animated local error"
-                $advancedPastAnimated = Invoke-Evaluate (
-                    "(() => { const button = document.querySelector(" +
-                    "'[data-product-id=viewer-error-next]'); if (!button || button.disabled) return false; " +
-                    "button.click(); return true; })()"
-                )
-                if (!$advancedPastAnimated) {
-                    throw "WebP product gate could not advance past the animated page."
-                }
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.getAttribute('data-page-index') === '4' && " +
+                    "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0"
+                ) "webp animated page displays"
+                Invoke-Evaluate "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true" | Out-Null
                 Wait-Evaluate (
-                    "document.querySelector('.viewer-toolbar span:last-of-type')?.textContent.startsWith('6 / 6') && " +
+                    "document.querySelector('.viewer-page-navigator output')?.textContent.startsWith('6 / 6') && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
                 ) "webp local error next recovery"
             }
             Invoke-Evaluate "document.querySelector('[data-product-id=viewer-close]')?.click(); true" | Out-Null
+            $script:socket.Dispose()
+            $script:socket = $null
+            $script:viewerTarget = $false
+            Connect-Cdp
             Wait-Evaluate "document.querySelector('.viewer') === null" "webp viewer close $($webpItem.Path)"
         }
         Stop-Product $cold
@@ -954,7 +975,7 @@ try {
         ) "webp thumbnail cache restart catalog"
         Wait-Evaluate (
             "(() => { const paths = $webpPathsJson; return paths.every((path) => " +
-            "document.querySelector('.catalog-item[data-relative-path=`"' + path + '`"]')?.closest('.catalog-cell')" +
+            "[...document.querySelectorAll('.catalog-item')].find(n => n.dataset.relativePath === path || n.dataset.relativePath.endsWith('/' + path))?.closest('.catalog-cell')" +
             ".querySelector('.thumbnail[data-cache-hit=true] img')?.naturalWidth > 0); })()"
         ) "webp thumbnail cache hit"
         $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
@@ -982,7 +1003,8 @@ try {
             viewerStaticLossyLosslessAlphaDecoded = $true
             comicCoverThumbnailCacheVerified = $true
             corruptLocalErrorRecovered = $true
-            animatedLocalErrorRecovered = $true
+            animatedPageDecoded = $true
+            pagePreviewPositionPreserved = $true
             otherComicRecovered = $true
             networkOrCodecInstall = $false
             sourceDifferenceCount = 0

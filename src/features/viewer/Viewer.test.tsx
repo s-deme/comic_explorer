@@ -118,6 +118,21 @@ describe("Viewer settings", () => {
     vi.mocked(deleteViewerFilterSet).mockResolvedValue({ status: "ok", requestId: "filters" as never, generation: 1 as never, data: filterCatalog });
   });
 
+  it("REQ-VIEW-023 keeps reader keys and position unchanged until a preview is selected", async () => {
+    HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
+    const onClose = vi.fn();
+    render(<Viewer session={multiPageSession} generation={1} onClose={onClose} onSettingsChange={vi.fn()} initialMode="single" initialDirection="rightToLeft" />);
+    fireEvent.click(screen.getByRole("button", { name: "プレビュー" }));
+    fireEvent.change(screen.getByLabelText("プレビューページ"), { target: { value: "2" } });
+    fireEvent.keyDown(window, { key: "PageDown" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "0");
+    fireEvent.click(screen.getByRole("button", { name: "このページへ移動" }));
+    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("starts from restored mode and direction and reports changes", () => {
     const onSettingsChange = vi.fn();
     render(

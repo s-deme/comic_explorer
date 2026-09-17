@@ -116,14 +116,33 @@ class ReleaseEvidenceTests(unittest.TestCase):
             {"type": "skip"},
         )
 
-    def test_main_window_can_update_its_native_title_for_the_open_viewer(self) -> None:
+    def test_main_window_can_create_and_reuse_the_native_viewer(self) -> None:
         capability = json.loads(
             (ROOT / "src-tauri" / "capabilities" / "default.json").read_text(
                 encoding="utf-8"
             )
         )
 
-        self.assertIn("core:window:allow-set-title", capability["permissions"])
+        self.assertEqual(capability["windows"], ["main"])
+        for permission in (
+            "core:webview:allow-create-webview-window",
+            "core:window:allow-show",
+            "core:window:allow-set-focus",
+            "core:window:allow-set-title",
+        ):
+            self.assertIn(permission, capability["permissions"])
+
+    def test_viewer_can_finish_a_native_close_request(self) -> None:
+        capability = json.loads(
+            (ROOT / "src-tauri" / "capabilities" / "viewer.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(capability["windows"], ["viewer"])
+        # Tauri onCloseRequested calls destroy after the handler accepts closing.
+        for permission in ("core:window:allow-close", "core:window:allow-destroy"):
+            self.assertIn(permission, capability["permissions"])
 
     def test_license_audit_accepts_allowlisted_spdx_expressions(self) -> None:
         self.assertEqual(

@@ -1244,6 +1244,9 @@ fn inspect_webp<R: Read + Seek>(
     let mut core_starts_container = false;
     let mut saw_alpha = false;
     let mut saw_unknown = false;
+    let mut animated = false;
+    let mut saw_animation_header = false;
+    let mut frames = 0;
     while position < compressed_size {
         let payload_start = position
             .checked_add(8)
@@ -1276,9 +1279,7 @@ fn inspect_webp<R: Read + Seek>(
                 if flags & !0x3e != 0 || payload[1..4] != [0, 0, 0] {
                     return Err(corrupt_webp("WebP VP8X flags are invalid."));
                 }
-                if flags & 0x02 != 0 {
-                    return Err(unsupported_animation());
-                }
+                animated = flags & 0x02 != 0;
                 extended = Some(WebpExtended {
                     width: read_u24(&payload[4..7]) + 1,
                     height: read_u24(&payload[7..10]) + 1,
@@ -1338,7 +1339,57 @@ fn inspect_webp<R: Read + Seek>(
                 }
                 saw_alpha = true;
             }
-            b"ANIM" | b"ANMF" => return Err(unsupported_animation()),
+            b"ANIM" => {
+                if !animated || saw_animation_header || frames != 0 || chunk_size != 6 {
+                    return Err(corrupt_webp("WebP animation header is invalid."));
+                }
+                saw_animation_header = true;
+            }
+            b"ANMF" => {
+                let canvas = extended
+                    .as_ref()
+                    .ok_or_else(|| corrupt_webp("Missing animation canvas."))?;
+                if !animated || !saw_animation_header || chunk_size < 24 {
+                    return Err(corrupt_webp("WebP animation frame is invalid."));
+                }
+                frames += 1;
+                if frames > 1024
+                    || u64::from(canvas.width) * u64::from(canvas.height) * 12 > MAX_IMAGE_BYTES
+                {
+                    return Err(error(
+                        ErrorCode::ResourceLimit,
+                        "WebP animation exceeds frame or canvas limits.",
+                    ));
+                }
+                let frame = read_webp_prefix(reader, chunk_size as usize)?;
+                let x = read_u24(&frame[0..3]) * 2;
+                let y = read_u24(&frame[3..6]) * 2;
+                let width = read_u24(&frame[6..9]) + 1;
+                let height = read_u24(&frame[9..12]) + 1;
+                if frame[15] & !3 != 0 || x + width > canvas.width || y + height > canvas.height {
+                    return Err(corrupt_webp("WebP frame exceeds its canvas."));
+                }
+                // Reuse static validation for every frame, including nested chunk bounds.
+                if !matches!(&frame[16..20], b"ALPH" | b"VP8 " | b"VP8L") {
+                    return Err(corrupt_webp("WebP frame has no supported bitstream."));
+                }
+                let mut wrapped = b"RIFF\0\0\0\0WEBP".to_vec();
+                if &frame[16..20] == b"ALPH" {
+                    wrapped.extend_from_slice(b"VP8X\x0a\0\0\0\x10\0\0\0");
+                    wrapped.extend_from_slice(&(width - 1).to_le_bytes()[..3]);
+                    wrapped.extend_from_slice(&(height - 1).to_le_bytes()[..3]);
+                }
+                wrapped.extend_from_slice(&frame[16..]);
+                let length = wrapped.len() as u32 - 8;
+                wrapped[4..8].copy_from_slice(&length.to_le_bytes());
+                let metadata =
+                    inspect_webp(&mut std::io::Cursor::new(&wrapped), wrapped.len() as u64)?;
+                if (metadata.width, metadata.height) != (width, height) {
+                    return Err(corrupt_webp(
+                        "WebP frame dimensions do not match its bitstream.",
+                    ));
+                }
+            }
             _ => saw_unknown = true,
         }
 
@@ -1361,6 +1412,23 @@ fn inspect_webp<R: Read + Seek>(
     }
     if position != compressed_size {
         return Err(corrupt_webp("WebP chunk layout is invalid."));
+    }
+    if animated {
+        if !saw_animation_header || frames == 0 || core.is_some() || saw_alpha {
+            return Err(corrupt_webp(
+                "WebP animation is missing frames or mixes static data.",
+            ));
+        }
+        let canvas = extended.ok_or_else(|| corrupt_webp("Missing animation canvas."))?;
+        let metadata = ImageMetadata {
+            format: ImageFormat::Webp,
+            width: canvas.width,
+            height: canvas.height,
+            has_alpha: canvas.alpha_flag,
+            animated: true,
+        };
+        validate_dimensions(metadata)?;
+        return Ok(metadata);
     }
     let core = core.ok_or_else(|| corrupt_webp("WebP has no image bitstream."))?;
     let has_alpha = match (extended, core.kind) {
@@ -1425,13 +1493,6 @@ fn read_u24(bytes: &[u8]) -> u32 {
 
 fn corrupt_webp(message: &str) -> AppError {
     error(ErrorCode::CorruptImage, message)
-}
-
-fn unsupported_animation() -> AppError {
-    error(
-        ErrorCode::UnsupportedFormat,
-        "Animated WebP is not supported.",
-    )
 }
 
 fn validate_dimensions(metadata: ImageMetadata) -> Result<(), AppError> {
@@ -2053,7 +2114,7 @@ mod tests {
     }
 
     #[test]
-    fn fr_b08_webp_rejects_animated_containers_without_falling_back_to_a_frame() {
+    fn fr_b08_webp_rejects_incomplete_animated_containers() {
         let cases = [
             (
                 "VP8X animation flag",
@@ -2074,9 +2135,54 @@ mod tests {
                 inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)
                     .unwrap_err()
                     .code,
-                ErrorCode::UnsupportedFormat,
+                ErrorCode::CorruptImage,
                 "{case}"
             );
         }
+    }
+
+    #[test]
+    fn fr_b08_webp_animation_validates_frames_and_canvas_limits() {
+        let mut frame = vec![0; 16];
+        frame.extend_from_slice(&webp(&[(*b"VP8L", vp8l(1, 1, false))])[12..]);
+        let make = |frame: Vec<u8>, width, height| {
+            webp(&[
+                (*b"VP8X", vp8x(width, height, 0x02)),
+                (*b"ANIM", vec![0; 6]),
+                (*b"ANMF", frame),
+            ])
+        };
+        let valid = make(frame.clone(), 1, 1);
+        let metadata = inspect_image(&mut Cursor::new(&valid), valid.len() as u64).unwrap();
+        assert!(metadata.animated);
+        assert_eq!((metadata.width, metadata.height), (1, 1));
+        let mut outside = frame.clone();
+        outside[0] = 1;
+        let mut truncated = frame.clone();
+        truncated[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+        for bytes in [make(outside, 1, 1), make(truncated, 1, 1)] {
+            assert_eq!(
+                inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::CorruptImage
+            );
+        }
+        let oversized = make(frame.clone(), 8000, 8000);
+        assert_eq!(
+            inspect_image(&mut Cursor::new(&oversized), oversized.len() as u64)
+                .unwrap_err()
+                .code,
+            ErrorCode::ResourceLimit
+        );
+        let mut chunks = vec![(*b"VP8X", vp8x(1, 1, 0x02)), (*b"ANIM", vec![0; 6])];
+        chunks.extend((0..1025).map(|_| (*b"ANMF", frame.clone())));
+        let excessive = webp(&chunks);
+        assert_eq!(
+            inspect_image(&mut Cursor::new(&excessive), excessive.len() as u64)
+                .unwrap_err()
+                .code,
+            ErrorCode::ResourceLimit
+        );
     }
 }
