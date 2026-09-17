@@ -20,6 +20,8 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-StrictMode -Off
 $executable = Join-Path $projectRoot "src-tauri\target\release\comic-explorer.exe"
 $evidenceRoot = Join-Path $projectRoot "dist\product-ui-harness"
+$captureRoot = Join-Path $projectRoot "src-tauri\target\verification\reader-ui"
+New-Item -ItemType Directory -Force -Path $captureRoot | Out-Null
 $library = Join-Path $evidenceRoot "library"
 $missingLibrary = Join-Path $evidenceRoot "library-missing"
 $appData = Join-Path $evidenceRoot "appdata"
@@ -111,7 +113,7 @@ function Connect-Cdp([int]$TimeoutSeconds = 30) {
         } catch {}
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw ("WebView2 DevTools endpoint did not become ready. diagnostics=" +
+    throw ("WebView2 DevTools endpoint did not become ready. pages=" + ($pages | ConvertTo-Json -Depth 3 -Compress) + " diagnostics=" +
         ((Get-HarnessDiagnostics) | ConvertTo-Json -Depth 6 -Compress))
 }
 
@@ -412,6 +414,7 @@ function Start-Product([string]$DataRoot = $appData) {
     foreach ($attempt in 1..2) {
         $script:port = Get-FreeTcpPort
         $env:LOCALAPPDATA = $DataRoot
+        $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $DataRoot 'webview2'
         $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
         $process = Start-Process -FilePath $executable -WindowStyle Hidden -PassThru
         $script:activeProduct = $process
@@ -713,6 +716,9 @@ $webpFolder = Join-Path $library "0-webp-folder"
 $webpZip = Join-Path $library "0-webp-static.zip"
 $webpCbz = Join-Path $library "0-webp-static.cbz"
 if ($WebpOnly) {
+    $avifFolder = Join-Path $library '0-avif-folder'
+    New-Item -ItemType Directory -Force -Path $avifFolder | Out-Null
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'tests\fixtures\generated\FIX-AVIF-001\rgb.avif') -Destination (Join-Path $avifFolder 'rgb.avif')
     $webpPayloads = [ordered]@{
         "1-lossy.webp" = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
         "2-lossless.webp" = "UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=="
@@ -819,7 +825,7 @@ $favoriteMovedArchive = Join-Path $favoriteMovedDirectory "1-valid.cbz"
 $favoriteMissingComic = Join-Path $evidenceRoot "missing-comic-folder"
 $favoriteMovedArchiveActive = $false
 $favoriteMissingComicActive = $false
-$expectedRootEntryCount = if ($WebpOnly) { 130 } elseif ($PdfOnly) { 128 } else { 127 }
+$expectedRootEntryCount = if ($WebpOnly) { 131 } elseif ($PdfOnly) { 128 } else { 127 }
 try {
     $cold = Start-Product
     Wait-Evaluate (
@@ -875,6 +881,7 @@ try {
     }
     if ($WebpOnly) {
         $webpItems = @(
+            [pscustomobject]@{ Path = "0-avif-folder"; DisplayName = "0-avif-folder"; PageCount = 1 },
             [pscustomobject]@{ Path = "0-webp-folder"; DisplayName = "0-webp-folder"; PageCount = 6 },
             [pscustomobject]@{ Path = "0-webp-static.zip"; DisplayName = "0-webp-static.zip"; PageCount = 3 },
             [pscustomobject]@{ Path = "0-webp-static.cbz"; DisplayName = "0-webp-static.cbz"; PageCount = 3 }
@@ -896,9 +903,14 @@ try {
             Invoke-Evaluate (
                 "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
                 ".find((node) => node.dataset.relativePath === $webpPathJson || node.dataset.relativePath.endsWith('/' + $webpPathJson)); " +
-                "if (!item) return false; item.click(); " +
-                "item.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', ctrlKey:true, bubbles:true})); return true; })()"
+                "if (!item) return false; item.dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, clientX:300, clientY:250})); return true; })()"
             ) | Out-Null
+            Wait-Evaluate "[...document.querySelectorAll('[role=menuitem]')].some(n => n.textContent.trim() === '開く')" "catalog context open"
+            Invoke-Evaluate "[...document.querySelectorAll('[role=menuitem]')].find(n => n.textContent.trim() === '開く').click(); true" | Out-Null
+            if ($webpItem.Path.EndsWith('-folder')) {
+                Wait-Evaluate "document.querySelector('#address').value.endsWith($webpPathJson) && document.querySelector('.catalog-item[data-kind=page]') !== null" "navigate into image folder"
+                Invoke-Evaluate "document.querySelector('.catalog-item[data-kind=page]').dispatchEvent(new MouseEvent('dblclick', {bubbles:true})); true" | Out-Null
+            }
             $script:socket.Dispose()
             $script:socket = $null
             $script:viewerTarget = $true
@@ -918,18 +930,48 @@ try {
                 Wait-Evaluate "document.querySelector('.page-preview-dialog img')?.alt.startsWith('2') && document.querySelector('.page-preview-dialog img')?.naturalWidth > 0" "page preview selection"
                 Wait-ViewerPage 1 "preview preserves reading position"
                 $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
-                [IO.File]::WriteAllBytes((Join-Path $evidenceRoot "page-preview.png"), [Convert]::FromBase64String($capture.data))
+                [IO.File]::WriteAllBytes((Join-Path $captureRoot "page-preview.png"), [Convert]::FromBase64String($capture.data))
                 Invoke-Key "Escape" "Escape" 27
                 Wait-Evaluate "document.querySelector('.page-preview-dialog') === null && document.querySelector('.viewer') !== null" "preview escape returns to reader"
                 Wait-ViewerPage 1 "preview cancel preserves reading position"
+                Invoke-Evaluate "document.querySelector('[data-product-id=viewer-preview]').click(); true" | Out-Null
+                Invoke-Evaluate "[...document.querySelectorAll('.page-preview-dialog button')].find(n => n.textContent === '全ページ一覧').click(); true" | Out-Null
+                Wait-Evaluate "document.querySelectorAll('.page-collection-grid img').length >= 3 && [...document.querySelectorAll('.page-collection-grid img')].every(n => n.naturalWidth > 0)" "page gallery images"
+                $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
+                [IO.File]::WriteAllBytes((Join-Path $captureRoot 'page-gallery.png'), [Convert]::FromBase64String($capture.data))
+                Wait-Evaluate "(() => { const g = document.querySelector('.page-collection-grid'); return g.scrollWidth <= g.clientWidth + 1; })()" "gallery has no horizontal overflow"
+                Invoke-Cdp "Emulation.setDeviceMetricsOverride" @{ width = 740; height = 540; deviceScaleFactor = 1; mobile = $false } | Out-Null
+                Invoke-Cdp "Emulation.setEmulatedMedia" @{ features = @(@{ name = 'prefers-color-scheme'; value = 'light' }) } | Out-Null
+                Wait-Evaluate "window.innerWidth === 740 && document.documentElement.dataset.themeScheme === 'light'" "small light viewport"
+                $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
+                [IO.File]::WriteAllBytes((Join-Path $captureRoot 'page-gallery-small-light.png'), [Convert]::FromBase64String($capture.data))
+                Invoke-Cdp "Emulation.clearDeviceMetricsOverride" @{} | Out-Null
+                Invoke-Cdp "Emulation.setEmulatedMedia" @{ features = @() } | Out-Null
+                Invoke-Key "Escape" "Escape" 27
+                Invoke-Evaluate "(() => { const s = document.querySelector('select[aria-label=表示枚数]'); s.value = 'scroll'; s.dispatchEvent(new Event('change', {bubbles:true})); return true; })()" | Out-Null
+                Wait-Evaluate "document.querySelector('.page-collection-reader img')?.naturalWidth > 0" "continuous reader image"
+                $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
+                [IO.File]::WriteAllBytes((Join-Path $captureRoot 'continuous-reader.png'), [Convert]::FromBase64String($capture.data))
+                Invoke-Evaluate "document.querySelector('.page-collection-reader').scrollTop = 1200; true" | Out-Null
+                Wait-Evaluate "!document.querySelector('.viewer-page-navigator output').textContent.startsWith('1 /')" "continuous reading position"
+                $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = "png" }
+                [IO.File]::WriteAllBytes((Join-Path $captureRoot 'continuous-reader-scrolled.png'), [Convert]::FromBase64String($capture.data))
+                Invoke-Evaluate "(() => { const s = document.querySelector('select[aria-label=表示枚数]'); s.value = 'single'; s.dispatchEvent(new Event('change', {bubbles:true})); return true; })()" | Out-Null
+                Wait-Evaluate "document.querySelector('.viewer').dataset.layoutMode === 'paged'" "return to paged layout"
+                Invoke-Evaluate "(() => { const input = document.querySelector('.viewer-page-navigator input[type=range]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '0'); input.dispatchEvent(new Event('input', {bubbles:true})); return true; })()" | Out-Null
+                Wait-ViewerPage 1 "return from continuous reader"
             }
-            for ($page = 1; $page -le 3; $page++) {
+            for ($page = 1; $page -le [Math]::Min(3, $webpItem.PageCount); $page++) {
                 Wait-Evaluate (
                     "document.querySelector('.viewer-page-navigator output')?.textContent.startsWith('$page / $($webpItem.PageCount)') && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalWidth > 0 && " +
                     "document.querySelector('.page-spread img:not(.prefetch-page)')?.naturalHeight > 0"
                 ) "webp viewer $($webpItem.Path) static page $page dimensions"
-                if ($page -lt 3) {
+                if ($webpItem.Path -eq '0-avif-folder') {
+                    $capture = Invoke-Cdp "Page.captureScreenshot" @{ format = 'png' }
+                    [IO.File]::WriteAllBytes((Join-Path $captureRoot 'avif.png'), [Convert]::FromBase64String($capture.data))
+                }
+                if ($page -lt [Math]::Min(3, $webpItem.PageCount)) {
                     Invoke-Evaluate "window.dispatchEvent(new KeyboardEvent('keydown', {key:'PageDown', bubbles:true})); true" |
                         Out-Null
                 }
@@ -964,11 +1006,24 @@ try {
             $script:socket = $null
             $script:viewerTarget = $false
             Connect-Cdp
+            $closeDeadline = [DateTime]::UtcNow.AddSeconds(10)
+            do {
+                $viewerPages = @(Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 2 | Where-Object { $_.url -like '*#viewer?*' })
+                if ($viewerPages.Count -eq 0) { break }
+                Start-Sleep -Milliseconds 100
+            } while ([DateTime]::UtcNow -lt $closeDeadline)
+            if ($viewerPages.Count -gt 0) { throw 'Viewer native close did not destroy its webview.' }
             Wait-Evaluate "document.querySelector('.viewer') === null" "webp viewer close $($webpItem.Path)"
+            if ($webpItem.Path.EndsWith('-folder')) {
+                Invoke-Evaluate "(() => { const input = document.querySelector('#address'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, $libraryJson); input.dispatchEvent(new Event('input', {bubbles:true})); document.querySelector('.address-bar button[type=submit]').click(); return true; })()" | Out-Null
+                Wait-Evaluate "document.querySelector('#address').value.endsWith('\\library') && document.querySelectorAll('.catalog-item').length > 10" "return to fixture catalog"
+            }
         }
         Stop-Product $cold
         $cold = $null
         $cold = Start-Product
+        Wait-Evaluate "document.querySelector('#address') !== null && document.querySelector('[role=tree]') !== null" "webp cache restart shell"
+        Invoke-Evaluate "(() => { const input = document.querySelector('#address'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, $libraryJson); input.dispatchEvent(new Event('input', {bubbles:true})); document.querySelector('.address-bar button[type=submit]').click(); return true; })()" | Out-Null
         Wait-Evaluate (
             "[...document.querySelectorAll('.status-bar span')].some((node) => " +
             "node.textContent.startsWith('$expectedRootEntryCount'))"
@@ -1004,6 +1059,9 @@ try {
             comicCoverThumbnailCacheVerified = $true
             corruptLocalErrorRecovered = $true
             animatedPageDecoded = $true
+            avifDecodedAndThumbnailCached = $true
+            pageGalleryAndContinuousReader = $true
+            nativeViewerCloseVerified = $true
             pagePreviewPositionPreserved = $true
             otherComicRecovered = $true
             networkOrCodecInstall = $false
@@ -1068,6 +1126,10 @@ try {
         return
     }
     if ($SearchOnly) {
+        $searchRootRelative = $library.Substring([IO.Path]::GetPathRoot($library).Length).Replace("\", "/")
+        $searchRootRelativeJson = $searchRootRelative | ConvertTo-Json -Compress
+        Invoke-Evaluate "document.querySelector('[data-product-id=toolbar-search]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('#catalog-search') !== null" "search pane opened"
         Invoke-Evaluate @"
 (() => {
   const input = document.querySelector('#catalog-search');
@@ -1081,8 +1143,8 @@ try {
         Wait-Evaluate (
             "(() => { const rows = [...document.querySelectorAll('[data-search-result-path]')]" +
             ".map((node) => node.dataset.searchResultPath + ':' + node.dataset.searchResultKind).sort(); " +
-            "const expected = ['folder-a/search-pair:folder', " +
-            "'folder-a/search-pair.cbz:archive'].sort(); " +
+            "const prefix = $searchRootRelativeJson + '/'; const expected = [prefix + 'folder-a/search-pair:folder', " +
+            "prefix + 'folder-a/search-pair.cbz:archive'].sort(); " +
             "return document.querySelector('.search-results')?.dataset.searchResultCount === '2' && " +
             "JSON.stringify(rows) === JSON.stringify(expected); })()"
         ) "search normalized mixed-kind result"
@@ -1098,17 +1160,20 @@ try {
 "@ | Out-Null
         Wait-Evaluate (
             "document.querySelector('.search-results')?.dataset.searchResultCount === '1' && " +
-            "document.querySelector('[data-search-result-path=`"z-next-comic`"]')?.dataset.searchResultKind === 'comicFolder'"
+            "document.querySelector('[data-search-result-path=`"$searchRootRelative/z-next-comic`"]')?.dataset.searchResultKind === 'folder'"
         ) "search navigation result"
-        Invoke-Evaluate "document.querySelector('[data-search-result-path=`"z-next-comic`"]')?.click(); true" |
+        Invoke-Evaluate "document.querySelector('[data-search-result-path=`"$searchRootRelative/z-next-comic`"]')?.click(); true" |
             Out-Null
+        Invoke-Evaluate "document.querySelector('[data-product-id=toolbar-search]')?.click(); true" | Out-Null
         Wait-Evaluate (
             "document.querySelector('.search-results') === null && " +
             "document.querySelector('#address')?.value.endsWith('\\library') && " +
-            "document.querySelector('[data-relative-path=`"z-next-comic`"]')?.dataset.selected === 'true' && " +
+            "document.querySelector('[data-relative-path=`"$searchRootRelative/z-next-comic`"]')?.dataset.selected === 'true' && " +
             "[...document.querySelectorAll('[role=treeitem]')].some((node) => " +
-            "node.textContent === 'library' && node.getAttribute('aria-selected') === 'true')"
+            "node.title === 'library' && node.getAttribute('aria-selected') === 'true')"
         ) "search result navigation and selection"
+        Invoke-Evaluate "document.querySelector('[data-product-id=toolbar-search]')?.click(); true" | Out-Null
+        Wait-Evaluate "document.querySelector('#catalog-search') !== null" "search pane reopened"
         Invoke-Evaluate @"
 (() => {
   const input = document.querySelector('#catalog-search');
@@ -1123,7 +1188,7 @@ try {
             "document.querySelector('.search-results')?.dataset.searchResultCount === '0'"
         ) "search empty result"
         Invoke-Evaluate (
-            "document.querySelector('.search-bar button[type=button]')?.click(); true"
+            "document.querySelector('.search-pane-form button[type=button]')?.click(); true"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('.search-results') === null && " +
@@ -1145,11 +1210,11 @@ try {
         ) "search rescan baseline"
         Copy-Item (Join-Path $library "1-valid.cbz") $searchFreshPath
         Invoke-Evaluate (
-            "document.querySelector('.search-bar button[type=submit]')?.click(); true"
+            "document.querySelector('.search-pane-form button[type=submit]')?.click(); true"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('.search-results')?.dataset.searchResultCount === '1' && " +
-            "document.querySelector('[data-search-result-path=`"rescan-needle.cbz`"]')?.dataset.searchResultKind === 'archive'"
+            "document.querySelector('[data-search-result-path=`"$searchRootRelative/rescan-needle.cbz`"]')?.dataset.searchResultKind === 'archive'"
         ) "search fresh rescan"
         Remove-Item -LiteralPath $searchFreshPath -Force
         $after = $sourceFiles | ForEach-Object { (Get-FileHash $_ -Algorithm SHA256).Hash }
