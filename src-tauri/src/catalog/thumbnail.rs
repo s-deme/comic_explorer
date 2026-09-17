@@ -442,6 +442,9 @@ pub fn decode_wic_bgra(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), AppError> {
             "Clipboard image source byte limit exceeded.",
         ));
     }
+    if let Some(png) = normalized_pixels(bytes)? {
+        return decode_wic_bgra(&png);
+    }
     if is_webp(bytes) {
         let (width, height, channels, decoded) = decode_static_webp_pixels(bytes)?;
         let pixel_count = usize::try_from(u64::from(width) * u64::from(height)).map_err(|_| {
@@ -585,6 +588,9 @@ pub fn encode_wic_jpeg(bytes: &[u8], output: &std::path::Path) -> Result<(u32, u
             "Thumbnail source byte limit exceeded.",
         ));
     }
+    if let Some(png) = normalized_pixels(bytes)? {
+        return encode_wic_jpeg(&png, output);
+    }
     if is_webp(bytes) {
         return encode_webp_wic_jpeg(bytes, output);
     }
@@ -661,6 +667,16 @@ fn svg_text_candidate(bytes: &[u8]) -> bool {
         .copied()
         .find(|byte| !byte.is_ascii_whitespace())
         == Some(b'<')
+}
+
+fn normalized_pixels(bytes: &[u8]) -> Result<Option<Vec<u8>>, AppError> {
+    if bytes.get(4..8) == Some(b"ftyp") {
+        let metadata = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?;
+        if metadata.format == ImageFormat::Avif {
+            return super::raster_delivery_png(bytes, ImageFormat::Avif).map(Some);
+        }
+    }
+    super::color_managed_png(bytes)
 }
 
 #[cfg(target_os = "windows")]

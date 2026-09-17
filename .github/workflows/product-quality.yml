@@ -38,6 +38,11 @@ jobs:
       - run: rustup toolchain install stable --profile minimal
       - run: rustup default stable
       - run: rustup component add rustfmt
+      - name: Make bundled Perl available for AVIF build
+        shell: pwsh
+        run: |
+          $gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source)
+          Join-Path $gitRoot 'usr\bin' | Out-File -FilePath $env:GITHUB_PATH -Append
       - run: cargo fmt --check
       - run: cargo check --locked
       - run: cargo test --locked

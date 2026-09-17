@@ -32,7 +32,7 @@ codd:
 | REQ-MVP-008 | 対応画像folderを安全に1冊として読む。 |
 | REQ-MVP-009 | 対応archiveを上限・危険path検証付きで非展開閲覧する。UTF-8 flagのないShift_JIS名を持つZIPも、安全な内部pathとして読み取る。 |
 | REQ-MVP-010 | folderは移動、archive・PDF・画像はViewerで開き、文脈を復元する。 |
-| REQ-MVP-011 | Viewerはページ送りだけを使い、旧scroll layout値をページ送りへ正規化する。 |
+| REQ-MVP-011 | Viewerはページ送りと連続縦読みを切り替えられ、切替時のページ位置を維持する。縦読みは表示範囲だけを読み込み、スクロール中の現在ページを保存する。 |
 | REQ-MVP-012 | 見開きは最大2pageで、横長・末尾pageは単独表示する。 |
 | REQ-MVP-013 | 読み方向を配置、移動、保存へ一貫して適用する。 |
 | REQ-MVP-014 | Viewerの入力、page bar、fullscreen、bounded prefetchを提供する。 |
@@ -48,10 +48,15 @@ codd:
 
 ## 閲覧補強（2026-09）
 
-- REQ-VIEW-023: ページプレビューでページ番号・画像・ファイル名を確認し、明示した移動操作だけで読書位置を変える。閉じる・Escでは位置を変えず、読み込み失敗は再試行できる。読み込みは同時1件、保持画像は1枚とし、古い応答を表示しない。受入確認: `PagePreviewDialog.test.tsx`。
+- REQ-VIEW-023: ページプレビューでページ番号・画像・ファイル名を確認し、明示した移動操作だけで読書位置を変える。閉じる・Escでは位置を変えず、読み込み失敗は再試行できる。読み込みは同時1件、単ページプレビューの保持画像は1枚とし、古い応答を表示しない。受入確認: `PagePreviewDialog.test.tsx`。
 - REQ-FORMAT-024: アニメーションWebPを原本のままViewerで再生し、サムネイル・画像フィルター・コピーでは先頭フレームを使う。RIFF長・フレーム境界・キャンバス・資源上限を検証し、不正画像は拒否する。受入確認: `image_metadata.rs` と `thumbnail.rs` のWebPテスト。
 
 ## 非機能契約
+
+- REQ-VIEW-025: 全ページ一覧は仮想表示で画像・番号・名前を確認でき、選択後に明示して移動する。読み込み失敗は再試行できる。受入確認: `PageCollection.test.tsx`。
+- REQ-VIEW-026: 連続縦読みは自然なホイール・キーボードスクロール、ページバーからの移動、ページ位置保存を提供する。受入確認: `PageCollection.test.tsx` と `Viewer.test.tsx`。
+- REQ-FORMAT-027: AVIFを同梱デコーダーで処理し、Viewer・サムネイル・フィルター・コピーでOS追加コーデックを不要にする。寸法・メモリ上限を維持する。受入確認: Rust画像デコードテスト。
+- REQ-COLOR-028: JPEG・PNG・WebP・TIFF・AVIFの埋め込みRGB ICCを持つ画像の派生画像はsRGBへ変換し、表示経路と整合させる。不正プロファイルはエラーとして扱い、原本を変更しない。非RGB ICCとHDRは未対応。受入確認: Rust色変換テスト。
 
 | ID | 現行契約 |
 |---|---|

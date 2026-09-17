@@ -11,6 +11,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / alloc-stdlib | 0.2.4 | BSD-3-Clause |
 | cargo / android_system_properties | 0.1.5 | MIT OR Apache-2.0 |
 | cargo / anyhow | 1.0.104 | MIT OR Apache-2.0 |
+| cargo / aom-decode | 0.2.14 | BSD-2-Clause |
 | cargo / arbitrary | 1.4.2 | MIT OR Apache-2.0 |
 | cargo / arrayref | 0.3.9 | BSD-2-Clause |
 | cargo / arrayvec | 0.7.8 | MIT OR Apache-2.0 |
@@ -28,6 +29,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / atk | 0.18.2 | MIT |
 | cargo / atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
 | cargo / autocfg | 1.5.1 | Apache-2.0 OR MIT |
+| cargo / avif-parse | 1.4.0 | MPL-2.0 |
 | cargo / base64 | 0.21.7 | MIT OR Apache-2.0 |
 | cargo / base64 | 0.22.1 | MIT OR Apache-2.0 |
 | cargo / bit-set | 0.6.0 | MIT OR Apache-2.0 |
@@ -36,6 +38,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / bit-vec | 0.8.0 | Apache-2.0 OR MIT |
 | cargo / bitflags | 1.3.2 | MIT OR Apache-2.0 |
 | cargo / bitflags | 2.13.1 | MIT OR Apache-2.0 |
+| cargo / bitreader | 0.3.11 | MIT OR Apache-2.0 |
 | cargo / block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | cargo / block2 | 0.6.2 | MIT |
 | cargo / blocking | 1.6.2 | Apache-2.0 OR MIT |
@@ -58,6 +61,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cargo / cfg-if | 1.0.4 | MIT OR Apache-2.0 |
 | cargo / chrono | 0.4.45 | MIT OR Apache-2.0 |
+| cargo / cmake | 0.1.58 | MIT OR Apache-2.0 |
 | cargo / color_quant | 1.1.0 | MIT |
 | cargo / combine | 4.6.7 | MIT |
 | cargo / concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
@@ -118,6 +122,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / event-listener | 5.4.2 | Apache-2.0 OR MIT |
 | cargo / fallible-iterator | 0.3.0 | MIT OR Apache-2.0 |
 | cargo / fallible-streaming-iterator | 0.1.9 | MIT OR Apache-2.0 |
+| cargo / fallible_collections | 0.5.2 | MIT OR Apache-2.0 |
 | cargo / fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | cargo / fax | 0.2.7 | MIT |
 | cargo / fdeflate | 0.3.7 | MIT OR Apache-2.0 |
@@ -202,6 +207,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / image-webp | 0.2.4 | MIT OR Apache-2.0 |
 | cargo / image | 0.25.9 | MIT OR Apache-2.0 |
 | cargo / imagesize | 0.13.0 | MIT |
+| cargo / imgref | 1.12.3 | CC0-1.0 OR Apache-2.0 |
 | cargo / indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | cargo / indexmap | 2.14.0 | Apache-2.0 OR MIT |
 | cargo / infer | 0.19.0 | MIT |
@@ -222,6 +228,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / kqueue-sys | 1.1.2 | MIT |
 | cargo / kqueue | 1.2.1 | MIT |
 | cargo / kurbo | 0.11.3 | Apache-2.0 OR MIT |
+| cargo / leb128 | 0.2.7 | MIT OR Apache-2.0 |
+| cargo / libaom-sys | 0.17.2+libaom.3.11.0 | BSD-2-Clause |
 | cargo / libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |
 | cargo / libappindicator | 0.9.0 | Apache-2.0 OR MIT |
 | cargo / libc | 0.2.189 | MIT OR Apache-2.0 |
@@ -541,6 +549,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / xmlwriter | 0.1.0 | MIT |
 | cargo / yoke-derive | 0.8.2 | Unicode-3.0 |
 | cargo / yoke | 0.8.3 | Unicode-3.0 |
+| cargo / yuv | 0.1.10 | BSD-2-Clause |
 | cargo / zbus | 5.13.2 | MIT |
 | cargo / zbus_macros | 5.13.2 | MIT |
 | cargo / zbus_names | 4.3.1 | MIT |
@@ -556,7 +565,9 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / zmij | 1.0.23 | MIT |
 | cargo / zopfli | 0.8.3 | Apache-2.0 |
 | cargo / zune-core | 0.4.12 | MIT OR Apache-2.0 OR Zlib |
+| cargo / zune-core | 0.5.3 | MIT OR Apache-2.0 OR Zlib |
 | cargo / zune-jpeg | 0.4.21 | MIT OR Apache-2.0 OR Zlib |
+| cargo / zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib |
 | cargo / zvariant | 5.9.2 | MIT |
 | cargo / zvariant_derive | 5.9.2 | MIT |
 | cargo / zvariant_utils | 3.3.0 | MIT |

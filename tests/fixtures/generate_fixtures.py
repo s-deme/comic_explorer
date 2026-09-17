@@ -44,6 +44,9 @@ WEBP_ANIMATED = base64.b64decode(
     "UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA"
 )
 WEBP_CORRUPT = WEBP_LOSSY[:20]
+AVIF_RGB = base64.b64decode(
+    "AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADrbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAAAAAAAOcGl0bQAAAAAAAQAAAB5pbG9jAAAAAEQAAAEAAQAAAAEAAAETAAAAHAAAAChpaW5mAAAAAAABAAAAGmluZmUCAAAAAAEAAGF2MDFDb2xvcgAAAABqaXBycAAAAEtpcGNvAAAAFGlzcGUAAAAAAAAAAwAAAAIAAAAQcGl4aQAAAAADCAgIAAAADGF2MUOBAAwAAAAAE2NvbHJuY2x4AAEADQAGgAAAABdpcG1hAAAAAAAAAAEAAQQBAoMEAAAAJG1kYXQSAAoFGAQrAhAyERGAAABAAGjTCEz/mJRycLiA"
+)
 
 # The fixture labels only need this deliberately small, platform-independent font.
 FONT = {
@@ -757,6 +760,9 @@ def main() -> None:
     output.mkdir(parents=True)
     builder = Builder(output)
     build_core(builder)
+    avif = output / "FIX-AVIF-001"
+    avif.mkdir()
+    (avif / "rgb.avif").write_bytes(AVIF_RGB)
     if args.include_performance:
         build_performance(builder)
     finalize(builder, args.include_performance)

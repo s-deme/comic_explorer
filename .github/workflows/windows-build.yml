@@ -28,6 +28,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Make bundled Perl available for AVIF build
+        shell: pwsh
+        run: |
+          $gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source)
+          Join-Path $gitRoot 'usr\bin' | Out-File -FilePath $env:GITHUB_PATH -Append
+
       - name: Generate release SBOM
         run: python scripts/prepare-release.py
 

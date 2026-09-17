@@ -18,6 +18,7 @@ function Get-ReleaseInputFiles {
     foreach ($relativePath in @(
         "index.html", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.app.json",
         "tsconfig.node.json", "vite.config.ts", "src-tauri\Cargo.toml", "src-tauri\Cargo.lock",
+        ".cargo\config.toml", "scripts\avif-toolchain.cmake",
         "src-tauri\build.rs", "src-tauri\tauri.conf.json", "scripts\generate-sbom.py",
         "scripts\windows-toolchain.ps1", "scripts\release-freshness.ps1",
         "scripts\invoke-windows-toolchain.ps1", "scripts\build-release-exe.cmd"

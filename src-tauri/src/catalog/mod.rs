@@ -15,7 +15,7 @@ pub use folder::{
     enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden, has_child_folder_with_hidden,
 };
 pub use image_metadata::{ImageMetadata, inspect_image};
-pub(crate) use image_render::{raster_delivery_png, render_svg_png};
+pub(crate) use image_render::{color_managed_png, raster_delivery_png, render_svg_png};
 pub use pdf::{enumerate_pdf_pages, pdf_page_index, render_pdf_page};
 pub use thumbnail::{
     CoverBytes, THUMBNAIL_JPEG_QUALITY, THUMBNAIL_LONG_EDGE, exif_orientation, output_dimensions,

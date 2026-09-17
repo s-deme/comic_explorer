@@ -443,10 +443,11 @@ fn is_avif_brand(brand: &[u8]) -> bool {
     brand == b"avif" || brand == b"avis"
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum AvifProperty {
     Ispe { width: u32, height: u32 },
     Av1Config,
+    Color(Vec<u8>),
     Other,
 }
 
@@ -482,6 +483,18 @@ struct AvifPrimaryMetadata {
     data_source: AvifDataSource,
     extents: Vec<(u64, u64)>,
     idat_length: Option<u64>,
+    color: Option<Vec<u8>>,
+}
+
+pub(super) fn avif_color(bytes: &[u8]) -> Result<Option<Vec<u8>>, AppError> {
+    let mut color = None;
+    for_each_bmff_box(bytes, "Invalid AVIF boxes.", |kind, payload| {
+        if kind == *b"meta" {
+            color = parse_avif_meta(payload)?.color;
+        }
+        Ok(())
+    })?;
+    Ok(color)
 }
 
 fn parse_avif_meta(payload: &[u8]) -> Result<AvifPrimaryMetadata, AppError> {
@@ -590,19 +603,26 @@ fn parse_avif_meta(payload: &[u8]) -> Result<AvifPrimaryMetadata, AppError> {
         .ok_or_else(|| corrupt_avif("AVIF primary item properties are missing."))?;
     let mut dimensions = None;
     let mut has_av1_config = false;
+    let mut color = None;
     for index in &primary_association.property_indexes {
         if *index == 0 {
             continue;
         }
-        match properties[*index - 1] {
+        match &properties[*index - 1] {
             AvifProperty::Ispe { width, height } => {
-                if dimensions.replace((width, height)).is_some() {
+                if dimensions.replace((*width, *height)).is_some() {
                     return Err(corrupt_avif(
                         "AVIF primary item has multiple ispe properties.",
                     ));
                 }
             }
             AvifProperty::Av1Config => has_av1_config = true,
+            AvifProperty::Color(value) => {
+                // ICC takes precedence over nclx when both properties exist.
+                if color.is_none() || value.starts_with(b"prof") || value.starts_with(b"rICC") {
+                    color = Some(value.clone());
+                }
+            }
             AvifProperty::Other => {}
         }
     }
@@ -620,6 +640,7 @@ fn parse_avif_meta(payload: &[u8]) -> Result<AvifPrimaryMetadata, AppError> {
         data_source,
         extents: location.extents,
         idat_length,
+        color,
     })
 }
 
@@ -879,6 +900,12 @@ fn parse_avif_ipco(payload: &[u8]) -> Result<Vec<AvifProperty>, AppError> {
                         return Err(corrupt_avif("AVIF av1C box is invalid."));
                     }
                     AvifProperty::Av1Config
+                }
+                b"colr" => {
+                    if payload.len() < 4 || payload.len() > 4 * 1024 * 1024 {
+                        return Err(corrupt_avif("Invalid AVIF color profile size."));
+                    }
+                    AvifProperty::Color(payload.to_vec())
                 }
                 _ => AvifProperty::Other,
             };

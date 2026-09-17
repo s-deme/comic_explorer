@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadPage, type ViewerSession } from "../library/client";
 import { presentError } from "../errors/presentation";
+import { PageCollection } from "./PageCollection";
 
 export function PagePreviewDialog({ session, generation, initialIndex, onSelect, onClose }: {
   session: ViewerSession;
@@ -16,6 +17,7 @@ export function PagePreviewDialog({ session, generation, initialIndex, onSelect,
   const [uri, setUri] = useState<string | null>(null);
   const [notice, setNotice] = useState("読み込み中…");
   const [failed, setFailed] = useState(false);
+  const [grid, setGrid] = useState(false);
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -23,6 +25,7 @@ export function PagePreviewDialog({ session, generation, initialIndex, onSelect,
     return () => { if (previous instanceof HTMLElement) previous.focus(); };
   }, []);
   useEffect(() => {
+    if (grid) return;
     let cancelled = false;
     setUri(null);
     setFailed(false);
@@ -49,7 +52,7 @@ export function PagePreviewDialog({ session, generation, initialIndex, onSelect,
       });
     }, 200);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [session, generation, index, retry]);
+  }, [session, generation, index, retry, grid]);
 
   function select(value: string) {
     const next = Number(value) - 1;
@@ -58,11 +61,12 @@ export function PagePreviewDialog({ session, generation, initialIndex, onSelect,
 
   return <dialog ref={dialog} className="page-preview-dialog" aria-label="ページプレビュー" onCancel={(event) => { event.preventDefault(); onClose(); }}>
     <header><h2>ページプレビュー</h2><button type="button" onClick={onClose}>閉じる</button></header>
-    <div className="page-preview-image">
+    <button type="button" aria-pressed={grid} onClick={() => setGrid(!grid)}>全ページ一覧</button>
+    {grid ? <PageCollection session={session} generation={generation} index={index} grid onIndex={setIndex} /> : <div className="page-preview-image">
       {uri && !failed && <img src={uri} alt={`${index + 1}ページのプレビュー`} onLoad={() => setNotice("")} onError={() => { setFailed(true); setNotice("画像を表示できませんでした。"); }} />}
       {notice && <p role="status">{notice}</p>}
       {failed && <button type="button" onClick={() => setRetry((value) => value + 1)}>再試行</button>}
-    </div>
+    </div>}
     <p className="page-preview-name" title={session.pages[index].relativePath}>{session.pages[index].relativePath}</p>
     <label>プレビューページ<input aria-label="プレビューページ" type="range" min={1} max={session.pages.length} value={index + 1} onChange={(event) => select(event.target.value)} /></label>
     <footer>

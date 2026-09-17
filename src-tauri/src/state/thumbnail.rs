@@ -73,8 +73,11 @@ impl ThumbnailPipeline {
         cover: CoverBytes,
         now_ms: i64,
     ) -> Result<ThumbnailResult, AppError> {
-        let content_hash =
-            stable_digest(&(cover.source_key.as_str(), cover.fingerprint_detail.as_str()));
+        let content_hash = stable_digest(&(
+            "srgb-avif-v1",
+            cover.source_key.as_str(),
+            cover.fingerprint_detail.as_str(),
+        ));
         if let Some(path) = self.cache.lookup(store, &content_hash, now_ms)? {
             self.cache.pin(&content_hash)?;
             return Ok(ThumbnailResult {

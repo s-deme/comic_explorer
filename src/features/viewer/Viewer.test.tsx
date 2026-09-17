@@ -69,6 +69,19 @@ function markPrefetchedPagesReady(): void {
 }
 
 describe("Viewer settings", () => {
+  it("REQ-VIEW-026 switches reading layouts without losing the selected page", async () => {
+    HTMLElement.prototype.scrollTo = vi.fn();
+    render(<Viewer session={multiPageSession} generation={1} initialMode="single" initialDirection="rightToLeft" onSettingsChange={() => undefined} onClose={() => undefined} />);
+    fireEvent.change(screen.getByRole("slider", { name: "ページ移動" }), { target: { value: "1" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "表示枚数" }), { target: { value: "scroll" } });
+    expect(screen.getByRole("region", { name: "連続縦読み" })).toHaveFocus();
+    expect(document.querySelector(".viewer")).toHaveAttribute("data-layout-mode", "scroll");
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(screen.getByRole("slider", { name: "ページ移動" })).toHaveValue("1");
+    fireEvent.change(screen.getByRole("combobox", { name: "表示枚数" }), { target: { value: "single" } });
+    expect(document.querySelector(".viewer")).toHaveAttribute("data-layout-mode", "paged");
+    expect(screen.getByRole("slider", { name: "ページ移動" })).toHaveValue("1");
+  });
   afterEach(() => {
     vi.useRealTimers();
     cleanup();

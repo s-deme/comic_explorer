@@ -268,7 +268,13 @@ function Initialize-WindowsToolchain {
     }
 
     Import-BatchEnvironment -ScriptPath $visualStudio.Path -Arguments $visualStudio.Arguments
-    $env:Path = "$(Split-Path $cargo.Path);$(Split-Path $node.Path);$env:Path"
+    $env:CMAKE_GENERATOR = "NMake Makefiles"
+    $env:Path = "$(Split-Path $cargo.Path);$(Split-Path $node.Path);$(Join-Path $ProjectRoot '.venv-windows\Scripts');$env:Path"
+    $gitCommand = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($gitCommand) {
+        $gitTools = Join-Path (Split-Path (Split-Path $gitCommand.Source)) 'usr\bin'
+        if (Test-Path -LiteralPath (Join-Path $gitTools 'perl.exe')) { $env:Path = "$env:Path;$gitTools" }
+    }
     $env:LIB = "$($sdk.UmLib);$($sdk.UcrtLib);$env:LIB"
     Assert-ToolCommand -ToolName "Cargo" -Executable $cargo.Path
     Assert-ToolCommand -ToolName "Node.js" -Executable $node.Path

@@ -9,6 +9,7 @@ import {
 } from "../library/client";
 import { presentError, presentUnexpectedError } from "../errors/presentation";
 import { PagePreviewDialog } from "./PagePreviewDialog";
+import { PageCollection } from "./PageCollection";
 import {
   clampLoupePointer,
   clampLoupeCenter,
@@ -414,6 +415,8 @@ export function Viewer({
   const rightClickRef = useRef<RightClickState | null>(null);
   const [panning, setPanning] = useState(false);
   const [pagePreviewOpen, setPagePreviewOpen] = useState(false);
+  const [continuous, setContinuous] = useState(false);
+  const [collectionRevision, setCollectionRevision] = useState(0);
   const [rectangleZoomArmed, setRectangleZoomArmed] = useState(false);
   const [rectangleZoomSelection, setRectangleZoomSelection] =
     useState<RectangleZoomSelection | null>(null);
@@ -430,6 +433,7 @@ export function Viewer({
   const clipboardRequestRef = useRef(0);
 
   function reloadFilteredPages() {
+    setCollectionRevision((value) => value + 1);
     pageRequests.current.clear();
     retainedIndicesRef.current.clear();
     setMediaUris({});
@@ -569,11 +573,11 @@ export function Viewer({
     ),
     [prefetchAhead, prefetchBehind, session.pages.length, visible],
   );
-  const retainedIndices = useMemo(() => Array.from(new Set([
+  const retainedIndices = useMemo(() => continuous ? [] : Array.from(new Set([
     ...visible,
     ...prefetchIndices,
     ...(pendingNextIndex === null ? [] : nextVisible),
-  ])), [nextVisible, pendingNextIndex, prefetchIndices, visible]);
+  ])), [continuous, nextVisible, pendingNextIndex, prefetchIndices, visible]);
   const preloadIndices = useMemo(
     () => retainedIndices.filter((index) => !visible.includes(index)),
     [retainedIndices, visible],
@@ -722,6 +726,11 @@ export function Viewer({
   }
 
   function next(factor = 1, skipOverflow = false) {
+    if (continuous) {
+      if (state.index + 1 < session.pages.length) dispatch({ type: "go", index: state.index + 1 });
+      else void flushReadingPosition().finally(() => onNextItem?.());
+      return;
+    }
     if (!skipOverflow && scrollPageOverflow(1, factor)) return;
     if (state.index + Math.max(1, visible.length) >= session.pages.length) {
       void flushReadingPosition().finally(() =>
@@ -752,6 +761,11 @@ export function Viewer({
   }, [pageScanMode, state.direction, state.index]);
 
   function previous(factor = 1, skipOverflow = false) {
+    if (continuous) {
+      if (state.index > 0) dispatch({ type: "go", index: state.index - 1 });
+      else void flushReadingPosition().finally(() => onPreviousItem?.());
+      return;
+    }
     if (!skipOverflow && scrollPageOverflow(-1, factor)) return;
     if (state.index === 0) {
       void flushReadingPosition().finally(() => onPreviousItem?.());
@@ -769,6 +783,7 @@ export function Viewer({
   }
 
   function applyImageTransform(action: ImageTransformAction) {
+    setContinuous(false);
     setImageTransform((current) => applyViewerImageTransform(current, action));
     setLoupe(null);
     const actionLabel = action === "rotateClockwise"
@@ -962,6 +977,7 @@ export function Viewer({
   }
 
   function applyScale(action: ViewerScaleAction) {
+    setContinuous(false);
     const baseScale =
       (action.type === "zoomIn" || action.type === "zoomOut")
       && scale.mode !== "custom"
@@ -1335,6 +1351,7 @@ export function Viewer({
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
       if (pagePreviewOpen) return;
+      if (continuous && ["ArrowUp", "ArrowDown", "PageUp", "PageDown", " ", "Home", "End"].includes(event.key)) return;
       if (event.isComposing) return;
       if (toolbarMoreOpen && event.key === "Escape") {
         event.preventDefault();
@@ -1494,7 +1511,7 @@ export function Viewer({
     <section
       className="viewer"
       aria-label={`${session.displayName} ビューワ`}
-      data-layout-mode="paged"
+      data-layout-mode={continuous ? "scroll" : "paged"}
       data-fullscreen={fullscreen}
       data-toolbar-more-open={toolbarMoreOpen}
       data-toolbar-visible={!fullscreen || fullscreenToolbarVisible}
@@ -1550,12 +1567,18 @@ export function Viewer({
               <span className="visually-hidden">表示枚数</span>
               <select
                 aria-label="表示枚数"
-                value={state.mode}
-                onChange={(event) => changeMode(event.target.value as ViewMode)}
+                value={continuous ? "scroll" : state.mode}
+                onChange={(event) => {
+                  const scroll = event.target.value === "scroll";
+                  setContinuous(scroll);
+                  setSlideshowRunning(false);
+                  if (!scroll) changeMode(event.target.value as ViewMode);
+                }}
               >
                 {VIEW_MODES.map((mode) => (
                   <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
                 ))}
+                <option value="scroll">連続縦読み</option>
               </select>
             </label>
           </div>
@@ -1601,7 +1624,7 @@ export function Viewer({
               aria-label="ルーペ"
               title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
               aria-pressed={scale.loupeEnabled}
-              onClick={() => applyScale({ type: "loupe", enabled: !scale.loupeEnabled })}
+              onClick={() => { setContinuous(false); applyScale({ type: "loupe", enabled: !scale.loupeEnabled }); }}
             >
               <span aria-hidden="true">⌕</span>
             </button>
@@ -1951,9 +1974,11 @@ export function Viewer({
           </section>
         </div>
       )}
+      {continuous && <PageCollection key={collectionRevision} session={session} generation={generation} index={state.index} onIndex={(index) => dispatch({ type: "go", index })} />}
       <div
         ref={stageRef}
         className="viewer-stage"
+        hidden={continuous}
         data-panning={panning}
         data-rectangle-zoom={rectangleZoomArmed}
         data-background={viewerBackground}

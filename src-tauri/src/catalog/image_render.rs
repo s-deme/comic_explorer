@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
 
-use image::{DynamicImage, ImageError, ImageFormat as DecoderFormat, ImageReader};
+use image::{DynamicImage, ImageDecoder, ImageError, ImageFormat as DecoderFormat, ImageReader};
 use resvg::tiny_skia::{Pixmap, Transform};
 use resvg::usvg::{ImageHrefResolver, Options, Tree};
 
@@ -22,6 +22,9 @@ pub(crate) fn decode_raster_metadata(
 }
 
 pub(crate) fn raster_delivery_png(bytes: &[u8], format: ImageFormat) -> Result<Vec<u8>, AppError> {
+    if let Some(png) = color_managed_png(bytes)? {
+        return Ok(png);
+    }
     let decoded = decode_raster(bytes, format)?;
     let width = decoded.width();
     let height = decoded.height();
@@ -83,6 +86,9 @@ fn decode_raster(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, AppE
             "Image byte limit exceeded.",
         ));
     }
+    if format == ImageFormat::Avif {
+        return decode_avif(bytes);
+    }
     let decoder_format = match format {
         ImageFormat::Bmp => DecoderFormat::Bmp,
         ImageFormat::Gif => DecoderFormat::Gif,
@@ -102,6 +108,199 @@ fn decode_raster(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, AppE
     limits.max_alloc = Some(MAX_IMAGE_BYTES);
     reader.limits(limits);
     reader.decode().map_err(raster_error)
+}
+
+fn decode_avif(bytes: &[u8]) -> Result<DynamicImage, AppError> {
+    let metadata = super::inspect_image(&mut Cursor::new(bytes), bytes.len() as u64)?;
+    if metadata.format != ImageFormat::Avif {
+        return Err(image_error(ErrorCode::CorruptImage, "Expected AVIF data."));
+    }
+    let fail = |error: &dyn std::fmt::Display| {
+        image_error(
+            ErrorCode::CorruptImage,
+            &format!("Cannot decode AVIF: {error}"),
+        )
+    };
+    let parsed = aom_decode::avif::Avif::parse_avif(bytes).map_err(|e| fail(&e))?;
+    // Validate the compressed AV1 dimensions too, before libaom allocates buffers.
+    for bitstream in std::iter::once(&parsed.primary_item).chain(parsed.alpha_item.iter()) {
+        let header =
+            aom_decode::avif::AV1Metadata::parse_av1_bitstream(bitstream).map_err(|e| fail(&e))?;
+        let width = header.max_frame_width.get();
+        let height = header.max_frame_height.get();
+        validate_render_dimensions(width, height, u64::from(width) * u64::from(height) * 16)?;
+    }
+    let decoded =
+        aom_decode::avif::Avif::from_parsed_avif_data(parsed, &aom_decode::Config { threads: 2 })
+            .and_then(|mut decoder| decoder.convert())
+            .map_err(|e| fail(&e))?;
+    use aom_decode::avif::Image;
+    let (width, height, pixels): (usize, usize, Vec<u8>) = match decoded {
+        Image::RGB8(img) => (
+            img.width(),
+            img.height(),
+            img.pixels().flat_map(|p| [p.r, p.g, p.b, 255]).collect(),
+        ),
+        Image::RGBA8(img) => (
+            img.width(),
+            img.height(),
+            img.pixels().flat_map(|p| [p.r, p.g, p.b, p.a]).collect(),
+        ),
+        Image::RGB16(img) => (
+            img.width(),
+            img.height(),
+            img.pixels()
+                .flat_map(|p| [(p.r >> 8) as u8, (p.g >> 8) as u8, (p.b >> 8) as u8, 255])
+                .collect(),
+        ),
+        Image::RGBA16(img) => (
+            img.width(),
+            img.height(),
+            img.pixels()
+                .flat_map(|p| {
+                    [
+                        (p.r >> 8) as u8,
+                        (p.g >> 8) as u8,
+                        (p.b >> 8) as u8,
+                        (p.a >> 8) as u8,
+                    ]
+                })
+                .collect(),
+        ),
+        Image::Gray8(img) => (
+            img.width(),
+            img.height(),
+            img.pixels().flat_map(|p| [p, p, p, 255]).collect(),
+        ),
+        Image::Gray16(img) => (
+            img.width(),
+            img.height(),
+            img.pixels()
+                .flat_map(|p| [(p >> 8) as u8, (p >> 8) as u8, (p >> 8) as u8, 255])
+                .collect(),
+        ),
+    };
+    if (width as u32, height as u32) != (metadata.width, metadata.height) {
+        return Err(image_error(
+            ErrorCode::CorruptImage,
+            "AVIF decoded dimensions differ from its container.",
+        ));
+    }
+    let mut rgba = image::RgbaImage::from_raw(width as u32, height as u32, pixels)
+        .ok_or_else(|| image_error(ErrorCode::CorruptImage, "Invalid AVIF pixel layout."))?;
+    if let Some(color) = super::image_metadata::avif_color(bytes)? {
+        if color.starts_with(b"prof") || color.starts_with(b"rICC") {
+            transform_icc(&color[4..], &mut rgba)?;
+        } else if color.starts_with(b"nclx") {
+            if color.len() != 11 {
+                return Err(image_error(
+                    ErrorCode::CorruptImage,
+                    "Invalid AVIF nclx profile.",
+                ));
+            }
+            let primaries = u16::from_be_bytes([color[4], color[5]]);
+            let transfer = u16::from_be_bytes([color[6], color[7]]);
+            if !matches!(primaries, 1 | 2 | 9 | 12) || !matches!(transfer, 1 | 2 | 6 | 13 | 14 | 15)
+            {
+                return Err(image_error(
+                    ErrorCode::UnsupportedFormat,
+                    "AVIF HDR or this color space is not supported.",
+                ));
+            }
+            let profile = moxcms::ColorProfile::new_from_cicp(moxcms::CicpProfile {
+                color_primaries: moxcms::CicpColorPrimaries::try_from(if primaries == 2 {
+                    1
+                } else {
+                    primaries as u8
+                })
+                .map_err(|e| fail(&e))?,
+                transfer_characteristics: moxcms::TransferCharacteristics::try_from(
+                    if transfer == 2 { 13 } else { transfer as u8 },
+                )
+                .map_err(|e| fail(&e))?,
+                matrix_coefficients: moxcms::MatrixCoefficients::Identity,
+                full_range: true,
+            });
+            transform_icc(&profile.encode().map_err(|e| fail(&e))?, &mut rgba)?;
+        }
+    }
+    Ok(DynamicImage::ImageRgba8(rgba))
+}
+
+/// Normalize embedded ICC to sRGB before producing untagged derived pixels.
+/// Original animated images stay intact in WebView2, which manages their profiles.
+pub(crate) fn color_managed_png(bytes: &[u8]) -> Result<Option<Vec<u8>>, AppError> {
+    let Ok(format) = image::guess_format(bytes) else {
+        return Ok(None);
+    };
+    if !matches!(
+        format,
+        DecoderFormat::Jpeg | DecoderFormat::Png | DecoderFormat::Tiff | DecoderFormat::WebP
+    ) {
+        return Ok(None);
+    }
+    let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_EDGE);
+    limits.max_image_height = Some(MAX_IMAGE_EDGE);
+    limits.max_alloc = Some(MAX_IMAGE_BYTES);
+    reader.limits(limits);
+    let mut decoder = reader.into_decoder().map_err(raster_error)?;
+    let Some(icc) = decoder.icc_profile().map_err(raster_error)? else {
+        return Ok(None);
+    };
+    if icc.len() > 4 * 1024 * 1024 {
+        return Err(image_error(
+            ErrorCode::ResourceLimit,
+            "ICC profile exceeds 4 MiB.",
+        ));
+    }
+    let (width, height) = decoder.dimensions();
+    validate_render_dimensions(width, height, u64::from(width) * u64::from(height) * 16)?;
+    let orientation = decoder.orientation().map_err(raster_error)?;
+    let mut decoded = DynamicImage::from_decoder(decoder).map_err(raster_error)?;
+    decoded.apply_orientation(orientation);
+    let mut rgba = decoded.into_rgba8();
+    transform_icc(&icc, &mut rgba)?;
+    let mut output = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(rgba)
+        .write_to(&mut output, DecoderFormat::Png)
+        .map_err(raster_error)?;
+    bounded_output(output.into_inner()).map(Some)
+}
+
+fn transform_icc(icc: &[u8], rgba: &mut image::RgbaImage) -> Result<(), AppError> {
+    use moxcms::{ColorProfile, Layout, TransformOptions};
+    let fail = |error: moxcms::CmsError| {
+        image_error(
+            ErrorCode::CorruptImage,
+            &format!("Invalid or unsupported ICC profile: {error}"),
+        )
+    };
+    let source = ColorProfile::new_from_slice(icc).map_err(fail)?;
+    if source.color_space != moxcms::DataColorSpace::Rgb {
+        return Err(image_error(
+            ErrorCode::UnsupportedFormat,
+            "ICC conversion currently requires an RGB source profile.",
+        ));
+    }
+    let transform = source
+        .create_transform_8bit(
+            Layout::Rgba,
+            &ColorProfile::new_srgb(),
+            Layout::Rgba,
+            TransformOptions::default(),
+        )
+        .map_err(fail)?;
+    let mut row = vec![0u8; rgba.width() as usize * 4];
+    for pixels in rgba.as_mut().chunks_exact_mut(row.len()) {
+        transform.transform(pixels, &mut row).map_err(fail)?;
+        // Preserve transparency independently of profile channel processing.
+        for (src, dst) in row.chunks_exact(4).zip(pixels.chunks_exact_mut(4)) {
+            dst[..3].copy_from_slice(&src[..3]);
+        }
+    }
+    Ok(())
 }
 
 fn parse_svg(bytes: &[u8]) -> Result<Tree, AppError> {
@@ -198,6 +397,54 @@ fn image_error(code: ErrorCode, message: &str) -> AppError {
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgba};
+
+    #[test]
+    fn bundled_avif_decoder_reads_pixels_and_rejects_truncation() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../tests/fixtures/generated/FIX-AVIF-001/rgb.avif");
+        let bytes = std::fs::read(path).expect("generate fixtures first");
+        let metadata =
+            crate::catalog::inspect_image(&mut Cursor::new(&bytes), bytes.len() as u64).unwrap();
+        assert_eq!((metadata.width, metadata.height), (3, 2));
+        let png = raster_delivery_png(&bytes, ImageFormat::Avif).unwrap();
+        let image = image::load_from_memory(&png).unwrap().into_rgba8();
+        assert_eq!(image.dimensions(), (3, 2));
+        let pixel = image.get_pixel(0, 0).0;
+        assert!(
+            (i16::from(pixel[0]) - 180).abs() < 8,
+            "decoded pixel: {pixel:?}"
+        );
+        assert_eq!(pixel[3], 255);
+        assert!(decode_avif(&bytes[..bytes.len() - 4]).is_err());
+        #[cfg(target_os = "windows")]
+        {
+            let (width, height, bgra) = crate::catalog::decode_wic_bgra(&bytes).unwrap();
+            assert_eq!((width, height), (3, 2));
+            assert_eq!(bgra.len(), 24);
+        }
+    }
+
+    #[test]
+    fn embedded_icc_is_converted_to_srgb_and_alpha_is_preserved() {
+        use image::ImageEncoder;
+        let profile = moxcms::ColorProfile::new_display_p3().encode().unwrap();
+        let mut encoded = Vec::new();
+        let mut encoder = image::codecs::png::PngEncoder::new(&mut encoded);
+        encoder.set_icc_profile(profile).unwrap();
+        encoder
+            .write_image(&[180, 80, 60, 123], 1, 1, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        let normalized = color_managed_png(&encoded).unwrap().unwrap();
+        let pixel = image::load_from_memory(&normalized)
+            .unwrap()
+            .into_rgba8()
+            .get_pixel(0, 0)
+            .0;
+        assert_ne!(&pixel[..3], &[180, 80, 60]);
+        assert_eq!(pixel[3], 123);
+        assert!(color_managed_png(&normalized).unwrap().is_none());
+        assert!(transform_icc(b"invalid", &mut image::RgbaImage::new(1, 1)).is_err());
+    }
 
     fn encoded_raster(format: DecoderFormat) -> Vec<u8> {
         let image = DynamicImage::ImageRgba8(ImageBuffer::from_pixel(3, 2, Rgba([1, 2, 3, 4])));

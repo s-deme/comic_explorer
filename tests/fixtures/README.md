@@ -75,3 +75,6 @@ Pythonの外部パッケージは使わない。PNGはPython標準ライブラ�
 ## 隔離と並列実行
 
 生成済み原本を直接変更するエラー注入は禁止する。各workerは生成物を `{run-id}/{worker-id}/{test-id}/library` へ複製し、別の `app-data`、`cache`、`temp` を使用する。性能、ACL、インストール、異常終了、通信監視は直列実行する。危険ZIP内の名前をホストファイルパスへ変換しない。
+# AVIF fixture
+
+`FIX-AVIF-001/rgb.avif` はPillow 12.1.1で生成した3×2、RGB(180,80,60)の合成画像です。生成済みペイロードをgeneratorに埋め込むため、fixture再生成にPillowは不要です。
