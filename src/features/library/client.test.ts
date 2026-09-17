@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import * as libraryClientFacade from "./client";
-import * as libraryClientCommands from "./client/commands";
 import { createDefaultSettingsProfile } from "../settings/profile";
 import {
+  listReadingHistory,
   deleteCatalogMask,
   evaluateCatalogMask,
   listCatalogMasks,
@@ -87,10 +86,14 @@ describe("library client settings contract", () => {
     listenMock.mockResolvedValue(vi.fn());
   });
 
-  it("exports every transport command through a feature facade", () => {
-    expect(Object.keys(libraryClientFacade).sort()).toEqual(
-      Object.keys(libraryClientCommands).sort(),
-    );
+  it("shares request IDs across feature clients while preserving generations", async () => {
+    await pickSearchSource(31);
+    await listReadingHistory(32);
+    const first = invokeMock.mock.calls[0][1] as { context: { requestId: string; generation: number } };
+    const second = invokeMock.mock.calls[1][1] as typeof first;
+    expect(first.context.generation).toBe(31);
+    expect(second.context.generation).toBe(32);
+    expect(first.context.requestId).not.toBe(second.context.requestId);
   });
 
   it("REQ-LEY-P3-021 uses typed Rust queue IPC and the bounded native event", async () => {

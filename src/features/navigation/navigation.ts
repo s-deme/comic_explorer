@@ -28,6 +28,11 @@ export function normalizeWindowsDisplayPath(path: string): string {
     : withoutExtendedPrefix.replace(/\\+$/, "");
 }
 
+/** Display identity only; filesystem containment is validated by Rust. */
+export function windowsDisplayPathKey(path: string): string {
+  return normalizeWindowsDisplayPath(path).toLocaleLowerCase("en-US");
+}
+
 export interface WindowsDriveAddress {
   driveRoot: string;
   relativePath: string;

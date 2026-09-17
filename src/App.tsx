@@ -6,6 +6,7 @@ import { CatalogGrid } from "./features/catalog/CatalogGrid";
 import {
   navigationReducer,
   normalizeWindowsDisplayPath,
+  windowsDisplayPathKey,
   parseWindowsDriveAddress,
   parentPath,
   relativeAddressWithinRoot,
@@ -21,13 +22,10 @@ import {
   cancelRecursiveThumbnailGeneration,
   listenRecursiveThumbnailProgress,
   listTags,
-  listReadingHistory,
   listPageBookmarks,
   listWindowsKnownFolders,
-  clearReadingHistory,
   openComic,
   pickLibraryRoot,
-  pickSearchSource,
   pickLibraryFile,
   registerLibraryRoot,
   watchLibraryFolder,
@@ -61,7 +59,6 @@ import {
   renameTag,
   queryTags,
   setItemRating,
-  searchLibrary,
   takeRecoveryNotice,
   addFavorite,
   listFavorites,
@@ -107,7 +104,6 @@ import {
   type SearchResultEntry,
   type ItemMetadata,
   type TagEntry,
-  type ReadingHistoryEntry,
   type RecursiveThumbnailProgress,
   type RecursiveThumbnailReport,
   type TrayStatus,
@@ -118,6 +114,8 @@ import {
   listenNativeFileDrops,
   nativeDropTargetAt,
 } from "./features/library/native-file-drop";
+import { useReadingHistory } from "./features/reading/useReadingHistory";
+import { useCatalogSearch } from "./features/catalog/useCatalogSearch";
 import { useLibraryDiagnostics } from "./features/diagnostics/useLibraryDiagnostics";
 import { LibraryDiagnosticsDialog } from "./features/diagnostics/LibraryDiagnosticsDialog";
 import {
@@ -285,7 +283,6 @@ import {
   tauriAlwaysOnTopAdapter,
   tauriWindowThemeAdapter,
   type AlwaysOnTopAdapter,
-  type NativeWindowTheme,
   type WindowThemeAdapter,
 } from "./features/workspace/window";
 import {
@@ -329,13 +326,10 @@ import type {
 } from "./features/settings/ThemeManager";
 import {
   DEFAULT_THEME_SELECTION,
-  LEGACY_THEME_SELECTION,
+  nativeWindowThemeFor,
+  validThemeState,
   applyThemeSelection,
-  normalizeCustomThemeSnapshot,
   normalizeThemeDefinitionV1,
-  normalizeThemeSelection,
-  resolveTheme,
-  themeSelectionMatchesSnapshot,
   type CustomThemeSnapshot,
   type ThemeBaseScheme,
   type ThemeDefinitionV1,
@@ -363,11 +357,8 @@ import {
   presentUnexpectedError,
 } from "./features/errors/presentation";
 import {
-  defaultSearchOptions,
-  toSearchRequestOptions,
   type SearchDateComparison,
   type SearchDateMode,
-  type SearchOptions,
   type SearchSizeComparison,
 } from "./features/catalog/search-options";
 import { archiveKindFromPath, itemKindLabel } from "./features/catalog/kind-label";
@@ -378,14 +369,6 @@ type LoadState =
   | { status: "loading"; path: string }
   | { status: "error"; path: string; message: string }
   | { status: "ready" };
-
-type SearchState =
-  | { status: "idle" }
-  | { status: "loading"; query: string }
-  | { status: "ready"; query: string; results: SearchResultEntry[] }
-  | { status: "error"; query: string; message: string };
-
-type SearchScope = "current" | "library" | "multiple";
 
 interface AppProps {
   fullscreenAdapter?: FullscreenAdapter;
@@ -398,28 +381,6 @@ function preferredSystemTheme(): ThemeBaseScheme {
     && window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
-}
-
-function nativeWindowThemeFor(
-  selection: ThemeSelection,
-  snapshot: CustomThemeSnapshot | null,
-  systemScheme: ThemeBaseScheme,
-): NativeWindowTheme {
-  return selection.kind === "system"
-    ? null
-    : resolveTheme(selection, snapshot, systemScheme).baseScheme;
-}
-
-function validThemeState(
-  selectionValue: unknown,
-  snapshotValue: unknown,
-): { selection: ThemeSelection; snapshot: CustomThemeSnapshot | null; fallback: boolean } {
-  const selection = normalizeThemeSelection(selectionValue);
-  const snapshot = snapshotValue === null ? null : normalizeCustomThemeSnapshot(snapshotValue);
-  if (selection !== null && themeSelectionMatchesSnapshot(selection, snapshot)) {
-    return { selection, snapshot, fallback: false };
-  }
-  return { selection: LEGACY_THEME_SELECTION, snapshot: null, fallback: true };
 }
 
 function themeRecordViews(catalog: CustomThemeCatalog): ThemeRecordView[] {
@@ -535,11 +496,9 @@ export function App({
   const metadataGeneration = useRef(0);
   const ratingSaveGeneration = useRef(0);
   const ratingSaveInFlight = useRef(false);
-  const historyGeneration = useRef(0);
   const tagGeneration = useRef(0);
   const itemTagGeneration = useRef(0);
   const recursiveThumbnailGeneration = useRef(0);
-  const searchSourceGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
   const fileUndoGeneration = useRef(0);
   const nativeFileDropGeneration = useRef(0);
@@ -791,14 +750,22 @@ export function App({
   const [viewerSession, setViewerSession] = useState<ViewerSession | null>(null);
   const [viewerLaunchMode, setViewerLaunchMode] = useState<ViewerLaunchMode>("normal");
   const [recoveryNotice, setRecoveryNotice] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchPaneOpen, setSearchPaneOpen] = useState(false);
-  const [searchScope, setSearchScope] = useState<SearchScope>("current");
-  const [searchOptions, setSearchOptions] = useState<SearchOptions>(defaultSearchOptions);
-  const [searchState, setSearchState] = useState<SearchState>({ status: "idle" });
-  const [searchSourceRoots, setSearchSourceRoots] = useState<string[]>([]);
-  const [searchSourceBusy, setSearchSourceBusy] = useState(false);
-  const [searchSourceNotice, setSearchSourceNotice] = useState<string | null>(null);
+  const {
+    searchQuery, setSearchQuery, searchPaneOpen, setSearchPaneOpen,
+    searchScope, setSearchScope, searchOptions, setSearchOptions,
+    searchState, setSearchState, searchSourceRoots, setSearchSourceRoots,
+    searchSourceBusy, searchSourceNotice, setSearchSourceNotice,
+    clearSearch, runSearch, addSearchSource, removeSearchSource,
+  } = useCatalogSearch({
+    generation, libraryRoot, currentPath: navigation.current,
+    onSearchStart() {
+      selectionAnchor.current = null;
+      setSelectedPaths([]);
+      setSelectedPath(null);
+      setThumbnails({});
+      thumbnailRequests.current.clear();
+    },
+  });
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteRefreshRevision, setFavoriteRefreshRevision] = useState(0);
@@ -814,10 +781,17 @@ export function App({
   >("idle");
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
-  const [readingHistory, setReadingHistory] = useState<ReadingHistoryEntry[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const {
+    readingHistory, historyOpen, setHistoryOpen, historyLoading, historyNotice,
+    refreshHistory, clearRecentHistory,
+  } = useReadingHistory({
+    onHistoryChange(entries) {
+      setRecentEntries(entries.slice(0, 20).map((entry) => recentCatalogEntry(entry.itemIdentity)));
+    },
+    async onOpenRecent(itemIdentity) {
+      await openComicEntry(recentCatalogEntry(itemIdentity));
+    },
+  });
   const [tagsOpen, setTagsOpen] = useState(false);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [tagQuery, setTagQuery] = useState("");
@@ -1624,8 +1598,8 @@ export function App({
         || !autoRefreshCurrentFolder
         || libraryRoot === null
         || change.generation !== generation.current
-        || normalizeWindowsDisplayPath(change.libraryRoot).toLocaleLowerCase("en-US")
-          !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+        || windowsDisplayPathKey(change.libraryRoot)
+          !== windowsDisplayPathKey(libraryRoot)
         || change.relativePath !== navigation.current
       ) return;
       if (change.status === "error") {
@@ -1761,46 +1735,34 @@ export function App({
     void load(navigation.current, selection);
   }
 
-  function selectAll() {
-    const next = visibleEntries.map((entry) => entry.relativePath);
+  function replaceSelection(next: string[]) {
     selectionAnchor.current = next.at(-1) ?? null;
     setSelectedPaths(next);
     setSelectedPath(selectionAnchor.current);
     setSelectionNotice(null);
   }
 
-  function selectByKind(kind: CatalogEntry["kind"] | "image") {
-    const next = selectEntriesByKind(visibleEntries, kind);
-    selectionAnchor.current = next.at(-1) ?? null;
-    setSelectedPaths(next);
-    setSelectedPath(selectionAnchor.current);
-    setSelectionNotice(null);
+  function selectAll() {
+    replaceSelection(visibleEntries.map((entry) => entry.relativePath));
+  }
+
+  function selectByKind(kind: CatalogEntry["kind"] | "file" | "image") {
+    replaceSelection(selectEntriesByKind(visibleEntries, kind));
   }
 
   function selectFiles() {
-    const next = selectEntriesByKind(visibleEntries, "file");
-    selectionAnchor.current = next.at(-1) ?? null;
-    setSelectedPaths(next);
-    setSelectedPath(selectionAnchor.current);
-    setSelectionNotice(null);
+    selectByKind("file");
   }
 
   function invertSelection() {
     const selected = new Set(selectedPaths);
-    const next = visibleEntries
+    replaceSelection(visibleEntries
       .filter((entry) => !selected.has(entry.relativePath))
-      .map((entry) => entry.relativePath);
-    selectionAnchor.current = next.at(-1) ?? null;
-    setSelectedPaths(next);
-    setSelectedPath(selectionAnchor.current);
-    setSelectionNotice(null);
+      .map((entry) => entry.relativePath));
   }
 
   function clearSelection() {
-    selectionAnchor.current = null;
-    setSelectedPaths([]);
-    setSelectedPath(null);
-    setSelectionNotice(null);
+    replaceSelection([]);
   }
 
   async function saveDisplayedThumbnail() {
@@ -2247,8 +2209,8 @@ export function App({
     if (paths.length === 0 || libraryRoot === null) return;
     if (
       destinationDriveRoot === null
-      || normalizeWindowsDisplayPath(destinationDriveRoot).toLocaleLowerCase("en-US")
-        !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+      || windowsDisplayPathKey(destinationDriveRoot)
+        !== windowsDisplayPathKey(libraryRoot)
     ) {
       setSelectionNotice("同じドライブ内のフォルダへ移動してください。");
       return;
@@ -2277,8 +2239,8 @@ export function App({
     if (dialog === null) return;
     if (
       libraryRoot === null
-      || normalizeWindowsDisplayPath(dialog.libraryRoot).toLocaleLowerCase("en-US")
-        !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
+      || windowsDisplayPathKey(dialog.libraryRoot)
+        !== windowsDisplayPathKey(libraryRoot)
     ) {
       setNativeFileDropDialog(null);
       setSelectionNotice("ライブラリが変わったため外部ファイルのコピーを中止しました。");
@@ -2655,12 +2617,6 @@ export function App({
     catalogActivationGeneration.current += 1;
   }, [libraryRoot, navigation.current]);
 
-  function clearSearch() {
-    generation.current += 1;
-    setSearchQuery("");
-    setSearchState({ status: "idle" });
-  }
-
   async function refreshFavorites() {
     const requestGeneration = ++favoriteGeneration.current;
     setFavoritesLoading(true);
@@ -2875,55 +2831,6 @@ export function App({
     }
   }
 
-  async function refreshHistory(openMostRecent = false) {
-    const requestGeneration = ++historyGeneration.current;
-    setHistoryLoading(true);
-    setHistoryNotice(null);
-    try {
-      const response = await listReadingHistory(requestGeneration);
-      if (requestGeneration !== historyGeneration.current) return;
-      if (response.status === "ok") {
-        setReadingHistory(response.data);
-        setRecentEntries(response.data.slice(0, 20).map((entry) =>
-          recentCatalogEntry(entry.itemIdentity),
-        ));
-        if (openMostRecent && response.data.length > 0) {
-          await openComicEntry(recentCatalogEntry(response.data[0].itemIdentity));
-        }
-      } else if (response.status === "error") {
-        setHistoryNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === historyGeneration.current) {
-        setHistoryNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === historyGeneration.current) {
-        setHistoryLoading(false);
-      }
-    }
-  }
-
-  async function clearRecentHistory() {
-    const requestGeneration = ++historyGeneration.current;
-    setHistoryLoading(true);
-    setHistoryNotice(null);
-    try {
-      const response = await clearReadingHistory(requestGeneration);
-      if (requestGeneration !== historyGeneration.current) return;
-      if (response.status === "ok") {
-        setReadingHistory([]);
-        setRecentEntries([]);
-      } else if (response.status === "error") {
-        setHistoryNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === historyGeneration.current) setHistoryNotice(presentUnexpectedError());
-    } finally {
-      if (requestGeneration === historyGeneration.current) setHistoryLoading(false);
-    }
-  }
-
   async function refreshItemTags(itemIdentity: string) {
     const requestGeneration = ++itemTagGeneration.current;
     setTagNotice(null);
@@ -3134,103 +3041,9 @@ export function App({
       .catch(() => undefined);
   }
 
-  async function runSearch() {
-    const query = searchQuery;
-    if (query.trim() === "") {
-      clearSearch();
-      return;
-    }
-    if (!searchOptions.includeFolders && !searchOptions.includeFiles) {
-      setSearchState({
-        status: "error",
-        query,
-        message: "検索結果に含める種類を1つ以上選択してください。",
-      });
-      return;
-    }
-    generation.current += 1;
-    const requestGeneration = generation.current;
-    setSearchState({ status: "loading", query });
-    selectionAnchor.current = null;
-    setSelectedPaths([]);
-    setSelectedPath(null);
-    setThumbnails({});
-    thumbnailRequests.current.clear();
-    try {
-      const requestOptions = toSearchRequestOptions(searchOptions);
-      requestOptions.fixedLocation = searchScope === "current" ? navigation.current : null;
-      requestOptions.sourceRoots = searchScope === "multiple"
-        ? [...searchSourceRoots]
-        : libraryRoot === null ? [] : [libraryRoot];
-      const response = await searchLibrary(
-        query,
-        requestGeneration,
-        requestOptions,
-      );
-      if (requestGeneration !== generation.current) return;
-      if (response.status === "ok") {
-        setSearchState({ status: "ready", query, results: response.data });
-      } else if (response.status === "error") {
-        setSearchState({
-          status: "error",
-          query,
-          message: response.error.code === "INVALID_REQUEST"
-            ? "検索式を確認してください。例: (*.cbz OR *.pdf) AND NOT sample*"
-            : presentError(response.error),
-        });
-      }
-    } catch {
-      if (requestGeneration === generation.current) {
-        setSearchState({
-          status: "error",
-          query,
-          message: presentUnexpectedError(),
-        });
-      }
-    }
-  }
-
   function submitSearch(event: React.FormEvent) {
     event.preventDefault();
     void runSearch();
-  }
-
-  async function addSearchSource() {
-    if (searchSourceRoots.length >= 8) {
-      setSearchSourceNotice("検索場所は最大8件です。不要な場所を外してから追加してください。");
-      return;
-    }
-    const requestGeneration = ++searchSourceGeneration.current;
-    setSearchSourceBusy(true);
-    setSearchSourceNotice(null);
-    try {
-      const response = await pickSearchSource(requestGeneration);
-      if (requestGeneration !== searchSourceGeneration.current) return;
-      if (response.status === "ok" && response.data !== null) {
-        const next = response.data.absolutePath;
-        setSearchSourceRoots((current) => current.some((source) =>
-          normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
-            === normalizeWindowsDisplayPath(next).toLocaleLowerCase("en-US")
-        ) ? current : [...current, next]);
-      } else if (response.status === "error") {
-        setSearchSourceNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === searchSourceGeneration.current) {
-        setSearchSourceNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === searchSourceGeneration.current) setSearchSourceBusy(false);
-    }
-  }
-
-  function removeSearchSource(source: string) {
-    if (
-      libraryRoot !== null
-      && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
-        === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")
-    ) return;
-    setSearchSourceRoots((current) => current.filter((candidate) => candidate !== source));
   }
 
   async function navigateToSearchResult(entry: SearchResultEntry) {
@@ -3238,8 +3051,8 @@ export function App({
     if (
       entry.sourceRoot !== undefined
       && (libraryRoot === null
-        || normalizeWindowsDisplayPath(entry.sourceRoot).toLocaleLowerCase("en-US")
-          !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US"))
+        || windowsDisplayPathKey(entry.sourceRoot)
+          !== windowsDisplayPathKey(libraryRoot))
     ) {
       await selectDrive(entry.sourceRoot, resultParent ?? "", entry.relativePath);
       return;
@@ -5890,8 +5703,8 @@ export function App({
             });
             return;
           }
-          if (libraryRoot === null || normalizeWindowsDisplayPath(target.driveRoot).toLocaleLowerCase("en-US")
-            !== normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US")) {
+          if (libraryRoot === null || windowsDisplayPathKey(target.driveRoot)
+            !== windowsDisplayPathKey(libraryRoot)) {
             void selectDrive(target.driveRoot, target.relativePath);
             return;
           }
@@ -6043,10 +5856,10 @@ export function App({
                         <ul className="search-source-list" aria-label="横断検索の場所">
                           {searchSourceRoots.map((source) => {
                             const currentSource = libraryRoot !== null
-                              && normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")
-                                === normalizeWindowsDisplayPath(libraryRoot).toLocaleLowerCase("en-US");
+                              && windowsDisplayPathKey(source)
+                                === windowsDisplayPathKey(libraryRoot);
                             return (
-                              <li key={normalizeWindowsDisplayPath(source).toLocaleLowerCase("en-US")}>
+                              <li key={windowsDisplayPathKey(source)}>
                                 <span title={source}>{source}</span>
                                 {currentSource ? (
                                   <span className="search-source-current">現在</span>

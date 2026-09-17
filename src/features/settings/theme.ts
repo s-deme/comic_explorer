@@ -450,6 +450,28 @@ export function themeSelectionMatchesSnapshot(
     : snapshot === null;
 }
 
+export function nativeWindowThemeFor(
+  selection: ThemeSelection,
+  snapshot: CustomThemeSnapshot | null,
+  systemScheme: ThemeBaseScheme,
+): ThemeBaseScheme | null {
+  return selection.kind === "system"
+    ? null
+    : resolveTheme(selection, snapshot, systemScheme).baseScheme;
+}
+
+export function validThemeState(
+  selectionValue: unknown,
+  snapshotValue: unknown,
+): { selection: ThemeSelection; snapshot: CustomThemeSnapshot | null; fallback: boolean } {
+  const selection = normalizeThemeSelection(selectionValue);
+  const snapshot = snapshotValue === null ? null : normalizeCustomThemeSnapshot(snapshotValue);
+  if (selection !== null && themeSelectionMatchesSnapshot(selection, snapshot)) {
+    return { selection, snapshot, fallback: false };
+  }
+  return { selection: LEGACY_THEME_SELECTION, snapshot: null, fallback: true };
+}
+
 export type ThemeFallbackReason = "customSnapshotMissingOrStale";
 
 export interface ResolvedTheme {

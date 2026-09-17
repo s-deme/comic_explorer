@@ -8,7 +8,7 @@ import {
 } from "../library/client";
 import type { FileClipboardStatus } from "../library/client";
 import { presentError } from "../errors/presentation";
-import { normalizeWindowsDisplayPath } from "./navigation";
+import { normalizeWindowsDisplayPath, windowsDisplayPathKey } from "./navigation";
 import {
   TreeContextMenu,
   type TreeFileAction,
@@ -63,7 +63,7 @@ function leafName(path: string): string {
 function normalizedDrive(path: string | null): string {
   return path === null
     ? ""
-    : normalizeWindowsDisplayPath(path).toLocaleLowerCase("en-US");
+    : windowsDisplayPathKey(path);
 }
 
 function drivePathKey(drive: string, path: string): string {

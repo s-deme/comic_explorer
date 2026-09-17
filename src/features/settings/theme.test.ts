@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyResolvedTheme,
+  nativeWindowThemeFor,
+  validThemeState,
   BUILTIN_THEME_IDS,
   BUILTIN_THEMES,
   contrastRatio,
@@ -201,4 +203,15 @@ describe("application theme model", () => {
     });
     expect(root.hasAttribute("data-theme-fallback")).toBe(false);
   });
+});
+
+it("restores only a matching custom snapshot and keeps system window theme automatic", () => {
+  const snapshot = customSnapshot();
+  const selection = { kind: "custom", themeId: snapshot.themeId, revision: snapshot.revision } as const;
+  expect(validThemeState(selection, snapshot)).toEqual({ selection, snapshot, fallback: false });
+  expect(validThemeState({ ...selection, revision: snapshot.revision + 1 }, snapshot)).toEqual({
+    selection: { kind: "builtin", themeId: "light" }, snapshot: null, fallback: true,
+  });
+  expect(nativeWindowThemeFor({ kind: "system" }, null, "dark")).toBeNull();
+  expect(nativeWindowThemeFor(selection, snapshot, "light")).toBe("dark");
 });
