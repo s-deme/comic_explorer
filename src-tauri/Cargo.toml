@@ -1,6 +1,6 @@
 [package]
 name = "comic-explorer"
-version = "0.1.0"
+version = "0.1.1"
 description = "Offline comic library explorer for Windows"
 authors = ["Comic Explorer contributors"]
 edition = "2024"

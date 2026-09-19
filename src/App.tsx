@@ -1,263 +1,48 @@
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useItemMetadata } from "./features/reading/useItemMetadata";
+import { useItemTags } from "./features/reading/useItemTags";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { CatalogGrid } from "./features/catalog/CatalogGrid";
-import {
-  navigationReducer,
-  normalizeWindowsDisplayPath,
-  windowsDisplayPathKey,
-  parseWindowsDriveAddress,
-  parentPath,
-  relativeAddressWithinRoot,
-} from "./features/navigation/navigation";
-import {
-  listFolder,
-  listenCatalogFolderChanges,
-  getCatalogSettings,
-  getItemMetadata,
-  getItemTags,
-  getThumbnail,
-  generateRecursiveThumbnails,
-  cancelRecursiveThumbnailGeneration,
-  listenRecursiveThumbnailProgress,
-  listTags,
-  listPageBookmarks,
-  listWindowsKnownFolders,
-  openComic,
-  pickLibraryRoot,
-  pickLibraryFile,
-  registerLibraryRoot,
-  watchLibraryFolder,
-  stopLibraryFolderWatch,
-  restoreLibraryRoot,
-  restoreLastFolder,
-  saveLastFolder,
-  takeCliLaunchRequest,
-  listenCliLaunchPending,
-  listShelves,
-  migrateLegacyShelf,
-  saveCatalogSort,
-  saveCatalogViewMode,
-  saveEndOfVolumePolicy,
-  saveItemMemo,
-  savePageBookmark,
-  saveSettingsProfile,
-  listNamedSettingsProfiles,
-  saveNamedSettingsProfile,
-  previewNamedSettingsProfileSwitch,
-  executeNamedSettingsProfileSwitch,
-  deleteNamedSettingsProfile,
-  listCustomThemes,
-  saveCustomTheme,
-  deleteCustomTheme,
-  exportCustomTheme,
-  previewCustomThemeImport,
-  executeCustomThemeImport,
-  resolveCatalogActivation,
-  saveViewerSettings,
-  assignTag,
-  removeTag,
-  renameTag,
-  queryTags,
-  setItemRating,
-  takeRecoveryNotice,
-  addFavorite,
-  listFavorites,
-  removeFavorite,
-  resolveFavorite,
-  getTrayStatus,
-  storeMainWindowInTray,
-  quitApplication,
-  renameFileItem,
-  createFileFolder,
-  copyFileItemsToFolder,
-  moveFileItemsToFolder,
-  moveFileItemsToDestination,
-  copyFileItemsToDestination,
-  previewNativeFileDrop,
-  copyNativeFileDrop,
-  startNativeFileDrag,
-  deleteFileItems,
-  getFileUndoStatus,
-  undoLastFileOperation,
-  deletePageBookmark,
-  setFileClipboard,
-  getFileClipboardStatus,
-  pasteFileItems,
-  revealFileItem,
-  openFileItemDefault,
-  openFileItemWith,
-  getRenamePreferences,
-  saveRenamePreferences,
-  type CatalogSettings,
-  type CliLaunchPlan,
-  type CliLaunchRequest,
-  type CatalogActivationTrigger,
-  type FavoriteEntry,
-  type FileClipboardStatus,
-  type FileOperationResult,
-  type FileUndoStatus,
-  type NativeFileDropPreview,
-  type RenamePreferences,
-  type NamedSettingsProfileSummary,
-  type SettingsProfileSwitchPreview,
-  type CustomThemeCatalog,
-  type SearchResultEntry,
-  type ItemMetadata,
-  type TagEntry,
-  type RecursiveThumbnailProgress,
-  type RecursiveThumbnailReport,
-  type TrayStatus,
-  type ViewerSession,
-  type WindowsKnownFolder,
-} from "./features/library/client";
-import {
-  listenNativeFileDrops,
-  nativeDropTargetAt,
-} from "./features/library/native-file-drop";
-import { useReadingHistory } from "./features/reading/useReadingHistory";
-import { useCatalogSearch } from "./features/catalog/useCatalogSearch";
-import { useLibraryDiagnostics } from "./features/diagnostics/useLibraryDiagnostics";
-import { LibraryDiagnosticsDialog } from "./features/diagnostics/LibraryDiagnosticsDialog";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
+import { ArchiveExplorerPane } from "./features/archive/ArchiveExplorerDialog";
+import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
 import {
   CatalogContextMenu,
   type CatalogContextAction,
 } from "./features/catalog/CatalogContextMenu";
-import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
-import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
+import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
+import { CatalogGrid } from "./features/catalog/CatalogGrid";
+import {
+  rangeSelection,
+  selectEntriesByKind,
+  toggleEntrySelection,
+  type SelectionAction,
+} from "./features/catalog/commands";
 import { CsvExportDialog } from "./features/catalog/CsvExportDialog";
-import { ArchiveExplorerPane } from "./features/archive/ArchiveExplorerDialog";
+import {
+  normalizeEndOfVolumePolicy,
+  resolveEndOfVolume,
+  type EndOfVolumeDecision,
+  type EndOfVolumePolicy
+} from "./features/catalog/end-of-volume";
+import { ExternalAppDialog } from "./features/catalog/ExternalAppDialog";
+import { ItemKindSelector } from "./features/catalog/ItemKindSelector";
+import { archiveKindFromPath, itemKindLabel } from "./features/catalog/kind-label";
+import { QuickAccess } from "./features/catalog/QuickAccess";
+import {
+  type SearchDateComparison,
+  type SearchDateMode,
+  type SearchSizeComparison,
+} from "./features/catalog/search-options";
 import {
   previousComicEntry,
   sortCatalogEntries,
   type SortField,
 } from "./features/catalog/sort";
 import {
-  END_OF_VOLUME_POLICY_LABELS,
-  normalizeEndOfVolumePolicy,
-  resolveEndOfVolume,
-  type EndOfVolumeDecision,
-  type EndOfVolumePolicy,
-} from "./features/catalog/end-of-volume";
-import { Viewer } from "./features/viewer/Viewer";
-import {
-  openViewerWindow,
-  type ViewerWindowLaunchMode,
-  type ViewerWindowStartAt,
-} from "./features/viewer/viewer-window";
-import type { FullscreenAdapter } from "./features/viewer/fullscreen";
-import type {
-  ReadingDirection,
-  ScaleMode,
-  ViewerBackground,
-  ViewMode,
-  ViewerScaleState,
-  ViewerGridColor,
-  SpreadRules,
-  FitRules,
-  PageScanMode,
-  ZoomRetention,
-} from "./features/viewer/model";
-import {
-  DEFAULT_SLIDESHOW_INTERVAL_MS,
-  DEFAULT_SLIDESHOW_ORDER,
-  isSlideshowIntervalMs,
-  isSlideshowOrder,
-  type SlideshowOrder,
-} from "./features/viewer/slideshow";
-import { resolveViewerCatalogSelection } from "./features/viewer/catalog-selection";
-import {
-  DEFAULT_PAN_FACTOR,
-  DEFAULT_VIEWER_GRID_COLOR,
-  DEFAULT_VIEWER_GRID_SIZE,
-  DEFAULT_WHEEL_DEAD_ZONE,
-  DEFAULT_SCROLL_STEP_PERCENT,
-  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
-  DEFAULT_KEY_SCROLL_CONTINUOUS,
-  DEFAULT_SMOOTH_SCROLL,
-  DEFAULT_PAGE_SCAN_MODE,
-  DEFAULT_LOUPE_SIZE,
-  DEFAULT_LOUPE_ZOOM,
-  DEFAULT_PREFETCH_AHEAD,
-  DEFAULT_PREFETCH_BEHIND,
-  DEFAULT_PREFETCH_MEMORY_MIB,
-  DEFAULT_ZOOM_RETENTION,
-  DEFAULT_VIEWER_BACKGROUND,
-  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
-  DEFAULT_VIEWER_PAGE_MARGIN,
-  DEFAULT_VIEWER_SPREAD_GAP,
-  DEFAULT_SPREAD_RULES,
-  DEFAULT_FIT_RULES,
-  normalizeViewerBackground,
-  normalizeViewerCursorAutoHideMs,
-  normalizeViewerSpacing,
-  normalizeViewerGridColor,
-  normalizeZoomRetention,
-  isPanFactor,
-  isViewerGridSize,
-  isWheelDeadZone,
-  isScrollStepPercent,
-  isKeyScrollAccelerationPercent,
-  isLoupeSize,
-  isLoupeZoom,
-  isPrefetchPageCount,
-  isPrefetchMemoryMiB,
-  isAutoViewportAspectPercent,
-  isPortraitAspectPercent,
-  SPREAD_PAIRINGS,
-  FIT_BASES,
-  PAGE_SCAN_MODES,
-} from "./features/viewer/model";
-import {
-  DEFAULT_SHORTCUTS,
-  SHORTCUT_COMMANDS,
-  SHORTCUT_LABELS,
-  customCatalogShortcutCommand,
-  eventShortcut,
-  fallbackCatalogShortcutCommand,
-  normalizeShortcutBindings,
-  removeShortcut,
-  remapShortcut,
-  resetShortcutBindings,
-  type ShortcutBindings,
-  type ShortcutCommand,
-} from "./features/input/shortcuts";
-import {
-  DEFAULT_CATALOG_MOUSE_BINDINGS,
-  strictCatalogMouseBindings,
-  type CatalogMouseAction,
-  type CatalogMouseBindings,
-} from "./features/input/catalog-mouse";
-import {
-  DEFAULT_VIEWER_QUADRANT_BINDINGS,
-  DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
-  strictViewerQuadrantBindings,
-  strictViewerRightClickAction,
-  type ViewerQuadrantBindings,
-  type ViewerRightClickAction,
-} from "./features/input/viewer-quadrants";
-import { FolderTree } from "./features/navigation/FolderTree";
-import type {
-  TreeFileAction,
-  TreeFileTarget,
-} from "./features/navigation/TreeContextMenu";
-import type { CatalogEntry } from "./types/domain";
-import type { ApiResponse } from "./types/api";
-import type { ThumbnailViewState } from "./features/catalog/CatalogGrid";
-import {
-  CATALOG_VIEW_MODE_LABELS,
-  CATALOG_VIEW_MODES,
-  DEFAULT_CATALOG_THUMBNAIL_SIZES,
-  DEFAULT_CATALOG_VIEW_MODE,
-  type CatalogThumbnailSizes,
-  normalizeCatalogThumbnailSizes,
-  normalizeCatalogViewMode,
-  type CatalogViewMode,
-} from "./features/catalog/view-mode";
-import {
-  formatThumbnailBytes,
   createManagedThumbnailMap,
+  formatThumbnailBytes,
   hasLegacyManagedThumbnails,
   loadManagedThumbnailsForLibrary,
   managedThumbnailFor,
@@ -271,8 +56,240 @@ import {
   type ImportedThumbnail,
   type ManagedThumbnailMap,
 } from "./features/catalog/thumbnail-maintenance";
-import { QuickAccess } from "./features/catalog/QuickAccess";
-import { ItemKindSelector } from "./features/catalog/ItemKindSelector";
+import { useCatalogSearch } from "./features/catalog/useCatalogSearch";
+import {
+  CATALOG_VIEW_MODE_LABELS,
+  CATALOG_VIEW_MODES,
+  DEFAULT_CATALOG_VIEW_MODE,
+  normalizeCatalogThumbnailSizes,
+  normalizeCatalogViewMode,
+  type CatalogViewMode
+} from "./features/catalog/view-mode";
+import { LibraryDiagnosticsDialog } from "./features/diagnostics/LibraryDiagnosticsDialog";
+import { useLibraryDiagnostics } from "./features/diagnostics/useLibraryDiagnostics";
+import {
+  presentError,
+  presentUnexpectedError,
+} from "./features/errors/presentation";
+import { OfflineHelp } from "./features/help/OfflineHelp";
+import {
+  DEFAULT_CATALOG_MOUSE_BINDINGS,
+  strictCatalogMouseBindings,
+  type CatalogMouseAction
+} from "./features/input/catalog-mouse";
+import {
+  customCatalogShortcutCommand,
+  DEFAULT_SHORTCUTS,
+  eventShortcut,
+  fallbackCatalogShortcutCommand,
+  normalizeShortcutBindings,
+  remapShortcut,
+  removeShortcut,
+  resetShortcutBindings,
+  SHORTCUT_LABELS,
+  type ShortcutCommand
+} from "./features/input/shortcuts";
+import {
+  DEFAULT_VIEWER_QUADRANT_BINDINGS,
+  DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
+  strictViewerQuadrantBindings,
+  strictViewerRightClickAction
+} from "./features/input/viewer-quadrants";
+import {
+  addFavorite,
+  cancelRecursiveThumbnailGeneration,
+  copyFileItemsToDestination,
+  copyFileItemsToFolder,
+  copyNativeFileDrop,
+  createFileFolder,
+  deleteFileItems,
+  deleteNamedSettingsProfile,
+  deletePageBookmark,
+  executeNamedSettingsProfileSwitch,
+  generateRecursiveThumbnails,
+  getCatalogSettings,
+  getFileClipboardStatus,
+  getFileUndoStatus,
+  getRenamePreferences,
+  getThumbnail,
+  getTrayStatus,
+  listenCatalogFolderChanges,
+  listenCliLaunchPending,
+  listenRecursiveThumbnailProgress,
+  listFavorites,
+  listFolder,
+  listNamedSettingsProfiles,
+  listPageBookmarks,
+  listShelves,
+  listWindowsKnownFolders,
+  migrateLegacyShelf,
+  moveFileItemsToDestination,
+  moveFileItemsToFolder,
+  openComic,
+  openFileItemDefault,
+  openFileItemWith,
+  pasteFileItems,
+  pickLibraryFile,
+  pickLibraryRoot,
+  previewNamedSettingsProfileSwitch,
+  previewNativeFileDrop,
+  quitApplication,
+  registerLibraryRoot,
+  removeFavorite,
+  renameFileItem,
+  resolveCatalogActivation,
+  resolveFavorite,
+  restoreLastFolder,
+  restoreLibraryRoot,
+  revealFileItem,
+  saveCatalogSort,
+  saveCatalogViewMode,
+  saveEndOfVolumePolicy,
+  saveLastFolder,
+  saveNamedSettingsProfile,
+  savePageBookmark,
+  saveRenamePreferences,
+  saveSettingsProfile,
+  saveViewerSettings,
+  setFileClipboard,
+  startNativeFileDrag,
+  stopLibraryFolderWatch,
+  storeMainWindowInTray,
+  takeCliLaunchRequest,
+  takeRecoveryNotice,
+  undoLastFileOperation,
+  watchLibraryFolder,
+  type CatalogActivationTrigger,
+  type CatalogSettings,
+  type CliLaunchPlan,
+  type CliLaunchRequest,
+  type FavoriteEntry,
+  type FileClipboardStatus,
+  type FileOperationResult,
+  type FileUndoStatus,
+  type NamedSettingsProfileSummary,
+  type NativeFileDropPreview,
+  type RecursiveThumbnailProgress,
+  type RecursiveThumbnailReport,
+  type RenamePreferences,
+  type SearchResultEntry,
+  type SettingsProfileSwitchPreview,
+  type TrayStatus,
+  type ViewerSession,
+  type WindowsKnownFolder
+} from "./features/library/client";
+import {
+  listenNativeFileDrops,
+  nativeDropTargetAt,
+} from "./features/library/native-file-drop";
+import { MediaCatalogDialog } from "./features/media/MediaCatalogDialog";
+import { FolderTree } from "./features/navigation/FolderTree";
+import {
+  navigationReducer,
+  normalizeWindowsDisplayPath,
+  parentPath,
+  parseWindowsDriveAddress,
+  relativeAddressWithinRoot,
+  windowsDisplayPathKey,
+} from "./features/navigation/navigation";
+import type {
+  TreeFileAction,
+  TreeFileTarget,
+} from "./features/navigation/TreeContextMenu";
+import {
+  clearLegacyBookshelfResult,
+  listBookmarks,
+  migrateLegacyCollections,
+  nextBookmark,
+  removeLegacyBookmarksForItemResult,
+  type PageBookmark,
+} from "./features/reading/collections";
+import { useReadingHistory } from "./features/reading/useReadingHistory";
+import {
+  APP_VERSION,
+  CATALOG_PANE_POSITIONS,
+  createDefaultSettingsProfile,
+  DEFAULT_CATALOG_PANE_POSITION,
+  DEFAULT_NAVIGATION_SELECTION_POLICY,
+  DEFAULT_STARTUP_LOCATION,
+  DEFAULT_THUMBNAIL_GENERATION_SCOPE,
+  DEFAULT_TREE_HEIGHT,
+  DEFAULT_TREE_WIDTH,
+  MAX_TREE_HEIGHT,
+  MAX_TREE_WIDTH,
+  MIN_TREE_HEIGHT,
+  MIN_TREE_WIDTH,
+  normalizeMouseGestures,
+  normalizeSettingsProfile,
+  type MouseGestureAction,
+  type MouseGestureName,
+  type NavigationSelectionPolicy,
+  type SettingsProfile,
+  type StartupLocation,
+  type ThumbnailGenerationScope
+} from "./features/settings/profile";
+import { SettingsDialog } from "./features/settings/SettingsDialog";
+import {
+  applyThemeSelection,
+  nativeWindowThemeFor,
+  validThemeState,
+  type ThemeBaseScheme
+} from "./features/settings/theme";
+import { themeRecordViews, useCustomThemes } from "./features/settings/useCustomThemes";
+import { ShelfDialog } from "./features/shelves/ShelfDialog";
+import { resolveViewerCatalogSelection } from "./features/viewer/catalog-selection";
+import type { FullscreenAdapter } from "./features/viewer/fullscreen";
+import type {
+  ViewerScaleState
+} from "./features/viewer/model";
+import {
+  DEFAULT_FIT_RULES,
+  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  DEFAULT_LOUPE_SIZE,
+  DEFAULT_LOUPE_ZOOM,
+  DEFAULT_PAGE_SCAN_MODE,
+  DEFAULT_PAN_FACTOR,
+  DEFAULT_PREFETCH_AHEAD,
+  DEFAULT_PREFETCH_BEHIND,
+  DEFAULT_PREFETCH_MEMORY_MIB,
+  DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_SPREAD_RULES,
+  DEFAULT_VIEWER_GRID_SIZE,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_WHEEL_DEAD_ZONE,
+  FIT_BASES,
+  isAutoViewportAspectPercent,
+  isKeyScrollAccelerationPercent,
+  isLoupeSize,
+  isLoupeZoom,
+  isPanFactor,
+  isPortraitAspectPercent,
+  isPrefetchMemoryMiB,
+  isPrefetchPageCount,
+  isScrollStepPercent,
+  isViewerGridSize,
+  isWheelDeadZone,
+  normalizeViewerBackground,
+  normalizeViewerCursorAutoHideMs,
+  normalizeViewerGridColor,
+  normalizeViewerSpacing,
+  normalizeZoomRetention,
+  PAGE_SCAN_MODES,
+  SPREAD_PAIRINGS
+} from "./features/viewer/model";
+import {
+  DEFAULT_SLIDESHOW_INTERVAL_MS,
+  DEFAULT_SLIDESHOW_ORDER,
+  isSlideshowIntervalMs,
+  isSlideshowOrder
+} from "./features/viewer/slideshow";
+import { Viewer } from "./features/viewer/Viewer";
+import {
+  openViewerWindow,
+  type ViewerWindowLaunchMode,
+  type ViewerWindowStartAt,
+} from "./features/viewer/viewer-window";
 import {
   restoreWorkspaceDisplay,
   shellGridRows,
@@ -287,84 +304,8 @@ import {
   type AlwaysOnTopAdapter,
   type WindowThemeAdapter,
 } from "./features/workspace/window";
-import {
-  APP_VERSION,
-  createDefaultSettingsProfile,
-  DEFAULT_MOUSE_GESTURES,
-  DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR,
-  DEFAULT_TREE_WIDTH,
-  DEFAULT_TREE_HEIGHT,
-  DEFAULT_CATALOG_PANE_POSITION,
-  CATALOG_PANE_POSITIONS,
-  MAX_TREE_HEIGHT,
-  MAX_TREE_WIDTH,
-  MIN_TREE_HEIGHT,
-  MIN_TREE_WIDTH,
-  DEFAULT_NAVIGATION_SELECTION_POLICY,
-  DEFAULT_STARTUP_LOCATION,
-  DEFAULT_THUMBNAIL_GENERATION_SCOPE,
-  SETTINGS_PROFILE_VERSION,
-  normalizeMouseGestures,
-  normalizeSettingsProfile,
-  type MouseGestureAction,
-  type CatalogPanePosition,
-  type MouseGestureBindings,
-  type MouseGestureName,
-  type NavigationSelectionPolicy,
-  type SettingsProfile,
-  type FullscreenEscapeBehavior,
-  type FileOpenRule,
-  type FolderOpenRule,
-  type DetailGridLineMode,
-  type DetailRowDensity,
-  type StartupLocation,
-  type ThumbnailGenerationScope,
-} from "./features/settings/profile";
-import { SettingsDialog } from "./features/settings/SettingsDialog";
-import type {
-  InvalidThemeRecordView,
-  ThemeImportPreviewView,
-  ThemeRecordView,
-} from "./features/settings/ThemeManager";
-import {
-  DEFAULT_THEME_SELECTION,
-  nativeWindowThemeFor,
-  validThemeState,
-  applyThemeSelection,
-  normalizeThemeDefinitionV1,
-  type CustomThemeSnapshot,
-  type ThemeBaseScheme,
-  type ThemeDefinitionV1,
-  type ThemeSelection,
-} from "./features/settings/theme";
-import { OfflineHelp } from "./features/help/OfflineHelp";
-import {
-  clearLegacyBookshelfResult,
-  listBookmarks,
-  migrateLegacyCollections,
-  nextBookmark,
-  removeLegacyBookmarksForItemResult,
-  type PageBookmark,
-} from "./features/reading/collections";
-import { ShelfDialog } from "./features/shelves/ShelfDialog";
-import { MediaCatalogDialog } from "./features/media/MediaCatalogDialog";
-import {
-  rangeSelection,
-  selectEntriesByKind,
-  toggleEntrySelection,
-  type SelectionAction,
-} from "./features/catalog/commands";
-import {
-  presentError,
-  presentUnexpectedError,
-} from "./features/errors/presentation";
-import {
-  type SearchDateComparison,
-  type SearchDateMode,
-  type SearchSizeComparison,
-} from "./features/catalog/search-options";
-import { archiveKindFromPath, itemKindLabel } from "./features/catalog/kind-label";
-import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
+import type { ApiResponse } from "./types/api";
+import type { CatalogEntry } from "./types/domain";
 
 type LoadState =
   | { status: "idle" }
@@ -400,24 +341,6 @@ function preferredSystemTheme(): ThemeBaseScheme {
     && window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
-}
-
-function themeRecordViews(catalog: CustomThemeCatalog): ThemeRecordView[] {
-  return catalog.themes.flatMap((theme) => {
-    const definition = normalizeThemeDefinitionV1(theme.definition);
-    return definition === null
-      || !Number.isSafeInteger(theme.themeId)
-      || theme.themeId <= 0
-      || !Number.isSafeInteger(theme.revision)
-      || theme.revision <= 0
-      ? []
-      : [{
-        id: theme.themeId,
-        revision: theme.revision,
-        definition,
-        updatedAtMs: theme.updatedAtMs,
-      }];
-  });
 }
 
 type MenuId = "file" | "edit" | "view" | "options" | "help";
@@ -505,18 +428,97 @@ export function App({
   alwaysOnTopAdapter = tauriAlwaysOnTopAdapter,
   windowThemeAdapter = tauriWindowThemeAdapter,
 }: AppProps = {}) {
+  const [settings, setSettings] = useState(createDefaultSettingsProfile);
+  const {
+    sortField,
+    sortDescending,
+    endOfVolumePolicy,
+    catalogViewMode,
+    catalogThumbnailSizes,
+    viewMode,
+    readingDirection,
+    scaleMode: viewerScaleMode,
+    scale: viewerScale,
+    loupeEnabled,
+    loupeSize,
+    loupeZoom,
+    prefetchAhead,
+    prefetchBehind,
+    prefetchMemoryMiB,
+    fullscreenEscapeBehavior,
+    preventDisplaySleepFullscreen,
+    trayStoreOnMinimize,
+    trayCloseBehavior,
+    trayRestoreGesture,
+    slideshowIntervalMs,
+    slideshowOrder,
+    slideshowRepeatCurrentItem,
+    viewerCatalogSelectionSync,
+    viewerBackground,
+    viewerPageMargin,
+    viewerSpreadGap,
+    cursorAutoHideMs,
+    zoomRetention,
+    viewerGridEnabled,
+    viewerGridSize,
+    viewerGridColor,
+    panFactor,
+    wheelDeadZone,
+    scrollStepPercent,
+    keyScrollAccelerationPercent,
+    keyScrollContinuous,
+    smoothScroll,
+    pageScanMode,
+    treeVisible,
+    treeAutoCollapse,
+    treeConfirmChildren,
+    treeWidth,
+    treeHeight,
+    catalogPanePosition,
+    menuBarVisible,
+    toolbarVisible,
+    addressBarVisible,
+    statusBarVisible,
+    alwaysOnTop,
+    themeSelection,
+    customThemeSnapshot,
+    navigationSelectionPolicy,
+    thumbnailGenerationScope,
+    startupLocation,
+    showHiddenFiles,
+    restoreLastViewer,
+    autoRefreshCurrentFolder,
+    folderOpenRule,
+    imageOpenRule,
+    archiveOpenRule,
+    detailGridLines,
+    detailRowDensity,
+    detailShowKind,
+    detailShowSize,
+    detailShowModified,
+    shortcuts,
+    catalogMouseBindings,
+    viewerQuadrantBindings,
+    viewerRightClickAction,
+    mouseGestures
+  } = settings;
+  const updateSetting = useCallback(<K extends keyof SettingsProfile>(
+    key: K, value: React.SetStateAction<SettingsProfile[K]>,
+  ) => {
+    setSettings((current) => {
+      const next = typeof value === "function"
+        ? (value as (previous: SettingsProfile[K]) => SettingsProfile[K])(current[key])
+        : value;
+      return Object.is(current[key], next) ? current : { ...current, [key]: next };
+    });
+  }, []);
+
   const generation = useRef(0);
   const viewerGeneration = useRef(0);
   const settingsGeneration = useRef(0);
-  const themeGeneration = useRef(0);
   const catalogActivationGeneration = useRef(0);
   const trayGeneration = useRef(0);
   const favoriteGeneration = useRef(0);
-  const metadataGeneration = useRef(0);
-  const ratingSaveGeneration = useRef(0);
-  const ratingSaveInFlight = useRef(false);
-  const tagGeneration = useRef(0);
-  const itemTagGeneration = useRef(0);
   const recursiveThumbnailGeneration = useRef(0);
   const fileOperationGeneration = useRef(0);
   const fileUndoGeneration = useRef(0);
@@ -618,17 +620,9 @@ export function App({
   const [mediaCatalogOpen, setMediaCatalogOpen] = useState(false);
   const [archiveExplorerPath, setArchiveExplorerPath] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDescending, setSortDescending] = useState(false);
-  const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>(
-    DEFAULT_CATALOG_VIEW_MODE,
-  );
-  const [catalogThumbnailSizes, setCatalogThumbnailSizes] = useState<CatalogThumbnailSizes>(
-    () => ({ ...DEFAULT_CATALOG_THUMBNAIL_SIZES }),
-  );
+
   const persistedCatalogViewMode = useRef<CatalogViewMode>(DEFAULT_CATALOG_VIEW_MODE);
-  const [endOfVolumePolicy, setEndOfVolumePolicy] =
-    useState<EndOfVolumePolicy>("auto_next");
+
   const endOfVolumePolicyRef = useRef<EndOfVolumePolicy>("auto_next");
   const endOfVolumePolicyRevision = useRef(0);
   const endOfVolumePolicyUserChanged = useRef(false);
@@ -636,130 +630,53 @@ export function App({
   const [pendingEndOfVolume, setPendingEndOfVolume] =
     useState<Extract<EndOfVolumeDecision, { kind: "confirm" }> | null>(null);
   const volumeNavigationBusy = useRef(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("single");
-  const [spreadRules, setSpreadRules] = useState<SpreadRules>(() => ({
-    ...DEFAULT_SPREAD_RULES,
-  }));
-  const [fitRules, setFitRules] = useState<FitRules>(() => ({ ...DEFAULT_FIT_RULES }));
-  const [readingDirection, setReadingDirection] =
-    useState<ReadingDirection>("rightToLeft");
-  const [viewerScaleMode, setViewerScaleMode] = useState<ScaleMode>("fit");
-  const [viewerScale, setViewerScale] = useState(1);
-  const [loupeEnabled, setLoupeEnabled] = useState(false);
-  const [loupeSize, setLoupeSize] = useState(DEFAULT_LOUPE_SIZE);
-  const [loupeZoom, setLoupeZoom] = useState(DEFAULT_LOUPE_ZOOM);
-  const [prefetchAhead, setPrefetchAhead] = useState(DEFAULT_PREFETCH_AHEAD);
-  const [prefetchBehind, setPrefetchBehind] = useState(DEFAULT_PREFETCH_BEHIND);
-  const [prefetchMemoryMiB, setPrefetchMemoryMiB] = useState(DEFAULT_PREFETCH_MEMORY_MIB);
-  const [fullscreenEscapeBehavior, setFullscreenEscapeBehavior] =
-    useState<FullscreenEscapeBehavior>(DEFAULT_FULLSCREEN_ESCAPE_BEHAVIOR);
-  const [preventDisplaySleepFullscreen, setPreventDisplaySleepFullscreen] = useState(false);
-  const [trayStoreOnMinimize, setTrayStoreOnMinimize] = useState(false);
-  const [trayCloseBehavior, setTrayCloseBehavior] =
-    useState<SettingsProfile["trayCloseBehavior"]>("quit");
-  const [trayRestoreGesture, setTrayRestoreGesture] =
-    useState<SettingsProfile["trayRestoreGesture"]>("singleClick");
-  const [slideshowIntervalMs, setSlideshowIntervalMs] =
-    useState(DEFAULT_SLIDESHOW_INTERVAL_MS);
-  const [slideshowOrder, setSlideshowOrder] =
-    useState<SlideshowOrder>(DEFAULT_SLIDESHOW_ORDER);
-  const [slideshowRepeatCurrentItem, setSlideshowRepeatCurrentItem] = useState(false);
-  const [viewerCatalogSelectionSync, setViewerCatalogSelectionSync] = useState(true);
-  const [viewerBackground, setViewerBackground] =
-    useState<ViewerBackground>(DEFAULT_VIEWER_BACKGROUND);
-  const [viewerPageMargin, setViewerPageMargin] =
-    useState(DEFAULT_VIEWER_PAGE_MARGIN);
-  const [viewerSpreadGap, setViewerSpreadGap] =
-    useState(DEFAULT_VIEWER_SPREAD_GAP);
-  const [cursorAutoHideMs, setCursorAutoHideMs] =
-    useState(DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS);
-  const [zoomRetention, setZoomRetention] = useState<ZoomRetention>(DEFAULT_ZOOM_RETENTION);
-  const [viewerGridEnabled, setViewerGridEnabled] = useState(false);
-  const [viewerGridSize, setViewerGridSize] = useState(DEFAULT_VIEWER_GRID_SIZE);
-  const [viewerGridColor, setViewerGridColor] =
-    useState<ViewerGridColor>(DEFAULT_VIEWER_GRID_COLOR);
-  const [panFactor, setPanFactor] = useState(DEFAULT_PAN_FACTOR);
-  const [wheelDeadZone, setWheelDeadZone] = useState(DEFAULT_WHEEL_DEAD_ZONE);
-  const [scrollStepPercent, setScrollStepPercent] = useState(DEFAULT_SCROLL_STEP_PERCENT);
-  const [keyScrollAccelerationPercent, setKeyScrollAccelerationPercent] =
-    useState(DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT);
-  const [keyScrollContinuous, setKeyScrollContinuous] =
-    useState(DEFAULT_KEY_SCROLL_CONTINUOUS);
-  const [smoothScroll, setSmoothScroll] = useState(DEFAULT_SMOOTH_SCROLL);
-  const [pageScanMode, setPageScanMode] = useState<PageScanMode>(DEFAULT_PAGE_SCAN_MODE);
-  const [shortcuts, setShortcuts] = useState<ShortcutBindings>(() => ({
-    ...DEFAULT_SHORTCUTS,
-  }));
-  const [catalogMouseBindings, setCatalogMouseBindings] = useState<CatalogMouseBindings>(() => ({
-    ...DEFAULT_CATALOG_MOUSE_BINDINGS,
-  }));
-  const [viewerQuadrantBindings, setViewerQuadrantBindings] = useState<ViewerQuadrantBindings>(() => ({
-    ...DEFAULT_VIEWER_QUADRANT_BINDINGS,
-  }));
-  const [viewerRightClickAction, setViewerRightClickAction] =
-    useState<ViewerRightClickAction>(DEFAULT_VIEWER_RIGHT_CLICK_ACTION);
+
+  const spreadRules = useMemo(() => ({
+    portraitMaxAspectPercent: settings.spreadPortraitMaxAspectPercent,
+    autoViewportMinAspectPercent: settings.autoSpreadMinViewportAspectPercent,
+    firstPageSingle: settings.spreadFirstPageSingle,
+    pairing: settings.spreadPairing,
+  }), [settings.spreadPortraitMaxAspectPercent, settings.autoSpreadMinViewportAspectPercent, settings.spreadFirstPageSingle, settings.spreadPairing]);
+  const fitRules = useMemo(() => ({
+    allowUpscale: settings.fitAllowUpscale,
+    basis: settings.fitBasis,
+    includePageMargin: settings.fitIncludePageMargin,
+  }), [settings.fitAllowUpscale, settings.fitBasis, settings.fitIncludePageMargin]);
+
   const [helpOpen, setHelpOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<SettingsProfile | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const { customThemeCatalog, markCustomThemeCatalogActive, refreshCustomThemes, saveThemeDefinition, deleteThemeRecord, deleteInvalidThemeRecord, previewThemeImport, confirmThemeImport, downloadCustomTheme } = useCustomThemes(
+    themeSelection, settingsSaving, setSettingsSaving, setProfileNotice,
+  );
   const [namedSettingsProfiles, setNamedSettingsProfiles] = useState<NamedSettingsProfileSummary[]>([]);
   const [settingsProfileSwitchPreview, setSettingsProfileSwitchPreview] =
     useState<SettingsProfileSwitchPreview | null>(null);
-  const [mouseGestures, setMouseGestures] = useState<MouseGestureBindings>(() => ({
-    ...DEFAULT_MOUSE_GESTURES,
-  }));
+
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [activeToolbarMenu, setActiveToolbarMenu] = useState<ToolbarMenuId | null>(null);
   const [menuTabStop, setMenuTabStop] = useState<MenuId>("file");
-  const [treeWidth, setTreeWidth] = useState(DEFAULT_TREE_WIDTH);
-  const [treeHeight, setTreeHeight] = useState(DEFAULT_TREE_HEIGHT);
-  const [catalogPanePosition, setCatalogPanePosition] =
-    useState<CatalogPanePosition>(DEFAULT_CATALOG_PANE_POSITION);
-  const [treeVisible, setTreeVisible] = useState(true);
-  const [treeAutoCollapse, setTreeAutoCollapse] = useState(false);
-  const [treeConfirmChildren, setTreeConfirmChildren] = useState(true);
-  const [menuBarVisible, setMenuBarVisible] = useState(true);
-  const [toolbarVisible, setToolbarVisible] = useState(true);
-  const [addressBarVisible, setAddressBarVisible] = useState(true);
-  const [statusBarVisible, setStatusBarVisible] = useState(true);
-  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
-  const [themeSelection, setThemeSelection] = useState<ThemeSelection>(DEFAULT_THEME_SELECTION);
-  const [customThemeSnapshot, setCustomThemeSnapshot] =
-    useState<CustomThemeSnapshot | null>(null);
+
   const [systemThemeScheme, setSystemThemeScheme] =
     useState<ThemeBaseScheme>(preferredSystemTheme);
-  const [customThemeCatalog, setCustomThemeCatalog] = useState<CustomThemeCatalog>({
-    themes: [],
-    invalidThemes: [],
-    maximumThemes: 32,
-  });
-  const [navigationSelectionPolicy, setNavigationSelectionPolicy] =
-    useState<NavigationSelectionPolicy>(DEFAULT_NAVIGATION_SELECTION_POLICY);
+
   const navigationSelectionPolicyRef = useRef<NavigationSelectionPolicy>(
     DEFAULT_NAVIGATION_SELECTION_POLICY,
   );
-  const [thumbnailGenerationScope, setThumbnailGenerationScope] =
-    useState<ThumbnailGenerationScope>(DEFAULT_THUMBNAIL_GENERATION_SCOPE);
+
   const thumbnailGenerationScopeRef = useRef<ThumbnailGenerationScope>(
     DEFAULT_THUMBNAIL_GENERATION_SCOPE,
   );
-  const [startupLocation, setStartupLocation] = useState<StartupLocation>(DEFAULT_STARTUP_LOCATION);
+
   const startupLocationRef = useRef<StartupLocation>(DEFAULT_STARTUP_LOCATION);
-  const [showHiddenFiles, setShowHiddenFiles] = useState(false);
-  const [restoreLastViewer, setRestoreLastViewer] = useState(false);
+
   const restoreLastViewerRef = useRef(false);
-  const [autoRefreshCurrentFolder, setAutoRefreshCurrentFolder] = useState(true);
+
   const autoRefreshCurrentFolderRef = useRef(true);
-  const [folderOpenRule, setFolderOpenRule] = useState<FolderOpenRule>("navigate");
-  const [imageOpenRule, setImageOpenRule] = useState<FileOpenRule>("read");
-  const [archiveOpenRule, setArchiveOpenRule] = useState<FileOpenRule>("read");
-  const [detailGridLines, setDetailGridLines] = useState<DetailGridLineMode>("none");
-  const [detailRowDensity, setDetailRowDensity] = useState<DetailRowDensity>("standard");
-  const [detailShowKind, setDetailShowKind] = useState(true);
-  const [detailShowSize, setDetailShowSize] = useState(true);
-  const [detailShowModified, setDetailShowModified] = useState(true);
+
   const [knownFolders, setKnownFolders] = useState<WindowsKnownFolder[]>([]);
   const [trayStatus, setTrayStatus] = useState<TrayStatus | null>(null);
   const [trayNotice, setTrayNotice] = useState<string | null>(null);
@@ -785,21 +702,23 @@ export function App({
       thumbnailRequests.current.clear();
     },
   });
+  const {
+    itemMetadata, memoDraft, setMemoDraft, memoSaveState,
+    setMemoSaveState, ratingSaveState, metadataLoading, metadataNotice,
+    loadItemMetadata, persistMemo, persistRating, resetItemMetadata,
+  } = useItemMetadata();
+  const {
+    tagsOpen, tagsLoading, tagQuery, setTagQuery,
+    tagResults, selectedTags, tagNameDraft, setTagNameDraft,
+    tagRenameDrafts, setTagRenameDrafts, tagNotice, refreshTags,
+    openTagsPanel, closeTagsPanel, assignTagToSelected, removeTagFromSelected,
+    renameTagEntry,
+  } = useItemTags(selectedPath);
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteRefreshRevision, setFavoriteRefreshRevision] = useState(0);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
-  const [itemMetadata, setItemMetadata] = useState<ItemMetadata | null>(null);
-  const [memoDraft, setMemoDraft] = useState("");
-  const [memoSaveState, setMemoSaveState] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
-  const [ratingSaveState, setRatingSaveState] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
-  const [metadataLoading, setMetadataLoading] = useState(false);
-  const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const {
     readingHistory, historyOpen, setHistoryOpen, historyLoading, historyNotice,
     refreshHistory, clearRecentHistory,
@@ -811,14 +730,6 @@ export function App({
       await openComicEntry(recentCatalogEntry(itemIdentity));
     },
   });
-  const [tagsOpen, setTagsOpen] = useState(false);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [tagQuery, setTagQuery] = useState("");
-  const [tagResults, setTagResults] = useState<TagEntry[]>([]);
-  const [selectedTags, setSelectedTags] = useState<TagEntry[]>([]);
-  const [tagNameDraft, setTagNameDraft] = useState("");
-  const [tagRenameDrafts, setTagRenameDrafts] = useState<Record<string, string>>({});
-  const [tagNotice, setTagNotice] = useState<string | null>(null);
   const {
     diagnosticsOpen,
     diagnosticsLoading,
@@ -1231,12 +1142,12 @@ export function App({
       .then((response) => {
         if (settingsRequestGeneration !== settingsGeneration.current) return;
         if (response.status === "ok") {
-          setSortField(response.data.sortField);
-          setSortDescending(response.data.sortDescending);
+          updateSetting("sortField", response.data.sortField);
+          updateSetting("sortDescending", response.data.sortDescending);
           const restoredCatalogViewMode = normalizeCatalogViewMode(response.data.catalogViewMode);
           persistedCatalogViewMode.current = restoredCatalogViewMode;
-          setCatalogViewMode(restoredCatalogViewMode);
-          setCatalogThumbnailSizes(normalizeCatalogThumbnailSizes(response.data.catalogThumbnailSizes));
+          updateSetting("catalogViewMode", restoredCatalogViewMode);
+          updateSetting("catalogThumbnailSizes", normalizeCatalogThumbnailSizes(response.data.catalogThumbnailSizes));
           if (
             !endOfVolumePolicyUserChanged.current &&
             policyRevisionAtRequest === endOfVolumePolicyRevision.current
@@ -1245,115 +1156,111 @@ export function App({
               response.data.endOfVolumePolicy,
             );
             endOfVolumePolicyRef.current = restoredEndOfVolumePolicy;
-            setEndOfVolumePolicy(restoredEndOfVolumePolicy);
+            updateSetting("endOfVolumePolicy", restoredEndOfVolumePolicy);
           }
-          setViewMode(response.data.viewMode);
-          setSpreadRules({
-            portraitMaxAspectPercent: isPortraitAspectPercent(
+          updateSetting("viewMode", response.data.viewMode);
+          updateSetting("spreadPortraitMaxAspectPercent", isPortraitAspectPercent(
               response.data.spreadPortraitMaxAspectPercent,
-            ) ? response.data.spreadPortraitMaxAspectPercent : DEFAULT_SPREAD_RULES.portraitMaxAspectPercent,
-            autoViewportMinAspectPercent: isAutoViewportAspectPercent(
+            ) ? response.data.spreadPortraitMaxAspectPercent : DEFAULT_SPREAD_RULES.portraitMaxAspectPercent);
+          updateSetting("autoSpreadMinViewportAspectPercent", isAutoViewportAspectPercent(
               response.data.autoSpreadMinViewportAspectPercent,
-            ) ? response.data.autoSpreadMinViewportAspectPercent : DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent,
-            firstPageSingle: response.data.spreadFirstPageSingle === true,
-            pairing: SPREAD_PAIRINGS.includes(response.data.spreadPairing)
+            ) ? response.data.autoSpreadMinViewportAspectPercent : DEFAULT_SPREAD_RULES.autoViewportMinAspectPercent);
+          updateSetting("spreadFirstPageSingle", response.data.spreadFirstPageSingle === true);
+          updateSetting("spreadPairing", SPREAD_PAIRINGS.includes(response.data.spreadPairing)
               ? response.data.spreadPairing
-              : DEFAULT_SPREAD_RULES.pairing,
-          });
-          setFitRules({
-            allowUpscale: response.data.fitAllowUpscale === true,
-            basis: FIT_BASES.includes(response.data.fitBasis)
+              : DEFAULT_SPREAD_RULES.pairing);
+          updateSetting("fitAllowUpscale", response.data.fitAllowUpscale === true);
+          updateSetting("fitBasis", FIT_BASES.includes(response.data.fitBasis)
               ? response.data.fitBasis
-              : DEFAULT_FIT_RULES.basis,
-            includePageMargin: response.data.fitIncludePageMargin !== false,
-          });
-          setReadingDirection(response.data.readingDirection);
-          setViewerScaleMode(response.data.scaleMode);
-          setViewerScale(response.data.scale);
-          setLoupeEnabled(response.data.loupeEnabled);
-          setLoupeSize(isLoupeSize(response.data.loupeSize)
+              : DEFAULT_FIT_RULES.basis);
+          updateSetting("fitIncludePageMargin", response.data.fitIncludePageMargin !== false);
+          updateSetting("readingDirection", response.data.readingDirection);
+          updateSetting("scaleMode", response.data.scaleMode);
+          updateSetting("scale", response.data.scale);
+          updateSetting("loupeEnabled", response.data.loupeEnabled);
+          updateSetting("loupeSize", isLoupeSize(response.data.loupeSize)
             ? response.data.loupeSize
             : DEFAULT_LOUPE_SIZE);
-          setLoupeZoom(isLoupeZoom(response.data.loupeZoom)
+          updateSetting("loupeZoom", isLoupeZoom(response.data.loupeZoom)
             ? response.data.loupeZoom
             : DEFAULT_LOUPE_ZOOM);
-          setPrefetchAhead(isPrefetchPageCount(response.data.prefetchAhead)
+          updateSetting("prefetchAhead", isPrefetchPageCount(response.data.prefetchAhead)
             ? response.data.prefetchAhead
             : DEFAULT_PREFETCH_AHEAD);
-          setPrefetchBehind(isPrefetchPageCount(response.data.prefetchBehind)
+          updateSetting("prefetchBehind", isPrefetchPageCount(response.data.prefetchBehind)
             ? response.data.prefetchBehind
             : DEFAULT_PREFETCH_BEHIND);
-          setPrefetchMemoryMiB(isPrefetchMemoryMiB(response.data.prefetchMemoryMiB)
+          updateSetting("prefetchMemoryMiB", isPrefetchMemoryMiB(response.data.prefetchMemoryMiB)
             ? response.data.prefetchMemoryMiB
             : DEFAULT_PREFETCH_MEMORY_MIB);
-          setFullscreenEscapeBehavior(response.data.fullscreenEscapeBehavior);
-          setPreventDisplaySleepFullscreen(response.data.preventDisplaySleepFullscreen === true);
-          setTrayStoreOnMinimize(response.data.trayStoreOnMinimize === true);
-          setTrayCloseBehavior(response.data.trayCloseBehavior);
-          setTrayRestoreGesture(response.data.trayRestoreGesture);
-          setSlideshowIntervalMs(isSlideshowIntervalMs(response.data.slideshowIntervalMs)
+          updateSetting("fullscreenEscapeBehavior", response.data.fullscreenEscapeBehavior);
+          updateSetting("preventDisplaySleepFullscreen", response.data.preventDisplaySleepFullscreen === true);
+          updateSetting("trayStoreOnMinimize", response.data.trayStoreOnMinimize === true);
+          updateSetting("trayCloseBehavior", response.data.trayCloseBehavior);
+          updateSetting("trayRestoreGesture", response.data.trayRestoreGesture);
+          updateSetting("slideshowIntervalMs", isSlideshowIntervalMs(response.data.slideshowIntervalMs)
             ? response.data.slideshowIntervalMs
             : DEFAULT_SLIDESHOW_INTERVAL_MS);
-          setSlideshowOrder(isSlideshowOrder(response.data.slideshowOrder)
+          updateSetting("slideshowOrder", isSlideshowOrder(response.data.slideshowOrder)
             ? response.data.slideshowOrder
             : DEFAULT_SLIDESHOW_ORDER);
-          setSlideshowRepeatCurrentItem(response.data.slideshowRepeatCurrentItem === true);
-          setViewerCatalogSelectionSync(response.data.viewerCatalogSelectionSync !== false);
-          setViewerBackground(normalizeViewerBackground(response.data.viewerBackground));
-          setViewerPageMargin(normalizeViewerSpacing(
+          updateSetting("slideshowRepeatCurrentItem", response.data.slideshowRepeatCurrentItem === true);
+          updateSetting("viewerCatalogSelectionSync", response.data.viewerCatalogSelectionSync !== false);
+          updateSetting("viewerBackground", normalizeViewerBackground(response.data.viewerBackground));
+          updateSetting("viewerPageMargin", normalizeViewerSpacing(
             response.data.viewerPageMargin,
             DEFAULT_VIEWER_PAGE_MARGIN,
           ));
-          setViewerSpreadGap(normalizeViewerSpacing(
+          updateSetting("viewerSpreadGap", normalizeViewerSpacing(
             response.data.viewerSpreadGap,
             DEFAULT_VIEWER_SPREAD_GAP,
           ));
-          setCursorAutoHideMs(normalizeViewerCursorAutoHideMs(
+          updateSetting("cursorAutoHideMs", normalizeViewerCursorAutoHideMs(
             response.data.cursorAutoHideMs,
           ));
-          setZoomRetention(normalizeZoomRetention(response.data.zoomRetention));
-          setViewerGridEnabled(response.data.viewerGridEnabled === true);
-          setViewerGridSize(isViewerGridSize(response.data.viewerGridSize)
+          updateSetting("zoomRetention", normalizeZoomRetention(response.data.zoomRetention));
+          updateSetting("viewerGridEnabled", response.data.viewerGridEnabled === true);
+          updateSetting("viewerGridSize", isViewerGridSize(response.data.viewerGridSize)
             ? response.data.viewerGridSize
             : DEFAULT_VIEWER_GRID_SIZE);
-          setViewerGridColor(normalizeViewerGridColor(response.data.viewerGridColor));
-          setPanFactor(isPanFactor(response.data.panFactor)
+          updateSetting("viewerGridColor", normalizeViewerGridColor(response.data.viewerGridColor));
+          updateSetting("panFactor", isPanFactor(response.data.panFactor)
             ? response.data.panFactor
             : DEFAULT_PAN_FACTOR);
-          setWheelDeadZone(isWheelDeadZone(response.data.wheelDeadZone)
+          updateSetting("wheelDeadZone", isWheelDeadZone(response.data.wheelDeadZone)
             ? response.data.wheelDeadZone
             : DEFAULT_WHEEL_DEAD_ZONE);
-          setScrollStepPercent(isScrollStepPercent(response.data.scrollStepPercent)
+          updateSetting("scrollStepPercent", isScrollStepPercent(response.data.scrollStepPercent)
             ? response.data.scrollStepPercent
             : DEFAULT_SCROLL_STEP_PERCENT);
-          setKeyScrollAccelerationPercent(
+          updateSetting("keyScrollAccelerationPercent",
             isKeyScrollAccelerationPercent(response.data.keyScrollAccelerationPercent)
               ? response.data.keyScrollAccelerationPercent
               : DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
           );
-          setKeyScrollContinuous(response.data.keyScrollContinuous !== false);
-          setSmoothScroll(response.data.smoothScroll !== false);
-          setPageScanMode(PAGE_SCAN_MODES.includes(response.data.pageScanMode)
+          updateSetting("keyScrollContinuous", response.data.keyScrollContinuous !== false);
+          updateSetting("smoothScroll", response.data.smoothScroll !== false);
+          updateSetting("pageScanMode", PAGE_SCAN_MODES.includes(response.data.pageScanMode)
             ? response.data.pageScanMode
             : DEFAULT_PAGE_SCAN_MODE);
-          setTreeVisible(response.data.treeVisible);
-          setTreeAutoCollapse(response.data.treeAutoCollapse === true);
-          setTreeConfirmChildren(response.data.treeConfirmChildren !== false);
-          setTreeWidth(Math.max(
+          updateSetting("treeVisible", response.data.treeVisible);
+          updateSetting("treeAutoCollapse", response.data.treeAutoCollapse === true);
+          updateSetting("treeConfirmChildren", response.data.treeConfirmChildren !== false);
+          updateSetting("treeWidth", Math.max(
             MIN_TREE_WIDTH,
             Math.min(MAX_TREE_WIDTH, response.data.treeWidth ?? DEFAULT_TREE_WIDTH),
           ));
-          setTreeHeight(Math.max(
+          updateSetting("treeHeight", Math.max(
             MIN_TREE_HEIGHT,
             Math.min(MAX_TREE_HEIGHT, response.data.treeHeight ?? DEFAULT_TREE_HEIGHT),
           ));
-          setCatalogPanePosition(CATALOG_PANE_POSITIONS.includes(response.data.catalogPanePosition)
+          updateSetting("catalogPanePosition", CATALOG_PANE_POSITIONS.includes(response.data.catalogPanePosition)
             ? response.data.catalogPanePosition
             : DEFAULT_CATALOG_PANE_POSITION);
-          setMenuBarVisible(response.data.menuBarVisible);
-          setToolbarVisible(response.data.toolbarVisible);
-          setAddressBarVisible(response.data.addressBarVisible !== false);
-          setStatusBarVisible(response.data.statusBarVisible !== false);
+          updateSetting("menuBarVisible", response.data.menuBarVisible);
+          updateSetting("toolbarVisible", response.data.toolbarVisible);
+          updateSetting("addressBarVisible", response.data.addressBarVisible !== false);
+          updateSetting("statusBarVisible", response.data.statusBarVisible !== false);
           const restoredNavigationSelection = ["none", "first", "last", "restore"].includes(
             response.data.navigationSelectionPolicy,
           ) ? response.data.navigationSelectionPolicy : DEFAULT_NAVIGATION_SELECTION_POLICY;
@@ -1364,26 +1271,26 @@ export function App({
             ? "driveRoot" : DEFAULT_STARTUP_LOCATION;
           navigationSelectionPolicyRef.current = restoredNavigationSelection as NavigationSelectionPolicy;
           thumbnailGenerationScopeRef.current = restoredThumbnailScope as ThumbnailGenerationScope;
-          setNavigationSelectionPolicy(restoredNavigationSelection as NavigationSelectionPolicy);
-          setThumbnailGenerationScope(restoredThumbnailScope as ThumbnailGenerationScope);
+          updateSetting("navigationSelectionPolicy", restoredNavigationSelection as NavigationSelectionPolicy);
+          updateSetting("thumbnailGenerationScope", restoredThumbnailScope as ThumbnailGenerationScope);
           startupLocationRef.current = restoredStartupLocation;
-          setStartupLocation(restoredStartupLocation);
-          setShowHiddenFiles(response.data.showHiddenFiles === true);
+          updateSetting("startupLocation", restoredStartupLocation);
+          updateSetting("showHiddenFiles", response.data.showHiddenFiles === true);
           restoreLastViewerRef.current = response.data.restoreLastViewer === true;
-          setRestoreLastViewer(restoreLastViewerRef.current);
+          updateSetting("restoreLastViewer", restoreLastViewerRef.current);
           autoRefreshCurrentFolderRef.current = response.data.autoRefreshCurrentFolder !== false;
-          setAutoRefreshCurrentFolder(autoRefreshCurrentFolderRef.current);
-          setFolderOpenRule(["navigate", "read", "none"].includes(response.data.folderOpenRule)
+          updateSetting("autoRefreshCurrentFolder", autoRefreshCurrentFolderRef.current);
+          updateSetting("folderOpenRule", ["navigate", "read", "none"].includes(response.data.folderOpenRule)
             ? response.data.folderOpenRule : "navigate");
-          setImageOpenRule(response.data.imageOpenRule === "none" ? "none" : "read");
-          setArchiveOpenRule(response.data.archiveOpenRule === "none" ? "none" : "read");
-          setDetailGridLines(["horizontal", "both"].includes(response.data.detailGridLines)
+          updateSetting("imageOpenRule", response.data.imageOpenRule === "none" ? "none" : "read");
+          updateSetting("archiveOpenRule", response.data.archiveOpenRule === "none" ? "none" : "read");
+          updateSetting("detailGridLines", ["horizontal", "both"].includes(response.data.detailGridLines)
             ? response.data.detailGridLines : "none");
-          setDetailRowDensity(["compact", "comfortable"].includes(response.data.detailRowDensity)
+          updateSetting("detailRowDensity", ["compact", "comfortable"].includes(response.data.detailRowDensity)
             ? response.data.detailRowDensity : "standard");
-          setDetailShowKind(response.data.detailShowKind !== false);
-          setDetailShowSize(response.data.detailShowSize !== false);
-          setDetailShowModified(response.data.detailShowModified !== false);
+          updateSetting("detailShowKind", response.data.detailShowKind !== false);
+          updateSetting("detailShowSize", response.data.detailShowSize !== false);
+          updateSetting("detailShowModified", response.data.detailShowModified !== false);
           if (!autoRefreshCurrentFolderRef.current) {
             void stopLibraryFolderWatch(generation.current);
           }
@@ -1399,8 +1306,8 @@ export function App({
           void applyWindowTheme(windowThemeAdapter, restoredNativeTheme).then((applied) => {
             if (settingsRequestGeneration !== settingsGeneration.current) return;
             if (applied) {
-              setThemeSelection(restoredTheme.selection);
-              setCustomThemeSnapshot(restoredTheme.snapshot);
+              updateSetting("themeSelection", restoredTheme.selection);
+              updateSetting("customThemeSnapshot", restoredTheme.snapshot);
               if (restoredTheme.fallback || response.data.themeFallbackReason !== null) {
                 setSelectionNotice("保存済みテーマを復元できないため、ライトテーマを使用します。");
               }
@@ -1410,23 +1317,23 @@ export function App({
           });
           const restoredAlwaysOnTop = response.data.alwaysOnTop === true;
           void applyAlwaysOnTop(alwaysOnTopAdapter, restoredAlwaysOnTop).then((applied) => {
-            if (applied) setAlwaysOnTop(restoredAlwaysOnTop);
+            if (applied) updateSetting("alwaysOnTop", restoredAlwaysOnTop);
             else setSelectionNotice("常に手前を復元できませんでした。");
           });
-          setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
-          setCatalogMouseBindings(
+          updateSetting("shortcuts", normalizeShortcutBindings(response.data.shortcuts));
+          updateSetting("catalogMouseBindings",
             strictCatalogMouseBindings(response.data.catalogMouseBindings)
               ?? { ...DEFAULT_CATALOG_MOUSE_BINDINGS },
           );
-          setViewerQuadrantBindings(
+          updateSetting("viewerQuadrantBindings",
             strictViewerQuadrantBindings(response.data.viewerQuadrantBindings)
               ?? { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
           );
-          setViewerRightClickAction(
+          updateSetting("viewerRightClickAction",
             strictViewerRightClickAction(response.data.viewerRightClickAction)
               ?? DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
           );
-          setMouseGestures(normalizeMouseGestures(response.data.mouseGestures));
+          updateSetting("mouseGestures", normalizeMouseGestures(response.data.mouseGestures));
         }
       })
       .catch(() => undefined);
@@ -2749,277 +2656,6 @@ export function App({
     void applyFavoriteOperation(removeFavorite(favorite.favoriteId, requestGeneration));
   }
 
-  async function loadItemMetadata(itemIdentity: string) {
-    const requestGeneration = ++metadataGeneration.current;
-    ratingSaveGeneration.current += 1;
-    ratingSaveInFlight.current = false;
-    setItemMetadata(null);
-    setMemoDraft("");
-    setMemoSaveState("idle");
-    setRatingSaveState("idle");
-    setMetadataLoading(true);
-    setMetadataNotice(null);
-    try {
-      const response = await getItemMetadata(itemIdentity, requestGeneration);
-      if (requestGeneration !== metadataGeneration.current) return;
-      if (response.status === "ok") {
-        setItemMetadata(response.data);
-        setMemoDraft(response.data.memo ?? "");
-      } else if (response.status === "error") {
-        setMetadataNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === metadataGeneration.current) {
-        setMetadataNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === metadataGeneration.current) {
-        setMetadataLoading(false);
-      }
-    }
-  }
-
-  async function persistMemo(body: string) {
-    if (itemMetadata === null) return;
-    const requestGeneration = metadataGeneration.current;
-    setMetadataLoading(true);
-    setMetadataNotice(null);
-    setMemoSaveState("saving");
-    try {
-      const response = await saveItemMemo(
-        itemMetadata.itemIdentity,
-        body,
-        requestGeneration,
-      );
-      if (requestGeneration !== metadataGeneration.current) return;
-      if (response.status === "ok") {
-        setItemMetadata(response.data);
-        setMemoDraft(response.data.memo ?? "");
-        setMemoSaveState("saved");
-      } else if (response.status === "error") {
-        setMetadataNotice(presentError(response.error));
-        setMemoSaveState("error");
-      }
-    } catch {
-      if (requestGeneration === metadataGeneration.current) {
-        setMetadataNotice(presentUnexpectedError());
-        setMemoSaveState("error");
-      }
-    } finally {
-      if (requestGeneration === metadataGeneration.current) {
-        setMetadataLoading(false);
-      }
-    }
-  }
-
-  async function persistRating(rating: number | null) {
-    if (itemMetadata === null || ratingSaveInFlight.current) return;
-    const metadataRequestGeneration = metadataGeneration.current;
-    const requestGeneration = ++ratingSaveGeneration.current;
-    ratingSaveInFlight.current = true;
-    setMetadataLoading(true);
-    setMetadataNotice(null);
-    setRatingSaveState("saving");
-    try {
-      const response = await setItemRating(
-        itemMetadata.itemIdentity,
-        rating,
-        metadataRequestGeneration,
-      );
-      if (
-        metadataRequestGeneration !== metadataGeneration.current ||
-        requestGeneration !== ratingSaveGeneration.current
-      ) {
-        return;
-      }
-      if (response.status === "ok") {
-        setItemMetadata(response.data);
-        setRatingSaveState("saved");
-      } else if (response.status === "error") {
-        setMetadataNotice(presentError(response.error));
-        setRatingSaveState("error");
-      } else {
-        setRatingSaveState("idle");
-      }
-    } catch {
-      if (
-        metadataRequestGeneration === metadataGeneration.current &&
-        requestGeneration === ratingSaveGeneration.current
-      ) {
-        setMetadataNotice(presentUnexpectedError());
-        setRatingSaveState("error");
-      }
-    } finally {
-      if (
-        metadataRequestGeneration === metadataGeneration.current &&
-        requestGeneration === ratingSaveGeneration.current
-      ) {
-        ratingSaveInFlight.current = false;
-        setMetadataLoading(false);
-      }
-    }
-  }
-
-  async function refreshItemTags(itemIdentity: string) {
-    const requestGeneration = ++itemTagGeneration.current;
-    setTagNotice(null);
-    try {
-      const response = await getItemTags(itemIdentity, requestGeneration);
-      if (requestGeneration !== itemTagGeneration.current) return;
-      if (response.status === "ok") {
-        setSelectedTags(response.data.tags);
-      } else if (response.status === "error") {
-        setTagNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === itemTagGeneration.current) {
-        setTagNotice(presentUnexpectedError());
-      }
-    }
-  }
-
-  async function refreshTags(query = tagQuery) {
-    const requestGeneration = ++tagGeneration.current;
-    setTagsLoading(true);
-    setTagNotice(null);
-    try {
-      const response =
-        query.trim() === ""
-          ? await listTags(requestGeneration)
-          : await queryTags(query, requestGeneration);
-      if (requestGeneration !== tagGeneration.current) return;
-      if (response.status === "ok") {
-        setTagResults(response.data);
-        setTagRenameDrafts((current) => {
-          const next = { ...current };
-          for (const tag of response.data) {
-            if (next[tag.tagId] === undefined) next[tag.tagId] = tag.name;
-          }
-          return next;
-        });
-      } else if (response.status === "error") {
-        setTagNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === tagGeneration.current) {
-        setTagNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === tagGeneration.current) {
-        setTagsLoading(false);
-      }
-    }
-  }
-
-  function openTagsPanel() {
-    setTagsOpen(true);
-    setTagNotice(null);
-    void refreshTags("");
-    if (selectedPath !== null) void refreshItemTags(selectedPath);
-  }
-
-  function closeTagsPanel() {
-    setTagsOpen(false);
-    setTagNotice(null);
-  }
-
-  async function assignTagToSelected() {
-    if (selectedPath === null) return;
-    const requestGeneration = ++itemTagGeneration.current;
-    setTagsLoading(true);
-    setTagNotice(null);
-    try {
-      const response = await assignTag(
-        selectedPath,
-        tagNameDraft,
-        requestGeneration,
-      );
-      if (requestGeneration !== itemTagGeneration.current) return;
-      if (response.status === "ok") {
-        setSelectedTags(response.data.tags);
-        setTagNameDraft("");
-        await refreshTags(tagQuery);
-      } else if (response.status === "error") {
-        setTagNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === itemTagGeneration.current) {
-        setTagNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === itemTagGeneration.current) {
-        setTagsLoading(false);
-      }
-    }
-  }
-
-  async function removeTagFromSelected(tag: TagEntry) {
-    if (selectedPath === null) return;
-    const requestGeneration = ++itemTagGeneration.current;
-    setTagsLoading(true);
-    setTagNotice(null);
-    try {
-      const response = await removeTag(
-        selectedPath,
-        tag.tagId,
-        requestGeneration,
-      );
-      if (requestGeneration !== itemTagGeneration.current) return;
-      if (response.status === "ok") {
-        setSelectedTags(response.data.tags);
-        await refreshTags(tagQuery);
-      } else if (response.status === "error") {
-        setTagNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === itemTagGeneration.current) {
-        setTagNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === itemTagGeneration.current) {
-        setTagsLoading(false);
-      }
-    }
-  }
-
-  async function renameTagEntry(tag: TagEntry) {
-    const newName = tagRenameDrafts[tag.tagId] ?? tag.name;
-    const requestGeneration = ++tagGeneration.current;
-    setTagsLoading(true);
-    setTagNotice(null);
-    try {
-      const response = await renameTag(tag.tagId, newName, requestGeneration);
-      if (requestGeneration !== tagGeneration.current) return;
-      if (response.status === "ok") {
-        setTagRenameDrafts((current) => ({
-          ...current,
-          [response.data.tagId]: response.data.name,
-        }));
-        await refreshTags(tagQuery);
-        if (selectedPath !== null) await refreshItemTags(selectedPath);
-      } else if (response.status === "error") {
-        setTagNotice(presentError(response.error));
-      }
-    } catch {
-      if (requestGeneration === tagGeneration.current) {
-        setTagNotice(presentUnexpectedError());
-      }
-    } finally {
-      if (requestGeneration === tagGeneration.current) {
-        setTagsLoading(false);
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (!tagsOpen) return;
-    if (selectedPath === null) {
-      setSelectedTags([]);
-      return;
-    }
-    void refreshItemTags(selectedPath);
-  }, [selectedPath, tagsOpen]);
-
   async function runRecursiveThumbnailGeneration() {
     if (libraryRoot === null || recursiveThumbnailRunning) return;
     const requestGeneration = ++recursiveThumbnailGeneration.current;
@@ -3101,376 +2737,7 @@ export function App({
   }
 
   function currentSettingsProfile(): SettingsProfile {
-    return {
-      profileVersion: SETTINGS_PROFILE_VERSION,
-      sortField,
-      sortDescending,
-      endOfVolumePolicy,
-      catalogViewMode,
-      catalogThumbnailSizes: { ...catalogThumbnailSizes },
-      viewMode,
-      spreadPortraitMaxAspectPercent: spreadRules.portraitMaxAspectPercent,
-      autoSpreadMinViewportAspectPercent: spreadRules.autoViewportMinAspectPercent,
-      spreadFirstPageSingle: spreadRules.firstPageSingle,
-      spreadPairing: spreadRules.pairing,
-      fitAllowUpscale: fitRules.allowUpscale,
-      fitBasis: fitRules.basis,
-      fitIncludePageMargin: fitRules.includePageMargin,
-      readingDirection,
-      scaleMode: viewerScaleMode,
-      scale: viewerScale,
-      loupeEnabled,
-      loupeSize,
-      loupeZoom,
-      prefetchAhead,
-      prefetchBehind,
-      prefetchMemoryMiB,
-      fullscreenEscapeBehavior,
-      preventDisplaySleepFullscreen,
-      trayStoreOnMinimize,
-      trayCloseBehavior,
-      trayRestoreGesture,
-      slideshowIntervalMs,
-      slideshowOrder,
-      slideshowRepeatCurrentItem,
-      viewerCatalogSelectionSync,
-      viewerBackground,
-      viewerPageMargin,
-      viewerSpreadGap,
-      cursorAutoHideMs,
-      zoomRetention,
-      viewerGridEnabled,
-      viewerGridSize,
-      viewerGridColor,
-      panFactor,
-      wheelDeadZone,
-      scrollStepPercent,
-      keyScrollAccelerationPercent,
-      keyScrollContinuous,
-      smoothScroll,
-      pageScanMode,
-      treeVisible,
-      treeAutoCollapse,
-      treeConfirmChildren,
-      treeWidth,
-      treeHeight,
-      catalogPanePosition,
-      menuBarVisible,
-      toolbarVisible,
-      addressBarVisible,
-      statusBarVisible,
-      alwaysOnTop,
-      themeSelection,
-      customThemeSnapshot,
-      navigationSelectionPolicy,
-      thumbnailGenerationScope,
-      startupLocation,
-      showHiddenFiles,
-      restoreLastViewer,
-      autoRefreshCurrentFolder,
-      folderOpenRule,
-      imageOpenRule,
-      archiveOpenRule,
-      detailGridLines,
-      detailRowDensity,
-      detailShowKind,
-      detailShowSize,
-      detailShowModified,
-      shortcuts: { ...shortcuts },
-      catalogMouseBindings: { ...catalogMouseBindings },
-      viewerQuadrantBindings: { ...viewerQuadrantBindings },
-      viewerRightClickAction,
-      mouseGestures: { ...mouseGestures },
-    };
-  }
-
-  function acceptCustomThemeCatalog(catalog: CustomThemeCatalog): ThemeRecordView[] {
-    setCustomThemeCatalog(catalog);
-    const themes = themeRecordViews(catalog);
-    const invalidCount = catalog.invalidThemes.length + catalog.themes.length - themes.length;
-    if (invalidCount > 0) {
-      setProfileNotice(
-        `読み込めないカスタムテーマが${invalidCount}件あります。記録は削除していません。`,
-      );
-    }
-    return themes;
-  }
-
-  function markCustomThemeCatalogActive(selection: ThemeSelection): void {
-    setCustomThemeCatalog((catalog) => ({
-      ...catalog,
-      themes: catalog.themes.map((theme) => ({
-        ...theme,
-        active: selection.kind === "custom" && selection.themeId === theme.themeId,
-      })),
-      invalidThemes: catalog.invalidThemes.map((theme) => ({
-        ...theme,
-        active: selection.kind === "custom" && selection.themeId === theme.themeId,
-      })),
-    }));
-  }
-
-  async function refreshCustomThemes(): Promise<void> {
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const response = await listCustomThemes(requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return;
-      if (response.status === "ok") acceptCustomThemeCatalog(response.data);
-      else if (response.status === "error") setProfileNotice(presentError(response.error));
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("カスタムテーマの一覧を読み込めませんでした。");
-      }
-    }
-  }
-
-  async function saveThemeDefinition(
-    definition: ThemeDefinitionV1,
-    themeId: number | null,
-    expectedRevision: number | null,
-  ): Promise<ThemeRecordView | null> {
-    if (settingsSaving) return null;
-    if (themeId !== null && themeSelection.kind === "custom" && themeSelection.themeId === themeId) {
-      setProfileNotice("現在適用中のテーマは直接編集できません。複製して編集してください。");
-      return null;
-    }
-    const validated = normalizeThemeDefinitionV1(definition);
-    if (validated === null) {
-      setProfileNotice("テーマの名前、色、コントラストを確認してください。");
-      return null;
-    }
-    const previousIds = new Set(customThemeCatalog.themes.map((theme) => theme.themeId));
-    setSettingsSaving(true);
-    setProfileNotice("カスタムテーマを検証して保存しています。");
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const response = await saveCustomTheme({
-        themeId,
-        expectedRevision,
-        definition: validated,
-      }, requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return null;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの保存をキャンセルしました。");
-        return null;
-      }
-      const themes = acceptCustomThemeCatalog(response.data);
-      const saved = themeId === null
-        ? themes.find((theme) => !previousIds.has(theme.id))
-          ?? themes.find((theme) => theme.definition.name === validated.name)
-        : themes.find((theme) => theme.id === themeId);
-      if (saved === undefined) {
-        setProfileNotice("テーマは保存されましたが、保存結果を確認できませんでした。");
-        return null;
-      }
-      setProfileNotice(`カスタムテーマ「${saved.definition.name}」を保存しました。適用を押すと画面へ反映します。`);
-      return saved;
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("カスタムテーマを保存できませんでした。");
-      }
-      return null;
-    } finally {
-      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
-    }
-  }
-
-  async function deleteThemeRecord(theme: ThemeRecordView): Promise<boolean> {
-    if (settingsSaving) return false;
-    if (themeSelection.kind === "custom" && themeSelection.themeId === theme.id) {
-      setProfileNotice("現在適用中のテーマは、別のテーマを適用してから削除してください。");
-      return false;
-    }
-    setSettingsSaving(true);
-    setProfileNotice(`カスタムテーマ「${theme.definition.name}」を削除しています。`);
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const response = await deleteCustomTheme(theme.id, true, requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return false;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの削除をキャンセルしました。");
-        return false;
-      }
-      acceptCustomThemeCatalog(response.data);
-      setProfileNotice(`カスタムテーマ「${theme.definition.name}」を削除しました。`);
-      return true;
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("カスタムテーマを削除できませんでした。");
-      }
-      return false;
-    } finally {
-      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
-    }
-  }
-
-  async function deleteInvalidThemeRecord(theme: InvalidThemeRecordView): Promise<boolean> {
-    if (settingsSaving) return false;
-    if (theme.active || (themeSelection.kind === "custom" && themeSelection.themeId === theme.id)) {
-      setProfileNotice("適用中の破損テーマは、別のテーマを適用してから削除してください。");
-      return false;
-    }
-    setSettingsSaving(true);
-    setProfileNotice(`読み込めないカスタムテーマ「${theme.name}」を削除しています。`);
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const response = await deleteCustomTheme(theme.id, true, requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return false;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの削除をキャンセルしました。");
-        return false;
-      }
-      acceptCustomThemeCatalog(response.data);
-      setProfileNotice(`読み込めないカスタムテーマ「${theme.name}」を削除しました。`);
-      return true;
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("読み込めないカスタムテーマを削除できませんでした。");
-      }
-      return false;
-    } finally {
-      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
-    }
-  }
-
-  async function previewThemeImport(file: File): Promise<ThemeImportPreviewView | null> {
-    if (settingsSaving) return null;
-    if (file.size === 0 || file.size > 65_536) {
-      setProfileNotice("テーマJSONは1 byte以上64 KiB以下にしてください。");
-      return null;
-    }
-    setSettingsSaving(true);
-    setProfileNotice("テーマJSONを検証しています。");
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
-      const response = await previewCustomThemeImport(bytes, requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return null;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの読み込みをキャンセルしました。");
-        return null;
-      }
-      const definition = normalizeThemeDefinitionV1(response.data.definition);
-      if (definition === null || response.data.byteLength !== bytes.length) {
-        setProfileNotice("テーマJSONの検証結果が不正です。保存していません。");
-        return null;
-      }
-      setProfileNotice("検証に成功しました。内容を確認して保存してください。");
-      return {
-        confirmationKey: response.data.confirmationKey,
-        definition,
-        existingThemeId: response.data.conflict?.themeId ?? null,
-        bytes,
-      };
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("テーマJSONを読み込めませんでした。");
-      }
-      return null;
-    } finally {
-      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
-    }
-  }
-
-  async function confirmThemeImport(
-    preview: ThemeImportPreviewView,
-    replace: boolean,
-  ): Promise<ThemeRecordView | null> {
-    if (settingsSaving) return null;
-    if (
-      replace
-      && preview.existingThemeId !== null
-      && themeSelection.kind === "custom"
-      && themeSelection.themeId === preview.existingThemeId
-    ) {
-      setProfileNotice("現在適用中のテーマは置き換えられません。別のテーマを適用してください。");
-      return null;
-    }
-    const previousIds = new Set(customThemeCatalog.themes.map((theme) => theme.themeId));
-    setSettingsSaving(true);
-    setProfileNotice("カスタムテーマを保存しています。");
-    const requestGeneration = ++themeGeneration.current;
-    try {
-      const response = await executeCustomThemeImport(
-        preview.bytes,
-        preview.confirmationKey,
-        replace,
-        requestGeneration,
-      );
-      if (requestGeneration !== themeGeneration.current) return null;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの読み込みをキャンセルしました。");
-        return null;
-      }
-      const themes = acceptCustomThemeCatalog(response.data);
-      const saved = preview.existingThemeId === null
-        ? themes.find((theme) => !previousIds.has(theme.id))
-          ?? themes.find((theme) => theme.definition.name === preview.definition.name)
-        : themes.find((theme) => theme.id === preview.existingThemeId);
-      if (saved === undefined) {
-        setProfileNotice("テーマは保存されましたが、保存結果を確認できませんでした。");
-        return null;
-      }
-      setProfileNotice(`カスタムテーマ「${saved.definition.name}」を読み込みました。適用を押すと画面へ反映します。`);
-      return saved;
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("カスタムテーマを保存できませんでした。");
-      }
-      return null;
-    } finally {
-      if (requestGeneration === themeGeneration.current) setSettingsSaving(false);
-    }
-  }
-
-  async function downloadCustomTheme(theme: ThemeRecordView): Promise<void> {
-    const requestGeneration = ++themeGeneration.current;
-    let url: string | null = null;
-    try {
-      const response = await exportCustomTheme(theme.id, requestGeneration);
-      if (requestGeneration !== themeGeneration.current) return;
-      if (response.status !== "ok") {
-        setProfileNotice(response.status === "error"
-          ? presentError(response.error)
-          : "テーマの書き出しをキャンセルしました。");
-        return;
-      }
-      if (typeof URL.createObjectURL !== "function") throw new Error("download unavailable");
-      if (
-        response.data.bytes.length === 0
-        || response.data.bytes.length > 65_536
-        || response.data.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
-      ) throw new Error("invalid export bytes");
-      url = URL.createObjectURL(new Blob([new Uint8Array(response.data.bytes)], {
-        type: "application/json",
-      }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = /^[^\u0000-\u001F/\\]{1,128}\.json$/i.test(response.data.fileName)
-        ? response.data.fileName
-        : `comic-explorer-theme-${theme.id}.json`;
-      link.click();
-      setProfileNotice("テーマJSONのダウンロードを開始しました。");
-    } catch {
-      if (requestGeneration === themeGeneration.current) {
-        setProfileNotice("カスタムテーマを書き出せませんでした。");
-      }
-    } finally {
-      if (url !== null) {
-        const downloadUrl = url;
-        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
-      }
-    }
+    return structuredClone(settings);
   }
 
   async function refreshNamedSettingsProfiles(requestGeneration: number) {
@@ -3583,113 +2850,40 @@ export function App({
         ));
         return;
       }
-      setSortField(normalized.sortField);
-      setSortDescending(normalized.sortDescending);
+
       endOfVolumePolicyUserChanged.current = true;
       endOfVolumePolicyRevision.current += 1;
       endOfVolumePolicyRef.current = normalized.endOfVolumePolicy;
-      setEndOfVolumePolicy(normalized.endOfVolumePolicy);
-      setCatalogViewMode(normalized.catalogViewMode);
+
       persistedCatalogViewMode.current = normalized.catalogViewMode;
-      setCatalogThumbnailSizes(normalized.catalogThumbnailSizes);
-      setViewMode(normalized.viewMode);
-      setSpreadRules({
-        portraitMaxAspectPercent: normalized.spreadPortraitMaxAspectPercent,
-        autoViewportMinAspectPercent: normalized.autoSpreadMinViewportAspectPercent,
-        firstPageSingle: normalized.spreadFirstPageSingle,
-        pairing: normalized.spreadPairing,
-      });
-      setFitRules({
-        allowUpscale: normalized.fitAllowUpscale,
-        basis: normalized.fitBasis,
-        includePageMargin: normalized.fitIncludePageMargin,
-      });
-      setReadingDirection(normalized.readingDirection);
-      setViewerScaleMode(normalized.scaleMode);
-      setViewerScale(normalized.scale);
-      setLoupeEnabled(normalized.loupeEnabled);
-      setLoupeSize(normalized.loupeSize);
-      setLoupeZoom(normalized.loupeZoom);
-      setPrefetchAhead(normalized.prefetchAhead);
-      setPrefetchBehind(normalized.prefetchBehind);
-      setPrefetchMemoryMiB(normalized.prefetchMemoryMiB);
-      setFullscreenEscapeBehavior(normalized.fullscreenEscapeBehavior);
-      setPreventDisplaySleepFullscreen(normalized.preventDisplaySleepFullscreen);
-      setTrayStoreOnMinimize(normalized.trayStoreOnMinimize);
-      setTrayCloseBehavior(normalized.trayCloseBehavior);
-      setTrayRestoreGesture(normalized.trayRestoreGesture);
-      setSlideshowIntervalMs(normalized.slideshowIntervalMs);
-      setSlideshowOrder(normalized.slideshowOrder);
-      setSlideshowRepeatCurrentItem(normalized.slideshowRepeatCurrentItem);
-      setViewerCatalogSelectionSync(normalized.viewerCatalogSelectionSync);
-      setViewerBackground(normalized.viewerBackground);
-      setViewerPageMargin(normalized.viewerPageMargin);
-      setViewerSpreadGap(normalized.viewerSpreadGap);
-      setCursorAutoHideMs(normalized.cursorAutoHideMs);
-      setZoomRetention(normalized.zoomRetention);
-      setViewerGridEnabled(normalized.viewerGridEnabled);
-      setViewerGridSize(normalized.viewerGridSize);
-      setViewerGridColor(normalized.viewerGridColor);
-      setPanFactor(normalized.panFactor);
-      setWheelDeadZone(normalized.wheelDeadZone);
-      setScrollStepPercent(normalized.scrollStepPercent);
-      setKeyScrollAccelerationPercent(normalized.keyScrollAccelerationPercent);
-      setKeyScrollContinuous(normalized.keyScrollContinuous);
-      setSmoothScroll(normalized.smoothScroll);
-      setPageScanMode(normalized.pageScanMode);
-      setTreeVisible(normalized.treeVisible);
-      setTreeAutoCollapse(normalized.treeAutoCollapse);
-      setTreeConfirmChildren(normalized.treeConfirmChildren);
-      setTreeWidth(normalized.treeWidth);
-      setTreeHeight(normalized.treeHeight);
-      setCatalogPanePosition(normalized.catalogPanePosition);
-      setMenuBarVisible(normalized.menuBarVisible);
-      setToolbarVisible(normalized.toolbarVisible);
-      setAddressBarVisible(normalized.addressBarVisible);
-      setStatusBarVisible(normalized.statusBarVisible);
-      setAlwaysOnTop(normalized.alwaysOnTop);
+
       const savedTheme = validThemeState(
         response.data.themeSelection,
         response.data.customThemeSnapshot,
       );
-      setThemeSelection(savedTheme.selection);
-      setCustomThemeSnapshot(savedTheme.snapshot);
+
+      setSettings({
+        ...normalized,
+        themeSelection: savedTheme.selection,
+        customThemeSnapshot: savedTheme.snapshot,
+        shortcuts: normalizeShortcutBindings(response.data.shortcuts),
+        catalogMouseBindings: strictCatalogMouseBindings(response.data.catalogMouseBindings) ?? normalized.catalogMouseBindings,
+        viewerQuadrantBindings: strictViewerQuadrantBindings(response.data.viewerQuadrantBindings) ?? normalized.viewerQuadrantBindings,
+        viewerRightClickAction: strictViewerRightClickAction(response.data.viewerRightClickAction) ?? normalized.viewerRightClickAction,
+      });
       markCustomThemeCatalogActive(savedTheme.selection);
       navigationSelectionPolicyRef.current = normalized.navigationSelectionPolicy;
       thumbnailGenerationScopeRef.current = normalized.thumbnailGenerationScope;
-      setNavigationSelectionPolicy(normalized.navigationSelectionPolicy);
-      setThumbnailGenerationScope(normalized.thumbnailGenerationScope);
+
       startupLocationRef.current = normalized.startupLocation;
-      setStartupLocation(normalized.startupLocation);
+
       const hiddenVisibilityChanged = normalized.showHiddenFiles !== showHiddenFiles;
-      setShowHiddenFiles(normalized.showHiddenFiles);
+
       restoreLastViewerRef.current = normalized.restoreLastViewer;
-      setRestoreLastViewer(normalized.restoreLastViewer);
+
       const autoRefreshChanged = normalized.autoRefreshCurrentFolder !== autoRefreshCurrentFolder;
       autoRefreshCurrentFolderRef.current = normalized.autoRefreshCurrentFolder;
-      setAutoRefreshCurrentFolder(normalized.autoRefreshCurrentFolder);
-      setFolderOpenRule(normalized.folderOpenRule);
-      setImageOpenRule(normalized.imageOpenRule);
-      setArchiveOpenRule(normalized.archiveOpenRule);
-      setDetailGridLines(normalized.detailGridLines);
-      setDetailRowDensity(normalized.detailRowDensity);
-      setDetailShowKind(normalized.detailShowKind);
-      setDetailShowSize(normalized.detailShowSize);
-      setDetailShowModified(normalized.detailShowModified);
-      setShortcuts(normalizeShortcutBindings(response.data.shortcuts));
-      setCatalogMouseBindings(
-        strictCatalogMouseBindings(response.data.catalogMouseBindings)
-          ?? normalized.catalogMouseBindings,
-      );
-      setViewerQuadrantBindings(
-        strictViewerQuadrantBindings(response.data.viewerQuadrantBindings)
-          ?? normalized.viewerQuadrantBindings,
-      );
-      setViewerRightClickAction(
-        strictViewerRightClickAction(response.data.viewerRightClickAction)
-          ?? normalized.viewerRightClickAction,
-      );
-      setMouseGestures(normalized.mouseGestures);
+
       setSettingsOpen(false);
       setSettingsDraft(null);
       setSettingsProfileSwitchPreview(null);
@@ -4226,8 +3420,8 @@ export function App({
   }
 
   function changeSort(nextField: SortField, nextDescending: boolean) {
-    setSortField(nextField);
-    setSortDescending(nextDescending);
+    updateSetting("sortField", nextField);
+    updateSetting("sortDescending", nextDescending);
     settingsGeneration.current += 1;
     void saveCatalogSort(
       { sortField: nextField, sortDescending: nextDescending },
@@ -4239,7 +3433,7 @@ export function App({
     endOfVolumePolicyUserChanged.current = true;
     endOfVolumePolicyRevision.current += 1;
     endOfVolumePolicyRef.current = policy;
-    setEndOfVolumePolicy(policy);
+    updateSetting("endOfVolumePolicy", policy);
     settingsGeneration.current += 1;
     void saveEndOfVolumePolicy(policy, settingsGeneration.current).catch(
       () => undefined,
@@ -4247,7 +3441,7 @@ export function App({
   }
 
   function changeCatalogViewMode(mode: CatalogViewMode) {
-    setCatalogViewMode(mode);
+    updateSetting("catalogViewMode", mode);
     const requestGeneration = ++settingsGeneration.current;
     void saveCatalogViewMode(mode, requestGeneration)
       .then((response) => {
@@ -4255,9 +3449,9 @@ export function App({
         if (response.status === "ok") {
           const persisted = normalizeCatalogViewMode(response.data.catalogViewMode);
           persistedCatalogViewMode.current = persisted;
-          setCatalogViewMode(persisted);
+          updateSetting("catalogViewMode", persisted);
         } else {
-          setCatalogViewMode(persistedCatalogViewMode.current);
+          updateSetting("catalogViewMode", persistedCatalogViewMode.current);
           setSelectionNotice(
             response.status === "error"
               ? presentError(response.error)
@@ -4267,7 +3461,7 @@ export function App({
       })
       .catch(() => {
         if (requestGeneration !== settingsGeneration.current) return;
-        setCatalogViewMode(persistedCatalogViewMode.current);
+        updateSetting("catalogViewMode", persistedCatalogViewMode.current);
         setSelectionNotice("一覧表示形式を保存できませんでした。");
       });
   }
@@ -4317,14 +3511,7 @@ export function App({
     setEndOfVolumeNotice(null);
     setViewerSession(null);
     setViewerLaunchMode("normal");
-    metadataGeneration.current += 1;
-    ratingSaveGeneration.current += 1;
-    ratingSaveInFlight.current = false;
-    setItemMetadata(null);
-    setMemoDraft("");
-    setMemoSaveState("idle");
-    setRatingSaveState("idle");
-    setMetadataNotice(null);
+    resetItemMetadata();
     setBookmarks([]);
     setBookmarkNotice(null);
     setThumbnails({});
@@ -4627,8 +3814,8 @@ export function App({
           pageScanMode={pageScanMode}
           shortcuts={shortcuts}
           onSettingsChange={(mode, direction) => {
-            setViewMode(mode);
-            setReadingDirection(direction);
+            updateSetting("viewMode", mode);
+            updateSetting("readingDirection", direction);
             persistViewerSettings({ viewMode: mode, readingDirection: direction });
           }}
           fullscreenAdapter={fullscreenAdapter}
@@ -4641,9 +3828,9 @@ export function App({
           slideshowRepeatCurrentItem={slideshowRepeatCurrentItem}
           onScaleChange={(next: ViewerScaleState) => {
             if (zoomRetention !== "global") return;
-            setViewerScaleMode(next.mode);
-            setViewerScale(next.scale);
-            setLoupeEnabled(next.loupeEnabled);
+            updateSetting("scaleMode", next.mode);
+            updateSetting("scale", next.scale);
+            updateSetting("loupeEnabled", next.loupeEnabled);
             persistViewerSettings({
               scaleMode: next.mode,
               scale: next.scale,
@@ -5259,11 +4446,11 @@ export function App({
                 onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
                 onClick={() => runMenuAction(() => {
                   const restored = restoreWorkspaceDisplay();
-                  setTreeVisible(restored.treeVisible);
-                  setToolbarVisible(restored.toolbarVisible);
-                  setMenuBarVisible(restored.menuBarVisible);
-                  setAddressBarVisible(restored.addressBarVisible);
-                  setStatusBarVisible(restored.statusBarVisible);
+                  updateSetting("treeVisible", restored.treeVisible);
+                  updateSetting("toolbarVisible", restored.toolbarVisible);
+                  updateSetting("menuBarVisible", restored.menuBarVisible);
+                  updateSetting("addressBarVisible", restored.addressBarVisible);
+                  updateSetting("statusBarVisible", restored.statusBarVisible);
                 })}
               >
                 UIを表示
@@ -5274,7 +4461,7 @@ export function App({
                 aria-checked={treeVisible}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
-                onClick={() => runMenuAction(() => setTreeVisible((current) => !current))}
+                onClick={() => runMenuAction(() => updateSetting("treeVisible", (current) => !current))}
               >
                 フォルダツリー {treeVisible ? "を隠す" : "を表示"}
               </button>
@@ -5284,7 +4471,7 @@ export function App({
                 aria-checked={toolbarVisible}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
-                onClick={() => runMenuAction(() => setToolbarVisible((current) => !current))}
+                onClick={() => runMenuAction(() => updateSetting("toolbarVisible", (current) => !current))}
               >
                 ツールバー {toolbarVisible ? "を隠す" : "を表示"}
               </button>
@@ -5294,7 +4481,7 @@ export function App({
                 aria-checked={menuBarVisible}
                 onFocus={(event) => markMenuItemActive(event.currentTarget)}
                 onKeyDown={(event) => handleMenuItemKeyDown("view", event)}
-                onClick={() => runMenuAction(() => setMenuBarVisible((current) => !current))}
+                onClick={() => runMenuAction(() => updateSetting("menuBarVisible", (current) => !current))}
               >
                 メニューバー {menuBarVisible ? "を隠す" : "を表示"}
               </button>
@@ -6219,7 +5406,7 @@ export function App({
                   && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
                   event.preventDefault();
                   const increaseKey = catalogPanePosition === "left" ? "ArrowLeft" : "ArrowRight";
-                  setTreeWidth((width) =>
+                  updateSetting("treeWidth", (width) =>
                     Math.max(
                       MIN_TREE_WIDTH,
                       Math.min(
@@ -6232,7 +5419,7 @@ export function App({
                   && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
                   event.preventDefault();
                   const increaseKey = catalogPanePosition === "top" ? "ArrowUp" : "ArrowDown";
-                  setTreeHeight((height) => Math.max(
+                  updateSetting("treeHeight", (height) => Math.max(
                     MIN_TREE_HEIGHT,
                     Math.min(MAX_TREE_HEIGHT, height + (event.key === increaseKey ? 10 : -10)),
                   ));
@@ -6247,12 +5434,12 @@ export function App({
                     const extent = catalogPanePosition === "left"
                       ? bounds.right - event.clientX
                       : event.clientX - bounds.left;
-                    setTreeWidth(Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, extent)));
+                    updateSetting("treeWidth", Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, extent)));
                   } else {
                     const extent = catalogPanePosition === "top"
                       ? bounds.bottom - event.clientY
                       : event.clientY - bounds.top;
-                    setTreeHeight(Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT, extent)));
+                    updateSetting("treeHeight", Math.max(MIN_TREE_HEIGHT, Math.min(MAX_TREE_HEIGHT, extent)));
                   }
                 }
               }}

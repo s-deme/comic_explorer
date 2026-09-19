@@ -4,8 +4,8 @@ import {
   fireEvent,
   render,
   screen,
-  within,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -13,10 +13,10 @@ import {
   getCatalogSettings,
   getItemMetadata,
   getThumbnail,
-  loadPage,
-  listTreeChildren,
   listFolder,
   listReadingHistory,
+  listTreeChildren,
+  loadPage,
   openComic,
   registerLibraryRoot,
   restoreLibraryRoot,
@@ -24,15 +24,11 @@ import {
   saveReadingPosition,
   setItemRating,
   takeRecoveryNotice,
-  type CatalogSettings,
   type ItemMetadata,
-  type ReadingHistoryEntry,
+  type ReadingHistoryEntry
 } from "./features/library/client";
+import { DEFAULT_CATALOG_SETTINGS as defaultSettings, testArchiveEntry as testEntry } from "./test/catalog-fixtures";
 import type { CatalogEntry } from "./types/domain";
-import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
-import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
-import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
-import { testArchiveEntry as testEntry } from "./test/catalog-fixtures";
 
 function openLibraryMenuItem(name: "閲覧履歴") {
   fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
@@ -63,6 +59,8 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   restoreLibraryRoot: vi.fn(),
+  restoreLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
+  saveLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
   takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
@@ -191,93 +189,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const defaultSettings: CatalogSettings = {
-  sortField: "name",
-  sortDescending: false,
-  endOfVolumePolicy: "auto_next",
-  catalogViewMode: "cover_list",
-  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
-  viewMode: "single",
-  spreadPortraitMaxAspectPercent: 100,
-  autoSpreadMinViewportAspectPercent: 125,
-  spreadFirstPageSingle: false,
-  spreadPairing: "continuous",
-  fitAllowUpscale: false,
-  fitBasis: "spread",
-  fitIncludePageMargin: true,
-  readingDirection: "rightToLeft",
-  scaleMode: "fit",
-  scale: 1,
-  loupeEnabled: false,
-  loupeSize: 180,
-  loupeZoom: 2,
-  prefetchAhead: 4,
-  prefetchBehind: 0,
-  prefetchMemoryMiB: 256,
-  fullscreenEscapeBehavior: "exitFullscreen",
-  preventDisplaySleepFullscreen: false,
-  trayStoreOnMinimize: false,
-  trayCloseBehavior: "quit",
-  trayRestoreGesture: "singleClick",
-  slideshowIntervalMs: 3_000,
-  slideshowOrder: "forward",
-  slideshowRepeatCurrentItem: false,
-  viewerCatalogSelectionSync: true,
-  viewerBackground: "checker",
-  viewerPageMargin: 0,
-  viewerSpreadGap: 8,
-  cursorAutoHideMs: 0,
-  zoomRetention: "global",
-  viewerGridEnabled: false,
-  viewerGridSize: 32,
-  viewerGridColor: "light",
-  panFactor: 1,
-  wheelDeadZone: 0,
-  scrollStepPercent: 90,
-  keyScrollAccelerationPercent: 150,
-  keyScrollContinuous: true,
-  smoothScroll: true,
-  pageScanMode: "vertical",
-  treeVisible: true,
-  treeAutoCollapse: false,
-  treeConfirmChildren: true,
-  treeWidth: 240,
-  treeHeight: 240,
-  catalogPanePosition: "right",
-  menuBarVisible: true,
-  toolbarVisible: true,
-  addressBarVisible: true,
-  statusBarVisible: true,
-  alwaysOnTop: false,
-  themeSelection: { kind: "system" },
-  customThemeSnapshot: null,
-  themeFallbackReason: null,
-  navigationSelectionPolicy: "restore",
-  thumbnailGenerationScope: "near",
-  startupLocation: "last",
-  showHiddenFiles: false,
-  restoreLastViewer: false,
-    autoRefreshCurrentFolder: true,
-    folderOpenRule: "navigate",
-    imageOpenRule: "read",
-    archiveOpenRule: "read",
-    detailGridLines: "none",
-    detailRowDensity: "standard",
-    detailShowKind: true,
-    detailShowSize: true,
-    detailShowModified: true,
-  shortcuts: { ...DEFAULT_SHORTCUTS },
-  catalogMouseBindings: {
-    primaryClick: "selectOnly",
-    doubleClick: "openSelected",
-    middleClick: "none",
-    backButton: "navigateBack",
-    forwardButton: "navigateForward",
-  },
-  viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
-  viewerRightClickAction: "none",
-  mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
-};
+
 
 function settingsResponse(requestId: string) {
   return {
@@ -317,7 +229,8 @@ async function registerTestLibrary(entries: CatalogEntry[]) {
     },
   });
   render(<App />);
-  await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  await waitFor(() => expect(grid).toHaveAttribute("data-entry-count", String(entries.length)));
 }
 
 async function requestOpenTestComic(relativePath: string) {

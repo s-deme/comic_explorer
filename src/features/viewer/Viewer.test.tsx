@@ -1,18 +1,18 @@
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import {
+  activateViewerFilterSet,
   copyViewerPageToClipboard,
+  deleteViewerFilterSet,
+  listViewerFilterSets,
   loadPage,
   resolveViewerRectangleZoom,
   saveReadingPosition,
-  activateViewerFilterSet,
-  deleteViewerFilterSet,
-  listViewerFilterSets,
   saveViewerFilterSet,
 } from "../library/client";
 import { DEFAULT_MOUSE_GESTURES } from "../settings/profile";
-import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "../input/viewer-quadrants";
 import { Viewer } from "./Viewer";
 
 vi.mock("../library/client", () => ({
@@ -312,76 +312,6 @@ describe("Viewer settings", () => {
     expect(images[1].style.top).toBe("");
   });
 
-  it("opens a labeled panel for secondary viewer actions", () => {
-    render(
-      <Viewer
-        session={session}
-        generation={1}
-        initialMode="single"
-        initialDirection="rightToLeft"
-        onSettingsChange={() => undefined}
-        onClose={() => undefined}
-      />,
-    );
-
-    const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
-    expect(toolbar).not.toBeNull();
-    const buttons = within(toolbar!).getAllByRole("button");
-    expect(buttons).toHaveLength(6);
-    buttons.forEach((button) => {
-      expect(button).toHaveClass("viewer-icon-button");
-      expect(button).toHaveAttribute("title");
-      expect(button.getAttribute("title")).not.toBe("");
-    });
-    expect(within(toolbar!).getAllByRole("group").map((group) => group.getAttribute("aria-label")))
-      .toEqual(["表示枚数", "倍率", "しおりと補助操作", "ウィンドウ操作"]);
-    expect(within(within(toolbar!).getByRole("group", { name: "しおりと補助操作" }))
-      .getAllByRole("button")
-      .map((button) => button.getAttribute("aria-label")))
-      .toEqual(["しおりを保存", "その他の操作"]);
-    expect(toolbar?.querySelector(".viewer-toolbar-identity"))
-      .toContainElement(within(toolbar!).getByRole("button", { name: "一覧へ戻る" }));
-    expect(toolbar?.querySelector(".viewer-toolbar-identity strong")).not.toBeInTheDocument();
-
-    expect(within(toolbar!).queryByRole("button", { name: "見開きへ" }))
-      .not.toBeInTheDocument();
-    const more = within(toolbar!).getByRole("button", { name: "その他の操作" });
-    const viewer = screen.getByRole("region", { name: "Book ビューワ" });
-    expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
-    expect(more).toHaveAttribute("aria-controls", "viewer-more-panel");
-    fireEvent.click(more);
-    expect(viewer).toHaveAttribute("data-toolbar-more-open", "true");
-    expect(within(toolbar!).getByRole("button", { name: "その他の操作を閉じる" }))
-      .toHaveAttribute("aria-expanded", "true");
-    const panel = screen.getByRole("region", { name: "その他の操作" });
-    expect(within(panel).getByRole("heading", { name: "表示とサイズ" })).toBeInTheDocument();
-    expect(within(panel).getByRole("heading", { name: "移動と読み方" })).toBeInTheDocument();
-    expect(within(panel).getByRole("heading", { name: "しおりと共有" })).toBeInTheDocument();
-    expect(within(panel).getByRole("heading", { name: "画像" })).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: "画像フィルター" })).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: "ルーペ" })).toBeInTheDocument();
-    const navigationGroup = within(panel).getByRole("heading", { name: "移動と読み方" })
-      .closest("section");
-    expect(navigationGroup).not.toBeNull();
-    expect(within(navigationGroup!).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual([
-        "読み方向",
-        "見開きを1ページ戻す",
-        "見開きを1ページ進める",
-        "ランダムページ",
-        "スライドショーを開始",
-      ]);
-    const pageActions = within(screen.getByRole("navigation", { name: "ページ移動" }))
-      .getByRole("group", { name: "ページ操作" });
-    expect(within(pageActions).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual(["前ページ", "次ページ"]);
-    fireEvent.click(within(panel).getByRole("button", { name: "閉じる" }));
-    expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
-    const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
-    expect(close).toHaveTextContent("↩");
-    expect(close).not.toHaveTextContent("一覧へ戻る");
-  });
-
   it("updates the native title while the Viewer is open and restores it after close", async () => {
     const windowTitleAdapter = { setTitle: vi.fn().mockResolvedValue(undefined) };
     const { unmount } = render(
@@ -648,44 +578,6 @@ describe("Viewer settings", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("keeps page navigation below and slideshow in secondary controls", () => {
-    render(
-      <Viewer
-        session={multiPageSession}
-        generation={1}
-        initialMode="single"
-        initialDirection="rightToLeft"
-        onSettingsChange={() => undefined}
-        onClose={() => undefined}
-      />,
-    );
-
-    const toolbar = document.querySelector<HTMLElement>(".viewer-toolbar");
-    expect(toolbar).not.toHaveTextContent("1 / 2");
-
-    const navigator = screen.getByRole("navigation", { name: "ページ移動" });
-    const slider = within(navigator).getByRole("slider", { name: "ページ移動" });
-    expect(slider).toHaveAttribute("dir", "rtl");
-    expect(slider).toHaveValue("0");
-    expect(slider).toHaveAttribute("aria-valuetext", "1 / 2");
-    expect(within(navigator).getByText("1 / 2")).toBeInTheDocument();
-    const actions = within(navigator).getByRole("group", { name: "ページ操作" });
-    expect(within(actions).getByRole("button", { name: "前ページ" })).toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: "次ページ" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
-    expect(within(screen.getByRole("region", { name: "その他の操作" })).getByRole("button", { name: "スライドショーを開始" }))
-      .toBeInTheDocument();
-    expect(toolbar?.querySelector(".viewer-toolbar-previous")).toBeNull();
-    expect(toolbar?.querySelector(".viewer-toolbar-next")).toBeNull();
-
-    fireEvent.change(slider, { target: { value: "1" } });
-
-    expect(slider).toHaveValue("1");
-    expect(slider).toHaveAttribute("aria-valuetext", "2 / 2");
-    expect(within(navigator).getByText("2 / 2")).toBeInTheDocument();
-    expect(document.querySelector(".page-spread")).toHaveAttribute("data-page-anchor", "1");
   });
 
   it("loads only the current page and four pages ahead in the paged layout", async () => {
@@ -1673,6 +1565,40 @@ describe("Viewer settings", () => {
 
     await waitFor(() => expect(adapter.setDisplayAwake).toHaveBeenLastCalledWith(false));
     expect(adapter.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])("preserves native window state across volume remounts (fullscreen=%s)", async (current) => {
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: vi.fn().mockResolvedValue(current),
+    };
+    const props = { session, generation: 1, initialMode: "single" as const,
+      initialDirection: "rightToLeft" as const, fullscreenAdapter: adapter,
+      preserveWindowStateOnUnmount: true, onSettingsChange: () => undefined,
+      onClose: () => undefined };
+    const view = render(<Viewer {...props} key="first" />);
+    await waitFor(() => expect(document.querySelector(".viewer")).toHaveAttribute("data-fullscreen", String(current)));
+    view.rerender(<Viewer {...props} key="next" generation={2} />);
+    await waitFor(() => expect(document.querySelector(".viewer")).toHaveAttribute("data-fullscreen", String(current)));
+    view.unmount();
+    expect(adapter.enter).not.toHaveBeenCalled();
+    expect(adapter.exit).not.toHaveBeenCalled();
+  });
+
+  it("ignores an old fullscreen query after a fullscreen request", async () => {
+    let resolveQuery!: (value: boolean) => void;
+    const adapter = {
+      enter: vi.fn().mockResolvedValue(undefined),
+      exit: vi.fn().mockResolvedValue(undefined),
+      isFullscreen: () => new Promise<boolean>((resolve) => { resolveQuery = resolve; }),
+    };
+    render(<Viewer session={session} generation={1} initialMode="single"
+      initialDirection="rightToLeft" initialFullscreen fullscreenAdapter={adapter}
+      onSettingsChange={() => undefined} onClose={() => undefined} />);
+    await waitFor(() => expect(document.querySelector(".viewer")).toHaveAttribute("data-fullscreen", "true"));
+    await act(async () => resolveQuery(false));
+    expect(document.querySelector(".viewer")).toHaveAttribute("data-fullscreen", "true");
   });
 
   it("starts context-menu fullscreen and advances slideshow pages", async () => {

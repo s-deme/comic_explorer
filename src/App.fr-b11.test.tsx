@@ -2,6 +2,27 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import {
+  DEFAULT_SHORTCUTS,
+  type ShortcutBindings,
+} from "./features/input/shortcuts";
+import {
+  getCatalogSettings,
+  getItemMetadata,
+  getThumbnail,
+  listFolder,
+  listTreeChildren,
+  loadPage,
+  openComic,
+  registerLibraryRoot,
+  restoreLibraryRoot,
+  saveReadingPosition,
+  saveSettingsProfile,
+  takeRecoveryNotice,
+  type ItemMetadata
+} from "./features/library/client";
+import { DEFAULT_CATALOG_SETTINGS, testArchiveEntry as testEntry } from "./test/catalog-fixtures";
+import type { CatalogEntry } from "./types/domain";
 
 function markViewerPrefetchReady(): void {
   document.querySelectorAll<HTMLImageElement>(".prefetch-page")
@@ -29,31 +50,6 @@ function openGeneralHelp() {
     within(menu).getByRole("menuitem", { name: "一般ヘルプ…" }),
   );
 }
-import {
-  DEFAULT_SHORTCUTS,
-  type ShortcutBindings,
-} from "./features/input/shortcuts";
-import { DEFAULT_MOUSE_GESTURES } from "./features/settings/profile";
-import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
-import { testArchiveEntry as testEntry } from "./test/catalog-fixtures";
-import {
-  getCatalogSettings,
-  getItemMetadata,
-  getThumbnail,
-  listFolder,
-  listReadingHistory,
-  listTreeChildren,
-  loadPage,
-  openComic,
-  registerLibraryRoot,
-  restoreLibraryRoot,
-  saveSettingsProfile,
-  saveReadingPosition,
-  takeRecoveryNotice,
-  type CatalogSettings,
-  type ItemMetadata,
-} from "./features/library/client";
-import type { CatalogEntry } from "./types/domain";
 
 vi.mock("./features/library/client", () => ({
   registerLibraryRoot: vi.fn(),
@@ -74,6 +70,8 @@ vi.mock("./features/library/client", () => ({
     status: "ok", requestId: "known-folders", generation: 1, data: [],
   })),
   restoreLibraryRoot: vi.fn(),
+  restoreLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
+  saveLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
   takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
@@ -143,93 +141,7 @@ function settingsResponse(shortcuts: Partial<ShortcutBindings> = {}) {
     status: "ok" as const,
     requestId: "settings" as never,
     generation: 1 as never,
-    data: {
-      sortField: "name" as const,
-      sortDescending: false,
-      endOfVolumePolicy: "auto_next" as const,
-      catalogViewMode: "cover_list" as const,
-      catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
-      viewMode: "single" as const,
-      spreadPortraitMaxAspectPercent: 100,
-      autoSpreadMinViewportAspectPercent: 125,
-      spreadFirstPageSingle: false,
-      spreadPairing: "continuous" as const,
-      fitAllowUpscale: false,
-      fitBasis: "spread" as const,
-      fitIncludePageMargin: true,
-      readingDirection: "rightToLeft" as const,
-      scaleMode: "fit" as const,
-      scale: 1,
-      loupeEnabled: false,
-      loupeSize: 180,
-      loupeZoom: 2,
-      prefetchAhead: 4,
-      prefetchBehind: 0,
-      prefetchMemoryMiB: 256,
-      fullscreenEscapeBehavior: "exitFullscreen",
-      preventDisplaySleepFullscreen: false,
-      trayStoreOnMinimize: false,
-      trayCloseBehavior: "quit",
-      trayRestoreGesture: "singleClick",
-      slideshowIntervalMs: 3_000,
-      slideshowOrder: "forward",
-      slideshowRepeatCurrentItem: false,
-      viewerCatalogSelectionSync: true,
-      viewerBackground: "checker" as const,
-      viewerPageMargin: 0,
-      viewerSpreadGap: 8,
-      cursorAutoHideMs: 0,
-      zoomRetention: "global" as const,
-      viewerGridEnabled: false,
-      viewerGridSize: 32,
-      viewerGridColor: "light" as const,
-      panFactor: 1,
-      wheelDeadZone: 0,
-      scrollStepPercent: 90,
-      keyScrollAccelerationPercent: 150,
-      keyScrollContinuous: true,
-      smoothScroll: true,
-      pageScanMode: "vertical" as const,
-      treeVisible: true,
-      treeAutoCollapse: false,
-      treeConfirmChildren: true,
-      treeWidth: 240,
-      treeHeight: 240,
-      catalogPanePosition: "right",
-      menuBarVisible: true,
-      toolbarVisible: true,
-      addressBarVisible: true,
-      statusBarVisible: true,
-      alwaysOnTop: false,
-      themeSelection: { kind: "system" as const },
-      customThemeSnapshot: null,
-      themeFallbackReason: null,
-      navigationSelectionPolicy: "restore" as const,
-      thumbnailGenerationScope: "near" as const,
-      startupLocation: "last" as const,
-      showHiddenFiles: false,
-      restoreLastViewer: false,
-    autoRefreshCurrentFolder: true,
-    folderOpenRule: "navigate",
-    imageOpenRule: "read",
-    archiveOpenRule: "read",
-    detailGridLines: "none",
-    detailRowDensity: "standard",
-    detailShowKind: true,
-    detailShowSize: true,
-    detailShowModified: true,
-      shortcuts: { ...DEFAULT_SHORTCUTS, ...shortcuts },
-      catalogMouseBindings: {
-        primaryClick: "selectOnly",
-        doubleClick: "openSelected",
-        middleClick: "none",
-        backButton: "navigateBack",
-        forwardButton: "navigateForward",
-      },
-      viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
-      viewerRightClickAction: "none",
-      mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
-    } satisfies CatalogSettings,
+    data: { ...DEFAULT_CATALOG_SETTINGS, shortcuts: { ...DEFAULT_SHORTCUTS, ...shortcuts } },
   };
 }
 
@@ -264,7 +176,8 @@ async function registerTestLibrary(entries: CatalogEntry[]) {
     data: entries,
   });
   render(<App />);
-  await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  await waitFor(() => expect(grid).toHaveAttribute("data-entry-count", String(entries.length)));
 }
 
 async function openTestComic(relativePath: string) {

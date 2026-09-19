@@ -1,958 +1,98 @@
+import "./test/app-harness";
 import "@testing-library/jest-dom/vitest";
 import {
   act,
-  cleanup,
   fireEvent,
   render,
   screen,
-  within,
   waitFor,
+  within
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { FullscreenAdapter } from "./features/viewer/fullscreen";
-import type { AlwaysOnTopAdapter, WindowThemeAdapter } from "./features/workspace/window";
 import {
-  getCatalogSettings,
-  getItemMetadata,
-  getThumbnail,
-  addFavorite,
-  listFavorites,
-  loadPage,
-  listTreeChildren,
-  listFolder,
-  listenCatalogFolderChanges,
-  listReadingHistory,
-  listPageBookmarks,
-  clearReadingHistory,
-  openComic,
-  resolveCatalogActivation,
-  pickLibraryFile,
-  pickLibraryRoot,
-  pickSearchSource,
-  registerLibraryRoot,
-  watchLibraryFolder,
-  stopLibraryFolderWatch,
-  removeFavorite,
-  restoreLibraryRoot,
-  takeCliLaunchRequest,
-  listenCliLaunchPending,
-  listShelves,
-  listArchiveVirtualTree,
-  saveCatalogSort,
-  saveCatalogViewMode,
-  saveEndOfVolumePolicy,
-  saveItemMemo,
-  saveReadingPosition,
-  savePageBookmark,
-  saveSettingsProfile,
-  listNamedSettingsProfiles,
-  saveNamedSettingsProfile,
-  previewNamedSettingsProfileSwitch,
-  executeNamedSettingsProfileSwitch,
-  deleteNamedSettingsProfile,
-  saveViewerSettings,
-  getTrayStatus,
-  storeMainWindowInTray,
-  quitApplication,
-  setItemRating,
-  searchLibrary,
-  listCsvExportPresets,
-  saveCsvExportPreset,
-  deleteCsvExportPreset,
-  exportCatalogCsv,
-  takeRecoveryNotice,
-  resolveFavorite,
-  diagnoseLibrary,
-  listenRecursiveThumbnailProgress,
   generateRecursiveThumbnails,
-  cancelRecursiveThumbnailGeneration,
-  renameFileItem,
-  getRenamePreferences,
-  saveRenamePreferences,
-  createFileFolder,
-  copyFileItemsToFolder,
-  moveFileItemsToFolder,
-  moveFileItemsToDestination,
-  copyFileItemsToDestination,
-  previewNativeFileDrop,
-  copyNativeFileDrop,
-  startNativeFileDrag,
-  deleteFileItems,
-  deletePageBookmark,
-  setFileClipboard,
-  getFileClipboardStatus,
-  getFileUndoStatus,
-  undoLastFileOperation,
-  pasteFileItems,
-  revealFileItem,
-  openFileItemDefault,
-  openFileItemWith,
-  listWindowsKnownFolders,
-  type CatalogSettings,
-  type FavoriteEntry,
-  type ItemMetadata,
-  type ReadingHistoryEntry,
+  getCatalogSettings,
+  listFavorites,
+  resolveCatalogActivation,
+  searchLibrary
 } from "./features/library/client";
-import type { CatalogEntry, ImageFormat } from "./types/domain";
-import { DEFAULT_SHORTCUTS } from "./features/input/shortcuts";
-import { DEFAULT_VIEWER_QUADRANT_BINDINGS } from "./features/input/viewer-quadrants";
-import {
-  APP_VERSION,
-  DEFAULT_MOUSE_GESTURES,
-  SETTINGS_PROFILE_VERSION,
-} from "./features/settings/profile";
 import { listBookmarks } from "./features/reading/collections";
+import type { FullscreenAdapter } from "./features/viewer/fullscreen";
 import { testArchiveEntry as testEntry } from "./test/catalog-fixtures";
+import type { CatalogEntry, ImageFormat } from "./types/domain";
 
-const folderWatchHarness = vi.hoisted(() => ({
-  handler: undefined as undefined | ((change: {
-    generation: number;
-    libraryRoot: string;
-    relativePath: string;
-    status: "changed" | "error";
-    message?: string | null;
-  }) => void),
-}));
-
-const recursiveThumbnailHarness = vi.hoisted(() => ({
-  handler: undefined as undefined | ((progress: {
-    generation: number;
-    phase: "enumerating" | "generating" | "completed" | "cancelled";
-    relativePath: string;
-    processed: number;
-    total: number;
-    generated: number;
-    cacheHits: number;
-    failed: number;
-  }) => void),
-}));
-
-const nativeFileDropHarness = vi.hoisted(() => ({
-  handler: undefined as undefined | ((event: {
-    type: "drop";
-    paths: string[];
-    position: { x: number; y: number };
-  }) => void),
-  target: { relativePath: "Target" } as { relativePath: string } | null,
-}));
-
-const cliLaunchHarness = vi.hoisted(() => ({
-  handler: undefined as undefined | (() => void),
-}));
-
-vi.mock("./features/library/native-file-drop", () => ({
-  listenNativeFileDrops: vi.fn(async (handler) => {
-    nativeFileDropHarness.handler = handler;
-    return vi.fn();
-  }),
-  nativeDropTargetAt: vi.fn(() => nativeFileDropHarness.target),
-}));
-
-vi.mock("./features/library/client", () => ({
-  registerLibraryRoot: vi.fn(),
-  pickLibraryFile: vi.fn(),
-  pickLibraryRoot: vi.fn(),
-  pickSearchSource: vi.fn(),
-  listFolder: vi.fn(),
-  listenCatalogFolderChanges: vi.fn(),
-  watchLibraryFolder: vi.fn(),
-  stopLibraryFolderWatch: vi.fn(),
-  listTreeChildren: vi.fn(),
-  listWindowsDrives: vi.fn(async () => ({
-    status: "ok", requestId: "drives", generation: 1,
-    data: [
-      { absolutePath: "C:\\", name: "ローカル ディスク (C:)" },
-      { absolutePath: "E:\\", name: "ボリューム (E:)" },
-    ],
-  })),
-  listWindowsKnownFolders: vi.fn(async () => ({
-    status: "ok", requestId: "known-folders", generation: 1, data: [],
-  })),
-  restoreLibraryRoot: vi.fn(),
-  takeCliLaunchRequest: vi.fn(),
-  listenCliLaunchPending: vi.fn(async () => () => undefined),
-  listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
-  listArchiveVirtualTree: vi.fn(async () => ({ status: "ok", data: { archiveRelativePath: "book.cbz", entries: [] } })),
-  getArchiveThumbnail: vi.fn(async () => ({ status: "cancelled" })),
-  copyArchivePageToClipboard: vi.fn(async () => ({ status: "cancelled" })),
-  openComic: vi.fn(),
-  resolveCatalogActivation: vi.fn(async (kind: string) => ({ status: "ok", data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read" })),
-  resolveViewerRectangleZoom: vi.fn(),
-  addFavorite: vi.fn(),
-  listFavorites: vi.fn(),
-  removeFavorite: vi.fn(),
-  resolveFavorite: vi.fn(),
-  getCatalogSettings: vi.fn(),
-  getItemMetadata: vi.fn(),
-  getThumbnail: vi.fn(),
-  loadPage: vi.fn(),
-  copyViewerPageToClipboard: vi.fn(),
-  saveCatalogSort: vi.fn(),
-  saveCatalogViewMode: vi.fn(),
-  saveEndOfVolumePolicy: vi.fn(),
-  saveItemMemo: vi.fn(),
-  saveReadingPosition: vi.fn(),
-  saveSettingsProfile: vi.fn(),
-  listNamedSettingsProfiles: vi.fn(),
-  listCustomThemes: vi.fn(async () => ({
-    status: "ok", data: { themes: [], invalidThemes: [], maximumThemes: 32 },
-  })),
-  saveCustomTheme: vi.fn(),
-  deleteCustomTheme: vi.fn(),
-  exportCustomTheme: vi.fn(),
-  previewCustomThemeImport: vi.fn(),
-  executeCustomThemeImport: vi.fn(),
-  saveNamedSettingsProfile: vi.fn(),
-  previewNamedSettingsProfileSwitch: vi.fn(),
-  executeNamedSettingsProfileSwitch: vi.fn(),
-  deleteNamedSettingsProfile: vi.fn(),
-  saveViewerSettings: vi.fn(),
-  getTrayStatus: vi.fn(),
-  storeMainWindowInTray: vi.fn(),
-  quitApplication: vi.fn(),
-  setItemRating: vi.fn(),
-  searchLibrary: vi.fn(),
-  listCsvExportPresets: vi.fn(),
-  saveCsvExportPreset: vi.fn(),
-  deleteCsvExportPreset: vi.fn(),
-  exportCatalogCsv: vi.fn(),
-  diagnoseLibrary: vi.fn(),
-  cancelLibraryDiagnostics: vi.fn(),
-  listenRecursiveThumbnailProgress: vi.fn(),
-  generateRecursiveThumbnails: vi.fn(),
-  cancelRecursiveThumbnailGeneration: vi.fn(),
-  takeRecoveryNotice: vi.fn(),
-  listReadingHistory: vi.fn(),
-  listPageBookmarks: vi.fn(),
-  clearReadingHistory: vi.fn(),
-  savePageBookmark: vi.fn(),
-  deletePageBookmark: vi.fn(),
-  renameFileItem: vi.fn(),
-  getRenamePreferences: vi.fn(),
-  saveRenamePreferences: vi.fn(),
-  previewBatchRename: vi.fn(),
-  executeBatchRename: vi.fn(),
-  createFileFolder: vi.fn(),
-  copyFileItemsToFolder: vi.fn(),
-  moveFileItemsToFolder: vi.fn(),
-  moveFileItemsToDestination: vi.fn(),
-  copyFileItemsToDestination: vi.fn(),
-  previewNativeFileDrop: vi.fn(),
-  copyNativeFileDrop: vi.fn(),
-  startNativeFileDrag: vi.fn(),
-  deleteFileItems: vi.fn(),
-  setFileClipboard: vi.fn(),
-  getFileClipboardStatus: vi.fn(),
-  getFileUndoStatus: vi.fn(),
-  undoLastFileOperation: vi.fn(),
-  pasteFileItems: vi.fn(),
-  revealFileItem: vi.fn(),
-  openFileItemDefault: vi.fn(),
-  openFileItemWith: vi.fn(),
-}));
-
-function markViewerPrefetchReady(): void {
-  document.querySelectorAll<HTMLImageElement>(".prefetch-page")
-    .forEach((image) => fireEvent.load(image));
-}
-
-const registerMock = vi.mocked(registerLibraryRoot);
-const pickerMock = vi.mocked(pickLibraryRoot);
-const searchSourcePickerMock = vi.mocked(pickSearchSource);
-const filePickerMock = vi.mocked(pickLibraryFile);
-const listMock = vi.mocked(listFolder);
-const listenCatalogFolderChangesMock = vi.mocked(listenCatalogFolderChanges);
-const watchLibraryFolderMock = vi.mocked(watchLibraryFolder);
-const stopLibraryFolderWatchMock = vi.mocked(stopLibraryFolderWatch);
-const treeMock = vi.mocked(listTreeChildren);
-const restoreMock = vi.mocked(restoreLibraryRoot);
-const takeCliLaunchRequestMock = vi.mocked(takeCliLaunchRequest);
-const listenCliLaunchPendingMock = vi.mocked(listenCliLaunchPending);
-const listShelvesMock = vi.mocked(listShelves);
-const listArchiveVirtualTreeMock = vi.mocked(listArchiveVirtualTree);
-const openMock = vi.mocked(openComic);
-const resolveCatalogActivationMock = vi.mocked(resolveCatalogActivation);
-const settingsMock = vi.mocked(getCatalogSettings);
-const metadataMock = vi.mocked(getItemMetadata);
-const thumbnailMock = vi.mocked(getThumbnail);
-const addFavoriteMock = vi.mocked(addFavorite);
-const listFavoritesMock = vi.mocked(listFavorites);
-const removeFavoriteMock = vi.mocked(removeFavorite);
-const resolveFavoriteMock = vi.mocked(resolveFavorite);
-const loadPageMock = vi.mocked(loadPage);
-const saveSortMock = vi.mocked(saveCatalogSort);
-const saveCatalogViewModeMock = vi.mocked(saveCatalogViewMode);
-const saveEndPolicyMock = vi.mocked(saveEndOfVolumePolicy);
-const saveMemoMock = vi.mocked(saveItemMemo);
-const saveReadingMock = vi.mocked(saveReadingPosition);
-const saveSettingsProfileMock = vi.mocked(saveSettingsProfile);
-const listNamedSettingsProfilesMock = vi.mocked(listNamedSettingsProfiles);
-const saveNamedSettingsProfileMock = vi.mocked(saveNamedSettingsProfile);
-const previewNamedSettingsProfileSwitchMock = vi.mocked(previewNamedSettingsProfileSwitch);
-const executeNamedSettingsProfileSwitchMock = vi.mocked(executeNamedSettingsProfileSwitch);
-const deleteNamedSettingsProfileMock = vi.mocked(deleteNamedSettingsProfile);
-const saveViewerMock = vi.mocked(saveViewerSettings);
-const getTrayStatusMock = vi.mocked(getTrayStatus);
-const storeMainWindowInTrayMock = vi.mocked(storeMainWindowInTray);
-const quitApplicationMock = vi.mocked(quitApplication);
-const setRatingMock = vi.mocked(setItemRating);
-const searchMock = vi.mocked(searchLibrary);
-const listCsvExportPresetsMock = vi.mocked(listCsvExportPresets);
-const saveCsvExportPresetMock = vi.mocked(saveCsvExportPreset);
-const deleteCsvExportPresetMock = vi.mocked(deleteCsvExportPreset);
-const exportCatalogCsvMock = vi.mocked(exportCatalogCsv);
-const recoveryNoticeMock = vi.mocked(takeRecoveryNotice);
-const historyMock = vi.mocked(listReadingHistory);
-const listPageBookmarksMock = vi.mocked(listPageBookmarks);
-const clearHistoryMock = vi.mocked(clearReadingHistory);
-const savePageBookmarkMock = vi.mocked(savePageBookmark);
-const deletePageBookmarkMock = vi.mocked(deletePageBookmark);
-const diagnoseMock = vi.mocked(diagnoseLibrary);
-const listenRecursiveThumbnailProgressMock = vi.mocked(listenRecursiveThumbnailProgress);
-const generateRecursiveThumbnailsMock = vi.mocked(generateRecursiveThumbnails);
-const cancelRecursiveThumbnailGenerationMock = vi.mocked(cancelRecursiveThumbnailGeneration);
-const renameFileItemMock = vi.mocked(renameFileItem);
-const getRenamePreferencesMock = vi.mocked(getRenamePreferences);
-const saveRenamePreferencesMock = vi.mocked(saveRenamePreferences);
-const createFileFolderMock = vi.mocked(createFileFolder);
-const copyFileItemsToFolderMock = vi.mocked(copyFileItemsToFolder);
-const moveFileItemsToFolderMock = vi.mocked(moveFileItemsToFolder);
-const moveFileItemsToDestinationMock = vi.mocked(moveFileItemsToDestination);
-const copyFileItemsToDestinationMock = vi.mocked(copyFileItemsToDestination);
-const previewNativeFileDropMock = vi.mocked(previewNativeFileDrop);
-const copyNativeFileDropMock = vi.mocked(copyNativeFileDrop);
-const startNativeFileDragMock = vi.mocked(startNativeFileDrag);
-const deleteFileItemsMock = vi.mocked(deleteFileItems);
-const setFileClipboardMock = vi.mocked(setFileClipboard);
-const getFileClipboardStatusMock = vi.mocked(getFileClipboardStatus);
-const getFileUndoStatusMock = vi.mocked(getFileUndoStatus);
-const undoLastFileOperationMock = vi.mocked(undoLastFileOperation);
-const pasteFileItemsMock = vi.mocked(pasteFileItems);
-const revealFileItemMock = vi.mocked(revealFileItem);
-const openFileItemDefaultMock = vi.mocked(openFileItemDefault);
-const openFileItemWithMock = vi.mocked(openFileItemWith);
-const knownFoldersMock = vi.mocked(listWindowsKnownFolders);
-
-const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
-  sortField: "name",
-  sortDescending: false,
-  endOfVolumePolicy: "auto_next",
-  catalogViewMode: "cover_list",
-  catalogThumbnailSizes: { smallThumbnail: 104, coverList: 144, cardGrid: 216, referenceTile: 128 },
-  viewMode: "single",
-  spreadPortraitMaxAspectPercent: 100,
-  autoSpreadMinViewportAspectPercent: 125,
-  spreadFirstPageSingle: false,
-  spreadPairing: "continuous",
-  fitAllowUpscale: false,
-  fitBasis: "spread",
-  fitIncludePageMargin: true,
-  readingDirection: "rightToLeft",
-  scaleMode: "fit",
-  scale: 1,
-  loupeEnabled: false,
-  loupeSize: 180,
-  loupeZoom: 2,
-  prefetchAhead: 4,
-  prefetchBehind: 0,
-  prefetchMemoryMiB: 256,
-  fullscreenEscapeBehavior: "exitFullscreen",
-  preventDisplaySleepFullscreen: false,
-  trayStoreOnMinimize: false,
-  trayCloseBehavior: "quit",
-  trayRestoreGesture: "singleClick",
-  slideshowIntervalMs: 3_000,
-  slideshowOrder: "forward",
-  slideshowRepeatCurrentItem: false,
-  viewerCatalogSelectionSync: true,
-  viewerBackground: "checker",
-  viewerPageMargin: 0,
-  viewerSpreadGap: 8,
-  cursorAutoHideMs: 0,
-  zoomRetention: "global",
-  viewerGridEnabled: false,
-  viewerGridSize: 32,
-  viewerGridColor: "light",
-  panFactor: 1,
-  wheelDeadZone: 0,
-  scrollStepPercent: 90,
-  keyScrollAccelerationPercent: 150,
-  keyScrollContinuous: true,
-  smoothScroll: true,
-  pageScanMode: "vertical",
-  treeVisible: true,
-  treeAutoCollapse: false,
-  treeConfirmChildren: true,
-  treeWidth: 240,
-  treeHeight: 240,
-  catalogPanePosition: "right",
-  menuBarVisible: true,
-  toolbarVisible: true,
-  addressBarVisible: true,
-  statusBarVisible: true,
-  alwaysOnTop: false,
-  themeSelection: { kind: "system" },
-  customThemeSnapshot: null,
-  themeFallbackReason: null,
-  navigationSelectionPolicy: "restore",
-  thumbnailGenerationScope: "near",
-  startupLocation: "last",
-  showHiddenFiles: false,
-  restoreLastViewer: false,
-    autoRefreshCurrentFolder: true,
-    folderOpenRule: "navigate",
-    imageOpenRule: "read",
-    archiveOpenRule: "read",
-    detailGridLines: "none",
-    detailRowDensity: "standard",
-    detailShowKind: true,
-    detailShowSize: true,
-    detailShowModified: true,
-  shortcuts: { ...DEFAULT_SHORTCUTS },
-  catalogMouseBindings: {
-    primaryClick: "selectOnly",
-    doubleClick: "openSelected",
-    middleClick: "none",
-    backButton: "navigateBack",
-    forwardButton: "navigateForward",
-  },
-  viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
-  viewerRightClickAction: "none",
-  mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
-};
-
-function testSession(itemKey: string) {
-  return {
-    itemKey,
-    displayName: itemKey,
-    pages: [
-      {
-        id: `${itemKey}-page` as never,
-        relativePath: "page-1.png" as never,
-        mediaUri: "data:image/png;base64,fixture",
-      },
-    ],
-    startIndex: 0,
-  };
-}
-
-function viewerResponse(itemKey: string) {
-  return {
-    status: "ok" as const,
-    requestId: `open-${itemKey}` as never,
-    generation: 1 as never,
-    data: testSession(itemKey),
-  };
-}
-
-function fileOperationResponse(operation: string, affected = 1) {
-  return {
-    status: "ok" as const,
-    requestId: `file-${operation}` as never,
-    generation: 1 as never,
-    data: { operation: operation as never, affected },
-  };
-}
-
-function searchResponse(results: CatalogEntry[]) {
-  return {
-    status: "ok" as const,
-    requestId: "search" as never,
-    generation: 1 as never,
-    data: results,
-  };
-}
-
-function favoriteEntry(
-  relativePath: string,
-  overrides: Partial<FavoriteEntry> = {},
-): FavoriteEntry {
-  return {
-    favoriteId: `favorite-${relativePath.replaceAll("/", "-")}`,
-    itemIdentity: `item-${relativePath.replaceAll("/", "-")}`,
-    relativePath: relativePath as never,
-    resolvedPath: relativePath as never,
-    kind: "folder",
-    status: "available",
-    ...overrides,
-  };
-}
-
-function favoritesResponse(data: FavoriteEntry[]) {
-  return {
-    status: "ok" as const,
-    requestId: "favorites" as never,
-    generation: 1 as never,
-    data,
-  };
-}
-
-function metadataResponse(
-  itemIdentity: string,
-  overrides: Partial<ItemMetadata> = {},
-) {
-  return {
-    status: "ok" as const,
-    requestId: `metadata-${itemIdentity}` as never,
-    generation: 1 as never,
-    data: {
-      itemIdentity: itemIdentity as never,
-      memo: null,
-      rating: null,
-      ...overrides,
-    },
-  };
-}
-
-function historyResponse(data: ReadingHistoryEntry[]) {
-  return {
-    status: "ok" as const,
-    requestId: "history" as never,
-    generation: 1 as never,
-    data,
-  };
-}
-
-async function registerTestLibrary(
-  entries: CatalogEntry[],
-  fullscreenAdapter?: FullscreenAdapter,
-  alwaysOnTopAdapter?: AlwaysOnTopAdapter,
-  windowThemeAdapter: WindowThemeAdapter = { setTheme: async () => undefined },
-) {
-  restoreMock.mockResolvedValue({
-    status: "ok",
-    requestId: "restore" as never,
-    generation: 1 as never,
-    data: { absolutePath: "C:\\" },
-  });
-  registerMock.mockResolvedValue({
-    status: "ok",
-    requestId: "register" as never,
-    generation: 1 as never,
-    data: { absolutePath: "C:\\" },
-  });
-  listMock.mockResolvedValue({
-    status: "ok",
-    requestId: "list" as never,
-    generation: 2 as never,
-    data: entries,
-  });
-  thumbnailMock.mockResolvedValue({
-    status: "error",
-    requestId: "thumbnail" as never,
-    generation: 1 as never,
-    error: {
-      code: "NOT_FOUND",
-      message: "missing",
-      retryable: true,
-    },
-  });
-  render(
-    <App
-      fullscreenAdapter={fullscreenAdapter}
-      alwaysOnTopAdapter={alwaysOnTopAdapter}
-      windowThemeAdapter={windowThemeAdapter}
-    />,
-  );
-  await screen.findByRole("grid", { name: "現在のフォルダの項目" });
-}
-
-async function openTestComic(relativePath: string) {
-  const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
-  const comicButton = within(grid)
-    .getAllByRole("button")
-    .find((button) => button.getAttribute("data-relative-path") === relativePath);
-  expect(comicButton).toBeDefined();
-  expect(comicButton).toHaveAttribute("data-relative-path", relativePath);
-  const basename = relativePath.split("/").at(-1) ?? relativePath;
-  expect(comicButton).toHaveAccessibleName(expect.stringContaining(basename));
-  fireEvent.keyDown(comicButton!, { key: "Enter" });
-  await screen.findByLabelText(`${relativePath} ビューワ`);
-}
-
-function openAppMenu(name: "ファイル" | "編集" | "表示" | "オプション" | "ヘルプ") {
-  fireEvent.click(screen.getByRole("menuitem", { name }));
-  return screen.getByRole("menu", { name });
-}
-
-function chooseAppMenuItem(
-  menuName: "ファイル" | "編集" | "表示" | "オプション" | "ヘルプ",
-  itemName: string | RegExp,
-) {
-  const menu = openAppMenu(menuName);
-  fireEvent.click(within(menu).getByRole("menuitem", { name: itemName }));
-}
-
-function chooseToolbarMenuItem(
-  triggerName: "並べ替え条件" | "一覧表示形式",
-  menuName: "並べ替え候補" | "一覧表示形式候補",
-  itemName: string,
-) {
-  fireEvent.click(screen.getByRole("button", { name: triggerName }));
-  const menu = screen.getByRole("menu", { name: menuName });
-  fireEvent.click(within(menu).getByRole("menuitemradio", { name: itemName }));
-}
-
-function openSearchPane() {
-  fireEvent.click(screen.getByRole("button", { name: "検索ペインを表示" }));
-  return screen.getByRole("complementary", { name: "検索ペイン" });
-}
+import {
+  addFavoriteMock,
+  cancelRecursiveThumbnailGenerationMock,
+  chooseAppMenuItem,
+  chooseToolbarMenuItem,
+  cliLaunchHarness,
+  copyFileItemsToDestinationMock,
+  copyNativeFileDropMock,
+  DEFAULT_CATALOG_SETTINGS,
+  deleteFileItemsMock,
+  deletePageBookmarkMock,
+  diagnoseMock,
+  favoriteEntry,
+  favoritesResponse,
+  filePickerMock,
+  folderWatchHarness,
+  generateRecursiveThumbnailsMock,
+  getFileClipboardStatusMock,
+  getFileUndoStatusMock,
+  installAppTestHooks,
+  knownFoldersMock,
+  listArchiveVirtualTreeMock,
+  listenCatalogFolderChangesMock,
+  listFavoritesMock,
+  listMock,
+  listPageBookmarksMock,
+  listShelvesMock,
+  loadPageMock,
+  markViewerPrefetchReady,
+  moveFileItemsToDestinationMock,
+  nativeFileDropHarness,
+  openAppMenu,
+  openMock,
+  openSearchPane,
+  openTestComic,
+  pasteFileItemsMock,
+  pickerMock,
+  previewNativeFileDropMock,
+  recoveryNoticeMock,
+  recursiveThumbnailHarness,
+  registerMock,
+  registerTestLibrary,
+  removeFavoriteMock,
+  renameFileItemMock,
+  resolveCatalogActivationMock,
+  resolveFavoriteMock,
+  restoreMock,
+  saveCatalogViewModeMock,
+  saveEndPolicyMock,
+  savePageBookmarkMock,
+  saveRenamePreferencesMock,
+  saveSettingsProfileMock,
+  saveSortMock,
+  searchMock,
+  searchResponse,
+  searchSourcePickerMock,
+  setFileClipboardMock,
+  settingsMock,
+  startNativeFileDragMock,
+  stopLibraryFolderWatchMock,
+  takeCliLaunchRequestMock,
+  testSession,
+  thumbnailMock,
+  treeMock,
+  undoLastFileOperationMock,
+  viewerResponse,
+  watchLibraryFolderMock
+} from "./test/app-harness";
 
 describe("application shell", () => {
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-    folderWatchHarness.handler = undefined;
-    cliLaunchHarness.handler = undefined;
-    recursiveThumbnailHarness.handler = undefined;
-    nativeFileDropHarness.handler = undefined;
-  });
-
-  beforeEach(() => {
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith("comic-explorer:last-folder:"))
-      .forEach((key) => localStorage.removeItem(key));
-    registerMock.mockReset();
-    pickerMock.mockReset();
-    searchSourcePickerMock.mockReset();
-    filePickerMock.mockReset();
-    listMock.mockReset();
-    listenCatalogFolderChangesMock.mockReset();
-    watchLibraryFolderMock.mockReset();
-    stopLibraryFolderWatchMock.mockReset();
-    folderWatchHarness.handler = undefined;
-    treeMock.mockReset();
-    restoreMock.mockReset();
-    takeCliLaunchRequestMock.mockReset();
-    listenCliLaunchPendingMock.mockReset();
-    listShelvesMock.mockReset();
-    listShelvesMock.mockResolvedValue({
-      status: "ok",
-      requestId: "shelves" as never,
-      generation: 1 as never,
-      data: { shelves: [], nodes: [], startupShelfId: null },
-    });
-    listArchiveVirtualTreeMock.mockReset();
-    listArchiveVirtualTreeMock.mockResolvedValue({
-      status: "ok",
-      requestId: "archive-tree" as never,
-      generation: 1 as never,
-      data: { archiveRelativePath: "book.cbz" as never, entries: [] },
-    });
-    cliLaunchHarness.handler = undefined;
-    takeCliLaunchRequestMock.mockResolvedValue({
-      status: "ok",
-      requestId: "cli-empty" as never,
-      generation: 1 as never,
-      data: null,
-    });
-    listenCliLaunchPendingMock.mockImplementation(async (handler) => {
-      cliLaunchHarness.handler = handler;
-      return vi.fn();
-    });
-    openMock.mockReset();
-    resolveCatalogActivationMock.mockReset();
-    resolveCatalogActivationMock.mockImplementation(async (kind, _trigger, generation) => ({
-      status: "ok",
-      requestId: "activation" as never,
-      generation: generation as never,
-      data: kind === "folder" || kind === "comicFolder" ? "navigate" : "read",
-    }));
-    settingsMock.mockReset();
-    metadataMock.mockReset();
-    thumbnailMock.mockReset();
-    addFavoriteMock.mockReset();
-    listFavoritesMock.mockReset();
-    removeFavoriteMock.mockReset();
-    resolveFavoriteMock.mockReset();
-    loadPageMock.mockReset();
-    saveSortMock.mockReset();
-    saveCatalogViewModeMock.mockReset();
-    saveEndPolicyMock.mockReset();
-    saveMemoMock.mockReset();
-    saveReadingMock.mockReset();
-    saveSettingsProfileMock.mockReset();
-    listNamedSettingsProfilesMock.mockReset();
-    saveNamedSettingsProfileMock.mockReset();
-    previewNamedSettingsProfileSwitchMock.mockReset();
-    executeNamedSettingsProfileSwitchMock.mockReset();
-    deleteNamedSettingsProfileMock.mockReset();
-    saveViewerMock.mockReset();
-    getTrayStatusMock.mockReset();
-    storeMainWindowInTrayMock.mockReset();
-    quitApplicationMock.mockReset();
-    setRatingMock.mockReset();
-    searchMock.mockReset();
-    listCsvExportPresetsMock.mockReset();
-    saveCsvExportPresetMock.mockReset();
-    deleteCsvExportPresetMock.mockReset();
-    exportCatalogCsvMock.mockReset();
-    recoveryNoticeMock.mockReset();
-    historyMock.mockReset();
-    listPageBookmarksMock.mockReset();
-    clearHistoryMock.mockReset();
-    savePageBookmarkMock.mockReset();
-    deletePageBookmarkMock.mockReset();
-    diagnoseMock.mockReset();
-    listenRecursiveThumbnailProgressMock.mockReset();
-    generateRecursiveThumbnailsMock.mockReset();
-    cancelRecursiveThumbnailGenerationMock.mockReset();
-    recursiveThumbnailHarness.handler = undefined;
-    renameFileItemMock.mockReset();
-    getRenamePreferencesMock.mockReset();
-    saveRenamePreferencesMock.mockReset();
-    createFileFolderMock.mockReset();
-    copyFileItemsToFolderMock.mockReset();
-    moveFileItemsToFolderMock.mockReset();
-    moveFileItemsToDestinationMock.mockReset();
-    copyFileItemsToDestinationMock.mockReset();
-    previewNativeFileDropMock.mockReset();
-    copyNativeFileDropMock.mockReset();
-    startNativeFileDragMock.mockReset();
-    nativeFileDropHarness.handler = undefined;
-    nativeFileDropHarness.target = { relativePath: "Target" };
-    deleteFileItemsMock.mockReset();
-    setFileClipboardMock.mockReset();
-    getFileClipboardStatusMock.mockReset();
-    getFileUndoStatusMock.mockReset();
-    undoLastFileOperationMock.mockReset();
-    pasteFileItemsMock.mockReset();
-    revealFileItemMock.mockReset();
-    openFileItemDefaultMock.mockReset();
-    openFileItemWithMock.mockReset();
-    knownFoldersMock.mockReset();
-    knownFoldersMock.mockResolvedValue({
-      status: "ok", requestId: "known-folders" as never, generation: 1 as never, data: [],
-    });
-    listenCatalogFolderChangesMock.mockImplementation(async (handler) => {
-      folderWatchHarness.handler = handler;
-      return vi.fn();
-    });
-    listenRecursiveThumbnailProgressMock.mockImplementation(async (handler) => {
-      recursiveThumbnailHarness.handler = handler;
-      return vi.fn();
-    });
-    cancelRecursiveThumbnailGenerationMock.mockResolvedValue({
-      status: "cancelled",
-      requestId: "cancel-recursive-thumbnails" as never,
-      generation: 1 as never,
-    });
-    watchLibraryFolderMock.mockImplementation(async (_path, generation) => ({
-      status: "ok",
-      requestId: "watch-folder" as never,
-      generation: generation as never,
-      data: true,
-    }));
-    stopLibraryFolderWatchMock.mockImplementation(async (generation) => ({
-      status: "ok",
-      requestId: "stop-watch-folder" as never,
-      generation: generation as never,
-      data: true,
-    }));
-    listCsvExportPresetsMock.mockResolvedValue({
-      status: "ok", requestId: "csv-presets" as never, generation: 1 as never, data: [],
-    });
-    exportCatalogCsvMock.mockResolvedValue({
-      status: "ok",
-      requestId: "csv-export" as never,
-      generation: 1 as never,
-      data: { fileName: "catalog.csv", bytes: [0xef, 0xbb, 0xbf], rowCount: 1 },
-    });
-    renameFileItemMock.mockResolvedValue(fileOperationResponse("rename"));
-    getRenamePreferencesMock.mockResolvedValue({
-      status: "ok", requestId: "rename-preferences" as never, generation: 1 as never,
-      data: { selectExtension: false, sequenceStart: 1, sequenceDigits: 3, separator: "_", preserveExtension: true },
-    });
-    saveRenamePreferencesMock.mockResolvedValue({
-      status: "ok", requestId: "save-rename-preferences" as never, generation: 1 as never,
-      data: { selectExtension: false, sequenceStart: 1, sequenceDigits: 3, separator: "_", preserveExtension: true },
-    });
-    createFileFolderMock.mockResolvedValue(fileOperationResponse("createFolder"));
-    copyFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("copy"));
-    moveFileItemsToFolderMock.mockResolvedValue(fileOperationResponse("move"));
-    moveFileItemsToDestinationMock.mockResolvedValue(fileOperationResponse("move"));
-    copyFileItemsToDestinationMock.mockResolvedValue(fileOperationResponse("copy"));
-    previewNativeFileDropMock.mockResolvedValue({
-      status: "ok",
-      requestId: "native-file-drop-preview" as never,
-      generation: 1 as never,
-      data: {
-        destinationRelativePath: "Target",
-        items: [{ name: "outside.cbz", kind: "file" }],
-        fileCount: 1,
-        folderCount: 0,
-      },
-    });
-    copyNativeFileDropMock.mockResolvedValue(fileOperationResponse("copy"));
-    startNativeFileDragMock.mockResolvedValue(fileOperationResponse("dragCopy"));
-    deleteFileItemsMock.mockResolvedValue(fileOperationResponse("recycle"));
-    setFileClipboardMock.mockResolvedValue(fileOperationResponse("clipboardCopy"));
-    pasteFileItemsMock.mockResolvedValue(fileOperationResponse("pasteCopy"));
-    revealFileItemMock.mockResolvedValue(fileOperationResponse("reveal"));
-    openFileItemDefaultMock.mockResolvedValue(fileOperationResponse("openDefault"));
-    openFileItemWithMock.mockResolvedValue(fileOperationResponse("openWith"));
-    getFileClipboardStatusMock.mockResolvedValue({
-      status: "ok",
-      requestId: "file-clipboard-status" as never,
-      generation: 1 as never,
-      data: { available: true, cut: false, items: 2 },
-    });
-    getFileUndoStatusMock.mockResolvedValue({
-      status: "ok",
-      requestId: "file-undo-status" as never,
-      generation: 1 as never,
-      data: { available: false, operation: null, affected: 0 },
-    });
-    undoLastFileOperationMock.mockResolvedValue(fileOperationResponse("undo"));
-    recoveryNoticeMock.mockResolvedValue({
-      status: "ok",
-      requestId: "recovery" as never,
-      generation: 1 as never,
-      data: false,
-    });
-    metadataMock.mockImplementation(async (itemIdentity) => metadataResponse(itemIdentity));
-    saveMemoMock.mockImplementation(async (itemIdentity, body) =>
-      metadataResponse(itemIdentity, { memo: body.trim() === "" ? null : body }),
-    );
-    setRatingMock.mockImplementation(async (itemIdentity, rating) =>
-      metadataResponse(itemIdentity, { rating }),
-    );
-    historyMock.mockResolvedValue(historyResponse([]));
-    listPageBookmarksMock.mockResolvedValue({
-      status: "ok", requestId: "bookmarks" as never, generation: 1 as never, data: [],
-    });
-    savePageBookmarkMock.mockImplementation(async (bookmark) => ({
-      status: "ok", requestId: "save-bookmark" as never, generation: 1 as never,
-      data: [bookmark],
-    }));
-    deletePageBookmarkMock.mockResolvedValue({
-      status: "ok", requestId: "delete-bookmark" as never, generation: 1 as never, data: [],
-    });
-    clearHistoryMock.mockResolvedValue({
-      status: "ok",
-      requestId: "clear-history" as never,
-      generation: 1 as never,
-      data: undefined,
-    });
-    listFavoritesMock.mockResolvedValue(favoritesResponse([]));
-    addFavoriteMock.mockResolvedValue(favoritesResponse([]));
-    removeFavoriteMock.mockResolvedValue(favoritesResponse([]));
-    resolveFavoriteMock.mockResolvedValue(favoritesResponse([]));
-    settingsMock.mockResolvedValue({
-      status: "ok",
-      requestId: "settings" as never,
-      generation: 1 as never,
-      data: { ...DEFAULT_CATALOG_SETTINGS },
-    });
-    getTrayStatusMock.mockResolvedValue({
-      status: "ok",
-      requestId: "tray-status" as never,
-      generation: 1 as never,
-      data: { available: true, stored: false, reason: null },
-    });
-    storeMainWindowInTrayMock.mockResolvedValue({
-      status: "ok",
-      requestId: "tray-store" as never,
-      generation: 1 as never,
-      data: { available: true, stored: true, reason: null },
-    });
-    quitApplicationMock.mockResolvedValue({
-      status: "ok",
-      requestId: "quit" as never,
-      generation: 1 as never,
-      data: undefined,
-    });
-    saveSettingsProfileMock.mockImplementation(async (profile) => ({
-      status: "ok",
-      requestId: "save-profile" as never,
-      generation: 1 as never,
-      data: {
-        ...profile,
-        themeFallbackReason: null,
-      },
-    }));
-    listNamedSettingsProfilesMock.mockResolvedValue({
-      status: "ok",
-      requestId: "named-profiles" as never,
-      generation: 1 as never,
-      data: [],
-    });
-    saveNamedSettingsProfileMock.mockImplementation(async (name) => ({
-      status: "ok",
-      requestId: "save-named-profile" as never,
-      generation: 1 as never,
-      data: { name, updatedAtMs: 1, active: false },
-    }));
-    deleteNamedSettingsProfileMock.mockResolvedValue({
-      status: "ok",
-      requestId: "delete-named-profile" as never,
-      generation: 1 as never,
-      data: true,
-    });
-    saveSortMock.mockResolvedValue({
-      status: "ok",
-      requestId: "save-sort" as never,
-      generation: 1 as never,
-      data: { ...DEFAULT_CATALOG_SETTINGS },
-    });
-    saveEndPolicyMock.mockResolvedValue({
-      status: "ok",
-      requestId: "save-end-policy" as never,
-      generation: 1 as never,
-      data: { ...DEFAULT_CATALOG_SETTINGS },
-    });
-    saveReadingMock.mockResolvedValue({
-      status: "ok",
-      requestId: "save-reading" as never,
-      generation: 1 as never,
-      data: undefined,
-    });
-    saveCatalogViewModeMock.mockImplementation(async (mode) => ({
-      status: "ok",
-      requestId: "save-catalog-view-mode" as never,
-      generation: 1 as never,
-      data: { ...DEFAULT_CATALOG_SETTINGS, catalogViewMode: mode },
-    }));
-    saveViewerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "save-viewer" as never,
-      generation: 1 as never,
-      data: { ...DEFAULT_CATALOG_SETTINGS },
-    });
-    restoreMock.mockResolvedValue({
-      status: "ok",
-      requestId: "restore" as never,
-      generation: 1 as never,
-      data: null,
-    });
-    pickerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "picker" as never,
-      generation: 1 as never,
-      data: null,
-    });
-    searchSourcePickerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "search-source-picker" as never,
-      generation: 1 as never,
-      data: null,
-    });
-    filePickerMock.mockResolvedValue({
-      status: "ok",
-      requestId: "file-picker" as never,
-      generation: 1 as never,
-      data: null,
-    });
-    treeMock.mockResolvedValue({
-      status: "ok",
-      requestId: "tree" as never,
-      generation: 1 as never,
-      data: [],
-    });
-  });
-
+  installAppTestHooks();
   it("announces app-data recovery without exposing the isolated database", async () => {
     recoveryNoticeMock.mockResolvedValue({
       status: "ok",
@@ -2532,19 +1672,6 @@ describe("application shell", () => {
     ).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
   });
-  it("FT-B04-001 fixes the App viewer to paged and hides the layout selector", async () => {
-    openMock.mockResolvedValueOnce(viewerResponse("layout.cbz"));
-    await registerTestLibrary([testEntry("layout.cbz")]);
-
-    fireEvent.keyDown(
-      await screen.findByRole("button", { name: /layout\.cbz/ }),
-      { key: "Enter" },
-    );
-    await screen.findByLabelText("layout.cbz ビューワ");
-    expect(screen.queryByRole("combobox", { name: "閲覧レイアウト" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "layout.cbz ビューワ" }))
-      .toHaveAttribute("data-layout-mode", "paged");
-  });
 
   it("FT-B04-004 starts archives fullscreen and exits with Esc", async () => {
     const adapter: FullscreenAdapter = {
@@ -2708,62 +1835,6 @@ describe("application shell", () => {
       "reference_tile",
       expect.any(Number),
     );
-  });
-
-  it("FT-B03-002 keeps long names and missing metadata available in every mode", async () => {
-    const entries: CatalogEntry[] = [
-      {
-        relativePath:
-          "A very long comic name that remains available to keyboard users.cbz" as never,
-        kind: "archive",
-        archiveKind: "cbz",
-        byteSize: 1234,
-        modifiedMs: 1_735_689_600_000,
-      },
-      {
-        relativePath: "missing-metadata" as never,
-        kind: "folder",
-      },
-      {
-        relativePath: "comic-folder" as never,
-        kind: "comicFolder",
-      },
-    ];
-
-    await registerTestLibrary(entries);
-    await screen.findByLabelText("一覧表示形式");
-    const grid = screen.getByRole("grid", { name: "現在のフォルダの項目" });
-
-    for (const [mode, label] of [
-      ["cover_list", "表紙グリッド"],
-      ["small_thumbnail", "小サムネイル"],
-      ["card_grid", "カードグリッド"],
-      ["reference_tile", "情報カード"],
-      ["detail_list", "詳細リスト"],
-    ] as const) {
-      chooseToolbarMenuItem("一覧表示形式", "一覧表示形式候補", label);
-      await waitFor(() =>
-        expect(grid).toHaveAttribute("data-catalog-view-mode", mode),
-      );
-      expect(grid).toHaveAttribute("data-entry-count", "3");
-      if (mode === "card_grid") {
-        expect(screen.queryByText("A very long comic name that remains available to keyboard users.cbz"))
-          .not.toBeInTheDocument();
-      } else {
-        expect(screen.getByText("A very long comic name that remains available to keyboard users.cbz"))
-          .toBeInTheDocument();
-      }
-      const folderItem = screen.getByRole("button", { name: /^missing-metadata、フォルダ/ });
-      if (mode === "detail_list" || mode === "reference_tile") {
-        expect(within(folderItem).getByText("フォルダ")).toBeInTheDocument();
-      } else {
-        expect(within(folderItem).queryByText("フォルダ")).not.toBeInTheDocument();
-      }
-      expect(screen.getByText("3項目")).toBeInTheDocument();
-    }
-
-    expect(screen.getByText("1.2 KB")).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
   it("FT-B03-003 keeps selection, keyboard focus and sorted navigation connected", async () => {

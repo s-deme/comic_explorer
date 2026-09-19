@@ -426,6 +426,7 @@ export function ViewerWindow() {
         pageScanMode={settings.pageScanMode}
         shortcuts={settings.shortcuts}
         initialFullscreen={launch.launchMode === "fullscreen"}
+        preserveWindowStateOnUnmount
         fullscreenEscapeBehavior={settings.fullscreenEscapeBehavior}
         preventDisplaySleepFullscreen={settings.preventDisplaySleepFullscreen}
         initialSlideshow={launch.launchMode === "slideshow"}

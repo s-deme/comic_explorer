@@ -1916,19 +1916,22 @@ try {
         return
     }
     if ($TagsOnly) {
+        $tagItemPathJson = ((Join-Path $library "comic-folder").Substring(
+            [IO.Path]::GetPathRoot($library).Length
+        ).Replace("\", "/")) | ConvertTo-Json -Compress
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
-            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            ".find((node) => node.dataset.relativePath === $tagItemPathJson); " +
             "if (!item) return false; item.click(); return true; })()"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('.catalog-item[data-selected=true]')?.dataset.relativePath === " +
-            "'comic-folder'"
+            "$tagItemPathJson"
         ) "tag item selection"
         Invoke-Evaluate (
-            "document.querySelector('[aria-controls=library-menu]')?.click(); true"
+            "document.querySelector('[aria-controls=options-menu]')?.click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('#library-menu') !== null" "tag library menu"
+        Wait-Evaluate "document.querySelector('#options-menu') !== null" "tag options menu"
         Invoke-Evaluate (
             "(() => { const action = document.querySelector(" +
             "'[data-product-id=tag-manager-menu-item]'); if (!action) return false; " +
@@ -2031,17 +2034,17 @@ try {
         ) "tag restart catalog"
         Invoke-Evaluate (
             "(() => { const item = [...document.querySelectorAll('.catalog-item')]" +
-            ".find((node) => node.dataset.relativePath === 'comic-folder'); " +
+            ".find((node) => node.dataset.relativePath === $tagItemPathJson); " +
             "if (!item) return false; item.click(); return true; })()"
         ) | Out-Null
         Wait-Evaluate (
             "document.querySelector('.catalog-item[data-selected=true]')?.dataset.relativePath === " +
-            "'comic-folder'"
+            "$tagItemPathJson"
         ) "tag restart item selection"
         Invoke-Evaluate (
-            "document.querySelector('[aria-controls=library-menu]')?.click(); true"
+            "document.querySelector('[aria-controls=options-menu]')?.click(); true"
         ) | Out-Null
-        Wait-Evaluate "document.querySelector('#library-menu') !== null" "tag restart library menu"
+        Wait-Evaluate "document.querySelector('#options-menu') !== null" "tag restart options menu"
         Invoke-Evaluate (
             "(() => { const action = document.querySelector(" +
             "'[data-product-id=tag-manager-menu-item]'); if (!action) return false; " +

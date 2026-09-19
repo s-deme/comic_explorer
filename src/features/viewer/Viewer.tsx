@@ -1,88 +1,11 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
-  copyViewerPageToClipboard,
-  loadPage,
-  resolveViewerRectangleZoom,
-  saveReadingPosition,
-  type ViewerSession,
-} from "../library/client";
+  END_OF_VOLUME_POLICY_LABELS,
+  normalizeEndOfVolumePolicy,
+  type EndOfVolumePolicy,
+} from "../catalog/end-of-volume";
 import { presentError, presentUnexpectedError } from "../errors/presentation";
-import { PagePreviewDialog } from "./PagePreviewDialog";
-import { PageCollection } from "./PageCollection";
-import {
-  clampLoupePointer,
-  clampLoupeCenter,
-  autoSpreadForViewport,
-  createViewerScaleState,
-  DEFAULT_VIEWER_BACKGROUND,
-  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
-  DEFAULT_VIEWER_PAGE_MARGIN,
-  DEFAULT_VIEWER_SPREAD_GAP,
-  DEFAULT_SPREAD_RULES,
-  DEFAULT_FIT_RULES,
-  DEFAULT_PAN_FACTOR,
-  DEFAULT_VIEWER_GRID_COLOR,
-  DEFAULT_VIEWER_GRID_SIZE,
-  DEFAULT_WHEEL_DEAD_ZONE,
-  DEFAULT_SCROLL_STEP_PERCENT,
-  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
-  DEFAULT_KEY_SCROLL_CONTINUOUS,
-  DEFAULT_SMOOTH_SCROLL,
-  DEFAULT_PAGE_SCAN_MODE,
-  DEFAULT_ZOOM_RETENTION,
-  DEFAULT_LOUPE_SIZE,
-  DEFAULT_LOUPE_ZOOM,
-  DEFAULT_PREFETCH_AHEAD,
-  DEFAULT_PREFETCH_BEHIND,
-  normalizeViewerBackground,
-  normalizeViewerCursorAutoHideMs,
-  normalizeViewerSpacing,
-  normalizeViewerGridColor,
-  normalizeZoomRetention,
-  randomPageIndex,
-  isPanFactor,
-  isViewerGridSize,
-  isWheelDeadZone,
-  isScrollStepPercent,
-  isKeyScrollAccelerationPercent,
-  keyboardScrollTarget,
-  isPagePairable,
-  type KeyboardScrollArrow,
-  isLoupeSize,
-  isLoupeZoom,
-  isPrefetchPageCount,
-  prefetchWindowIndices,
-  fitScaleForPages,
-  pageScanTarget,
-  PAGE_SCAN_MODES,
-  scaleForPixelDimension,
-  scaleReducer,
-  viewerReducer,
-  visibleIndices,
-  VIEW_MODE_LABELS,
-  VIEW_MODES,
-  type ReadingDirection,
-  type ScaleMode,
-  type ViewerScaleAction,
-  type ViewerScaleState,
-  type ViewerBackground,
-  type ViewerGridColor,
-  type ViewMode,
-  type SpreadRules,
-  type FitRules,
-  type PageScanMode,
-  type ZoomRetention,
-} from "./model";
-import {
-  tauriFullscreenAdapter,
-  type FullscreenAdapter,
-} from "./fullscreen";
-import {
-  applyWindowTitle,
-  tauriWindowTitleAdapter,
-  type WindowTitleAdapter,
-} from "../workspace/window";
 import {
   customShortcutCommand,
   fallbackShortcutCommand,
@@ -99,6 +22,13 @@ import {
   type ViewerQuadrantBindings,
   type ViewerRightClickAction,
 } from "../input/viewer-quadrants";
+import {
+  copyViewerPageToClipboard,
+  loadPage,
+  resolveViewerRectangleZoom,
+  saveReadingPosition,
+  type ViewerSession,
+} from "../library/client";
 import { resolveBookmarks, type PageBookmark } from "../reading/collections";
 import {
   normalizeMouseGestures,
@@ -107,18 +37,17 @@ import {
   type MouseGestureBindings,
 } from "../settings/profile";
 import {
-  END_OF_VOLUME_POLICY_LABELS,
-  normalizeEndOfVolumePolicy,
-  type EndOfVolumePolicy,
-} from "../catalog/end-of-volume";
+  applyWindowTitle,
+  tauriWindowTitleAdapter,
+  type WindowTitleAdapter,
+} from "../workspace/window";
+import { FilterDialog } from "./FilterDialog";
+import { PageCollection } from "./PageCollection";
+import { PagePreviewDialog } from "./PagePreviewDialog";
 import {
-  createRandomSlideshowQueue,
-  DEFAULT_SLIDESHOW_INTERVAL_MS,
-  DEFAULT_SLIDESHOW_ORDER,
-  isSlideshowIntervalMs,
-  isSlideshowOrder,
-  type SlideshowOrder,
-} from "./slideshow";
+  tauriFullscreenAdapter,
+  type FullscreenAdapter,
+} from "./fullscreen";
 import {
   applyViewerImageTransform,
   IDENTITY_IMAGE_TRANSFORM,
@@ -128,7 +57,79 @@ import {
   type ImageTransformAction,
   type ViewerImageTransform,
 } from "./image-transform";
-import { FilterDialog } from "./FilterDialog";
+import {
+  autoSpreadForViewport,
+  clampLoupeCenter,
+  clampLoupePointer,
+  createViewerScaleState,
+  DEFAULT_FIT_RULES,
+  DEFAULT_KEY_SCROLL_ACCELERATION_PERCENT,
+  DEFAULT_KEY_SCROLL_CONTINUOUS,
+  DEFAULT_LOUPE_SIZE,
+  DEFAULT_LOUPE_ZOOM,
+  DEFAULT_PAGE_SCAN_MODE,
+  DEFAULT_PAN_FACTOR,
+  DEFAULT_PREFETCH_AHEAD,
+  DEFAULT_PREFETCH_BEHIND,
+  DEFAULT_SCROLL_STEP_PERCENT,
+  DEFAULT_SMOOTH_SCROLL,
+  DEFAULT_SPREAD_RULES,
+  DEFAULT_VIEWER_BACKGROUND,
+  DEFAULT_VIEWER_CURSOR_AUTO_HIDE_MS,
+  DEFAULT_VIEWER_GRID_COLOR,
+  DEFAULT_VIEWER_GRID_SIZE,
+  DEFAULT_VIEWER_PAGE_MARGIN,
+  DEFAULT_VIEWER_SPREAD_GAP,
+  DEFAULT_WHEEL_DEAD_ZONE,
+  DEFAULT_ZOOM_RETENTION,
+  fitScaleForPages,
+  isKeyScrollAccelerationPercent,
+  isLoupeSize,
+  isLoupeZoom,
+  isPagePairable,
+  isPanFactor,
+  isPrefetchPageCount,
+  isScrollStepPercent,
+  isViewerGridSize,
+  isWheelDeadZone,
+  keyboardScrollTarget,
+  normalizeViewerBackground,
+  normalizeViewerCursorAutoHideMs,
+  normalizeViewerGridColor,
+  normalizeViewerSpacing,
+  normalizeZoomRetention,
+  PAGE_SCAN_MODES,
+  pageScanTarget,
+  prefetchWindowIndices,
+  randomPageIndex,
+  scaleForPixelDimension,
+  scaleReducer,
+  VIEW_MODE_LABELS,
+  VIEW_MODES,
+  viewerReducer,
+  visibleIndices,
+  type FitRules,
+  type KeyboardScrollArrow,
+  type PageScanMode,
+  type ReadingDirection,
+  type ScaleMode,
+  type SpreadRules,
+  type ViewerBackground,
+  type ViewerGridColor,
+  type ViewerScaleAction,
+  type ViewerScaleState,
+  type ViewMode,
+  type ZoomRetention,
+} from "./model";
+import {
+  createRandomSlideshowQueue,
+  DEFAULT_SLIDESHOW_INTERVAL_MS,
+  DEFAULT_SLIDESHOW_ORDER,
+  isSlideshowIntervalMs,
+  isSlideshowOrder,
+  type SlideshowOrder,
+} from "./slideshow";
+import { useViewerFullscreen } from "./useViewerFullscreen";
 
 const FULLSCREEN_EDGE_REVEAL_HEIGHT = 32;
 
@@ -172,6 +173,7 @@ interface ViewerProps {
   fullscreenAdapter?: FullscreenAdapter;
   windowTitleAdapter?: WindowTitleAdapter;
   initialFullscreen?: boolean;
+  preserveWindowStateOnUnmount?: boolean;
   fullscreenEscapeBehavior?: FullscreenEscapeBehavior;
   preventDisplaySleepFullscreen?: boolean;
   initialSlideshow?: boolean;
@@ -266,6 +268,7 @@ export function Viewer({
   fullscreenAdapter = tauriFullscreenAdapter,
   windowTitleAdapter = tauriWindowTitleAdapter,
   initialFullscreen = false,
+  preserveWindowStateOnUnmount = false,
   fullscreenEscapeBehavior = "exitFullscreen",
   preventDisplaySleepFullscreen = false,
   initialSlideshow,
@@ -361,10 +364,11 @@ export function Viewer({
     width: window.innerWidth,
     height: window.innerHeight,
   }));
-  const [fullscreen, setFullscreen] = useState(false);
+  const { fullscreen, fullscreenError, requestFullscreen: changeFullscreen } = useViewerFullscreen({
+    fullscreenAdapter, initialFullscreen, preventDisplaySleepFullscreen, preserveWindowStateOnUnmount,
+  });
   const [fullscreenToolbarVisible, setFullscreenToolbarVisible] = useState(true);
   const [fullscreenPageNavigatorVisible, setFullscreenPageNavigatorVisible] = useState(true);
-  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
   const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
   const [clipboardCopying, setClipboardCopying] = useState(false);
   const [imageTransformNotice, setImageTransformNotice] = useState<string | null>(null);
@@ -425,10 +429,6 @@ export function Viewer({
   const [cursorHidden, setCursorHidden] = useState(false);
   const cursorInsideStageRef = useRef(false);
   const cursorHideTimerRef = useRef<number | null>(null);
-  const initialFullscreenRequested = useRef(false);
-  const displayAwakeHeldRef = useRef(false);
-  const fullscreenRef = useRef(false);
-  const lifecycleMountedRef = useRef(true);
   const randomSlideshowQueueRef = useRef<number[]>([]);
   const clipboardRequestRef = useRef(0);
 
@@ -892,61 +892,12 @@ export function Viewer({
   }, [autoSpread, effectiveLandscape, imageErrors, nextStartIndex, nextVisible, pendingNextIndex, readyPages, session.pages.length, spreadRules]);
 
   async function requestFullscreen(next: boolean): Promise<boolean> {
-    setFullscreenError(null);
-    try {
-      if (next) {
-        await fullscreenAdapter.enter();
-        if (!lifecycleMountedRef.current) {
-          await fullscreenAdapter.exit().catch(() => undefined);
-          return false;
-        }
-        if (preventDisplaySleepFullscreen) {
-          try {
-            if (fullscreenAdapter.setDisplayAwake === undefined) {
-              throw new Error("display awake control unavailable");
-            }
-            await fullscreenAdapter.setDisplayAwake(true);
-            displayAwakeHeldRef.current = true;
-            if (!lifecycleMountedRef.current) {
-              await fullscreenAdapter.setDisplayAwake(false).catch(() => undefined);
-              displayAwakeHeldRef.current = false;
-              await fullscreenAdapter.exit().catch(() => undefined);
-              return false;
-            }
-          } catch (error) {
-            await fullscreenAdapter.exit().catch(() => undefined);
-            throw error;
-          }
-        }
-      } else {
-        const hadDisplayRequest = displayAwakeHeldRef.current;
-        if (hadDisplayRequest) {
-          await fullscreenAdapter.setDisplayAwake?.(false);
-          displayAwakeHeldRef.current = false;
-        }
-        try {
-          await fullscreenAdapter.exit();
-        } catch (error) {
-          if (hadDisplayRequest) {
-            await fullscreenAdapter.setDisplayAwake?.(true);
-            displayAwakeHeldRef.current = true;
-          }
-          throw error;
-        }
-      }
+    const changed = await changeFullscreen(next);
+    if (changed) {
       if (next) fullscreenButtonRef.current?.blur();
-      setFullscreenToolbarVisible(!next);
-      setFullscreenPageNavigatorVisible(!next);
-      fullscreenRef.current = next;
-      setFullscreen(next);
-      if (!next) requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
-      return true;
-    } catch {
-      if (lifecycleMountedRef.current) {
-        setFullscreenError("全画面表示を切り替えられません。もう一度お試しください。");
-      }
-      return false;
+      else requestAnimationFrame(() => fullscreenButtonRef.current?.focus());
     }
+    return changed;
   }
 
   async function close() {
@@ -1193,45 +1144,9 @@ export function Viewer({
   }, [session.displayName, session.itemKey, windowTitleAdapter]);
 
   useEffect(() => {
-    let mounted = true;
-    lifecycleMountedRef.current = true;
-    void fullscreenAdapter
-      .isFullscreen()
-      .then((current) => {
-        if (mounted) {
-          fullscreenRef.current = current;
-          setFullscreen(current);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      mounted = false;
-      lifecycleMountedRef.current = false;
-      void (async () => {
-        if (displayAwakeHeldRef.current) {
-          displayAwakeHeldRef.current = false;
-          if (fullscreenAdapter.setDisplayAwake !== undefined) {
-            await fullscreenAdapter.setDisplayAwake(false).catch(() => undefined);
-          }
-        }
-        if (fullscreenRef.current) {
-          fullscreenRef.current = false;
-          await fullscreenAdapter.exit().catch(() => undefined);
-        }
-      })();
-    };
-  }, [fullscreenAdapter, preventDisplaySleepFullscreen]);
-
-  useEffect(() => {
     setFullscreenToolbarVisible(!fullscreen);
     setFullscreenPageNavigatorVisible(!fullscreen);
   }, [fullscreen]);
-
-  useEffect(() => {
-    if (!initialFullscreen || initialFullscreenRequested.current) return;
-    initialFullscreenRequested.current = true;
-    void requestFullscreen(true);
-  }, [initialFullscreen]);
 
   useEffect(() => {
     setSlideshowRunning(

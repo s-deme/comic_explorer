@@ -2,15 +2,6 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-
-function openTagsMenuItem() {
-  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
-  fireEvent.click(
-    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
-      name: "タグ管理",
-    }),
-  );
-}
 import {
   addFavorite,
   assignTag,
@@ -47,6 +38,15 @@ import {
   type TagEntry,
 } from "./features/library/client";
 import type { CatalogEntry } from "./types/domain";
+
+function openTagsMenuItem() {
+  fireEvent.click(screen.getByRole("menuitem", { name: "オプション" }));
+  fireEvent.click(
+    within(screen.getByRole("menu", { name: "オプション" })).getByRole("menuitem", {
+      name: "タグ管理",
+    }),
+  );
+}
 
 vi.mock("./features/library/client", () => ({
   addFavorite: vi.fn(),
@@ -88,6 +88,8 @@ vi.mock("./features/library/client", () => ({
   renameTag: vi.fn(),
   resolveFavorite: vi.fn(),
   restoreLibraryRoot: vi.fn(),
+  restoreLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
+  saveLastFolder: vi.fn(async () => ({ status: "ok", data: null })),
   takeCliLaunchRequest: vi.fn(async () => ({ status: "ok", data: null })),
   listenCliLaunchPending: vi.fn(async () => () => undefined),
   listShelves: vi.fn(async () => ({ status: "ok", data: { shelves: [], nodes: [], startupShelfId: null } })),
@@ -175,7 +177,8 @@ async function registerTestLibrary(entries: CatalogEntry[]) {
   listFolderMock.mockResolvedValue(response(entries, "list") as never);
   await Promise.resolve();
   render(<App />);
-  await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  const grid = await screen.findByRole("grid", { name: "現在のフォルダの項目" });
+  await waitFor(() => expect(grid).toHaveAttribute("data-entry-count", String(entries.length)));
 }
 
 async function openTagsForSelectedItem() {

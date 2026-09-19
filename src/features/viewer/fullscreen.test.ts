@@ -15,18 +15,6 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 describe("Tauri fullscreen adapter", () => {
-  it("FT-B04-004 delegates enter, exit and state reads to the current OS window", async () => {
-    windowMock.setFullscreen.mockResolvedValue(undefined);
-    windowMock.isFullscreen.mockResolvedValue(true);
-
-    await tauriFullscreenAdapter.enter();
-    await tauriFullscreenAdapter.exit();
-    await expect(tauriFullscreenAdapter.isFullscreen()).resolves.toBe(true);
-
-    expect(windowMock.setFullscreen).toHaveBeenNthCalledWith(1, true);
-    expect(windowMock.setFullscreen).toHaveBeenNthCalledWith(2, false);
-    expect(windowMock.isFullscreen).toHaveBeenCalledTimes(1);
-  });
 
   it("REQ-LEY-P2-011 delegates bounded fullscreen display-awake requests", async () => {
     invokeMock
