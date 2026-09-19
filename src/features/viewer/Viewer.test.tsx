@@ -328,7 +328,7 @@ describe("Viewer settings", () => {
       .closest("section");
     expect(navigationGroup).not.toBeNull();
     expect(within(navigationGroup!).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual(["読み方向"]);
+      .toEqual(["読み方向", "見開きを1ページ戻す", "見開きを1ページ進める", "ランダムページ", "スライドショーを開始"]);
     const pageActions = within(screen.getByRole("navigation", { name: "ページ移動" }))
       .getByRole("group", { name: "ページ操作" });
     expect(within(pageActions).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
