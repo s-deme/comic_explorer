@@ -915,6 +915,8 @@ export function SettingsDialog({
                   {Object.entries(VIEW_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </SettingRow>
+              <details className="settings-advanced" open={isSearching ? true : undefined}>
+                <summary>見開きの詳細設定</summary>
               <SettingRow id="spread-portrait-ratio" title="縦長ページ判定" description="幅÷高さがこの値以下のページだけを見開き候補にします。" hidden={rowHidden("spread-portrait-ratio")}>
                 <div className="settings-number-control">
                   <input
@@ -964,6 +966,7 @@ export function SettingsDialog({
                   {SPREAD_PAIRINGS.map((pairing) => <option key={pairing} value={pairing}>{SPREAD_PAIRING_LABELS[pairing]}</option>)}
                 </select>
               </SettingRow>
+              </details>
               <h3 className="settings-subheading" hidden={groupHidden(["end-of-volume", "slideshow-settings", "viewer-catalog-selection-sync", "reading-direction"])}>読み進め方</h3>
               <SettingRow id="end-of-volume" title="巻末動作" description="最後のページから先へ進んだときの動作です。" hidden={rowHidden("end-of-volume")}>
                 <select aria-label="profile巻末動作" value={draft.endOfVolumePolicy} onChange={(event) => update({ endOfVolumePolicy: normalizeEndOfVolumePolicy(event.target.value) })}>
@@ -1047,6 +1050,8 @@ export function SettingsDialog({
                   </label>
                 </div>
               </SettingRow>
+              <details className="settings-advanced settings-advanced--compact" open={isSearching ? true : undefined}>
+                <summary>性能の詳細設定</summary>
               <SettingRow id="viewer-prefetch" title="先読み" description="現在位置の前後に保持するページ数と圧縮済みmediaの上限を指定します。" hidden={rowHidden("viewer-prefetch")}>
                 <div className="settings-inline-actions">
                   <label className="settings-number-control">
@@ -1066,6 +1071,7 @@ export function SettingsDialog({
                   </label>
                 </div>
               </SettingRow>
+              </details>
               <SettingRow id="viewer-fullscreen-lifecycle" title="全画面の終了と画面消灯" description="Escの動作と、全画面中だけスクリーンセーバー・画面消灯を抑止するかを指定します。" hidden={rowHidden("viewer-fullscreen-lifecycle")}>
                 <div className="settings-inline-actions">
                   <select
@@ -1163,6 +1169,8 @@ export function SettingsDialog({
                   {Object.entries(SCALE_MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </SettingRow>
+              <details className="settings-advanced" open={isSearching ? true : undefined}>
+                <summary>フィットの詳細設定</summary>
               <SettingRow id="fit-upscale" title="小画像のフィット拡大" description="全体フィット時に100%未満の小画像を表示領域まで拡大します。" hidden={rowHidden("fit-upscale")}>
                 <label className="settings-switch">
                   <input type="checkbox" aria-label="profile小画像のフィット拡大" checked={draft.fitAllowUpscale} onChange={(event) => update({ fitAllowUpscale: event.target.checked })} />
@@ -1180,6 +1188,7 @@ export function SettingsDialog({
                   <span>{draft.fitIncludePageMargin ? "含める" : "含めない"}</span>
                 </label>
               </SettingRow>
+              </details>
               <SettingRow id="custom-scale" title="任意倍率" description="任意倍率を1%から800%の範囲で指定します。" hidden={rowHidden("custom-scale")}>
                 <div className="settings-number-control">
                   <input
@@ -1197,6 +1206,8 @@ export function SettingsDialog({
                   <span>%</span>
                 </div>
               </SettingRow>
+              <details className="settings-advanced" open={isSearching ? true : undefined}>
+                <summary>表示補助の詳細設定</summary>
               <SettingRow id="zoom-retention" title="倍率の保持" description="倍率を全作品、現在の作品、現在のページのどこまで保持するか選びます。" hidden={rowHidden("zoom-retention")}>
                 <select
                   aria-label="profile倍率の保持"
@@ -1248,6 +1259,7 @@ export function SettingsDialog({
                   </select>
                 </div>
               </SettingRow>
+              </details>
             </section>
 
             <section className="settings-panel" aria-label="画面設定" hidden={panelHidden("interface")}>

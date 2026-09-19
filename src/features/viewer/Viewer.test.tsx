@@ -135,7 +135,7 @@ describe("Viewer settings", () => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
     const onClose = vi.fn();
     render(<Viewer session={multiPageSession} generation={1} onClose={onClose} onSettingsChange={vi.fn()} initialMode="single" initialDirection="rightToLeft" />);
-    fireEvent.click(screen.getByRole("button", { name: "プレビュー" }));
+    fireEvent.click(screen.getByRole("button", { name: "ページ一覧" }));
     fireEvent.change(screen.getByLabelText("プレビューページ"), { target: { value: "2" } });
     fireEvent.keyDown(window, { key: "PageDown" });
     fireEvent.keyDown(window, { key: "Escape" });
@@ -299,11 +299,11 @@ describe("Viewer settings", () => {
       expect(button.getAttribute("title")).not.toBe("");
     });
     expect(within(toolbar!).getAllByRole("group").map((group) => group.getAttribute("aria-label")))
-      .toEqual(["表示枚数", "倍率", "ルーペとしおりと補助操作", "ウィンドウ操作"]);
-    expect(within(within(toolbar!).getByRole("group", { name: "ルーペとしおりと補助操作" }))
+      .toEqual(["表示枚数", "倍率", "しおりと補助操作", "ウィンドウ操作"]);
+    expect(within(within(toolbar!).getByRole("group", { name: "しおりと補助操作" }))
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")))
-      .toEqual(["ルーペ", "しおりを保存", "その他の操作"]);
+      .toEqual(["しおりを保存", "その他の操作"]);
     expect(toolbar?.querySelector(".viewer-toolbar-identity"))
       .toContainElement(within(toolbar!).getByRole("button", { name: "一覧へ戻る" }));
     expect(toolbar?.querySelector(".viewer-toolbar-identity strong")).not.toBeInTheDocument();
@@ -332,14 +332,11 @@ describe("Viewer settings", () => {
     const pageActions = within(screen.getByRole("navigation", { name: "ページ移動" }))
       .getByRole("group", { name: "ページ操作" });
     expect(within(pageActions).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
-      .toEqual([
-        "見開きを1ページ戻す",
-        "前ページ",
-        "次ページ",
-        "見開きを1ページ進める",
-        "ランダムページ",
-        "スライドショーを開始",
-      ]);
+      .toEqual(["前ページ", "次ページ"]);
+    expect(within(panel).getByRole("button", { name: "見開きを1ページ戻す" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "見開きを1ページ進める" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "ランダムページ" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "スライドショーを開始" })).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button", { name: "閉じる" }));
     expect(viewer).toHaveAttribute("data-toolbar-more-open", "false");
     const close = within(toolbar!).getByRole("button", { name: "一覧へ戻る" });
@@ -639,7 +636,7 @@ describe("Viewer settings", () => {
     const actions = within(navigator).getByRole("group", { name: "ページ操作" });
     expect(within(actions).getByRole("button", { name: "前ページ" })).toBeInTheDocument();
     expect(within(actions).getByRole("button", { name: "次ページ" })).toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: "スライドショーを開始" }))
+    expect(screen.getByRole("button", { name: "スライドショーを開始" }))
       .toBeInTheDocument();
     expect(toolbar?.querySelector(".viewer-toolbar-previous")).toBeNull();
     expect(toolbar?.querySelector(".viewer-toolbar-next")).toBeNull();
