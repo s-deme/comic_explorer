@@ -3021,3 +3021,40 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .page-collection-reader img { display: block; width: 100%; height: auto; }
 .page-collection-reader .page-collection-page { min-height: 160px; }
 .page-collection-caption { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Reader chrome refresh: keep the image dominant and move secondary controls out of the persistent bars. */
+.viewer-toolbar {
+  padding: 4px 7px;
+}
+.viewer-toolbar-group--utility {
+  margin-left: auto;
+}
+.viewer-toolbar-group--window {
+  margin-left: 4px;
+  padding-left: 6px;
+}
+.viewer-icon-button {
+  border-color: transparent;
+  background: transparent;
+}
+.viewer-icon-button:hover,
+.viewer-icon-button:focus-visible,
+.viewer-icon-button[aria-pressed="true"] {
+  border-color: var(--theme-border);
+  background: var(--theme-surface-raised);
+}
+.viewer-page-navigator {
+  gap: 8px;
+  padding: 5px 10px;
+}
+.viewer-page-browser {
+  flex: 0 0 auto;
+}
+.viewer-page-actions {
+  gap: 2px;
+}
+.viewer-more-action--slideshow[aria-pressed="true"] {
+  color: var(--theme-on-accent);
+  border-color: var(--theme-accent);
+  background: var(--theme-accent);
+}

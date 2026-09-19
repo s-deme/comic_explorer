@@ -1617,17 +1617,7 @@ export function Viewer({
               <span aria-hidden="true">＋</span>
             </button>
           </div>
-          <div className="viewer-toolbar-group viewer-toolbar-group--utility" role="group" aria-label="ルーペとしおりと補助操作">
-            <button
-              className="viewer-icon-button viewer-toolbar-loupe"
-              type="button"
-              aria-label="ルーペ"
-              title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
-              aria-pressed={scale.loupeEnabled}
-              onClick={() => { setContinuous(false); applyScale({ type: "loupe", enabled: !scale.loupeEnabled }); }}
-            >
-              <span aria-hidden="true">⌕</span>
-            </button>
+          <div className="viewer-toolbar-group viewer-toolbar-group--utility" role="group" aria-label="しおりと補助操作">
             <button
               className="viewer-icon-button viewer-toolbar-bookmark"
               type="button"
@@ -1768,6 +1758,16 @@ export function Viewer({
             <div className="viewer-more-actions">
               <button
                 className="viewer-more-action"
+                type="button"
+                aria-label="ルーペ"
+                title={scale.loupeEnabled ? "ルーペを無効にする" : "ルーペを有効にする"}
+                aria-pressed={scale.loupeEnabled}
+                onClick={() => { setContinuous(false); applyScale({ type: "loupe", enabled: !scale.loupeEnabled }); }}
+              >
+                <span aria-hidden="true">⌕</span><span>ルーペ</span>
+              </button>
+              <button
+                className="viewer-more-action"
                 aria-label="矩形ズーム"
                 title={rectangleZoomArmed
                   ? "矩形ズームを解除"
@@ -1811,6 +1811,50 @@ export function Viewer({
                 onClick={toggleDirection}
               >
                 <span aria-hidden="true">⇄</span><span>{state.direction === "rightToLeft" ? "左開きへ" : "右開きへ"}</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="見開きを1ページ戻す"
+                title="見開きの開始位置を1ページ戻す"
+                disabled={state.mode !== "spread" || state.index === 0}
+                onClick={() => shiftOnePage(-1)}
+              >
+                <span aria-hidden="true">1◀</span><span>見開きを1ページ戻す</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="見開きを1ページ進める"
+                title="見開きの開始位置を1ページ進める"
+                disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
+                onClick={() => shiftOnePage(1)}
+              >
+                <span aria-hidden="true">▶1</span><span>見開きを1ページ進める</span>
+              </button>
+              <button
+                className="viewer-more-action"
+                type="button"
+                aria-label="ランダムページ"
+                title="現在以外のページへランダム移動"
+                disabled={session.pages.length <= 1}
+                onClick={randomPage}
+              >
+                <span aria-hidden="true">⤨</span><span>ランダムページ</span>
+              </button>
+              <button
+                className="viewer-more-action viewer-more-action--slideshow"
+                type="button"
+                aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
+                title={slideshowRunning
+                  ? "スライドショーを停止"
+                  : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
+                aria-pressed={slideshowRunning}
+                disabled={session.pages.length <= 1}
+                onClick={toggleSlideshow}
+              >
+                <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
+                <span>{slideshowRunning ? "スライドショー停止" : "スライドショー"}</span>
               </button>
             </div>
           </section>
@@ -2360,18 +2404,17 @@ export function Viewer({
           onChange={(event) => dispatch({ type: "go", index: Number(event.target.value) })}
         />
         <output aria-live="polite">{progress}</output>
-        <button type="button" data-product-id="viewer-preview" onClick={() => { setSlideshowRunning(false); setPagePreviewOpen(true); }}>プレビュー</button>
+        <button
+          className="viewer-icon-button viewer-page-browser"
+          type="button"
+          data-product-id="viewer-preview"
+          aria-label="ページ一覧"
+          title="ページ一覧とプレビューを開く"
+          onClick={() => { setSlideshowRunning(false); setPagePreviewOpen(true); }}
+        >
+          <span aria-hidden="true">▦</span>
+        </button>
         <div className="viewer-page-actions" role="group" aria-label="ページ操作">
-          <button
-            className="viewer-icon-button viewer-page-action"
-            type="button"
-            aria-label="見開きを1ページ戻す"
-            title="見開きの開始位置を1ページ戻す"
-            disabled={state.mode !== "spread" || state.index === 0}
-            onClick={() => shiftOnePage(-1)}
-          >
-            <span aria-hidden="true">1◀</span>
-          </button>
           <button
             className="viewer-icon-button viewer-page-action"
             type="button"
@@ -2389,39 +2432,6 @@ export function Viewer({
             onClick={() => next()}
           >
             <span aria-hidden="true">▶</span>
-          </button>
-          <button
-            className="viewer-icon-button viewer-page-action"
-            type="button"
-            aria-label="見開きを1ページ進める"
-            title="見開きの開始位置を1ページ進める"
-            disabled={state.mode !== "spread" || state.index + 1 >= session.pages.length}
-            onClick={() => shiftOnePage(1)}
-          >
-            <span aria-hidden="true">▶1</span>
-          </button>
-          <button
-            className="viewer-icon-button viewer-page-action"
-            type="button"
-            aria-label="ランダムページ"
-            title="現在以外のページへランダム移動"
-            disabled={session.pages.length <= 1}
-            onClick={randomPage}
-          >
-            <span aria-hidden="true">⤨</span>
-          </button>
-          <button
-            className="viewer-icon-button viewer-page-action viewer-page-action--slideshow"
-            type="button"
-            aria-label={slideshowRunning ? "スライドショーを停止" : "スライドショーを開始"}
-            title={slideshowRunning
-              ? "スライドショーを停止"
-              : `${activeSlideshowIntervalMs / 1000}秒間隔・${slideshowOrder === "forward" ? "順方向" : slideshowOrder === "reverse" ? "逆方向" : "ランダム"}でスライドショーを開始`}
-            aria-pressed={slideshowRunning}
-            disabled={session.pages.length <= 1}
-            onClick={toggleSlideshow}
-          >
-            <span aria-hidden="true">{slideshowRunning ? "Ⅱ" : "▷"}</span>
           </button>
         </div>
       </nav>
