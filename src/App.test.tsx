@@ -611,6 +611,9 @@ describe("application shell", () => {
   });
 
   beforeEach(() => {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("comic-explorer:last-folder:"))
+      .forEach((key) => localStorage.removeItem(key));
     registerMock.mockReset();
     pickerMock.mockReset();
     searchSourcePickerMock.mockReset();

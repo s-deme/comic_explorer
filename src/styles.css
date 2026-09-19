@@ -21,6 +21,8 @@
   --ui-soft-danger: var(--theme-surface-muted);
   --ui-soft-warning: var(--theme-surface-muted);
   --ui-soft-success: var(--theme-surface-muted);
+  --button-radius: 6px;
+  --button-shadow: 0 1px 1px color-mix(in srgb, var(--theme-text) 10%, transparent);
   font-family: "Segoe UI", sans-serif;
   font-size: 14px;
   color: var(--theme-text);
@@ -45,7 +47,7 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-button { min-height: 30px; }
+button { min-height: 30px; border-radius: var(--button-radius); transition: background-color .14s ease, border-color .14s ease, box-shadow .14s ease, color .14s ease; }
 button:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--theme-focus);
   outline-offset: 1px;
@@ -56,7 +58,9 @@ button, input, select, textarea {
   border-color: var(--theme-border);
   background-color: var(--theme-surface-raised);
 }
-button:hover:not(:disabled) { border-color: var(--theme-focus); background-color: var(--ui-hover-surface); }
+button { box-shadow: var(--button-shadow); }
+button:hover:not(:disabled) { border-color: var(--theme-focus); background-color: var(--ui-hover-surface); box-shadow: 0 2px 5px color-mix(in srgb, var(--theme-text) 14%, transparent); }
+button:active:not(:disabled) { box-shadow: inset 0 1px 2px color-mix(in srgb, var(--theme-text) 16%, transparent); }
 button:disabled, input:disabled, select:disabled, textarea:disabled { color: var(--theme-text-muted); }
 input::placeholder, textarea::placeholder { color: var(--theme-text-muted); }
 input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--theme-accent); }

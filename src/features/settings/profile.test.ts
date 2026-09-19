@@ -53,7 +53,7 @@ function validProfile(): SettingsProfile {
     viewerCatalogSelectionSync: true,
     viewerBackground: "checker",
     viewerPageMargin: 0,
-    viewerSpreadGap: 8,
+    viewerSpreadGap: 0,
     cursorAutoHideMs: 0,
     zoomRetention: "global",
     viewerGridEnabled: false,

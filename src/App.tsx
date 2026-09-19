@@ -884,6 +884,18 @@ export function App({
     }
   }
 
+  function lastFolderStorageKey(root: string): string {
+    return `comic-explorer:last-folder:${windowsDisplayPathKey(root)}`;
+  }
+
+  function readLastFolder(root: string): string {
+    return browserStorage()?.getItem(lastFolderStorageKey(root)) ?? "";
+  }
+
+  function rememberLastFolder(root: string, relativePath: string): void {
+    browserStorage()?.setItem(lastFolderStorageKey(root), relativePath);
+  }
+
   function replaceManagedThumbnails(next: ManagedThumbnailMap) {
     managedThumbnailsRef.current = next;
     setManagedThumbnails(next);
@@ -1441,7 +1453,7 @@ export function App({
             activateLibraryRoot(driveResponse.data.absolutePath);
             const startupPath = startupLocationRef.current === "driveRoot"
               ? ""
-              : restored.relativePath;
+              : readLastFolder(driveResponse.data.absolutePath) || restored.relativePath;
             dispatch({ type: "reset", path: startupPath });
             await load(startupPath);
           }
@@ -1527,6 +1539,7 @@ export function App({
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
       if (response.status === "ok") {
+        if (libraryRoot !== null) rememberLastFolder(libraryRoot, relativePath);
         rememberCatalogSnapshot(relativePath, response.data);
         setEntries(response.data);
         setLoadedCatalogPath(relativePath);
