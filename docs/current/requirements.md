@@ -38,7 +38,7 @@ codd:
 | REQ-MVP-014 | Viewerの入力、page bar、fullscreen、bounded prefetchを提供する。ページ送り表示のホイール操作はブラウザー標準スクロールと二重適用せず、画像端を越えるオーバースクロールを行わない。 |
 | REQ-MVP-014A | 再利用可能な別native Viewer window、常時使える閉じる操作、native title、用途別toolbarを提供する。 |
 | REQ-MVP-015 | page単位の読書位置をapp-local SQLiteへ安全に保存・復元する。 |
-| REQ-MVP-016 | catalog順に前後の作品へ安全に移動する。 |
+| REQ-MVP-016 | catalog順に前後の作品へ安全に移動する。前の巻の末尾・読書位置復元・ページ指定から開いた場合も、移動履歴がなくても前ページへ戻れる。 |
 | REQ-MVP-017 | 閲覧、thumbnail、読書位置保存で原本を変更しない。 |
 | REQ-MVP-018 | 外部通信とtelemetryを行わない。 |
 | REQ-MVP-019 | access、missing、corrupt、unsupported errorから復帰可能にする。 |

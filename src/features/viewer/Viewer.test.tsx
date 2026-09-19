@@ -1126,6 +1126,14 @@ describe("Viewer settings", () => {
     await waitFor(() => expect(screen.getByText("3-4 / 4")).toBeInTheDocument());
   });
 
+  it("scrolls backward after opening the previous volume at its last page", () => {
+    render(<Viewer session={{ ...multiPageSession, startIndex: 1 }} generation={1}
+      initialMode="single" initialDirection="rightToLeft"
+      onSettingsChange={() => undefined} onClose={() => undefined} />);
+    fireEvent.wheel(document.querySelector(".viewer-stage")!, { deltaY: -120 });
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+  });
+
   it("starts tall pages at the top and advances downward before changing pages", async () => {
     render(
       <Viewer

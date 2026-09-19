@@ -176,6 +176,19 @@ describe("viewer page model", () => {
     expect(state.index).toBe(0);
   });
 
+  it("returns from a restored or jumped page without display-unit history", () => {
+    const action = { type: "previous" as const };
+    for (const mode of ["single", "spread", "auto"] as const) {
+      let state = { ...initial, index: 5, mode };
+      for (let expected = 4; expected >= 0; expected -= 1) {
+        state = viewerReducer(state, action);
+        expect(state.index).toBe(expected);
+      }
+    }
+    expect(viewerReducer({ ...initial, index: 1 }, action).index).toBe(0);
+    expect(viewerReducer(initial, action)).toBe(initial);
+  });
+
   it("FT-B23-001 shifts a spread anchor by exactly one page without crossing bounds", () => {
     let state = viewerReducer(initial, { type: "shift", delta: 1, pageCount: 5 });
     expect(state.index).toBe(1);

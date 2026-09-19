@@ -566,8 +566,9 @@ export function viewerReducer(
       return { ...state, index: next, history: [...state.history, state.index] };
     }
     case "previous": {
-      const previous = state.history.at(-1);
-      if (previous === undefined) return state;
+      // Without history, step one page so unknown landscape pages cannot be skipped.
+      const previous = state.history.at(-1) ?? Math.max(0, state.index - 1);
+      if (previous === state.index) return state;
       return { ...state, index: previous, history: state.history.slice(0, -1) };
     }
     case "shift": {
