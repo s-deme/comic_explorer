@@ -44,7 +44,7 @@ codd:
 | REQ-MVP-019 | access、missing、corrupt、unsupported errorから復帰可能にする。 |
 | REQ-MVP-020 | 上限検証したPDFを既存Viewer機能へ接続する。 |
 | REQ-MVP-021 | 明示的なfile manager操作だけをroot境界・確認・再列挙付きで許可する。 |
-| REQ-MVP-022 | 統合設定を用途順に整理し、重複・無効な旧設定を公開schemaから除去する。 |
+| REQ-MVP-022 | 統合設定を用途順に整理し、重複・無効な旧設定を公開schemaから除去する。見開き・性能・フィット・表示補助の詳細設定は折りたたみ、設定検索時は一致する詳細を展開して表示する。 |
 
 ## 閲覧補強（2026-09）
 

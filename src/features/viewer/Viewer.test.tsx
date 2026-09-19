@@ -615,7 +615,7 @@ describe("Viewer settings", () => {
     }
   });
 
-  it("keeps page and slideshow controls at the bottom-right page navigator", () => {
+  it("keeps page navigation below and slideshow in secondary controls", () => {
     render(
       <Viewer
         session={multiPageSession}
@@ -639,7 +639,8 @@ describe("Viewer settings", () => {
     const actions = within(navigator).getByRole("group", { name: "ページ操作" });
     expect(within(actions).getByRole("button", { name: "前ページ" })).toBeInTheDocument();
     expect(within(actions).getByRole("button", { name: "次ページ" })).toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: "スライドショーを開始" }))
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    expect(within(screen.getByRole("region", { name: "その他の操作" })).getByRole("button", { name: "スライドショーを開始" }))
       .toBeInTheDocument();
     expect(toolbar?.querySelector(".viewer-toolbar-previous")).toBeNull();
     expect(toolbar?.querySelector(".viewer-toolbar-next")).toBeNull();

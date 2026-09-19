@@ -3058,3 +3058,26 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   border-color: var(--theme-accent);
   background: var(--theme-accent);
 }
+
+/* Viewer settings: keep everyday choices visible and tuck expert tuning behind disclosure. */
+.settings-advanced {
+  margin: 8px 0 14px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-border) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--theme-surface-muted) 62%, transparent);
+}
+.settings-advanced > summary {
+  cursor: pointer;
+  padding: 9px 2px;
+  color: var(--theme-text-muted);
+  font-size: .82rem;
+  font-weight: 650;
+  user-select: none;
+}
+.settings-advanced[open] > summary {
+  color: var(--theme-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-border) 62%, transparent);
+}
+.settings-advanced > .settings-row:last-child { border-bottom: 0; }
+.settings-advanced--compact { margin-bottom: 10px; }

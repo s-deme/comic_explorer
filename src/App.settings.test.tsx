@@ -1358,6 +1358,28 @@ describe("application settings", () => {
     expect(dialog).toBeInTheDocument();
   });
 
+  it("expands matching advanced settings during search and hides unrelated groups", async () => {
+    await registerTestLibrary([]);
+    chooseAppMenuItem("オプション", "統合設定…");
+    const dialog = screen.getByRole("dialog", { name: "統合設定" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /^ビューワ/ }));
+    const summary = within(dialog).getByText("見開きの詳細設定");
+    const details = summary.closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    fireEvent.click(summary);
+    expect(details).toHaveAttribute("open");
+    fireEvent.click(summary);
+    expect(details).not.toHaveAttribute("open");
+    fireEvent.change(within(dialog).getByRole("searchbox", { name: "設定を検索" }), {
+      target: { value: "縦長" },
+    });
+    expect(details).toHaveAttribute("open");
+    expect(within(dialog).getByLabelText("profile見開き縦長判定（%）")).toBeVisible();
+    expect(within(dialog).getByText("性能の詳細設定")).not.toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "設定検索をクリア" }));
+    expect(details).not.toHaveAttribute("open");
+  });
+
   it("FT-B19-006 searches categorized settings and resets the whole draft", async () => {
     await registerTestLibrary([]);
     chooseAppMenuItem("オプション", "統合設定…");
