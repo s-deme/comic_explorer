@@ -2850,6 +2850,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   gap: var(--viewer-spread-gap, 8px);
   overflow: auto;
   scrollbar-width: none;
+  overscroll-behavior: none;
 }
 .page-spread::-webkit-scrollbar { display: none; }
 .page-spread[data-layout-mode="paged"][data-scale-mode="width"] {
@@ -2857,6 +2858,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   height: 100%;
 }
 .page-spread[data-layout-mode="paged"][data-scale-mode="width"] > img {
+  position: sticky;
   margin-block: auto;
 }
 .page-spread[data-layout-mode="paged"] > img {

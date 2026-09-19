@@ -599,6 +599,20 @@ export function Viewer({
       fitRules,
     );
   }, [fitRules, fitViewport.height, fitViewport.width, imageTransform, pageSizes, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
+  useLayoutEffect(() => {
+    const spread = spreadRef.current;
+    if (!spread) return;
+    spread.querySelectorAll<HTMLImageElement>("img[data-page-index]").forEach((image) => {
+      if (scale.mode !== "width") {
+        image.style.top = "";
+        return;
+      }
+      const space = spread.clientHeight - viewerPageMargin * 2
+        - image.getBoundingClientRect().height;
+      // Keep each page at its own bottom edge; shorter pages stay centered.
+      image.style.top = `${space > 0 ? space / 2 : viewerPageMargin + space}px`;
+    });
+  }, [fitViewport, imageTransform, pageSizes, readyPages, scale.mode, viewerPageMargin, viewerSpreadGap, visible]);
   const resolvedBookmarks = useMemo(
     () => resolveBookmarks(bookmarks, session.pages.map((page) => page.relativePath)),
     [bookmarks, session.pages],
@@ -1452,6 +1466,41 @@ export function Viewer({
     return () => window.removeEventListener("keydown", handleKey);
   });
 
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (rectangleZoomArmed) {
+        event.preventDefault();
+        return;
+      }
+      const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
+      if (rightWheel && event.deltaY !== 0) {
+        if (rightClickRef.current !== null) rightClickRef.current.canceled = true;
+        event.preventDefault();
+        applyMouseGesture(
+          event.deltaY > 0
+            ? activeMouseGestures.rightWheelDown
+            : activeMouseGestures.rightWheelUp,
+        );
+      } else if (event.ctrlKey) {
+        event.preventDefault();
+        applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
+      } else if (event.deltaY !== 0) {
+        event.preventDefault();
+        if (Math.abs(event.deltaY) < wheelDeadZone) return;
+        applyMouseGesture(
+          event.deltaY > 0
+            ? activeMouseGestures.wheelDown
+            : activeMouseGestures.wheelUp,
+        );
+      }
+    };
+    // React's passive wheel listener cannot suppress native scrolling.
+    stage.addEventListener("wheel", handleWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", handleWheel);
+  });
+
   const progress =
     visible.length === 2
       ? `${visible[0] + 1}-${visible[1] + 1} / ${session.pages.length}`
@@ -2248,33 +2297,6 @@ export function Viewer({
           }
           clearQuadrantClickTimer();
           void requestFullscreen(!fullscreen);
-        }}
-        onWheel={(event) => {
-          if (rectangleZoomArmed) {
-            event.preventDefault();
-            return;
-          }
-          const rightWheel = rightButtonHeldRef.current || (event.buttons & 2) !== 0;
-          if (rightWheel && event.deltaY !== 0) {
-            if (rightClickRef.current !== null) rightClickRef.current.canceled = true;
-            event.preventDefault();
-            applyMouseGesture(
-              event.deltaY > 0
-                ? activeMouseGestures.rightWheelDown
-                : activeMouseGestures.rightWheelUp,
-            );
-          } else if (event.ctrlKey) {
-            event.preventDefault();
-            applyScale({ type: event.deltaY > 0 ? "zoomOut" : "zoomIn" });
-          } else if (event.deltaY !== 0) {
-            if (Math.abs(event.deltaY) < wheelDeadZone) return;
-            event.preventDefault();
-            applyMouseGesture(
-              event.deltaY > 0
-                ? activeMouseGestures.wheelDown
-                : activeMouseGestures.wheelUp,
-            );
-          }
         }}
       >
         <div

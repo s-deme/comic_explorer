@@ -277,6 +277,41 @@ describe("Viewer settings", () => {
     }
   });
 
+  it("REQ-MVP-012 stops width-fit pages at their own bottom and recenters pages that fit", () => {
+    render(<Viewer session={multiPageSession} generation={1} initialMode="spread"
+      initialDirection="rightToLeft" initialScaleMode="width" initialPageMargin={10}
+      onSettingsChange={() => undefined} onClose={() => undefined} />);
+    const spread = document.querySelector<HTMLElement>(".page-spread")!;
+    Object.defineProperty(spread, "clientHeight", { configurable: true, value: 800 });
+    const images = [1, 2].map((page) => screen.getByAltText(`Multi Page ${page}ページ`) as HTMLImageElement);
+    images.forEach((image, index) => {
+      vi.spyOn(image, "getBoundingClientRect").mockReturnValue({ height: 1200 + index * 200 } as DOMRect);
+      Object.defineProperties(image, {
+        naturalWidth: { configurable: true, value: 800 },
+        naturalHeight: { configurable: true, value: 1200 + index * 200 },
+      });
+      fireEvent.load(image);
+    });
+    expect(images[0].style.top).toBe("-410px");
+    expect(images[1].style.top).toBe("-610px");
+
+    // A resized viewport keeps fitting pages centered instead of scrolling them away.
+    Object.defineProperty(spread, "clientHeight", { configurable: true, value: 1600 });
+    vi.spyOn(spread, "getBoundingClientRect").mockReturnValue({ width: 1200, height: 1600 } as DOMRect);
+    fireEvent(window, new Event("resize"));
+    expect(images[0].style.top).toBe("190px");
+    expect(images[1].style.top).toBe("90px");
+
+    // A cached page can finish loading without changing its known natural size.
+    vi.mocked(images[0].getBoundingClientRect).mockReturnValue({ height: 1000 } as DOMRect);
+    fireEvent.load(images[0]);
+    expect(images[0].style.top).toBe("290px");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "倍率モード" }), { target: { value: "fit" } });
+    expect(images[0].style.top).toBe("");
+    expect(images[1].style.top).toBe("");
+  });
+
   it("opens a labeled panel for secondary viewer actions", () => {
     render(
       <Viewer
@@ -2093,11 +2128,11 @@ describe("Viewer settings", () => {
     fireEvent.pointerUp(stage!, { clientX: 100 });
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
-    fireEvent.wheel(stage!, { deltaY: 30 });
+    expect(fireEvent.wheel(stage!, { deltaY: 30, cancelable: true })).toBe(false);
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
-    fireEvent.wheel(stage!, { deltaY: 120 });
+    expect(fireEvent.wheel(stage!, { deltaY: 120, cancelable: true })).toBe(false);
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
-    fireEvent.wheel(stage!, { deltaY: -120 });
+    expect(fireEvent.wheel(stage!, { deltaY: -120, cancelable: true })).toBe(false);
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
     fireEvent.pointerDown(stage!, { button: 4 });

@@ -170,6 +170,11 @@ class UiStyleContractTests(unittest.TestCase):
         )
 
     def test_paged_width_fit_uses_full_stage_and_safe_vertical_margins(self) -> None:
+        self.assert_rule_contains(".page-spread", "overscroll-behavior: none")
+        self.assert_rule_contains(
+            '.page-spread[data-layout-mode="paged"][data-scale-mode="width"] > img',
+            "position: sticky",
+        )
         self.assert_rule_contains(
             '.page-spread[data-layout-mode="paged"][data-scale-mode="width"]',
             "width: 100%",

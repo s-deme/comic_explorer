@@ -33,9 +33,9 @@ codd:
 | REQ-MVP-009 | 対応archiveを上限・危険path検証付きで非展開閲覧する。UTF-8 flagのないShift_JIS名を持つZIPも、安全な内部pathとして読み取る。 |
 | REQ-MVP-010 | folderは移動、archive・PDF・画像はViewerで開き、文脈を復元する。 |
 | REQ-MVP-011 | Viewerはページ送りと連続縦読みを切り替えられ、切替時のページ位置を維持する。縦読みは表示範囲だけを読み込み、スクロール中の現在ページを保存する。 |
-| REQ-MVP-012 | 見開きは最大2pageで、横長・末尾pageは単独表示する。 |
+| REQ-MVP-012 | 見開きは最大2pageで、横長・末尾pageは単独表示する。横幅フィットのスクロールでは各pageを自身の下端で止め、高さの異なる見開きで短いpageの下に余分な背景を出さない。画面内に収まるpageは中央表示を保つ。 |
 | REQ-MVP-013 | 読み方向を配置、移動、保存へ一貫して適用する。 |
-| REQ-MVP-014 | Viewerの入力、page bar、fullscreen、bounded prefetchを提供する。 |
+| REQ-MVP-014 | Viewerの入力、page bar、fullscreen、bounded prefetchを提供する。ページ送り表示のホイール操作はブラウザー標準スクロールと二重適用せず、画像端を越えるオーバースクロールを行わない。 |
 | REQ-MVP-014A | 再利用可能な別native Viewer window、常時使える閉じる操作、native title、用途別toolbarを提供する。 |
 | REQ-MVP-015 | page単位の読書位置をapp-local SQLiteへ安全に保存・復元する。 |
 | REQ-MVP-016 | catalog順に前後の作品へ安全に移動する。 |
