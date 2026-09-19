@@ -74,6 +74,14 @@ export async function restoreLibraryRoot(
   });
 }
 
+export async function restoreLastFolder(root: string, generation: number): Promise<ApiResponse<string | null>> {
+  return invoke("get_last_folder", { context: context(generation), root });
+}
+
+export async function saveLastFolder(root: string, relativePath: string, generation: number): Promise<ApiResponse<void>> {
+  return invoke("save_last_folder", { context: context(generation), root, relativePath });
+}
+
 export async function restoreMainWindowFromTray(
   generation: number,
 ): Promise<ApiResponse<TrayStatus>> {

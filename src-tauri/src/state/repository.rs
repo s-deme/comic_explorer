@@ -555,6 +555,27 @@ impl StateStore {
         Ok(settings)
     }
 
+    pub fn last_folder(&self, root: &str) -> Result<Option<String>, AppError> {
+        self.connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                [format!("lastFolder:{root}")],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(database_error)
+    }
+
+    pub fn save_last_folder(&mut self, root: &str, relative_path: &str) -> Result<(), AppError> {
+        self.connection
+            .execute(
+                "INSERT INTO settings(key, value) VALUES(?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![format!("lastFolder:{root}"), relative_path],
+            )
+            .map_err(database_error)?;
+        Ok(())
+    }
+
     pub fn save_settings(&mut self, settings: &Settings) -> Result<(), AppError> {
         self.save_settings_with_active_profile(settings, None)
     }

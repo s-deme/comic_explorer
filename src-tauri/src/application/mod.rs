@@ -893,6 +893,47 @@ pub fn get_library_root(
 }
 
 #[tauri::command]
+pub fn get_last_folder(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    root: String,
+) -> Result<Response<Option<String>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    let value = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .ok_or_else(|| "store unavailable".to_owned())?
+        .last_folder(&root)
+        .map_err(|error| error.message)?;
+    Ok(Response::Ok { request_id: context.request_id, generation: context.generation, data: value })
+}
+
+#[tauri::command]
+pub fn save_last_folder(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    root: String,
+    relative_path: String,
+) -> Result<Response<()>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_mut()
+        .ok_or_else(|| "store unavailable".to_owned())?
+        .save_last_folder(&root, &relative_path)
+        .map_err(|error| error.message)?;
+    Ok(Response::Ok { request_id: context.request_id, generation: context.generation, data: () })
+}
+
+#[tauri::command]
 pub fn set_fullscreen_display_awake(
     state: tauri::State<'_, AppState>,
     context: RequestContext,

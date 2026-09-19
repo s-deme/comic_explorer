@@ -31,6 +31,8 @@ import {
   watchLibraryFolder,
   stopLibraryFolderWatch,
   restoreLibraryRoot,
+  restoreLastFolder,
+  saveLastFolder,
   takeCliLaunchRequest,
   listenCliLaunchPending,
   listShelves,
@@ -901,16 +903,13 @@ export function App({
     }
   }
 
-  function lastFolderStorageKey(root: string): string {
-    return `comic-explorer:last-folder:${windowsDisplayPathKey(root)}`;
-  }
-
-  function readLastFolder(root: string): string {
-    return browserStorage()?.getItem(lastFolderStorageKey(root)) ?? "";
+  async function readLastFolder(root: string, requestGeneration: number): Promise<string> {
+    const response = await restoreLastFolder(root, requestGeneration);
+    return response.status === "ok" ? response.data ?? "" : "";
   }
 
   function rememberLastFolder(root: string, relativePath: string): void {
-    browserStorage()?.setItem(lastFolderStorageKey(root), relativePath);
+    void saveLastFolder(root, relativePath, generation.current);
   }
 
   function replaceManagedThumbnails(next: ManagedThumbnailMap) {
@@ -1470,7 +1469,7 @@ export function App({
             activateLibraryRoot(driveResponse.data.absolutePath);
             const startupPath = startupLocationRef.current === "driveRoot"
               ? ""
-              : readLastFolder(driveResponse.data.absolutePath) || restored.relativePath;
+              : (await readLastFolder(driveResponse.data.absolutePath, requestGeneration)) || restored.relativePath;
             dispatch({ type: "reset", path: startupPath });
             await load(startupPath);
           }
