@@ -33,6 +33,8 @@ Windows filesystem上では、個別ツールを組み合わせず次のラッ�
 .\scripts\run-build-windows.ps1
 ```
 
+このWindows buildはfrontendだけでなく、SBOM生成を含むTauri Release buildまで実行する。成功時のportable実行ファイルは `src-tauri\target\release\comic-explorer.exe`、NSIS installerは `src-tauri\target\release\bundle\nsis\` に出力される。`dist\` はfrontend資産とrelease metadataの作業領域であり、exeの出力先ではない。
+
 文書、設計、設定、コード、テストなどCoDDの追跡対象を変更した後は、少なくともscanとcheckを実行する。
 
 ```powershell
