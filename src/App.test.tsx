@@ -1853,7 +1853,7 @@ describe("application shell", () => {
       .not.toBeInTheDocument();
 
     const direction = screen.getByRole("button", { name: "並び順: 昇順" });
-    expect(direction).toHaveTextContent("▲");
+    expect(direction.querySelector("svg.toolbar-icon")).not.toBeNull();
     expect(direction).not.toHaveTextContent("昇順");
     expect(direction).toHaveAttribute("title", "昇順を降順へ変更");
 

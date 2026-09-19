@@ -581,12 +581,19 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   white-space: nowrap;
 }
 .tree-icon {
-  display: inline-block;
-  width: 14px;
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
   margin-right: 2px;
   color: var(--theme-warning);
   text-align: center;
 }
+.toolbar-icon { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.toolbar > button > .toolbar-icon { margin: auto; }
+.tree-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.tree-icon--folder svg { fill: color-mix(in srgb, var(--theme-warning) 18%, transparent); }
+.tree-icon--archive { color: var(--theme-success); }
 .tree-icon--pc { color: var(--theme-accent); }
 .tree-icon--drive { color: var(--theme-text-muted); }
 .tree-load-error { margin: 8px; color: var(--theme-danger); font-size: .78rem; }

@@ -82,6 +82,19 @@ function currentFolderAddress(libraryRoot: string | null, currentPath: string): 
   return `${root}${separator}${currentPath.replaceAll("/", "\\")}`;
 }
 
+function TreeIcon({ kind, expanded }: { kind: TreeNode["kind"]; expanded: boolean }) {
+  if (kind === "pc") {
+    return <svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>;
+  }
+  if (kind === "drive") {
+    return <svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M6 15h12M17 9h.01" /></svg>;
+  }
+  if (kind === "archive") {
+    return <svg viewBox="0 0 24 24" focusable="false"><path d="M4 6h16v14H4zM3 4h18v3H3z" /><path d="M10 9h4M10 12h4M10 15h4" /></svg>;
+  }
+  return <svg viewBox="0 0 24 24" focusable="false"><path d={expanded ? "M3 6h7l2 2h9v11H3z" : "M3 7h7l2 2h9v10H3z"} /></svg>;
+}
+
 export function FolderTree({
   libraryRoot,
   currentPath,
@@ -518,7 +531,7 @@ export function FolderTree({
                   }}
                 >
                   <span className={`tree-icon tree-icon--${node.kind}`} aria-hidden="true">
-                    {node.kind === "pc" ? "▣" : node.kind === "drive" ? "▰" : node.kind === "archive" ? "▤" : "■"}
+                    <TreeIcon kind={node.kind} expanded={isExpanded} />
                   </span>
                   {node.name}
                 </button>

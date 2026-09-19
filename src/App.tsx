@@ -376,6 +376,23 @@ interface AppProps {
   windowThemeAdapter?: WindowThemeAdapter;
 }
 
+type ToolbarIconName = "back" | "forward" | "up" | "refresh" | "copy" | "properties" | "bookshelf" | "sort-up" | "sort-down";
+
+function ToolbarIcon({ name }: { name: ToolbarIconName }) {
+  const paths: Record<ToolbarIconName, string> = {
+    back: "M19 12H5m6-6-6 6 6 6",
+    forward: "M5 12h14m-6-6 6 6-6 6",
+    up: "M12 19V5m-6 6 6-6 6 6",
+    refresh: "M20 11a8 8 0 1 0 1 4M20 5v6h-6",
+    copy: "M8 8h11v12H8zM5 16H4V4h12v1",
+    properties: "M12 16v-5m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+    bookshelf: "M4 5h3v14H4zM10 5h4v14h-4zM17 5h3v14h-3zM3 20h18",
+    "sort-up": "M12 18V6m-5 5 5-5 5 5",
+    "sort-down": "M12 6v12m-5-5 5 5 5-5",
+  };
+  return <svg className="toolbar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={paths[name]} /></svg>;
+}
+
 function preferredSystemTheme(): ThemeBaseScheme {
   return typeof window.matchMedia === "function"
     && window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -5532,7 +5549,7 @@ export function App({
           }}
           title="戻る"
         >
-          ←
+          <ToolbarIcon name="back" />
         </button>
         <button
           type="button"
@@ -5544,7 +5561,7 @@ export function App({
           }}
           title="進む"
         >
-          →
+          <ToolbarIcon name="forward" />
         </button>
         <button
           type="button"
@@ -5553,7 +5570,7 @@ export function App({
           onClick={() => up !== null && navigate(up)}
           title="上へ"
         >
-          ↑
+          <ToolbarIcon name="up" />
         </button>
         <div className="icon-command-toolbar" aria-label="コマンドツールバー">
           <button
@@ -5581,10 +5598,10 @@ export function App({
               <path d="m16.5 16.5 4 4" />
             </svg>
           </button>
-          <button type="button" aria-label="現在場所を更新" title="現在のフォルダを再読み込み" data-product-id="toolbar-refresh" onClick={refreshCatalog}>⟳</button>
-          <button type="button" aria-label="選択パスをコピー" title="選択した項目のパスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}>⧉</button>
-          <button type="button" aria-label="選択項目のプロパティ" title="選択した項目のプロパティを表示" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}>ⓘ</button>
-          <button type="button" aria-label="本棚を表示" title="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}>▤</button>
+          <button type="button" aria-label="現在場所を更新" title="現在のフォルダを再読み込み" data-product-id="toolbar-refresh" onClick={refreshCatalog}><ToolbarIcon name="refresh" /></button>
+          <button type="button" aria-label="選択パスをコピー" title="選択した項目のパスをコピー" data-product-id="toolbar-copy-path" onClick={() => void copySelectedPaths()}><ToolbarIcon name="copy" /></button>
+          <button type="button" aria-label="選択項目のプロパティ" title="選択した項目のプロパティを表示" data-product-id="toolbar-properties" disabled={selectedPaths.length !== 1} onClick={() => setPropertiesOpen(true)}><ToolbarIcon name="properties" /></button>
+          <button type="button" aria-label="本棚を表示" title="本棚を表示" data-product-id="toolbar-bookshelf" onClick={() => setBookshelfOpen(true)}><ToolbarIcon name="bookshelf" /></button>
         </div>
         <div className="toolbar-control-menu toolbar-control-menu--leading">
           <button
@@ -5647,7 +5664,7 @@ export function App({
           data-sort-descending={sortDescending}
           onClick={() => changeSort(sortField, !sortDescending)}
         >
-          <span aria-hidden="true">{sortDescending ? "▼" : "▲"}</span>
+          <ToolbarIcon name={sortDescending ? "sort-down" : "sort-up"} />
         </button>
         <div className="toolbar-control-menu">
           <button
