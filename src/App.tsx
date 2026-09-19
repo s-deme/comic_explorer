@@ -1470,7 +1470,7 @@ export function App({
             activateLibraryRoot(driveResponse.data.absolutePath);
             const startupPath = startupLocationRef.current === "driveRoot"
               ? ""
-              : readLastFolder(response.data.absolutePath) || restored.relativePath;
+              : readLastFolder(driveResponse.data.absolutePath) || restored.relativePath;
             dispatch({ type: "reset", path: startupPath });
             await load(startupPath);
           }
@@ -4416,6 +4416,7 @@ export function App({
         requestedPageKey,
       });
       if (opened) {
+        if (libraryRoot !== null) rememberLastFolder(libraryRoot, navigation.current);
         rememberRecent(entry);
         setLoadState({ status: "ready" });
         return true;
@@ -4442,6 +4443,7 @@ export function App({
           return false;
         }
         rememberRecent(entry);
+        if (libraryRoot !== null) rememberLastFolder(libraryRoot, navigation.current);
         void refreshBookmarks(response.data.itemKey, requestGeneration);
         setViewerSession({
           ...response.data,
