@@ -1470,7 +1470,7 @@ export function App({
             activateLibraryRoot(driveResponse.data.absolutePath);
             const startupPath = startupLocationRef.current === "driveRoot"
               ? ""
-              : readLastFolder(driveResponse.data.absolutePath) || restored.relativePath;
+              : readLastFolder(response.data.absolutePath) || restored.relativePath;
             dispatch({ type: "reset", path: startupPath });
             await load(startupPath);
           }
