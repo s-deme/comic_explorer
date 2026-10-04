@@ -28,6 +28,7 @@ function ok<T>(data: T) { return { status: "ok", requestId: "test", generation: 
 
 describe("FilterDialog", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(listViewerFilterSets).mockResolvedValue(ok(catalog));
     vi.mocked(saveViewerFilterSet).mockResolvedValue(ok(catalog));
     vi.mocked(activateViewerFilterSet).mockResolvedValue(ok(catalog));

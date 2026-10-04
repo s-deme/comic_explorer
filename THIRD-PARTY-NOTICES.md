@@ -32,9 +32,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / avif-parse | 1.4.0 | MPL-2.0 |
 | cargo / base64 | 0.21.7 | MIT OR Apache-2.0 |
 | cargo / base64 | 0.22.1 | MIT OR Apache-2.0 |
-| cargo / bit-set | 0.6.0 | MIT OR Apache-2.0 |
+| cargo / base64 | 0.23.1 | MIT OR Apache-2.0 |
 | cargo / bit-set | 0.8.0 | Apache-2.0 OR MIT |
-| cargo / bit-vec | 0.7.0 | MIT OR Apache-2.0 |
 | cargo / bit-vec | 0.8.0 | Apache-2.0 OR MIT |
 | cargo / bitflags | 1.3.2 | MIT OR Apache-2.0 |
 | cargo / bitflags | 2.13.1 | MIT OR Apache-2.0 |
@@ -72,9 +71,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / core-graphics | 0.25.0 | MIT OR Apache-2.0 |
 | cargo / core_maths | 0.1.1 | MIT |
 | cargo / cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
-| cargo / crc-catalog | 2.5.0 | MIT OR Apache-2.0 |
 | cargo / crc32fast | 1.5.0 | MIT OR Apache-2.0 |
-| cargo / crc | 3.4.0 | MIT OR Apache-2.0 |
 | cargo / crossbeam-channel | 0.5.16 | MIT OR Apache-2.0 |
 | cargo / crossbeam-utils | 0.8.22 | MIT OR Apache-2.0 |
 | cargo / crunchy | 0.2.4 | MIT |
@@ -127,8 +124,6 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / fax | 0.2.7 | MIT |
 | cargo / fdeflate | 0.3.7 | MIT OR Apache-2.0 |
 | cargo / field-offset | 0.3.6 | MIT OR Apache-2.0 |
-| cargo / filetime | 0.2.29 | MIT OR Apache-2.0 |
-| cargo / filetime_creation | 0.2.0 | MIT OR Apache-2.0 |
 | cargo / find-msvc-tools | 0.1.9 | MIT OR Apache-2.0 |
 | cargo / flate2 | 1.1.9 | MIT OR Apache-2.0 |
 | cargo / float-cmp | 0.9.0 | MIT |
@@ -242,7 +237,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / litemap | 0.8.2 | Unicode-3.0 |
 | cargo / lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | cargo / log | 0.4.33 | MIT OR Apache-2.0 |
-| cargo / lzma-rust | 0.1.7 | Apache-2.0 |
+| cargo / lzma-rust2 | 0.20.1 | Apache-2.0 |
 | cargo / markup5ever | 0.38.0 | MIT OR Apache-2.0 |
 | cargo / memchr | 2.8.3 | Unlicense OR MIT |
 | cargo / memoffset | 0.9.1 | MIT |
@@ -256,8 +251,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / new_debug_unreachable | 1.0.6 | MIT |
 | cargo / notify-types | 2.1.0 | MIT OR Apache-2.0 |
 | cargo / notify | 8.2.0 | CC0-1.0 |
-| cargo / nt-time | 0.8.1 | Apache-2.0 OR MIT |
-| cargo / num-conv | 0.1.0 | MIT OR Apache-2.0 |
+| cargo / num-conv | 0.2.2 | MIT OR Apache-2.0 |
 | cargo / num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | cargo / num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | cargo / num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
@@ -296,7 +290,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | cargo / piper | 0.2.5 | MIT OR Apache-2.0 |
 | cargo / pkg-config | 0.3.33 | MIT OR Apache-2.0 |
-| cargo / plist | 1.8.0 | MIT |
+| cargo / plist | 1.10.1 | MIT |
 | cargo / png | 0.17.16 | MIT OR Apache-2.0 |
 | cargo / png | 0.18.1 | MIT OR Apache-2.0 |
 | cargo / polling | 3.11.0 | Apache-2.0 OR MIT |
@@ -311,7 +305,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | cargo / pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | cargo / quick-error | 2.0.1 | MIT OR Apache-2.0 |
-| cargo / quick-xml | 0.38.4 | MIT |
+| cargo / quick-xml | 0.42.0 | MIT |
 | cargo / quote | 1.0.47 | MIT OR Apache-2.0 |
 | cargo / r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | cargo / r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
@@ -355,7 +349,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | cargo / serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | cargo / servo_arc | 0.4.3 | MIT OR Apache-2.0 |
-| cargo / sevenz-rust | 0.6.1 | Apache-2.0 |
+| cargo / sevenz-rust2 | 0.22.2 | Apache-2.0 |
 | cargo / sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | cargo / shlex | 2.0.1 | MIT OR Apache-2.0 |
 | cargo / signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
@@ -401,9 +395,9 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / thiserror | 1.0.69 | MIT OR Apache-2.0 |
 | cargo / thiserror | 2.0.19 | MIT OR Apache-2.0 |
 | cargo / tiff | 0.10.3 | MIT |
-| cargo / time-core | 0.1.7 | MIT OR Apache-2.0 |
-| cargo / time-macros | 0.2.25 | MIT OR Apache-2.0 |
-| cargo / time | 0.3.45 | MIT OR Apache-2.0 |
+| cargo / time-core | 0.1.8 | MIT OR Apache-2.0 |
+| cargo / time-macros | 0.2.27 | MIT OR Apache-2.0 |
+| cargo / time | 0.3.47 | MIT OR Apache-2.0 |
 | cargo / tiny-skia-path | 0.11.4 | BSD-3-Clause |
 | cargo / tiny-skia | 0.11.4 | BSD-3-Clause |
 | cargo / tinystr | 0.8.3 | Unicode-3.0 |
@@ -502,7 +496,6 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | cargo / windows-strings | 0.4.2 | MIT OR Apache-2.0 |
 | cargo / windows-strings | 0.5.1 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.45.0 | MIT OR Apache-2.0 |
-| cargo / windows-sys | 0.52.0 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.59.0 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.60.2 | MIT OR Apache-2.0 |
 | cargo / windows-sys | 0.61.2 | MIT OR Apache-2.0 |
@@ -660,6 +653,7 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / @rollup/rollup-win32-ia32-msvc | 4.62.3 | MIT |
 | npm / @rollup/rollup-win32-x64-gnu | 4.62.3 | MIT |
 | npm / @rollup/rollup-win32-x64-msvc | 4.62.3 | MIT |
+| npm / @standard-schema/spec | 1.1.0 | MIT |
 | npm / @tanstack/react-virtual | 3.14.8 | MIT |
 | npm / @tanstack/virtual-core | 3.17.6 | MIT |
 | npm / @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT |
@@ -689,13 +683,13 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / @types/react-dom | 19.2.3 | MIT |
 | npm / @types/react | 19.2.17 | MIT |
 | npm / @vitejs/plugin-react | 5.2.0 | MIT |
-| npm / @vitest/expect | 3.2.7 | MIT |
-| npm / @vitest/mocker | 3.2.7 | MIT |
-| npm / @vitest/pretty-format | 3.2.7 | MIT |
-| npm / @vitest/runner | 3.2.7 | MIT |
-| npm / @vitest/snapshot | 3.2.7 | MIT |
-| npm / @vitest/spy | 3.2.7 | MIT |
-| npm / @vitest/utils | 3.2.7 | MIT |
+| npm / @vitest/expect | 4.1.11 | MIT |
+| npm / @vitest/mocker | 4.1.11 | MIT |
+| npm / @vitest/pretty-format | 4.1.11 | MIT |
+| npm / @vitest/runner | 4.1.11 | MIT |
+| npm / @vitest/snapshot | 4.1.11 | MIT |
+| npm / @vitest/spy | 4.1.11 | MIT |
+| npm / @vitest/utils | 4.1.11 | MIT |
 | npm / agent-base | 7.1.4 | MIT |
 | npm / ansi-regex | 5.0.1 | MIT |
 | npm / ansi-styles | 5.2.0 | MIT |
@@ -704,10 +698,8 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / baseline-browser-mapping | 2.11.6 | Apache-2.0 |
 | npm / bidi-js | 1.0.3 | MIT |
 | npm / browserslist | 4.28.7 | MIT |
-| npm / cac | 6.7.14 | MIT |
 | npm / caniuse-lite | 1.0.30001806 | CC-BY-4.0 |
-| npm / chai | 5.3.3 | MIT |
-| npm / check-error | 2.1.3 | MIT |
+| npm / chai | 6.3.0 | MIT |
 | npm / convert-source-map | 2.0.0 | MIT |
 | npm / css-tree | 3.2.1 | MIT |
 | npm / css.escape | 1.5.1 | MIT |
@@ -716,13 +708,12 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / data-urls | 6.0.1 | MIT |
 | npm / debug | 4.4.3 | MIT |
 | npm / decimal.js | 10.6.0 | MIT |
-| npm / deep-eql | 5.0.2 | MIT |
 | npm / dequal | 2.0.3 | MIT |
 | npm / dom-accessibility-api | 0.5.16 | MIT |
 | npm / dom-accessibility-api | 0.6.3 | MIT |
 | npm / electron-to-chromium | 1.5.397 | ISC |
 | npm / entities | 8.0.0 | BSD-2-Clause |
-| npm / es-module-lexer | 1.7.0 | MIT |
+| npm / es-module-lexer | 2.3.2 | MIT |
 | npm / esbuild | 0.28.1 | MIT |
 | npm / escalade | 3.2.0 | MIT |
 | npm / estree-walker | 3.0.3 | MIT |
@@ -736,11 +727,9 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / indent-string | 4.0.0 | MIT |
 | npm / is-potential-custom-element-name | 1.0.1 | MIT |
 | npm / js-tokens | 4.0.0 | MIT |
-| npm / js-tokens | 9.0.1 | MIT |
 | npm / jsdom | 27.4.0 | MIT |
 | npm / jsesc | 3.1.0 | MIT |
 | npm / json5 | 2.2.3 | MIT |
-| npm / loupe | 3.2.1 | MIT |
 | npm / lru-cache | 11.5.2 | BlueOak-1.0.0 |
 | npm / lru-cache | 11.5.2 | BlueOak-1.0.0 |
 | npm / lru-cache | 11.5.2 | BlueOak-1.0.0 |
@@ -750,11 +739,11 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / mdn-data | 2.27.1 | CC0-1.0 |
 | npm / min-indent | 1.0.1 | MIT |
 | npm / ms | 2.1.3 | MIT |
-| npm / nanoid | 3.3.16 | MIT |
+| npm / nanoid | 3.3.18 | MIT |
 | npm / node-releases | 2.0.51 | MIT |
+| npm / obug | 2.2.1 | MIT |
 | npm / parse5 | 8.0.1 | MIT |
 | npm / pathe | 2.0.3 | MIT |
-| npm / pathval | 2.0.1 | MIT |
 | npm / picocolors | 1.1.1 | ISC |
 | npm / picomatch | 4.0.5 | MIT |
 | npm / postcss | 8.5.24 | MIT |
@@ -773,25 +762,21 @@ Exact versions and checksums are recorded in the bundled `SBOM.json`.
 | npm / siginfo | 2.0.0 | ISC |
 | npm / source-map-js | 1.2.1 | BSD-3-Clause |
 | npm / stackback | 0.0.2 | MIT |
-| npm / std-env | 3.10.0 | MIT |
+| npm / std-env | 4.3.0 | MIT |
 | npm / strip-indent | 3.0.0 | MIT |
-| npm / strip-literal | 3.1.0 | MIT |
 | npm / symbol-tree | 3.2.4 | MIT |
 | npm / tinybench | 2.9.0 | MIT |
-| npm / tinyexec | 0.3.2 | MIT |
+| npm / tinyexec | 1.3.1 | MIT |
 | npm / tinyglobby | 0.2.17 | MIT |
-| npm / tinypool | 1.1.1 | MIT |
-| npm / tinyrainbow | 2.0.0 | MIT |
-| npm / tinyspy | 4.0.4 | MIT |
+| npm / tinyrainbow | 3.2.0 | MIT |
 | npm / tldts-core | 7.4.9 | MIT |
 | npm / tldts | 7.4.9 | MIT |
 | npm / tough-cookie | 6.0.2 | BSD-3-Clause |
 | npm / tr46 | 6.0.0 | MIT |
 | npm / typescript | 5.9.3 | Apache-2.0 |
 | npm / update-browserslist-db | 1.2.3 | MIT |
-| npm / vite-node | 3.2.4 | MIT |
 | npm / vite | 7.3.6 | MIT |
-| npm / vitest | 3.2.7 | MIT |
+| npm / vitest | 4.1.11 | MIT |
 | npm / w3c-xmlserializer | 5.0.0 | MIT |
 | npm / webidl-conversions | 8.0.1 | BSD-2-Clause |
 | npm / whatwg-mimetype | 4.0.0 | MIT |

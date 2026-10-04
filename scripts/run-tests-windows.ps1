@@ -39,7 +39,7 @@ try {
 
     $frontendTests = Invoke-TrackedNative -FilePath $node `
         -Arguments @((Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
-            "--pool=threads", "--maxWorkers=$FrontendWorkers", "--minWorkers=1") `
+            "--pool=threads", "--maxWorkers=$FrontendWorkers") `
         -WorkingDirectory $projectRoot
     if ($frontendTests.StandardOutput) { [Console]::Out.Write($frontendTests.StandardOutput) }
     if ($frontendTests.StandardError) { [Console]::Error.Write($frontendTests.StandardError) }

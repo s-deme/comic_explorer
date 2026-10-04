@@ -101,7 +101,7 @@ def main() -> int:
             "test",
             "--",
             "--pool=threads",
-            "--poolOptions.threads.singleThread=true",
+            "--maxWorkers=1", "--no-file-parallelism",
         ]
     )
 

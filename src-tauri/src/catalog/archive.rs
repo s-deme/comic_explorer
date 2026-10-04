@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 use delharc::LhaHeader;
 use encoding_rs::SHIFT_JIS;
-use sevenz_rust::{
-    Archive as SevenZipArchive, Error as SevenZipError, Password, SevenZMethod, SevenZReader,
+use sevenz_rust2::{
+    Archive as SevenZipArchive, ArchiveReader, EncoderMethod, Error as SevenZipError, Password,
 };
 use unrar::error::{Code as UnrarCode, UnrarError, When as UnrarWhen};
 use unrar::{Archive, VolumeInfo};
@@ -523,24 +523,24 @@ fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<ArchiveListin
     if archive.files.len() > MAX_ARCHIVE_ENTRIES {
         return Err(limit_error("Archive entry-count limit exceeded."));
     }
-    for folder in &archive.folders {
+    for folder in &archive.blocks {
         for coder in &folder.coders {
-            let method = coder.decompression_method_id();
-            if method == SevenZMethod::ID_AES256SHA256 {
+            let method = coder.encoder_method_id();
+            if method == EncoderMethod::ID_AES256_SHA256 {
                 return Err(encrypted_archive_error(
                     "Encrypted 7z archives are not supported.",
                 ));
             }
             let supported = [
-                SevenZMethod::ID_COPY,
-                SevenZMethod::ID_LZMA,
-                SevenZMethod::ID_LZMA2,
-                SevenZMethod::ID_BCJ_X86,
-                SevenZMethod::ID_BCJ_PPC,
-                SevenZMethod::ID_BCJ_ARM,
-                SevenZMethod::ID_BCJ_ARM_THUMB,
-                SevenZMethod::ID_BCJ_SPARC,
-                SevenZMethod::ID_DELTA,
+                EncoderMethod::ID_COPY,
+                EncoderMethod::ID_LZMA,
+                EncoderMethod::ID_LZMA2,
+                EncoderMethod::ID_BCJ_X86,
+                EncoderMethod::ID_BCJ_PPC,
+                EncoderMethod::ID_BCJ_ARM,
+                EncoderMethod::ID_BCJ_ARM_THUMB,
+                EncoderMethod::ID_BCJ_SPARC,
+                EncoderMethod::ID_DELTA,
             ];
             if !supported.contains(&method) {
                 return Err(unsupported_archive_error(
@@ -548,16 +548,16 @@ fn validate_seven_zip_archive(archive: &SevenZipArchive) -> Result<ArchiveListin
                 ));
             }
 
-            let dictionary_size = if method == SevenZMethod::ID_LZMA {
+            let dictionary_size = if method == EncoderMethod::ID_LZMA {
                 let bytes: [u8; 4] = coder
-                    .properties
+                    .properties()
                     .get(1..5)
                     .and_then(|value| value.try_into().ok())
                     .ok_or_else(|| corrupt_archive_error("Invalid LZMA properties."))?;
                 u32::from_le_bytes(bytes) as u64
-            } else if method == SevenZMethod::ID_LZMA2 {
+            } else if method == EncoderMethod::ID_LZMA2 {
                 let bits = *coder
-                    .properties
+                    .properties()
                     .first()
                     .ok_or_else(|| corrupt_archive_error("Invalid LZMA2 properties."))?
                     as u32;
@@ -801,7 +801,7 @@ fn read_seven_zip_entry(
     entry_name: &str,
     max_bytes: u64,
 ) -> Result<ArchiveEntryBytes, AppError> {
-    let mut archive = SevenZReader::open(path, Password::empty()).map_err(seven_zip_error)?;
+    let mut archive = ArchiveReader::open(path, Password::empty()).map_err(seven_zip_error)?;
     validate_seven_zip_archive(archive.archive())?;
     let expected = archive
         .archive()
@@ -823,7 +823,7 @@ fn read_seven_zip_entry(
                 reader
                     .take(max_bytes.saturating_add(1))
                     .read_to_end(&mut bytes)
-                    .map_err(SevenZipError::io)?;
+                    .map_err(SevenZipError::from)?;
                 if bytes.len() as u64 > max_bytes {
                     return Err(SevenZipError::MaxMemLimited {
                         max_kb: usize::try_from(max_bytes / 1024).unwrap_or(usize::MAX),
@@ -833,7 +833,7 @@ fn read_seven_zip_entry(
                 found = Some(bytes);
                 return Ok(false);
             }
-            std::io::copy(reader, &mut std::io::sink()).map_err(SevenZipError::io)?;
+            std::io::copy(reader, &mut std::io::sink()).map_err(SevenZipError::from)?;
             Ok(true)
         })
         .map_err(seven_zip_error)?;
@@ -1323,11 +1323,11 @@ mod tests {
     }
 
     fn write_seven_zip(path: &Path, entries: &[(&str, &[u8])]) {
-        use sevenz_rust::{SevenZArchiveEntry, SevenZWriter};
+        use sevenz_rust2::{ArchiveEntry, ArchiveWriter};
 
-        let mut archive = SevenZWriter::create(path).unwrap();
+        let mut archive = ArchiveWriter::create(path).unwrap();
         for (name, bytes) in entries {
-            let mut entry = SevenZArchiveEntry::new();
+            let mut entry = ArchiveEntry::new();
             entry.name = (*name).to_string();
             archive.push_archive_entry(entry, Some(*bytes)).unwrap();
         }

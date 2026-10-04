@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Verified non-secret test token or PlayerPrefs identifier"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^src\-tauri/src/media/mod\.rs''']
+regexes = ['''^0123456789abcdef0123456789abcdef$''']

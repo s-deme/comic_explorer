@@ -136,7 +136,7 @@ const cliLaunchHarness = vi.hoisted(() => ({
 vi.mock("../features/library/native-file-drop", () => ({
   listenNativeFileDrops: vi.fn(async (handler) => {
     nativeFileDropHarness.handler = handler;
-    return vi.fn();
+    return vi.fn<() => void>();
   }),
   nativeDropTargetAt: vi.fn(() => nativeFileDropHarness.target),
 }));
@@ -557,7 +557,7 @@ export function installAppTestHooks(settings: Partial<CatalogSettings> = {}) {
     });
     listenCliLaunchPendingMock.mockImplementation(async (handler) => {
       cliLaunchHarness.handler = handler;
-      return vi.fn();
+      return vi.fn<() => void>();
     });
     openMock.mockReset();
     resolveCatalogActivationMock.mockReset();
@@ -635,11 +635,11 @@ export function installAppTestHooks(settings: Partial<CatalogSettings> = {}) {
     });
     listenCatalogFolderChangesMock.mockImplementation(async (handler) => {
       folderWatchHarness.handler = handler;
-      return vi.fn();
+      return vi.fn<() => void>();
     });
     listenRecursiveThumbnailProgressMock.mockImplementation(async (handler) => {
       recursiveThumbnailHarness.handler = handler;
-      return vi.fn();
+      return vi.fn<() => void>();
     });
     cancelRecursiveThumbnailGenerationMock.mockResolvedValue({
       status: "cancelled",

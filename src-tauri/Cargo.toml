@@ -4,7 +4,7 @@ version = "0.1.1"
 description = "Offline comic library explorer for Windows"
 authors = ["Comic Explorer contributors"]
 edition = "2024"
-rust-version = "1.91"
+rust-version = "1.93"
 
 [lib]
 name = "comic_explorer_lib"
@@ -26,7 +26,7 @@ resvg = { version = "=0.45.1", default-features = false, features = ["system-fon
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sevenz-rust = { version = "=0.6.1", default-features = false }
+sevenz-rust2 = { version = "=0.22.2", default-features = false }
 tauri = { version = "2", features = ["tray-icon"] }
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
@@ -57,4 +57,4 @@ zip = { version = "6", default-features = false, features = ["deflate"] }
 tauri-plugin-single-instance = "=2.4.3"
 
 [dev-dependencies]
-sevenz-rust = { version = "=0.6.1", default-features = false, features = ["compress"] }
+sevenz-rust2 = { version = "=0.22.2", default-features = false, features = ["compress"] }

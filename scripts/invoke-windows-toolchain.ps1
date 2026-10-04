@@ -92,7 +92,7 @@ try {
             $vitestArguments = @(
                 (Join-Path $projectRoot "node_modules\vitest\vitest.mjs"), "run",
                 $frontendTestPath,
-                "--pool=threads", "--poolOptions.threads.singleThread=true"
+                "--pool=threads", "--maxWorkers=1", "--no-file-parallelism"
             )
             if (![string]::IsNullOrWhiteSpace($FrontendTestName)) {
                 $vitestArguments += @("-t", $FrontendTestName, "--reporter=json")
