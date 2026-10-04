@@ -46,8 +46,9 @@ use crate::api::{Generation, MAX_IMAGE_BYTES, RequestContext, Response};
 use crate::catalog::enumerate_folder_pages;
 use crate::catalog::{
     CatalogEntry, CoverBytes, enumerate_archive_pages, enumerate_folder,
-    enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden, enumerate_pdf_pages,
-    has_child_folder_with_hidden, render_pdf_page,
+    enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden,
+    enumerate_folder_with_hidden_cancellable, enumerate_pdf_pages, has_child_folder_with_hidden,
+    render_pdf_page,
 };
 use crate::diagnostics::{DiagnosticReport, DiagnosticSnapshotEntry, scan_library};
 use crate::domain::{
@@ -70,6 +71,7 @@ pub struct AppState {
     library_root: Mutex<Option<PathBuf>>,
     search_sources: Mutex<BTreeMap<String, PathBuf>>,
     folder_watch: Mutex<Option<folder_watch::FolderWatch>>,
+    tree_confirmation_gate: Arc<Mutex<()>>,
     navigation: Mutex<NavigationCoordinator>,
     diagnostics: Mutex<NavigationCoordinator>,
     recursive_thumbnails: Mutex<NavigationCoordinator>,
@@ -273,6 +275,7 @@ impl Default for AppState {
             library_root: Mutex::new(library_root),
             search_sources: Mutex::new(search_sources),
             folder_watch: Mutex::new(None),
+            tree_confirmation_gate: Arc::new(Mutex::new(())),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
@@ -2609,22 +2612,14 @@ fn resolve_thumbnail(
     if retry {
         pipeline.retry(item);
     }
-    let stores = stores
-        .lock()
-        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail cache state is poisoned."))?;
-    let Some(store) = stores.as_ref() else {
-        return Err(request_error(
-            ErrorCode::Internal,
-            "Thumbnail cache is unavailable.",
-        ));
-    };
+    // ponytail: serialize the shared pipeline; split per-worker state if thumbnail throughput needs it.
     #[cfg(target_os = "windows")]
     {
-        pipeline.resolve(store, root, item, now_ms)
+        pipeline.resolve(stores, root, item, now_ms)
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (store, root, now_ms);
+        let _ = (stores, root, now_ms);
         Err(request_error(
             ErrorCode::UnsupportedFormat,
             "WIC thumbnail generation requires Windows.",
@@ -2647,22 +2642,13 @@ fn resolve_thumbnail_cover(
             "Thumbnail generation is unavailable on this platform.",
         ));
     };
-    let stores = stores
-        .lock()
-        .map_err(|_| request_error(ErrorCode::Internal, "Thumbnail cache state is poisoned."))?;
-    let Some(store) = stores.as_ref() else {
-        return Err(request_error(
-            ErrorCode::Internal,
-            "Thumbnail cache is unavailable.",
-        ));
-    };
     #[cfg(target_os = "windows")]
     {
-        pipeline.resolve_cover(store, cover, now_ms)
+        pipeline.resolve_cover(stores, cover, now_ms)
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (pipeline, store, cover, now_ms);
+        let _ = (pipeline, stores, cover, now_ms);
         Err(request_error(
             ErrorCode::UnsupportedFormat,
             "WIC thumbnail generation requires Windows.",
@@ -2899,7 +2885,8 @@ fn enumerate_folder_port(
     if cancellation.is_cancelled() {
         return Err(AppError::cancelled());
     }
-    let result = enumerate_folder_with_hidden(root, directory, show_hidden);
+    let result =
+        enumerate_folder_with_hidden_cancellable(root, directory, show_hidden, cancellation);
     if cancellation.is_cancelled() {
         Err(AppError::cancelled())
     } else {
@@ -3416,16 +3403,15 @@ pub async fn list_tree_children(
         }
     };
     let requested_directory = root.join(relative_path.as_str());
-    let (show_hidden, confirm_children) = state
+    let show_hidden = state
         .store
         .lock()
         .map_err(|_| "state poisoned")?
         .as_ref()
         .and_then(|store| store.load_settings().ok())
-        .map(|settings| (settings.show_hidden_files, settings.tree_confirm_children))
-        .unwrap_or((false, true));
+        .is_some_and(|settings| settings.show_hidden_files);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        enumerate_tree_children(&root, &requested_directory, show_hidden, confirm_children)
+        enumerate_tree_children(&root, &requested_directory, show_hidden)
     })
     .await
     .map_err(|error| format!("tree worker failed: {error}"))?;
@@ -3437,6 +3423,109 @@ pub async fn list_tree_children(
         },
         Err(error) => error_response(&context, error),
     })
+}
+
+#[tauri::command]
+pub async fn confirm_tree_children(
+    state: tauri::State<'_, AppState>,
+    context: RequestContext,
+    relative_paths: Vec<String>,
+) -> Result<Response<Vec<TreeEntry>>, String> {
+    if let Err(error) = validate_request(&state, &context) {
+        return Ok(error_response(&context, error));
+    }
+    if relative_paths.len() > 64 {
+        return Ok(error_response(
+            &context,
+            request_error(
+                ErrorCode::ResourceLimit,
+                "Tree confirmation accepts at most 64 paths.",
+            ),
+        ));
+    }
+    let root = match configured_library_root(&state)? {
+        Some(root) => root,
+        None => {
+            return Ok(error_response(
+                &context,
+                request_error(ErrorCode::InvalidRequest, "Library root is not configured."),
+            ));
+        }
+    };
+    let (show_hidden, confirm_children) = state
+        .store
+        .lock()
+        .map_err(|_| "state poisoned")?
+        .as_ref()
+        .and_then(|store| store.load_settings().ok())
+        .map(|settings| (settings.show_hidden_files, settings.tree_confirm_children))
+        .unwrap_or((false, true));
+    let gate = state.tree_confirmation_gate.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = gate.lock().map_err(|_| {
+            request_error(ErrorCode::Internal, "Tree confirmation state is poisoned.")
+        })?;
+        confirm_tree_children_port(&root, relative_paths, show_hidden, confirm_children)
+    })
+    .await
+    .map_err(|error| format!("tree confirmation worker failed: {error}"))?;
+    Ok(port_response(context, result, true))
+}
+
+fn confirm_tree_children_port(
+    root: &Path,
+    paths: Vec<String>,
+    show_hidden: bool,
+    enabled: bool,
+) -> Result<Vec<TreeEntry>, AppError> {
+    if paths.len() > 64 {
+        return Err(request_error(
+            ErrorCode::ResourceLimit,
+            "Tree confirmation accepts at most 64 paths.",
+        ));
+    }
+    let paths = paths
+        .into_iter()
+        .map(|path| {
+            RelativePath::parse(path)
+                .map_err(|message| request_error(ErrorCode::InvalidPath, message))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|_| request_error(ErrorCode::InvalidPath, "Library root is unavailable."))?;
+    paths
+        .into_iter()
+        .map(|relative_path| {
+            match root.join(relative_path.as_str()).canonicalize() {
+                Ok(path) if !path.starts_with(&canonical_root) => {
+                    return Err(request_error(
+                        ErrorCode::OutsideLibraryRoot,
+                        "Tree folder is outside the library root.",
+                    ));
+                }
+                _ => {}
+            }
+            let has_children = if enabled {
+                match has_child_folder_with_hidden(
+                    root,
+                    &root.join(relative_path.as_str()),
+                    show_hidden,
+                ) {
+                    Ok(value) => Some(value),
+                    Err(error) if error.code == ErrorCode::OutsideLibraryRoot => return Err(error),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+            Ok(TreeEntry {
+                relative_path,
+                has_children,
+                entry_kind: "folder".into(),
+            })
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -3592,7 +3681,6 @@ fn enumerate_tree_children(
     root: &Path,
     requested_directory: &Path,
     show_hidden: bool,
-    confirm_children: bool,
 ) -> Result<Vec<TreeEntry>, AppError> {
     enumerate_folder_with_hidden(root, requested_directory, show_hidden).and_then(|entries| {
         entries
@@ -3607,18 +3695,7 @@ fn enumerate_tree_children(
             })
             .map(|entry| {
                 let is_archive = entry.kind == crate::domain::ItemKind::Archive;
-                let has_children = if is_archive {
-                    Some(true)
-                } else if confirm_children {
-                    has_child_folder_with_hidden(
-                        root,
-                        &root.join(entry.relative_path.as_str()),
-                        show_hidden,
-                    )
-                    .ok()
-                } else {
-                    None
-                };
+                let has_children = if is_archive { Some(true) } else { None };
                 Ok(TreeEntry {
                     relative_path: entry.relative_path,
                     has_children,
@@ -5162,6 +5239,7 @@ mod shutdown_tests {
             library_root: Mutex::new(None),
             search_sources: Mutex::new(BTreeMap::new()),
             folder_watch: Mutex::new(None),
+            tree_confirmation_gate: Arc::new(Mutex::new(())),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
@@ -5269,6 +5347,7 @@ mod shutdown_tests {
             library_root: Mutex::new(None),
             search_sources: Mutex::new(BTreeMap::new()),
             folder_watch: Mutex::new(None),
+            tree_confirmation_gate: Arc::new(Mutex::new(())),
             navigation: Mutex::new(NavigationCoordinator::default()),
             diagnostics: Mutex::new(NavigationCoordinator::default()),
             recursive_thumbnails: Mutex::new(NavigationCoordinator::default()),
@@ -5771,21 +5850,58 @@ mod shutdown_tests {
         }
 
         let started = std::time::Instant::now();
-        let entries = enumerate_tree_children(&root, &root, false, true).unwrap();
+        let entries = enumerate_tree_children(&root, &root, false).unwrap();
         let elapsed = started.elapsed();
         eprintln!(
-            "REQ-LEY-P3-006 10000 direct folders with child confirmation: {:.3} ms",
+            "REQ-LEY-P3-006 10000 direct folders without eager child confirmation: {:.3} ms",
             elapsed.as_secs_f64() * 1000.0
         );
         assert_eq!(entries.len(), 10_000);
-        assert!(
+        assert!(entries.iter().all(|entry| entry.has_children.is_none()));
+        assert!(elapsed < Duration::from_secs(60));
+        let confirmed = confirm_tree_children_port(
+            &root,
             entries
+                .iter()
+                .take(64)
+                .map(|entry| entry.relative_path.to_string())
+                .collect(),
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(
+            confirmed
                 .iter()
                 .all(|entry| entry.has_children == Some(false))
         );
-        assert!(elapsed < Duration::from_secs(60));
-        let unconfirmed = enumerate_tree_children(&root, &root, false, false).unwrap();
-        assert!(unconfirmed.iter().all(|entry| entry.has_children.is_none()));
+        assert_eq!(
+            confirm_tree_children_port(&root, vec!["folder-00000".into(); 65], false, true)
+                .unwrap_err()
+                .code,
+            ErrorCode::ResourceLimit
+        );
+        assert_eq!(
+            confirm_tree_children_port(&root, vec!["../outside".into()], false, true)
+                .unwrap_err()
+                .code,
+            ErrorCode::InvalidPath
+        );
+        std::fs::create_dir(root.join("folder-00000/.hidden-child")).unwrap();
+        let paths = vec!["folder-00000".into(), "missing".into()];
+        let visible = confirm_tree_children_port(&root, paths.clone(), false, true).unwrap();
+        assert_eq!(visible[0].has_children, Some(false));
+        assert_eq!(visible[1].has_children, None);
+        assert_eq!(
+            confirm_tree_children_port(&root, paths.clone(), true, true).unwrap()[0].has_children,
+            Some(true)
+        );
+        assert!(
+            confirm_tree_children_port(&root, paths, true, false)
+                .unwrap()
+                .iter()
+                .all(|entry| entry.has_children.is_none())
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 

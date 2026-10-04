@@ -185,6 +185,7 @@ import {
 } from "./features/library/native-file-drop";
 import { MediaCatalogDialog } from "./features/media/MediaCatalogDialog";
 import { FolderTree } from "./features/navigation/FolderTree";
+import { ThumbnailQueue } from "./features/catalog/thumbnail-queue";
 import {
   navigationReducer,
   normalizeWindowsDisplayPath,
@@ -527,7 +528,7 @@ export function App({
   const cliLaunchGeneration = useRef(0);
   const cliLaunchRequested = useRef(false);
   const cliLaunchChain = useRef<Promise<void>>(Promise.resolve());
-  const thumbnailRequests = useRef(new Set<string>());
+  const thumbnailRequests = useRef<ThumbnailQueue | null>(null);
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const menuBarRef = useRef<HTMLElement>(null);
@@ -568,6 +569,31 @@ export function App({
   const catalogSnapshots = useRef<Map<string, CatalogEntry[]>>(new Map());
   const [loadedCatalogPath, setLoadedCatalogPath] = useState<string | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<string, ThumbnailViewState>>({});
+  if (thumbnailRequests.current === null) {
+    thumbnailRequests.current = new ThumbnailQueue(async (path, requestGeneration, priority) => {
+      if (requestGeneration !== generation.current) return;
+      setThumbnails((current) => ({ ...current, [path]: { status: "loading" } }));
+      try {
+        const response = await getThumbnail(path, requestGeneration, false, priority);
+        if (requestGeneration !== generation.current) return;
+        if (response.status === "cancelled") {
+          setThumbnails((current) => { const next = { ...current }; delete next[path]; return next; });
+          return;
+        }
+        setThumbnails((current) => ({ ...current, [path]: response.status === "ok"
+          ? { status: "ready", mediaUri: response.data.mediaUri, cacheHit: response.data.cacheHit }
+          : { status: "error" } }));
+      } catch {
+        if (requestGeneration === generation.current) {
+          setThumbnails((current) => ({ ...current, [path]: { status: "error" } }));
+        }
+      }
+    });
+  }
+  useEffect(() => () => {
+    generation.current += 1;
+    thumbnailRequests.current?.reset(generation.current);
+  }, []);
   const [managedThumbnails, setManagedThumbnails] = useState<ManagedThumbnailMap>(
     createManagedThumbnailMap,
   );
@@ -700,7 +726,7 @@ export function App({
       setSelectedPaths([]);
       setSelectedPath(null);
       setThumbnails({});
-      thumbnailRequests.current.clear();
+      thumbnailRequests.current?.reset(generation.current);
     },
   });
   const {
@@ -1439,27 +1465,16 @@ export function App({
   }, [navigation.current, selectedPath]);
 
   useEffect(() => {
-    const requestGeneration = generation.current;
-    sortedEntries.forEach((entry, index) => {
-      if (
-        entry.kind !== "archive"
-      ) return;
-      if (thumbnailGenerationScopeRef.current === "visible" && index >= 25) return;
-      if (thumbnailGenerationScopeRef.current === "near" && index >= 40) return;
-      if (managedThumbnailFor(managedThumbnails, entry.relativePath) !== undefined) return;
-      if (thumbnails[entry.relativePath] !== undefined) return;
-      const priority =
-        index < 25 ? "visible" : index < 40 ? "near" : "background";
-      queueThumbnail(entry, requestGeneration, priority);
-    });
-  }, [managedThumbnails, sortedEntries, thumbnailGenerationScope, thumbnails]);
+    thumbnailRequests.current?.configure(sortedEntries, thumbnailGenerationScope,
+      (path) => managedThumbnailFor(managedThumbnails, path) !== undefined);
+  }, [managedThumbnails, sortedEntries, thumbnailGenerationScope]);
 
   async function load(relativePath: string, selectionPathsToRestore: readonly string[] = []) {
     generation.current += 1;
     const requestGeneration = generation.current;
     setLoadState({ status: "loading", path: relativePath });
     setThumbnails({});
-    thumbnailRequests.current.clear();
+    thumbnailRequests.current?.reset(requestGeneration);
     try {
       const response = await listFolder(relativePath, requestGeneration);
       if (requestGeneration !== generation.current) return;
@@ -3165,44 +3180,7 @@ export function App({
     requestGeneration: number,
     priority: "visible" | "near" | "background",
   ) {
-    if (thumbnailRequests.current.has(entry.relativePath)) return;
-    thumbnailRequests.current.add(entry.relativePath);
-    setThumbnails((current) => ({
-      ...current,
-      [entry.relativePath]: { status: "loading" },
-    }));
-    void getThumbnail(entry.relativePath, requestGeneration, false, priority)
-      .then((response) => {
-        if (requestGeneration !== generation.current) return;
-        if (response.status === "cancelled") {
-          setThumbnails((current) => {
-            const next = { ...current };
-            delete next[entry.relativePath];
-            return next;
-          });
-          return;
-        }
-        setThumbnails((current) => ({
-          ...current,
-          [entry.relativePath]:
-            response.status === "ok"
-              ? {
-                  status: "ready",
-                  mediaUri: response.data.mediaUri,
-                  cacheHit: response.data.cacheHit,
-                }
-              : { status: "error" },
-        }));
-      })
-      .catch(() => {
-        if (requestGeneration === generation.current) {
-          setThumbnails((current) => ({
-            ...current,
-            [entry.relativePath]: { status: "error" },
-          }));
-        }
-      })
-      .finally(() => thumbnailRequests.current.delete(entry.relativePath));
+    if (requestGeneration === generation.current) thumbnailRequests.current?.add(entry.relativePath, priority);
   }
 
   const selected = entries.find(
@@ -3517,7 +3495,7 @@ export function App({
     setBookmarks([]);
     setBookmarkNotice(null);
     setThumbnails({});
-    thumbnailRequests.current.clear();
+    thumbnailRequests.current?.reset(generation.current);
   }
 
   function synchronizeViewerCatalogSelection(
@@ -4967,6 +4945,7 @@ export function App({
         <FolderTree
           key={`tree:${libraryRoot ?? "pc"}:${treeConfirmChildren}`}
           libraryRoot={libraryRoot}
+          confirmChildren={treeConfirmChildren}
           currentPath={navigation.current}
           hidden={!treeVisible || searchPaneOpen}
           autoCollapse={treeAutoCollapse}

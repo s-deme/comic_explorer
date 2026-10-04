@@ -215,6 +215,13 @@ export async function listTreeChildren(
   });
 }
 
+export async function confirmTreeChildren(
+  relativePaths: string[],
+  generation: number,
+): Promise<ApiResponse<TreeEntry[]>> {
+  return invoke("confirm_tree_children", { context: context(generation), relativePaths });
+}
+
 export async function listenCatalogFolderChanges(
   handler: (change: CatalogFolderChange) => void,
 ): Promise<UnlistenFn> {

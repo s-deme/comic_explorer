@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { createDefaultSettingsProfile } from "../settings/profile";
 import {
   listReadingHistory,
+  confirmTreeChildren,
   deleteCatalogMask,
   evaluateCatalogMask,
   listCatalogMasks,
@@ -79,6 +80,14 @@ const invokeMock = vi.mocked(invoke);
 const listenMock = vi.mocked(listen);
 
 describe("library client settings contract", () => {
+  it("forwards bounded tree confirmation paths with the request context", async () => {
+    vi.mocked(invoke).mockResolvedValue({ status: "ok", data: [] });
+    await confirmTreeChildren(["shelf/book"], 9);
+    expect(invoke).toHaveBeenCalledWith("confirm_tree_children", {
+      context: expect.objectContaining({ apiVersion: 1, generation: 9 }), relativePaths: ["shelf/book"],
+    });
+  });
+
   beforeEach(() => {
     invokeMock.mockReset();
     invokeMock.mockResolvedValue({ status: "cancelled" });

@@ -57,6 +57,25 @@ Windows版の全ページ一覧、同梱AVIFデコード、連続縦読み、埋
 
 ICC変換はDisplay P3からの画素変換・アルファ保持・不正プロファイル拒否をRustテストで確認した。HDR、AVIF grid合成等、非RGB ICCは未対応。大規模作品の実測性能、実モニターの色精度、複数フレームのアニメーション進行時間、assistive technology、clean VM配布確認は未測定。IMP-015全体のfeature canonicalを今回再実行した記録ではない。
 
+## 2026-10-02 大量フォルダーの一覧応答
+
+サムネイルの設定・DBロックをキャッシュ操作へ限定し、一覧要求を同時2件・待機64件へ制限した。全件生成はカーソルで順次送信する。ツリーは下位確認前に表示し、表示範囲とoverscanだけ最大64件・同時1バッチで確認する。旧世代応答の破棄、列挙途中のキャンセル、容量上限以下のLRU走査省略、Windows列挙メタデータの再利用を追加した。
+
+Windows focused test・TypeScript typecheck、production build、Rust canonical（lib 279件・shutdown process 1件）、CoDD scan/check/verifyが成功した。遅い画像生成中の設定取得・フォルダー列挙、1万項目の要求上限・優先順位・世代切替、ツリーの遅延確認・隠し項目・未確認行・古い応答・スクロール位置維持を自動テストで確認した。CoDDのadvisory・SKIP・VACUOUSは合格件数に含めない。ビルドと同じ正規Windowsホストでrelease freshnessも成功した。
+
+`scripts/measure-catalog-windows.ps1` で `E:\F\doujin\_A`（7,637項目）を旧・新EXEそれぞれ3回試行し、各2回で計測値を取得した。毎回アプリ用データとキャッシュを分離し、250ms間隔の30回スクロール中に、一覧項目が処理したキーから次の描画までを測った。
+
+| EXE | 初回表示（秒） | キー処理→描画 P95（ms） | JS heap（MiB） | プロセス群Working Set（MiB） |
+| --- | --- | --- | --- | --- |
+| 変更前・1回目 | 1.65 | 37.8 | 14.7 | 569.1 |
+| 変更前・2回目 | 1.55 | 76.6 | 15.9 | 515.3 |
+| 変更後・2回目 | 2.89 | 31.9 | 22.8 | 508.8 |
+| 変更後・3回目 | 4.96 | 36.2 | 23.3 | 559.0 |
+
+変更後の計測上のP95は200ms以内だったが、初回表示時間の改善は確認できず、JS heapの観測値は増えた。メモリはスクロール終了時のスナップショットでありピーク値ではない。ファイルシステムのキャッシュは制御していない。キーはJavaScriptから送ったもので、OSからの実入力遅延・読込中の実操作・報告されたフリーズの解消は未検証。各3回のうち1回はフォルダーを開く前のCDP起動接続に失敗し、変更後の1回は計測後の終了にもタイムアウトした。追加の旧EXE試行でもaddress表示待ち・終了確認に失敗しており、3回全成功とは扱わない。
+
+証跡は追跡対象外の `src-tauri/target/verification/catalog-performance/{before-comparison,after-comparison,before-confirmation}/results.json`。旧EXEのSHA-256は `bf31cb50a76f6765c4b9e80c5ea7fca5d523f6e63d2dde1c02fa3994e73032fd`、変更後は `c11bf2c33e56acf20e0156a26949e1ea2e92a37afc379751df6fc020b852d544`。以上の未測定・失敗を残し、性能受入全体のPASSとはしない。
+
 ## 過去の未完了記録と未測定
 
 2026-09-17のWindows版変更（閉じる権限、ページプレビュー、アニメーションWebP）では、CoDD scan/check/verify、TypeScript typecheck、Rust canonical test、release EXE buildとfreshness確認が成功した。feature canonical（IMP-015）はproduct-webp段階で失敗しており、全体PASSではない。UI harnessの再試行でもViewerのCDP接続を確認できず、閉じる操作・プレビュー・アニメーションの実画面検証は未完了。AVIFの実サンプル表示も未検証。

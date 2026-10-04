@@ -179,6 +179,7 @@ pub fn run() {
             application::get_thumbnail,
             application::generate_recursive_thumbnails,
             application::list_tree_children,
+            application::confirm_tree_children,
             application::archive_browser::list_archive_virtual_tree,
             application::archive_browser::get_archive_thumbnail,
             application::archive_browser::copy_archive_page_to_clipboard,

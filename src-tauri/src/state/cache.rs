@@ -171,6 +171,17 @@ impl ThumbnailCache {
     }
 
     pub fn evict_to_limit(&self, store: &StateStore, limit_bytes: u64) -> Result<u64, AppError> {
+        let total: i64 = store
+            .connection()
+            .query_row(
+                "SELECT COALESCE(SUM(MAX(size_bytes, 0)), 0) FROM thumbnail_index",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(cache_error)?;
+        if total.max(0) as u64 <= limit_bytes {
+            return Ok(total.max(0) as u64);
+        }
         let pinned = self.pins.snapshot()?;
         let mut statement = store
             .connection()
@@ -270,6 +281,9 @@ mod tests {
             .unwrap();
         cache.pin(&first).unwrap();
 
+        assert_eq!(cache.evict_to_limit(&store, 11).unwrap(), 11);
+        assert!(cache.path_for(&first).unwrap().is_file());
+        assert!(cache.path_for(&second).unwrap().is_file());
         assert_eq!(cache.evict_to_limit(&store, 5).unwrap(), 5);
         assert!(cache.lookup(&store, &first, 3).unwrap().is_some());
         assert!(cache.lookup(&store, &second, 3).unwrap().is_none());

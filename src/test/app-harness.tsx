@@ -44,6 +44,7 @@ import {
   listReadingHistory,
   listShelves,
   listTreeChildren,
+  confirmTreeChildren,
   listWindowsKnownFolders,
   loadPage,
   moveFileItemsToDestination,
@@ -151,6 +152,7 @@ vi.mock("../features/library/client", () => ({
   watchLibraryFolder: vi.fn(),
   stopLibraryFolderWatch: vi.fn(),
   listTreeChildren: vi.fn(),
+  confirmTreeChildren: vi.fn(),
   listWindowsDrives: vi.fn(async () => ({
     status: "ok", requestId: "drives", generation: 1,
     data: [
@@ -531,6 +533,9 @@ export function installAppTestHooks(settings: Partial<CatalogSettings> = {}) {
     stopLibraryFolderWatchMock.mockReset();
     folderWatchHarness.handler = undefined;
     treeMock.mockReset();
+    vi.mocked(confirmTreeChildren).mockReset();
+    vi.mocked(confirmTreeChildren).mockResolvedValue({ status: "ok", requestId: "confirm" as never,
+      generation: 1 as never, data: [] });
     restoreMock.mockReset();
     takeCliLaunchRequestMock.mockReset();
     listenCliLaunchPendingMock.mockReset();

@@ -68,7 +68,7 @@ codd:
 
 | ID | 現行契約 |
 |---|---|
-| NFR-MVP-001 | 大規模catalogでも遅延処理、virtualize、bounded thumbnail cacheを使う。 |
+| NFR-MVP-001 | 大規模catalogでも遅延処理、virtualize、bounded thumbnail cacheを使う。一覧のthumbnail要求は同時2件・待機64件以内とし、表示中を優先する。画像読込・デコード中は設定・DBの共通lockを保持しない。folder treeは下位確認を待たず表示し、下位確認が有効なら表示範囲とoverscanだけを最大64件・同時1batchで順次確認する。folder移動・drive切替・更新前の古い応答を表示しない。受入確認: thumbnail queue・FolderTree・Rust thumbnail/tree/cancellationテスト。 |
 | NFR-MVP-002 | 起動、一覧、page、検索、memoryの性能目標を維持し、未測定は未測定と記録する。 |
 | NFR-MVP-003 | keyboard操作、focus可視化、判読可能なテーマ、responsiveな一覧・dialogを維持する。 |
 | NFR-MVP-004 | 再配布可能license、SBOM、THIRD-PARTY-NOTICESを同期し、version tagに対応するGitHub ReleaseからWindows installer、portable ZIP、SHA-256 checksumを取得可能にする。 |

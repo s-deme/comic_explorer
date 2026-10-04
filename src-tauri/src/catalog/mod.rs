@@ -12,7 +12,8 @@ pub use archive::{
 };
 pub use folder::{
     ArchiveKind, CatalogEntry, enumerate_folder, enumerate_folder_pages,
-    enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden, has_child_folder_with_hidden,
+    enumerate_folder_pages_with_hidden, enumerate_folder_with_hidden,
+    enumerate_folder_with_hidden_cancellable, has_child_folder_with_hidden,
 };
 pub use image_metadata::{ImageMetadata, inspect_image};
 pub(crate) use image_render::{color_managed_png, raster_delivery_png, render_svg_png};

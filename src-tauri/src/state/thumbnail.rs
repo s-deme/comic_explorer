@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use crate::catalog::{CoverBytes, read_cover};
 use crate::domain::{AppError, ErrorCode, RelativePath};
@@ -38,7 +39,7 @@ impl ThumbnailPipeline {
     #[cfg(target_os = "windows")]
     pub fn resolve(
         &mut self,
-        store: &StateStore,
+        stores: &Mutex<Option<StateStore>>,
         root: &Path,
         item: &RelativePath,
         now_ms: i64,
@@ -51,7 +52,7 @@ impl ThumbnailPipeline {
 
         let result = (|| {
             let cover = read_cover(root, item)?;
-            self.resolve_cover(store, cover, now_ms)
+            self.resolve_cover(stores, cover, now_ms)
         })();
 
         if let Err(error) = &result {
@@ -69,16 +70,34 @@ impl ThumbnailPipeline {
     #[cfg(target_os = "windows")]
     pub fn resolve_cover(
         &mut self,
-        store: &StateStore,
+        stores: &Mutex<Option<StateStore>>,
         cover: CoverBytes,
         now_ms: i64,
+    ) -> Result<ThumbnailResult, AppError> {
+        self.resolve_cover_with_encoder(stores, cover, now_ms, crate::catalog::encode_wic_jpeg)
+    }
+
+    #[cfg(target_os = "windows")]
+    fn resolve_cover_with_encoder(
+        &mut self,
+        stores: &Mutex<Option<StateStore>>,
+        cover: CoverBytes,
+        now_ms: i64,
+        encode: impl FnOnce(&[u8], &Path) -> Result<(u32, u32), AppError>,
     ) -> Result<ThumbnailResult, AppError> {
         let content_hash = stable_digest(&(
             "srgb-avif-v1",
             cover.source_key.as_str(),
             cover.fingerprint_detail.as_str(),
         ));
-        if let Some(path) = self.cache.lookup(store, &content_hash, now_ms)? {
+        let cached = {
+            let stores = stores.lock().map_err(pipeline_io_error)?;
+            let store = stores
+                .as_ref()
+                .ok_or_else(|| pipeline_io_error("cache unavailable"))?;
+            self.cache.lookup(store, &content_hash, now_ms)?
+        };
+        if let Some(path) = cached {
             self.cache.pin(&content_hash)?;
             return Ok(ThumbnailResult {
                 content_hash,
@@ -94,8 +113,12 @@ impl ThumbnailPipeline {
             &content_hash[..16]
         ));
         let generated: Result<ThumbnailResult, AppError> = (|| {
-            let (width, height) = crate::catalog::encode_wic_jpeg(&cover.bytes, &temporary)?;
+            let (width, height) = encode(&cover.bytes, &temporary)?;
             let jpeg = std::fs::read(&temporary).map_err(pipeline_io_error)?;
+            let stores = stores.lock().map_err(pipeline_io_error)?;
+            let store = stores
+                .as_ref()
+                .ok_or_else(|| pipeline_io_error("cache unavailable"))?;
             let path =
                 self.cache
                     .write_atomic(store, &content_hash, &jpeg, width, height, now_ms)?;
@@ -205,6 +228,7 @@ mod tests {
     fn real_folder_cover_generates_then_hits_atomic_cache_and_negative_cache_expires() {
         let paths = temporary_paths("integration");
         let (store, _) = StateStore::open(&paths).unwrap();
+        let store = Mutex::new(Some(store));
         let mut pipeline = ThumbnailPipeline::new(&paths).unwrap();
         let fixture_root =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");
@@ -275,9 +299,56 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
+    fn slow_thumbnail_encoding_does_not_lock_settings_or_folder_navigation() {
+        use std::sync::{Arc, mpsc};
+        let paths = temporary_paths("store-lock");
+        let (store, _) = StateStore::open(&paths).unwrap();
+        let stores = Arc::new(Mutex::new(Some(store)));
+        let mut pipeline = ThumbnailPipeline::new(&paths).unwrap();
+        let worker_stores = stores.clone();
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            pipeline.resolve_cover_with_encoder(
+                &worker_stores,
+                CoverBytes {
+                    bytes: vec![],
+                    source_key: "test-cover".into(),
+                    fingerprint_detail: "test".into(),
+                },
+                100,
+                |_, output| {
+                    started_tx.send(()).unwrap();
+                    release_rx
+                        .recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    std::fs::write(output, b"test jpeg").unwrap();
+                    Ok((1, 1))
+                },
+            )
+        });
+        started_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        {
+            let store = stores
+                .try_lock()
+                .expect("decoding must not hold the settings/DB lock");
+            store.as_ref().unwrap().load_settings().unwrap();
+            assert!(crate::catalog::enumerate_folder(&paths.root, &paths.root).is_ok());
+        }
+        release_tx.send(()).unwrap();
+        assert!(worker.join().unwrap().unwrap().path.is_file());
+        drop(stores);
+        std::fs::remove_dir_all(paths.root).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
     fn req_ley_p3_009_measures_small_real_recursive_batch_through_shared_pipeline() {
         let paths = temporary_paths("recursive-batch-measure");
         let (store, _) = StateStore::open(&paths).unwrap();
+        let store = Mutex::new(Some(store));
         let mut pipeline = ThumbnailPipeline::new(&paths).unwrap();
         let fixture_root =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/generated");

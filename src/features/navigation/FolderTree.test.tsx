@@ -1,17 +1,21 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listTreeChildren, listWindowsDrives } from "../library/client";
+import { confirmTreeChildren, listTreeChildren, listWindowsDrives } from "../library/client";
 import { FolderTree } from "./FolderTree";
 
-vi.mock("../library/client", () => ({ listTreeChildren: vi.fn(), listWindowsDrives: vi.fn() }));
+vi.mock("../library/client", () => ({ confirmTreeChildren: vi.fn(), listTreeChildren: vi.fn(), listWindowsDrives: vi.fn() }));
 const listMock = vi.mocked(listTreeChildren);
 const driveMock = vi.mocked(listWindowsDrives);
+const confirmMock = vi.mocked(confirmTreeChildren);
 
 describe("FolderTree", () => {
   afterEach(cleanup);
 
   beforeEach(() => {
+    confirmMock.mockReset();
+    confirmMock.mockImplementation(async (paths) => ({ status: "ok", requestId: "confirm" as never,
+      generation: 1 as never, data: paths.map((relativePath) => ({ relativePath: relativePath as never, hasChildren: null })) }));
     listMock.mockReset();
     driveMock.mockReset();
     driveMock.mockResolvedValue({
@@ -48,6 +52,80 @@ describe("FolderTree", () => {
               ]
             : [],
     }));
+  });
+
+  it("lists 10000 folders before confirming only virtual rows, with one bounded batch", async () => {
+    listMock.mockResolvedValue({ status: "ok", requestId: "large" as never, generation: 1 as never,
+      data: Array.from({ length: 10000 }, (_, index) => ({ relativePath: `Folder-${index}` as never, hasChildren: null })) });
+    let finish!: (value: Awaited<ReturnType<typeof confirmTreeChildren>>) => void;
+    confirmMock.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    render(<FolderTree libraryRoot="E:\\" currentPath="" onNavigate={vi.fn()} onSelectDrive={vi.fn()} />);
+    expect(await screen.findByRole("treeitem", { name: "Folder-0" })).toBeInTheDocument();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    expect(listMock).toHaveBeenCalledTimes(1);
+    const paths = confirmMock.mock.calls[0][0];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.length).toBeLessThanOrEqual(64);
+    expect(paths).not.toContain("Folder-9999");
+    expect(document.querySelectorAll(".tree-row").length).toBeLessThan(64);
+    const scroll = document.querySelector<HTMLElement>(".tree-scroll")!;
+    scroll.scrollTo = vi.fn((options?: ScrollToOptions | number) => {
+      if (typeof options === "object") scroll.scrollTop = options.top ?? scroll.scrollTop;
+    });
+    scroll.scrollTop = 1000;
+    fireEvent.scroll(scroll);
+    await act(async () => finish({ status: "ok", requestId: "confirmed" as never, generation: 1 as never,
+      data: paths.map((relativePath) => ({ relativePath: relativePath as never, hasChildren: false })) }));
+    expect(scroll.scrollTop).toBe(1000);
+    expect(scroll.scrollTo).not.toHaveBeenCalled();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(2));
+    expect(confirmMock.mock.calls[1][0]).not.toEqual(paths);
+  });
+
+  it("does not confirm unknown rows when hidden or child confirmation is disabled", async () => {
+    listMock.mockResolvedValue({ status: "ok", requestId: "unknown" as never, generation: 1 as never,
+      data: [{ relativePath: "Folder" as never, hasChildren: null }] });
+    const props = { libraryRoot: "E:\\", currentPath: "", onNavigate: vi.fn(), onSelectDrive: vi.fn() };
+    const { rerender } = render(<FolderTree {...props} confirmChildren={false} />);
+    await screen.findByRole("treeitem", { name: "Folder" });
+    expect(confirmMock).not.toHaveBeenCalled();
+    rerender(<FolderTree {...props} hidden confirmChildren />);
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores pre-refresh confirmations and starts the current batch after the old one finishes", async () => {
+    listMock.mockResolvedValue({ status: "ok", requestId: "unknown" as never, generation: 1 as never,
+      data: [{ relativePath: "Folder" as never, hasChildren: null }] });
+    let finish!: (value: Awaited<ReturnType<typeof confirmTreeChildren>>) => void;
+    confirmMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    confirmMock.mockResolvedValue({ status: "ok", requestId: "new" as never, generation: 2 as never,
+      data: [{ relativePath: "Folder" as never, hasChildren: true }] });
+    const props = { libraryRoot: "E:\\", currentPath: "", onNavigate: vi.fn(), onSelectDrive: vi.fn() };
+    const { rerender } = render(<FolderTree {...props} />);
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    rerender(<FolderTree {...props} refreshToken={1} />);
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    finish({ status: "ok", requestId: "old" as never, generation: 1 as never,
+      data: [{ relativePath: "Folder" as never, hasChildren: false }] });
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Folderを展開する" })).not.toBeDisabled());
+  });
+
+  it("ignores old listings after a refresh and deduplicates ancestor requests", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof listTreeChildren>>) => void;
+    listMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    listMock.mockResolvedValue({ status: "ok", requestId: "new" as never, generation: 2 as never,
+      data: [{ relativePath: "New" as never, hasChildren: false }] });
+    const props = { libraryRoot: "E:\\", currentPath: "", onNavigate: vi.fn(), onSelectDrive: vi.fn() };
+    const { rerender } = render(<FolderTree {...props} />);
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    rerender(<FolderTree {...props} refreshToken={1} />);
+    expect(await screen.findByRole("treeitem", { name: "New" })).toBeInTheDocument();
+    await act(async () => finish({ status: "ok", requestId: "old" as never, generation: 1 as never,
+      data: [{ relativePath: "Old" as never, hasChildren: false }] }));
+    await waitFor(() => expect(screen.queryByRole("treeitem", { name: "Old" })).not.toBeInTheDocument());
+    expect(screen.getByRole("treeitem", { name: "New" })).toBeInTheDocument();
   });
 
   it("expands an unselected branch and navigates to its child", async () => {

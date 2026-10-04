@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listTreeChildren,
+  confirmTreeChildren,
   listWindowsDrives,
   type TreeEntry,
   type WindowsDrive,
@@ -31,6 +32,7 @@ interface FolderTreeProps {
   currentPath: string;
   hidden?: boolean;
   autoCollapse?: boolean;
+  confirmChildren?: boolean;
   onNavigate: (relativePath: string) => void;
   onSelectDrive: (absolutePath: string, relativePath?: string) => unknown | Promise<unknown>;
   clipboard?: FileClipboardStatus;
@@ -100,6 +102,7 @@ export function FolderTree({
   currentPath,
   hidden = false,
   autoCollapse = false,
+  confirmChildren = true,
   onNavigate,
   onSelectDrive,
   clipboard = { available: false, cut: false, items: 0 },
@@ -127,31 +130,52 @@ export function FolderTree({
   const [contextMenu, setContextMenu] = useState<TreeMenuState | null>(null);
   const [revealRequest, setRevealRequest] = useState(0);
   const activeDrive = normalizedDrive(libraryRoot);
+  const requestEpoch = useRef(0);
+  const pendingLoads = useRef(new Map<string, number>());
+  const confirmationActive = useRef(false);
+  const mounted = useRef(true);
+  const confirmed = useRef(new Set<string>());
+  const [confirmationRevision, setConfirmationRevision] = useState(0);
+  const scope = `${activeDrive}\0${refreshToken}\0${confirmChildren}`;
+  const requestScope = useRef(scope);
+  if (requestScope.current !== scope) {
+    requestScope.current = scope;
+    requestEpoch.current += 1;
+    confirmed.current.clear();
+  }
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requestEpoch.current += 1; confirmed.current.clear(); };
+  }, []);
 
   async function loadChildren(path: string, driveAtRequest = activeDrive) {
     if (driveAtRequest === "") return;
     const pathKey = drivePathKey(driveAtRequest, path);
+    const epoch = requestEpoch.current;
+    if (pendingLoads.current.get(pathKey) === epoch) return;
+    pendingLoads.current.set(pathKey, epoch);
     setLoading((previous) => new Set(previous).add(pathKey));
     generation.current += 1;
-    const response = await listTreeChildren(path, generation.current);
-    setLoading((previous) => {
-      const next = new Set(previous);
-      next.delete(pathKey);
-      return next;
-    });
-    if (response.status === "ok") {
-      setChildren((previous) => {
-        const next = new Map(previous);
-        next.set(pathKey, response.data);
-        return next;
+    try {
+      const response = await listTreeChildren(path, generation.current);
+      if (epoch !== requestEpoch.current) return;
+      if (response.status === "ok") {
+        setChildren((previous) => new Map(previous).set(pathKey, response.data));
+        setErrors((previous) => {
+          const next = new Map(previous);
+          next.delete(pathKey);
+          return next;
+        });
+      } else if (response.status === "error") {
+        setErrors((previous) => new Map(previous).set(pathKey, presentError(response.error)));
+      }
+    } catch {
+      if (epoch === requestEpoch.current) setErrors((previous) => new Map(previous).set(pathKey, "フォルダーを読み込めませんでした。"));
+    } finally {
+      if (pendingLoads.current.get(pathKey) === epoch) pendingLoads.current.delete(pathKey);
+      if (epoch === requestEpoch.current) setLoading((previous) => {
+        const next = new Set(previous); next.delete(pathKey); return next;
       });
-      setErrors((previous) => {
-        const next = new Map(previous);
-        next.delete(pathKey);
-        return next;
-      });
-    } else if (response.status === "error") {
-      setErrors((previous) => new Map(previous).set(pathKey, presentError(response.error)));
     }
   }
 
@@ -252,6 +276,7 @@ export function FolderTree({
 
   useEffect(() => {
     if (refreshToken === 0 || activeDrive === "") return;
+    setLoading(new Set());
     const visibleParents = new Set([""]);
     for (const node of nodes) {
       if (
@@ -291,6 +316,31 @@ export function FolderTree({
       return () => observer.disconnect();
     },
   });
+  const virtualNodes = virtualizer.getVirtualItems();
+  const nodeOrder = nodes.map((node) => node.key).join("\0");
+  const confirmationPaths = virtualNodes.map(({ index }) => nodes[index])
+    .filter((node) => node.kind === "folder" && node.driveIdentity === activeDrive && node.hasChildren == null)
+    .map((node) => node.path).join("\0");
+
+  useEffect(() => {
+    if (hidden || !confirmChildren || confirmationActive.current || confirmationPaths === "") return;
+    const paths = confirmationPaths.split("\0").filter((path) => !confirmed.current.has(path)).slice(0, 64);
+    if (paths.length === 0) return;
+    const epoch = requestEpoch.current;
+    paths.forEach((path) => confirmed.current.add(path));
+    confirmationActive.current = true;
+    void confirmTreeChildren(paths, ++generation.current).then((response) => {
+      if (epoch !== requestEpoch.current || response.status !== "ok") return;
+      const results = new Map(response.data.map((entry) => [entry.relativePath, entry.hasChildren]));
+      setChildren((previous) => new Map([...previous].map(([key, entries]) => [key,
+        key.startsWith(`${activeDrive}\0`) ? entries.map((entry) => results.has(entry.relativePath)
+          ? { ...entry, hasChildren: results.get(entry.relativePath) } : entry) : entries,
+      ])));
+    }).catch(() => undefined).finally(() => {
+      confirmationActive.current = false;
+      if (mounted.current) setConfirmationRevision((value) => value + 1);
+    });
+  }, [activeDrive, scope, confirmationPaths, hidden, confirmChildren, confirmationRevision]);
 
   useEffect(() => {
     if (libraryRoot === null || hidden) return;
@@ -299,7 +349,8 @@ export function FolderTree({
       : folderExpansionKey(activeDrive, currentPath);
     const index = nodes.findIndex((node) => node.key === key);
     if (index >= 0) virtualizer.scrollToIndex(index, { align: "auto" });
-  }, [activeDrive, currentPath, hidden, nodes, revealRequest, virtualizer]);
+  // Confirming row metadata must not pull a user's scroll back to the selected folder.
+  }, [activeDrive, currentPath, hidden, nodeOrder, revealRequest, virtualizer]);
 
   function revealCurrentFolder() {
     if (libraryRoot === null) return;
@@ -370,7 +421,7 @@ export function FolderTree({
           className="tree-canvas"
           style={{ height: virtualizer.getTotalSize() }}
         >
-          {virtualizer.getVirtualItems().map((virtualNode) => {
+          {virtualNodes.map((virtualNode) => {
             const node = nodes[virtualNode.index];
             const isExpanded = expanded.has(node.key) && node.hasChildren !== false;
             const nodeDrive = node.driveIdentity ?? activeDrive;

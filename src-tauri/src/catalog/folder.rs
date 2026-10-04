@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 
 use crate::domain::{
     AppError, ErrorCode, FileKind, ItemKind, RelativePath, classify_file_name, natural_cmp,
@@ -76,18 +77,39 @@ pub fn enumerate_folder_with_hidden(
     directory: &Path,
     show_hidden: bool,
 ) -> Result<Vec<CatalogEntry>, AppError> {
+    enumerate_folder_with_hidden_cancellable(
+        root,
+        directory,
+        show_hidden,
+        &CancellationToken::new(),
+    )
+}
+
+pub fn enumerate_folder_with_hidden_cancellable(
+    root: &Path,
+    directory: &Path,
+    show_hidden: bool,
+    cancellation: &CancellationToken,
+) -> Result<Vec<CatalogEntry>, AppError> {
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
     let root = canonical_directory(root)?;
     let directory = canonical_directory(directory)?;
     ensure_contained(&root, &directory)?;
     let mut entries = Vec::new();
     let iterator = fs::read_dir(&directory).map_err(|source| io_error(&directory, source))?;
     for result in iterator {
+        if cancellation.is_cancelled() {
+            return Err(AppError::cancelled());
+        }
         let entry = match result {
             Ok(entry) => entry,
             Err(_) => continue,
         };
         let path = entry.path();
-        let metadata = match fs::symlink_metadata(&path) {
+        // Windows directory entries already carry metadata; avoid reopening every item.
+        let metadata = match entry.metadata() {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
@@ -141,6 +163,9 @@ pub fn enumerate_folder_with_hidden(
             archive_kind,
         });
     }
+    if cancellation.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
     entries.sort_by(|left, right| {
         natural_cmp(left.relative_path.as_str(), right.relative_path.as_str())
     });
@@ -161,7 +186,7 @@ pub fn has_child_folder_with_hidden(
             Ok(entry) => entry,
             Err(_) => continue,
         };
-        let metadata = match fs::symlink_metadata(entry.path()) {
+        let metadata = match entry.metadata() {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
@@ -213,7 +238,7 @@ fn walk_pages(
             Err(_) => continue,
         };
         let path = entry.path();
-        let metadata = match fs::symlink_metadata(&path) {
+        let metadata = match entry.metadata() {
             Ok(metadata) => metadata,
             Err(_) => continue,
         };
@@ -313,6 +338,32 @@ mod tests {
             "comic-explorer-{test_name}-{}-{nonce}",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn cancelling_large_folder_enumeration_does_not_return_partial_entries() {
+        let root = temporary_root("cancellable");
+        fs::create_dir_all(&root).unwrap();
+        for index in 0..10000 {
+            fs::write(root.join(format!("page-{index:05}.jpg")), b"page").unwrap();
+        }
+        let cancellation = CancellationToken::new();
+        let worker_cancellation = cancellation.clone();
+        let worker_root = root.clone();
+        let worker = std::thread::spawn(move || {
+            enumerate_folder_with_hidden_cancellable(
+                &worker_root,
+                &worker_root,
+                false,
+                &worker_cancellation,
+            )
+        });
+        cancellation.cancel();
+        assert_eq!(
+            worker.join().unwrap().unwrap_err().code,
+            ErrorCode::Cancelled
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
