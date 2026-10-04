@@ -153,6 +153,7 @@ pub struct Settings {
     pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub viewer_right_click_action: String,
     pub mouse_gesture_bindings: BTreeMap<String, String>,
+    pub stroke_gestures: crate::state::stroke_gestures::StrokeGestures,
 }
 
 impl Default for Settings {
@@ -240,6 +241,7 @@ impl Default for Settings {
             viewer_quadrant_bindings: default_viewer_quadrant_bindings(),
             viewer_right_click_action: "none".into(),
             mouse_gesture_bindings: default_mouse_gesture_bindings(),
+            stroke_gestures: Default::default(),
         }
     }
 }
@@ -390,6 +392,16 @@ impl StateStore {
                     }
                 }
                 "viewerRightClickAction" => settings.viewer_right_click_action = value,
+                "strokeGestures" => {
+                    if let Ok(gestures) = serde_json::from_str::<
+                        crate::state::stroke_gestures::StrokeGestures,
+                    >(&value)
+                    {
+                        if gestures.is_valid() {
+                            settings.stroke_gestures = gestures;
+                        }
+                    }
+                }
                 "mouseGestureBindings" => {
                     if let Ok(bindings) = serde_json::from_str::<BTreeMap<String, String>>(&value) {
                         settings.mouse_gesture_bindings = bindings;
@@ -454,6 +466,13 @@ impl StateStore {
             .map_err(|error| AppError {
                 code: ErrorCode::Internal,
                 message: format!("Mouse gesture settings could not be encoded: {error}"),
+                target: None,
+                retryable: false,
+            })?;
+        let stroke_gestures =
+            serde_json::to_string(&settings.stroke_gestures).map_err(|error| AppError {
+                code: ErrorCode::Internal,
+                message: format!("Stroke gesture settings could not be encoded: {error}"),
                 target: None,
                 retryable: false,
             })?;
@@ -622,6 +641,7 @@ impl StateStore {
                 settings.viewer_right_click_action.clone(),
             ),
             ("mouseGestureBindings", mouse_gesture_bindings),
+            ("strokeGestures", stroke_gestures),
         ];
         if let Some(root) = &settings.library_root {
             values.push(("libraryRoot", root.to_string_lossy().into_owned()));

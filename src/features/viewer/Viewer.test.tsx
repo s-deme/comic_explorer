@@ -2438,4 +2438,29 @@ describe("Viewer settings", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("対応していません");
     expect(document.querySelector(".page-spread")).toHaveAttribute("data-scale", "1");
   });
+  it("connects first/last, single/spread, next/previous item and close defaults", async () => {
+    const nextItem = vi.fn(), previousItem = vi.fn(), close = vi.fn();
+    vi.mocked(saveReadingPosition).mockResolvedValue({ status: "ok", data: null } as never);
+    render(<Viewer session={multiPageSession} generation={1} initialMode="single" initialDirection="rightToLeft"
+      onSettingsChange={() => undefined} onClose={close} onNextItem={nextItem} onPreviousItem={previousItem} />);
+    const stage = document.querySelector(".viewer-stage")!;
+    const stroke = (pattern: string) => {
+      let x = 200, y = 200;
+      const pointer = { pointerId: 1, pointerType: "mouse", button: 2, buttons: 2 };
+      fireEvent.pointerDown(stage, { ...pointer, clientX: x, clientY: y });
+      for (const d of pattern) {
+        x += d === "L" ? -50 : d === "R" ? 50 : 0;
+        y += d === "U" ? -50 : d === "D" ? 50 : 0;
+        fireEvent.pointerMove(stage, { ...pointer, clientX: x, clientY: y });
+      }
+      fireEvent.pointerUp(stage, { ...pointer, buttons: 0, clientX: x, clientY: y });
+    };
+    stroke("UL"); expect(screen.getByRole("slider", { name: "ページ移動" })).toHaveValue("1");
+    stroke("UR"); expect(screen.getByRole("slider", { name: "ページ移動" })).toHaveValue("0");
+    stroke("RL"); expect(screen.getByRole("combobox", { name: "表示枚数" })).toHaveValue("spread");
+    stroke("LR"); expect(screen.getByRole("combobox", { name: "表示枚数" })).toHaveValue("single");
+    stroke("LD"); await waitFor(() => expect(nextItem).toHaveBeenCalledExactlyOnceWith(true));
+    stroke("RD"); await waitFor(() => expect(previousItem).toHaveBeenCalledOnce());
+    stroke("DR"); await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  });
 });

@@ -673,6 +673,7 @@ pub(super) fn catalog_settings_resolved(
         viewer_quadrant_bindings,
         viewer_right_click_action,
         mouse_gestures,
+        stroke_gestures: settings.stroke_gestures.clone(),
     }
 }
 

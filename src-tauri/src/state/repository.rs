@@ -877,6 +877,42 @@ mod tests {
     }
 
     #[test]
+    fn stroke_gestures_persist_across_reopen_and_recover_invalid_storage() {
+        let paths = temporary_paths("stroke-gestures");
+        let mut settings = Settings::default();
+        settings.stroke_gestures.enabled = false;
+        settings.stroke_gestures.threshold = 40;
+        settings.stroke_gestures.bindings[0].action = "firstPage".into();
+        {
+            let (mut store, _) = StateStore::open(&paths).unwrap();
+            assert_eq!(
+                store.load_settings().unwrap().stroke_gestures,
+                Default::default()
+            );
+            store.save_settings(&settings).unwrap();
+        }
+        {
+            let (store, _) = StateStore::open(&paths).unwrap();
+            assert_eq!(
+                store.load_settings().unwrap().stroke_gestures,
+                settings.stroke_gestures
+            );
+            store
+                .connection
+                .execute(
+                    "UPDATE settings SET value = '{}' WHERE key = 'strokeGestures'",
+                    [],
+                )
+                .unwrap();
+            assert_eq!(
+                store.load_settings().unwrap().stroke_gestures,
+                Default::default()
+            );
+        }
+        let _ = fs::remove_dir_all(paths.root);
+    }
+
+    #[test]
     fn req_ley_p4_004_layout_settings_round_trip_and_recover_invalid_storage() {
         let paths = temporary_paths("layout-settings");
         let (mut store, notice) = StateStore::open(&paths).unwrap();
@@ -1025,6 +1061,7 @@ mod tests {
                 .into_iter()
                 .collect(),
                 viewer_right_click_action: "zoomOut".into(),
+                stroke_gestures: Default::default(),
                 mouse_gesture_bindings: [
                     ("swipeLeft".into(), "previousPage".into()),
                     ("swipeRight".into(), "nextPage".into()),

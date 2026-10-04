@@ -1572,7 +1572,7 @@ describe("application shell", () => {
     localStorage.clear();
   });
 
-  it("keeps the Viewer open and reports a stop policy at the boundary", async () => {
+  it("keeps the stop policy at the boundary but allows an explicit next-work gesture", async () => {
     const first = testEntry("01-first.cbz");
     const second = testEntry("02-second.cbz");
     openMock.mockResolvedValueOnce(viewerResponse(first.relativePath));
@@ -1590,6 +1590,15 @@ describe("application shell", () => {
       screen.getByLabelText(`${first.relativePath} ビューワ`),
     ).toBeInTheDocument();
     expect(openMock).toHaveBeenCalledTimes(1);
+    openMock.mockResolvedValueOnce(viewerResponse(second.relativePath));
+    const stage = document.querySelector(".viewer-stage")!;
+    const pointer = { pointerId: 1, pointerType: "mouse", button: 2, buttons: 2 };
+    fireEvent.pointerDown(stage, { ...pointer, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(stage, { ...pointer, clientX: 50, clientY: 100 });
+    fireEvent.pointerMove(stage, { ...pointer, clientX: 50, clientY: 150 });
+    fireEvent.pointerUp(stage, { ...pointer, buttons: 0, clientX: 50, clientY: 150 });
+    expect(await screen.findByLabelText(`${second.relativePath} ビューワ`)).toBeInTheDocument();
+    expect(openMock).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the Viewer open and reports a safe stop when there is no next comic", async () => {

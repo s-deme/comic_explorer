@@ -1,3 +1,4 @@
+import type { StrokeGestures } from "../../input/stroke-gestures";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -261,6 +262,7 @@ export interface CatalogSettings {
   viewerQuadrantBindings: ViewerQuadrantBindings;
   viewerRightClickAction: SettingsProfile["viewerRightClickAction"];
   mouseGestures: MouseGestureBindings;
+  strokeGestures?: StrokeGestures;
 }
 
 export interface NamedSettingsProfileSummary {

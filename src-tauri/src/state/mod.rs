@@ -5,6 +5,7 @@ mod paths;
 mod reading_position;
 mod repository;
 mod shelf;
+pub mod stroke_gestures;
 mod theme;
 mod thumbnail;
 mod viewer_filter;

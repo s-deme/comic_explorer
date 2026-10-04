@@ -256,6 +256,7 @@ export async function saveSettingsProfile(
       viewerQuadrantBindings: profile.viewerQuadrantBindings,
       viewerRightClickAction: profile.viewerRightClickAction,
       mouseGestures: profile.mouseGestures,
+      strokeGestures: profile.strokeGestures,
     },
   });
 }

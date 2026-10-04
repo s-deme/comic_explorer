@@ -172,6 +172,12 @@ pub(crate) fn validate_settings_profile(
             "Shortcut bindings are invalid or conflicting.",
         )
     })?;
+    if !profile.stroke_gestures.is_valid() {
+        return Err(request_error(
+            ErrorCode::InvalidRequest,
+            "Stroke gestures are invalid or conflicting.",
+        ));
+    }
     let mouse_gestures = normalize_mouse_gestures(&profile.mouse_gestures).ok_or_else(|| {
         request_error(
             ErrorCode::InvalidRequest,
@@ -419,6 +425,7 @@ pub(crate) fn apply_settings_profile_to_settings(
     settings.viewer_quadrant_bindings = quadrants;
     settings.viewer_right_click_action = right_click;
     settings.mouse_gesture_bindings = gestures;
+    settings.stroke_gestures = profile.stroke_gestures;
     Ok(())
 }
 

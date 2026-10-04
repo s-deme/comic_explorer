@@ -311,7 +311,7 @@ export function ViewerWindow() {
     );
   }
 
-  async function handleEndOfVolume() {
+  async function handleEndOfVolume(explicit = false) {
     const current = sessionRef.current;
     if (current === null || settings === null || pendingNext !== null) return;
     const catalog = await volumeCatalog(current.itemKey);
@@ -320,7 +320,7 @@ export function ViewerWindow() {
       setNotice("次の漫画を確認できませんでした。");
       return;
     }
-    const decision = resolveEndOfVolume(catalog, current.itemKey, settings.endOfVolumePolicy);
+    const decision = resolveEndOfVolume(catalog, current.itemKey, explicit ? "auto_next" : settings.endOfVolumePolicy);
     if (decision.kind === "open") {
       setLaunch({
         itemRelativePath: decision.entry.relativePath,
@@ -385,7 +385,7 @@ export function ViewerWindow() {
         session={session}
         generation={viewerGeneration.current}
         onClose={() => void closeViewerWindow()}
-        onNextItem={() => void handleEndOfVolume()}
+        onNextItem={(explicit) => void handleEndOfVolume(explicit)}
         onPreviousItem={() => void handleStartOfVolume()}
         endOfVolumePolicy={settings.endOfVolumePolicy}
         onEndOfVolumePolicyChange={changeEndOfVolumePolicy}
@@ -443,6 +443,7 @@ export function ViewerWindow() {
           }).catch(() => undefined);
         }}
         mouseGestures={settings.mouseGestures}
+        strokeGestures={settings.strokeGestures}
         quadrantBindings={settings.viewerQuadrantBindings}
         rightClickAction={settings.viewerRightClickAction}
         onSettingsChange={(viewMode, readingDirection) => {

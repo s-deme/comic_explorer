@@ -553,6 +553,8 @@ pub struct CatalogSettings {
     pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub viewer_right_click_action: String,
     pub mouse_gestures: BTreeMap<String, String>,
+    #[serde(default)]
+    pub stroke_gestures: crate::state::stroke_gestures::StrokeGestures,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -668,6 +670,8 @@ pub struct SettingsProfileInput {
     pub viewer_quadrant_bindings: BTreeMap<String, String>,
     pub viewer_right_click_action: String,
     pub mouse_gestures: BTreeMap<String, String>,
+    #[serde(default)]
+    pub stroke_gestures: crate::state::stroke_gestures::StrokeGestures,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -4591,6 +4595,7 @@ mod shutdown_tests {
             viewer_quadrant_bindings: default_viewer_quadrant_bindings(),
             viewer_right_click_action: "zoomIn".into(),
             mouse_gestures: default_mouse_gestures(),
+            stroke_gestures: Default::default(),
         };
         let (shortcuts, catalog_mouse, quadrants, right_click, gestures) =
             validate_settings_profile(&profile).unwrap();

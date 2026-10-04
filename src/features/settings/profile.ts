@@ -1,3 +1,4 @@
+import { defaultStrokeGestures, parseStrokeGestures, type StrokeGestures } from "../input/stroke-gestures";
 import {
   DEFAULT_SHORTCUTS,
   VIEWER_SHORTCUT_COMMANDS,
@@ -257,6 +258,7 @@ export interface SettingsProfile {
   viewerQuadrantBindings: ViewerQuadrantBindings;
   viewerRightClickAction: ViewerRightClickAction;
   mouseGestures: MouseGestureBindings;
+  strokeGestures: StrokeGestures;
 }
 
 export function createDefaultSettingsProfile(): SettingsProfile {
@@ -340,6 +342,7 @@ export function createDefaultSettingsProfile(): SettingsProfile {
     viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
     viewerRightClickAction: DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
+    strokeGestures: defaultStrokeGestures(),
   };
 }
 
@@ -397,6 +400,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     candidate.profileVersion !== SETTINGS_PROFILE_VERSION,
   );
   const mouseGestures = strictMouseGestureBindings(candidate.mouseGestures);
+  const strokeGestures = parseStrokeGestures(candidate.strokeGestures);
   const legacyViewerAppearance =
     candidate.profileVersion === 1
     || candidate.profileVersion === 2
@@ -707,7 +711,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     catalogMouseBindings === null ||
     viewerQuadrantBindings === null ||
     viewerRightClickAction === null ||
-    mouseGestures === null
+    strokeGestures === null || mouseGestures === null
   ) {
     return null;
   }
@@ -791,6 +795,7 @@ export function normalizeSettingsProfile(value: unknown): SettingsProfile | null
     viewerQuadrantBindings,
     viewerRightClickAction,
     mouseGestures,
+    strokeGestures,
   };
 }
 

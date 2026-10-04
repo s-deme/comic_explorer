@@ -1,3 +1,5 @@
+import { StrokeGestureSurface } from "./StrokeGestureSurface";
+import { defaultStrokeGestures, type StrokeAction, type StrokeGestures } from "../input/stroke-gestures";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -137,7 +139,7 @@ interface ViewerProps {
   session: ViewerSession;
   generation: number;
   onClose: () => void;
-  onNextItem?: () => void;
+  onNextItem?: (explicit?: boolean) => void;
   onPreviousItem?: () => void;
   endOfVolumePolicy?: EndOfVolumePolicy;
   onEndOfVolumePolicyChange?: (policy: EndOfVolumePolicy) => void;
@@ -183,6 +185,7 @@ interface ViewerProps {
   bookmarks?: PageBookmark[];
   onPageChange?: (index: number) => void;
   mouseGestures?: MouseGestureBindings;
+  strokeGestures?: StrokeGestures;
   quadrantBindings?: ViewerQuadrantBindings;
   rightClickAction?: ViewerRightClickAction;
   onSaveBookmark?: (index: number) => void;
@@ -278,6 +281,7 @@ export function Viewer({
   bookmarks = [],
   onPageChange,
   mouseGestures,
+  strokeGestures,
   quadrantBindings,
   rightClickAction,
   onSaveBookmark,
@@ -393,6 +397,7 @@ export function Viewer({
     () => normalizeShortcutBindings(shortcuts),
     [shortcuts],
   );
+  const activeStrokeGestures = useMemo(() => strokeGestures ?? defaultStrokeGestures(), [strokeGestures]);
   const activeMouseGestures = useMemo(
     () => normalizeMouseGestures(mouseGestures),
     [mouseGestures],
@@ -1217,8 +1222,19 @@ export function Viewer({
     if (next !== null && next !== undefined) dispatch({ type: "go", index: next });
   }
 
-  function applyMouseGesture(action: MouseGestureAction | undefined) {
+  function applyMouseGesture(action: MouseGestureAction | StrokeAction | undefined) {
     switch (action) {
+      case "firstPage": setPendingNextIndex(null); dispatch({ type: "go", index: 0 }); break;
+      case "lastPage": setPendingNextIndex(null); dispatch({ type: "go", index: Math.max(0, session.pages.length - 1) }); break;
+      case "nextItem": void flushReadingPosition().then(() => onNextItem?.(true)); break;
+      case "previousItem": void flushReadingPosition().then(() => onPreviousItem?.()); break;
+      case "fit": case "width": case "original": applyScale({ type: "mode", mode: action }); break;
+      case "autoSpread": changeMode("auto"); break;
+      case "pageList": setSlideshowRunning(false); setPagePreviewOpen(true); break;
+      case "addBookmark": onSaveBookmark?.(state.index); break;
+      case "bookmarkList": setSlideshowRunning(false); setBookmarkListOpen(true); break;
+      case "nextBookmark": jumpToNextBookmark(); break;
+      case "toggleSlideshow": toggleSlideshow(); break;
       case "nextPage":
         next();
         break;
@@ -1982,6 +1998,7 @@ export function Viewer({
           </section>
         </div>
       )}
+      <StrokeGestureSurface key={`${session.itemKey}:${generation}`} settings={activeStrokeGestures} suspended={rectangleZoomArmed || pagePreviewOpen || bookmarkListOpen || filterDialogOpen} onAction={applyMouseGesture}>
       {continuous && <PageCollection key={collectionRevision} session={session} generation={generation} index={state.index} onIndex={(index) => dispatch({ type: "go", index })} />}
       <div
         ref={stageRef}
@@ -2150,6 +2167,7 @@ export function Viewer({
             rightClickRef.current = null;
             rightButtonHeldRef.current = false;
             scheduleCursorHide();
+            if (event.defaultPrevented) return;
             event.preventDefault();
             if (
               rightClick?.pointerId === event.pointerId
@@ -2204,6 +2222,7 @@ export function Viewer({
           setPanning(false);
           scheduleCursorHide();
         }}
+        onLostPointerCapture={() => { rightClickRef.current = null; rightButtonHeldRef.current = false; }}
         onContextMenu={(event) => event.preventDefault()}
         onDoubleClick={(event) => {
           if (rectangleZoomArmed) {
@@ -2315,6 +2334,7 @@ export function Viewer({
           />
         ))}
       </div>
+      </StrokeGestureSurface>
       <nav
         className="viewer-page-navigator"
         aria-label="ページ移動"

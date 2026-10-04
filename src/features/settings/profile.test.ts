@@ -1,3 +1,4 @@
+import { defaultStrokeGestures } from "../input/stroke-gestures";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SHORTCUTS,
@@ -104,6 +105,7 @@ function validProfile(): SettingsProfile {
     viewerQuadrantBindings: { ...DEFAULT_VIEWER_QUADRANT_BINDINGS },
     viewerRightClickAction: "none",
     mouseGestures: { ...DEFAULT_MOUSE_GESTURES },
+    strokeGestures: defaultStrokeGestures(),
   };
 }
 

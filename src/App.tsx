@@ -1,3 +1,4 @@
+import { defaultStrokeGestures, parseStrokeGestures } from "./features/input/stroke-gestures";
 import { useItemMetadata } from "./features/reading/useItemMetadata";
 import { useItemTags } from "./features/reading/useItemTags";
 import { isTauri } from "@tauri-apps/api/core";
@@ -500,7 +501,7 @@ export function App({
     catalogMouseBindings,
     viewerQuadrantBindings,
     viewerRightClickAction,
-    mouseGestures
+    mouseGestures, strokeGestures
   } = settings;
   const updateSetting = useCallback(<K extends keyof SettingsProfile>(
     key: K, value: React.SetStateAction<SettingsProfile[K]>,
@@ -1334,6 +1335,7 @@ export function App({
               ?? DEFAULT_VIEWER_RIGHT_CLICK_ACTION,
           );
           updateSetting("mouseGestures", normalizeMouseGestures(response.data.mouseGestures));
+          updateSetting("strokeGestures", parseStrokeGestures(response.data.strokeGestures) ?? defaultStrokeGestures());
         }
       })
       .catch(() => undefined);
@@ -3155,7 +3157,7 @@ export function App({
     startupLocation, showHiddenFiles, restoreLastViewer,
     autoRefreshCurrentFolder, folderOpenRule, imageOpenRule, archiveOpenRule,
     detailGridLines, detailRowDensity, detailShowKind, detailShowSize, detailShowModified,
-    shortcuts, catalogMouseBindings, viewerQuadrantBindings, viewerRightClickAction, mouseGestures,
+    shortcuts, catalogMouseBindings, viewerQuadrantBindings, viewerRightClickAction, mouseGestures, strokeGestures,
   ]);
 
   function queueThumbnail(
@@ -3699,7 +3701,7 @@ export function App({
     );
   }
 
-  async function handleEndOfVolume() {
+  async function handleEndOfVolume(explicit = false) {
     if (
       volumeNavigationBusy.current
       || pendingEndOfVolume !== null
@@ -3726,7 +3728,7 @@ export function App({
       const decision = resolveEndOfVolume(
         volumeCatalog,
         sessionAtStart.itemKey,
-        endOfVolumePolicyRef.current,
+        explicit ? "auto_next" : endOfVolumePolicyRef.current,
       );
       if (decision.kind === "open") {
         await openComicEntry(decision.entry, "normal", "first");
@@ -3849,6 +3851,7 @@ export function App({
             activeViewerGeneration,
           )}
           mouseGestures={mouseGestures}
+          strokeGestures={strokeGestures}
           quadrantBindings={viewerQuadrantBindings}
           rightClickAction={viewerRightClickAction}
           onSaveBookmark={saveCurrentBookmark}

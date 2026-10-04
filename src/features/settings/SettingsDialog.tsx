@@ -1,3 +1,4 @@
+import { StrokeGestureSettings } from "./StrokeGestureSettings";
 import { useMemo, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from "react";
 import { ThemeManager, type ThemeManagerProps } from "./ThemeManager";
 import {
@@ -609,6 +610,7 @@ export function SettingsDialog({
       category: "commands",
       text: `Viewer 右クリック 割当 ${viewerQuadrantActionLabel(draft.viewerRightClickAction)} right wheel context menu`,
     },
+    { id: "stroke-gestures", category: "commands", text: "右ボタン 軌跡 ジェスチャー 先頭 末尾 作品 単ページ 見開き 編集 試し描き 認識距離" },
     ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => ({
       id: `gesture-${name}`,
       category: "commands" as const,
@@ -1693,7 +1695,7 @@ export function SettingsDialog({
                 aria-labelledby="settings-gestures-heading"
                 hidden={inputGroupHidden("gestures", [
                   ...CONFIGURABLE_MOUSE_GESTURE_NAMES.map((name) => `gesture-${name}`),
-                  "gesture-double-click",
+                  "gesture-double-click", "stroke-gestures",
                   "wheel-dead-zone",
                 ])}
               >
@@ -1703,6 +1705,7 @@ export function SettingsDialog({
                     <p>Viewerの画像表示領域だけで実行します。割り当てを変更しても、通常の右クリックmenu、Ctrl＋ホイール拡大縮小、touch、penは変わりません。</p>
                   </div>
                 </div>
+                {!panelHidden("commands") && !inputGroupHidden("gestures", ["stroke-gestures"]) && !rowHidden("stroke-gestures") && <StrokeGestureSettings value={draft.strokeGestures} onChange={(strokeGestures) => onDraftChange({ ...draft, strokeGestures })} />}
                 <h5 className="settings-subheading" hidden={groupHidden(SWIPE_GESTURE_NAMES.map((name) => `gesture-${name}`))}>スワイプ</h5>
                 {SWIPE_GESTURE_NAMES.map((name) => (
                   <SettingRow

@@ -1,3 +1,4 @@
+import { defaultStrokeGestures } from "./features/input/stroke-gestures";
 import "./test/app-harness";
 import "@testing-library/jest-dom/vitest";
 import {
@@ -47,6 +48,7 @@ describe("application settings", () => {
       profileVersion: SETTINGS_PROFILE_VERSION,
       ...DEFAULT_CATALOG_SETTINGS,
       sortField: "size" as const,
+      strokeGestures: defaultStrokeGestures(),
     };
     listNamedSettingsProfilesMock.mockResolvedValue({
       status: "ok",
@@ -159,6 +161,9 @@ describe("application settings", () => {
       ctrlKey: true,
     });
     fireEvent.click(within(inputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "←を編集" }));
+    fireEvent.change(within(dialog).getByLabelText("軌跡に割り当てる操作"), { target: { value: "firstPage" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "割り当てを保存" }));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
@@ -201,6 +206,9 @@ describe("application settings", () => {
     fireEvent.click(within(categories).getByRole("button", { name: /^操作/ }));
     const inputGroups = within(dialog).getByRole("navigation", { name: "操作と入力の分類" });
     fireEvent.click(within(inputGroups).getByRole("button", { name: /^ジェスチャー設定/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "←を編集" }));
+    fireEvent.change(within(dialog).getByLabelText("軌跡に割り当てる操作"), { target: { value: "firstPage" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "割り当てを保存" }));
     fireEvent.change(within(dialog).getByLabelText("middleClickジェスチャー"), {
       target: { value: "toggleDirection" },
     });
@@ -243,6 +251,7 @@ describe("application settings", () => {
           bottomRight: "nextPage",
         }),
         viewerRightClickAction: "zoomIn",
+        strokeGestures: expect.objectContaining({ bindings: expect.arrayContaining([{ pattern: "L", action: "firstPage", enabled: true }]) }),
         mouseGestures: expect.objectContaining({
           middleClick: "toggleDirection",
           doubleClick: "toggleFullscreen",
