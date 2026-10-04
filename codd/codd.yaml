@@ -25,10 +25,16 @@ dag:
     - "unresolved_import_residue"
   implementation_suffixes_extend:
     - ".css"
+    - ".json"
+    - ".md"
   import_aliases:
+    "third-party-notices?raw":
+      - "THIRD-PARTY-NOTICES.md"
     architecture_spike_runner:
       - "benchmarks/architecture-spike/run_foundation_benchmark.py"
   impl_file_patterns:
+    - "package.json"
+    - "THIRD-PARTY-NOTICES.md"
     - "vite.config.ts"
     - "src-tauri/build.rs"
   test_file_patterns:

@@ -4,7 +4,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
-import THIRD_PARTY_NOTICES from "../THIRD-PARTY-NOTICES.md?raw";
+import THIRD_PARTY_NOTICES from "third-party-notices?raw";
 import { ArchiveExplorerPane } from "./features/archive/ArchiveExplorerDialog";
 import { BatchRenameDialog, renameSelectionEnd } from "./features/catalog/BatchRenameDialog";
 import {

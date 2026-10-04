@@ -3,6 +3,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: { "third-party-notices?raw": decodeURIComponent(new URL("./THIRD-PARTY-NOTICES.md", import.meta.url).pathname).replace(/^\/([A-Za-z]:\/)/, "$1") + "?raw" },
+  },
   clearScreen: false,
   server: {
     host: "127.0.0.1",
